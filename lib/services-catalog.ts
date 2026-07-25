@@ -1,0 +1,289 @@
+/**
+ * Demo service catalog shaped for country configuration.
+ * UI reads from the active country config — no hardcoded country branching.
+ */
+
+export type ServiceProvider = {
+  id: string;
+  name: string;
+  category: string;
+  description?: string;
+  accent?: string;
+};
+
+export type VirtualNumberOffer = {
+  id: string;
+  countryCode: string;
+  countryName: string;
+  flag: string;
+  type: "Buy" | "Rent";
+  category: string;
+  price: number;
+  duration: string;
+  smsCapable: boolean;
+};
+
+export type SocialPackage = {
+  id: string;
+  platform: string;
+  name: string;
+  metric: string;
+  quantity: string;
+  price: number;
+  delivery: string;
+  popular?: boolean;
+};
+
+export type GiftCardBrand = {
+  id: string;
+  name: string;
+  category: string;
+  color: string;
+};
+
+export type CountryServiceConfig = {
+  code: string;
+  name: string;
+  currency: string;
+  currencySymbol: string;
+  billProviders: ServiceProvider[];
+  socialPackages: SocialPackage[];
+  virtualNumbers: VirtualNumberOffer[];
+  giftCardBrands: GiftCardBrand[];
+  giftCardsEnabled: boolean;
+};
+
+/** Active demo config — swap/add countries via config, not code rewrites */
+export const activeCountryConfig: CountryServiceConfig = {
+  code: "NG",
+  name: "Nigeria",
+  currency: "NGN",
+  currencySymbol: "₦",
+  giftCardsEnabled: false,
+  billProviders: [
+    {
+      id: "electricity-ikedc",
+      name: "IKEDC",
+      category: "Electricity",
+      description: "Ikeja Electric prepaid & postpaid",
+      accent: "#FF6A00",
+    },
+    {
+      id: "electricity-ekedc",
+      name: "EKEDC",
+      category: "Electricity",
+      description: "Eko Electricity Distribution",
+      accent: "#FF8C42",
+    },
+    {
+      id: "electricity-aedc",
+      name: "AEDC",
+      category: "Electricity",
+      description: "Abuja Electricity Distribution",
+      accent: "#FFCC00",
+    },
+    {
+      id: "tv-dstv",
+      name: "DStv",
+      category: "TV",
+      description: "MultiChoice DStv subscriptions",
+      accent: "#0066FF",
+    },
+    {
+      id: "tv-gotv",
+      name: "GOtv",
+      category: "TV",
+      description: "GOtv bouquet renewals",
+      accent: "#00A651",
+    },
+    {
+      id: "tv-startimes",
+      name: "Startimes",
+      category: "TV",
+      description: "Startimes TV packages",
+      accent: "#E31C23",
+    },
+  ],
+  socialPackages: [
+    {
+      id: "ig-1k",
+      platform: "Instagram",
+      name: "Starter Boost",
+      metric: "Followers",
+      quantity: "1,000",
+      price: 2500,
+      delivery: "6–24 hrs",
+      popular: true,
+    },
+    {
+      id: "ig-likes",
+      platform: "Instagram",
+      name: "Likes Pack",
+      metric: "Likes",
+      quantity: "2,500",
+      price: 1800,
+      delivery: "1–6 hrs",
+    },
+    {
+      id: "tt-1k",
+      platform: "TikTok",
+      name: "Views Surge",
+      metric: "Views",
+      quantity: "10,000",
+      price: 3000,
+      delivery: "2–12 hrs",
+      popular: true,
+    },
+    {
+      id: "tt-followers",
+      platform: "TikTok",
+      name: "Follower Grow",
+      metric: "Followers",
+      quantity: "500",
+      price: 3500,
+      delivery: "12–48 hrs",
+    },
+    {
+      id: "yt-subs",
+      platform: "YouTube",
+      name: "Subscriber Lift",
+      metric: "Subscribers",
+      quantity: "200",
+      price: 4500,
+      delivery: "24–72 hrs",
+    },
+    {
+      id: "yt-views",
+      platform: "YouTube",
+      name: "Watch Boost",
+      metric: "Views",
+      quantity: "5,000",
+      price: 2800,
+      delivery: "6–24 hrs",
+      popular: true,
+    },
+    {
+      id: "x-followers",
+      platform: "X",
+      name: "Audience Pack",
+      metric: "Followers",
+      quantity: "500",
+      price: 2200,
+      delivery: "12–36 hrs",
+    },
+    {
+      id: "fb-likes",
+      platform: "Facebook",
+      name: "Page Likes",
+      metric: "Likes",
+      quantity: "1,000",
+      price: 2000,
+      delivery: "12–48 hrs",
+    },
+  ],
+  virtualNumbers: [
+    {
+      id: "us-buy-sms",
+      countryCode: "US",
+      countryName: "United States",
+      flag: "🇺🇸",
+      type: "Buy",
+      category: "SMS Verification",
+      price: 4500,
+      duration: "Permanent",
+      smsCapable: true,
+    },
+    {
+      id: "us-rent-sms",
+      countryCode: "US",
+      countryName: "United States",
+      flag: "🇺🇸",
+      type: "Rent",
+      category: "SMS Verification",
+      price: 800,
+      duration: "24 hours",
+      smsCapable: true,
+    },
+    {
+      id: "uk-rent-sms",
+      countryCode: "GB",
+      countryName: "United Kingdom",
+      flag: "🇬🇧",
+      type: "Rent",
+      category: "SMS Verification",
+      price: 1200,
+      duration: "24 hours",
+      smsCapable: true,
+    },
+    {
+      id: "ca-buy",
+      countryCode: "CA",
+      countryName: "Canada",
+      flag: "🇨🇦",
+      type: "Buy",
+      category: "Voice + SMS",
+      price: 6500,
+      duration: "Permanent",
+      smsCapable: true,
+    },
+    {
+      id: "ng-rent",
+      countryCode: "NG",
+      countryName: "Nigeria",
+      flag: "🇳🇬",
+      type: "Rent",
+      category: "SMS Verification",
+      price: 500,
+      duration: "24 hours",
+      smsCapable: true,
+    },
+    {
+      id: "za-rent",
+      countryCode: "ZA",
+      countryName: "South Africa",
+      flag: "🇿🇦",
+      type: "Rent",
+      category: "SMS Verification",
+      price: 900,
+      duration: "24 hours",
+      smsCapable: true,
+    },
+  ],
+  giftCardBrands: [
+    { id: "amazon", name: "Amazon", category: "Shopping", color: "#FF9900" },
+    { id: "apple", name: "Apple", category: "Apps & Media", color: "#1C1C1E" },
+    {
+      id: "google-play",
+      name: "Google Play",
+      category: "Apps & Games",
+      color: "#34A853",
+    },
+    { id: "steam", name: "Steam", category: "Gaming", color: "#1B2838" },
+    {
+      id: "playstation",
+      name: "PlayStation",
+      category: "Gaming",
+      color: "#003087",
+    },
+    { id: "xbox", name: "Xbox", category: "Gaming", color: "#107C10" },
+    { id: "netflix", name: "Netflix", category: "Streaming", color: "#E50914" },
+    { id: "spotify", name: "Spotify", category: "Music", color: "#1DB954" },
+  ],
+};
+
+export function formatMoney(
+  value: number,
+  symbol = activeCountryConfig.currencySymbol,
+) {
+  return `${symbol}${value.toLocaleString("en-NG")}`;
+}
+
+export const billCategories = ["All", "Electricity", "TV"] as const;
+export const socialPlatforms = [
+  "All",
+  "Instagram",
+  "TikTok",
+  "YouTube",
+  "X",
+  "Facebook",
+] as const;

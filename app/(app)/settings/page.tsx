@@ -79,7 +79,7 @@ export default function SettingsPage() {
         <Section title="Support">
           <Row href="/support" icon={HelpCircle} label="Help Center" />
           <Row href="/support" icon={MessageCircle} label="Live Chat" />
-          <Row href="/" icon={ShieldCheck} label="About ORYNO" />
+          <Row href="/about" icon={ShieldCheck} label="About ORYNO" />
         </Section>
       </MotionSection>
     </AppShell>

@@ -4,10 +4,10 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   ArrowRight,
-  Gift,
   MoreHorizontal,
   Phone,
   Smartphone,
+  TrendingUp,
   Wifi,
   Zap,
 } from "lucide-react";
@@ -22,7 +22,7 @@ const quickActions = [
   { href: "/services/airtime", label: "Airtime", icon: Smartphone },
   { href: "/services/data", label: "Data", icon: Wifi },
   { href: "/services/bills", label: "Bills", icon: Zap },
-  { href: "/services/gift-cards", label: "Cards", icon: Gift },
+  { href: "/services/social", label: "Social", icon: TrendingUp },
   { href: "/services/virtual-numbers", label: "Numbers", icon: Phone },
   { href: "/services", label: "More", icon: MoreHorizontal },
 ];

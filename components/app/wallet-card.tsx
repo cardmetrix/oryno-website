@@ -12,6 +12,7 @@ import {
   Plus,
   Wallet,
 } from "lucide-react";
+import { activeCountryConfig } from "@/lib/services-catalog";
 import { cn } from "@/lib/utils";
 
 type WalletCardProps = {
@@ -21,12 +22,23 @@ type WalletCardProps = {
   className?: string;
 };
 
+const countryFlags: Record<string, string> = {
+  NG: "🇳🇬",
+  GH: "🇬🇭",
+  ZA: "🇿🇦",
+  KE: "🇰🇪",
+};
+
 export function WalletCard({
-  currency = "NGN Wallet",
+  currency,
   balance = "₦1,245,600.00",
   accountLabel = "Acc No: 1045920394 • Kuda",
   className,
 }: WalletCardProps) {
+  const { code, name: countryName, currency: currencyCode } =
+    activeCountryConfig;
+  const flag = countryFlags[code] ?? "🌍";
+  const walletLabel = currency ?? `${currencyCode} Wallet`;
   const [hidden, setHidden] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -77,25 +89,32 @@ export function WalletCard({
                 <Wallet className="h-5 w-5" strokeWidth={1.75} />
               </motion.span>
               <div>
-                <p className="text-sm font-semibold text-white">{currency}</p>
-                <p className="text-xs text-white/75">Primary · Protected</p>
+                <p className="text-sm font-semibold text-white">{walletLabel}</p>
+                <p className="text-xs text-white/75">
+                  {flag} {countryName} · {currencyCode}
+                </p>
               </div>
             </div>
 
-            <motion.button
-              type="button"
-              whileHover={{ scale: 1.06 }}
-              whileTap={{ scale: 0.94 }}
-              onClick={() => setHidden((v) => !v)}
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/20 backdrop-blur-md"
-              aria-label={hidden ? "Show balance" : "Hide balance"}
-            >
-              {hidden ? (
-                <EyeOff className="h-4 w-4" />
-              ) : (
-                <Eye className="h-4 w-4" />
-              )}
-            </motion.button>
+            <div className="flex items-center gap-2">
+              <span className="hidden rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-semibold text-white ring-1 ring-white/20 sm:inline-flex">
+                Primary
+              </span>
+              <motion.button
+                type="button"
+                whileHover={{ scale: 1.06 }}
+                whileTap={{ scale: 0.94 }}
+                onClick={() => setHidden((v) => !v)}
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/20 backdrop-blur-md"
+                aria-label={hidden ? "Show balance" : "Hide balance"}
+              >
+                {hidden ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </motion.button>
+            </div>
           </div>
 
           <div className="mt-7">
