@@ -208,95 +208,41 @@ export function WalletCard({
                   {formatCardNumber(accountNumber, hidden)}
                 </p>
               </div>
-
-              {/* Footer row */}
-              <div className="mt-4 flex items-end justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-[9px] font-medium tracking-[0.18em] text-white/40 uppercase">
-                    Card holder
-                  </p>
-                  <p className="mt-0.5 truncate text-xs font-semibold tracking-[0.14em] text-white/90 uppercase">
-                    {displayHolder}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-[9px] font-medium tracking-[0.18em] text-white/40 uppercase">
-                    Bank
-                  </p>
-                  <p className="mt-0.5 text-xs font-semibold text-white/90">
-                    {bankName}
-                  </p>
-                </div>
-                <div className="flex flex-col items-end">
-                  <span className="bg-gradient-to-br from-[#ff8a2b] via-oryno-orange to-[#c24e00] bg-clip-text text-lg font-black tracking-tight text-transparent">
-                    O
-                  </span>
-                  <span className="text-[9px] font-bold tracking-[0.2em] text-white/55">
-                    {currencyCode}
-                  </span>
-                </div>
-              </div>
             </div>
           </div>
         </div>
       </motion.div>
 
-      {/* Account strip + actions under the premium card */}
-      <div className="flex flex-wrap items-center gap-2 px-0.5">
-        <span className="rounded-full border border-border bg-background/80 px-3 py-1.5 text-xs text-muted-foreground shadow-[var(--shadow-soft)]">
-          Acc · {hidden ? "••••••••" : accountNumber} · {bankName}
-        </span>
-        <motion.button
-          type="button"
-          whileHover={{ scale: 1.04 }}
-          whileTap={{ scale: 0.96 }}
-          onClick={handleCopy}
-          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground shadow-[var(--shadow-soft)]"
-        >
-          {copied ? (
-            <>
-              <Check className="h-3.5 w-3.5 text-primary" />
-              Copied
-            </>
-          ) : (
-            <>
-              <Copy className="h-3.5 w-3.5" />
-              Copy
-            </>
-          )}
-        </motion.button>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <motion.div
-          whileHover={{ y: -3, scale: 1.02 }}
-          whileTap={{ scale: 0.97 }}
-          transition={{ type: "spring", stiffness: 400, damping: 22 }}
-        >
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+        <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }}>
           <Link
             href="/fund"
-            className="group relative inline-flex h-12 w-full items-center justify-center gap-2 overflow-hidden rounded-[16px] bg-oryno-charcoal text-sm font-bold text-white shadow-[0_12px_28px_rgba(28,28,30,0.28)] ring-1 ring-black/10"
+            className="group relative flex h-[52px] w-full items-center justify-center gap-2.5 overflow-hidden rounded-[18px] bg-gradient-to-br from-[#ff8124] via-oryno-orange to-[#e85d00] px-3 text-sm font-bold text-white shadow-[0_14px_32px_rgba(255,106,0,0.35)] ring-1 ring-white/20"
           >
             <span
               aria-hidden="true"
-              className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/15 to-transparent transition-transform duration-700 ease-out group-hover:translate-x-full"
+              className="pointer-events-none absolute inset-0 bg-[linear-gradient(120deg,transparent_30%,rgba(255,255,255,0.22)_50%,transparent_70%)] opacity-0 transition-opacity duration-300 group-hover:opacity-100"
             />
-            <span className="relative flex h-7 w-7 items-center justify-center rounded-full bg-oryno-orange text-white shadow-[0_0_0_3px_rgba(255,106,0,0.25)] transition-transform duration-300 group-hover:rotate-90 group-hover:scale-110">
+            <span className="relative flex h-8 w-8 items-center justify-center rounded-full bg-white/20 ring-1 ring-white/30 backdrop-blur-sm transition-transform duration-300 group-hover:rotate-90">
               <Plus className="h-4 w-4" strokeWidth={2.5} />
             </span>
-            <span className="relative tracking-wide">Fund Wallet</span>
+            <span className="relative tracking-wide">Fund</span>
           </Link>
         </motion.div>
 
-        <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }}>
+        <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }}>
           <Link
             href="/withdraw"
-            className="group inline-flex h-12 w-full items-center justify-center gap-2 rounded-[16px] border border-border bg-background text-sm font-bold text-foreground shadow-[var(--shadow-soft)] transition-colors hover:bg-muted"
+            className="group relative flex h-[52px] w-full items-center justify-center gap-2.5 overflow-hidden rounded-[18px] bg-[#141416] px-3 text-sm font-bold text-white shadow-[0_14px_32px_rgba(0,0,0,0.28)] ring-1 ring-white/10"
           >
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-muted transition-transform group-hover:scale-110">
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(255,106,0,0.22),transparent_55%)] opacity-70"
+            />
+            <span className="relative flex h-8 w-8 items-center justify-center rounded-full bg-white/10 ring-1 ring-white/15 transition-transform duration-300 group-hover:scale-110">
               <ArrowUpRight className="h-4 w-4" strokeWidth={2.25} />
             </span>
-            Withdraw
+            <span className="relative tracking-wide">Withdraw</span>
           </Link>
         </motion.div>
       </div>
