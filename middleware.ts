@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { ADMIN_SESSION_COOKIE } from "@/lib/admin-auth";
 
 /**
  * Clerk is available as a dependency, but auth screens are currently custom.
@@ -17,6 +18,19 @@ export function middleware(request: NextRequest) {
   // Keep UploadThing API open
   if (pathname.startsWith("/api/uploadthing")) {
     return NextResponse.next();
+  }
+
+  const isAdminRoute = pathname.startsWith("/admin");
+  const isAdminLogin = pathname === "/admin/login";
+  const hasAdminSession =
+    request.cookies.get(ADMIN_SESSION_COOKIE)?.value === "1";
+
+  if (isAdminRoute && !isAdminLogin && !hasAdminSession) {
+    return NextResponse.redirect(new URL("/admin/login", request.url));
+  }
+
+  if (isAdminLogin && hasAdminSession) {
+    return NextResponse.redirect(new URL("/admin", request.url));
   }
 
   return NextResponse.next();
