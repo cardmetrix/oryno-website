@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useSignUp } from "@clerk/nextjs";
 import { ArrowLeft } from "lucide-react";
-import { AuthShell } from "@/components/auth/auth-shell";
+import { AuthSplitLayout } from "@/components/auth/auth-split-layout";
 import {
   InputOTP,
   InputOTPGroup,
@@ -19,6 +19,7 @@ type PendingVerify = {
   email?: string;
   phone?: string;
   fullName?: string;
+  username?: string;
 };
 
 export default function OtpPage() {
@@ -40,6 +41,14 @@ export default function OtpPage() {
   }, []);
 
   useEffect(() => {
+    if (!isLoaded) return;
+    // Sign-up client state is required to verify; if lost, restart register.
+    if (!signUp || signUp.status === null) {
+      setError("Verification session expired. Please create your account again.");
+    }
+  }, [isLoaded, signUp]);
+
+  useEffect(() => {
     if (seconds <= 0) return;
     const id = window.setInterval(() => {
       setSeconds((s) => (s <= 1 ? 0 : s - 1));
@@ -48,29 +57,82 @@ export default function OtpPage() {
   }, [seconds]);
 
   const destination = useMemo(() => {
-    if (pending.email) {
-      const [user, domain] = pending.email.split("@");
-      if (!domain) return pending.email;
-      const masked =
-        user.length <= 2
-          ? `${user[0] ?? "*"}***`
-          : `${user.slice(0, 2)}***`;
-      return `${masked}@${domain}`;
+    const email = pending.email || signUp?.emailAddress || "";
+    if (!email) return "your email";
+    const [user, domain] = email.split("@");
+    if (!domain) return email;
+    const masked =
+      user.length <= 2 ? `${user[0] ?? "*"}***` : `${user.slice(0, 2)}***`;
+    return `${masked}@${domain}`;
+  }, [pending.email, signUp?.emailAddress]);
+
+  async function finalizeSignUp() {
+    if (!signUp || !setActive) return false;
+
+    // Clerk may still require username (or other fields) after email verify.
+    if (
+      signUp.status === "missing_requirements" &&
+      signUp.missingFields?.includes("username") &&
+      pending.username
+    ) {
+      await signUp.update({ username: pending.username });
     }
-    return "your email";
-  }, [pending.email]);
+
+    if (signUp.status === "complete" && signUp.createdSessionId) {
+      await setActive({ session: signUp.createdSessionId });
+      const sync = await syncSessionToDatabase();
+      sessionStorage.removeItem("oryno_pending_verify");
+
+      if (!sync.ok) {
+        setError(sync.error ?? "Verified, but account sync failed.");
+        return false;
+      }
+
+      router.replace("/dashboard");
+      return true;
+    }
+
+    return false;
+  }
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!isLoaded || !signUp || !setActive || value.length < 6) return;
+    if (!isLoaded || !signUp || !setActive) return;
+
+    const code = value.replace(/\D/g, "");
+    if (code.length < 6) {
+      setError("Enter the 6-digit code from your email.");
+      return;
+    }
+
+    if (!signUp.id) {
+      setError("Verification session expired. Please create your account again.");
+      return;
+    }
 
     setError(null);
     setLoading(true);
 
     try {
-      const result = await signUp.attemptEmailAddressVerification({
-        code: value,
-      });
+      // Already verified in a previous attempt — just finish.
+      if (signUp.status === "complete") {
+        const ok = await finalizeSignUp();
+        if (!ok) setError("Could not finish sign-up. Try resending the code.");
+        return;
+      }
+
+      const emailStatus = signUp.verifications?.emailAddress?.status;
+      if (emailStatus === "verified") {
+        const ok = await finalizeSignUp();
+        if (!ok) {
+          setError(
+            "Email verified, but account setup is incomplete. Check username requirements in Clerk.",
+          );
+        }
+        return;
+      }
+
+      const result = await signUp.attemptEmailAddressVerification({ code });
 
       if (result.status === "complete") {
         await setActive({ session: result.createdSessionId });
@@ -86,7 +148,16 @@ export default function OtpPage() {
         return;
       }
 
-      setError("Verification incomplete. Please try again.");
+      if (result.status === "missing_requirements") {
+        const ok = await finalizeSignUp();
+        if (ok) return;
+
+        const missing = result.missingFields?.join(", ") || "required fields";
+        setError(`Almost done — still need: ${missing}. Go back and retry.`);
+        return;
+      }
+
+      setError("Verification incomplete. Please try again or resend the code.");
     } catch (err) {
       setError(clerkErrorMessage(err, "Invalid or expired code."));
     } finally {
@@ -95,40 +166,54 @@ export default function OtpPage() {
   }
 
   async function resend() {
-    if (!isLoaded || !signUp) return;
+    if (!isLoaded || !signUp?.id) {
+      setError("Verification session expired. Please create your account again.");
+      return;
+    }
     setError(null);
     try {
-      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+      try {
+        await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+      } catch {
+        await signUp.prepareEmailAddressVerification();
+      }
       setSeconds(54);
+      setValue("");
     } catch (err) {
       setError(clerkErrorMessage(err, "Could not resend the code."));
     }
   }
 
   return (
-    <AuthShell>
-      <Link
-        href="/register"
-        className="mb-6 inline-flex items-center gap-2 text-base font-semibold text-foreground"
-      >
-        <ArrowLeft className="h-5 w-5" strokeWidth={1.75} />
-        OTP Verification
-      </Link>
+    <AuthSplitLayout
+      title="Verify your email"
+      subtitle={`We've sent a 6-digit verification code to ${destination}.`}
+      panelTitle="One more step to your wallet."
+      panelSubtitle="Confirm your email to secure your ORYNO account and unlock airtime, data, bills, and payouts."
+      top={
+        <Link
+          href="/register"
+          className="inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4" strokeWidth={1.75} />
+          Back to Create Account
+        </Link>
+      }
+    >
+      <form onSubmit={onSubmit} className="flex flex-col">
+        {pending.username ? (
+          <p className="mb-4 text-sm text-muted-foreground">
+            Username{" "}
+            <span className="font-semibold text-foreground">
+              @{pending.username}
+            </span>
+          </p>
+        ) : null}
 
-      <div className="mb-8">
-        <h1 className="text-[2rem] font-bold tracking-tight text-foreground">
-          Verify your email
-        </h1>
-        <p className="mt-2 text-base leading-relaxed text-muted-foreground">
-          We&apos;ve sent a 6-digit verification code to {destination}
-        </p>
-      </div>
-
-      <form onSubmit={onSubmit} className="flex flex-1 flex-col">
         <InputOTP
           maxLength={6}
           value={value}
-          onChange={setValue}
+          onChange={(next) => setValue(next.replace(/\D/g, ""))}
           containerClassName="justify-between gap-2"
         >
           <InputOTPGroup className="flex w-full justify-between gap-2">
@@ -164,7 +249,14 @@ export default function OtpPage() {
         </p>
 
         {error ? (
-          <p className="mt-4 text-sm text-destructive">{error}</p>
+          <p className="mt-4 text-sm text-destructive">
+            {error}{" "}
+            {error.toLowerCase().includes("expired") ? (
+              <Link href="/register" className="font-semibold underline">
+                Register again
+              </Link>
+            ) : null}
+          </p>
         ) : null}
 
         <button
@@ -175,6 +267,6 @@ export default function OtpPage() {
           {loading ? "Verifying…" : "Verify & Proceed"}
         </button>
       </form>
-    </AuthShell>
+    </AuthSplitLayout>
   );
 }

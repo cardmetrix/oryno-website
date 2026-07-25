@@ -11,6 +11,10 @@ import { PasswordField } from "@/components/auth/password-field";
 import { SocialAuth } from "@/components/auth/social-auth";
 import { Checkbox } from "@/components/ui/checkbox";
 import { clerkErrorMessage } from "@/lib/auth/clerk-errors";
+import {
+  isValidUsername,
+  normalizeUsername,
+} from "@/lib/auth/username";
 import { AUTH_LINKS } from "@/lib/auth-links";
 
 export default function RegisterPage() {
@@ -26,10 +30,16 @@ export default function RegisterPage() {
 
     const form = new FormData(e.currentTarget);
     const fullName = String(form.get("fullName") ?? "").trim();
+    const username = normalizeUsername(String(form.get("username") ?? ""));
     const email = String(form.get("email") ?? "").trim().toLowerCase();
     const phone = String(form.get("phone") ?? "").trim();
     const password = String(form.get("password") ?? "");
     const confirmPassword = String(form.get("confirmPassword") ?? "");
+
+    if (!isValidUsername(username)) {
+      setError("Username must be 3–32 characters (letters, numbers, _).");
+      return;
+    }
 
     if (password !== confirmPassword) {
       setError("Passwords do not match.");
@@ -45,25 +55,30 @@ export default function RegisterPage() {
     try {
       await signUp.create({
         emailAddress: email,
+        username,
         password,
         firstName: firstName || undefined,
         lastName,
         unsafeMetadata: {
           fullName,
           phone,
+          username,
         },
       });
 
-      await signUp.prepareEmailAddressVerification({
-        strategy: "email_code",
-      });
-
-      if (typeof window !== "undefined") {
-        sessionStorage.setItem(
-          "oryno_pending_verify",
-          JSON.stringify({ email, phone, fullName }),
-        );
+      // Prefer email code OTP; fall back if Clerk instance uses a different strategy.
+      try {
+        await signUp.prepareEmailAddressVerification({
+          strategy: "email_code",
+        });
+      } catch {
+        await signUp.prepareEmailAddressVerification();
       }
+
+      sessionStorage.setItem(
+        "oryno_pending_verify",
+        JSON.stringify({ email, phone, fullName, username }),
+      );
 
       router.push("/otp");
     } catch (err) {
@@ -89,6 +104,21 @@ export default function RegisterPage() {
               placeholder="e.g. Chidi Benson"
               autoComplete="name"
               required
+              className={authInputClassName}
+            />
+          </AuthField>
+
+          <AuthField label="Username">
+            <input
+              type="text"
+              name="username"
+              placeholder="e.g. chidi_b"
+              autoComplete="username"
+              required
+              minLength={3}
+              maxLength={32}
+              pattern="[A-Za-z0-9_]+"
+              title="Letters, numbers, and underscores only"
               className={authInputClassName}
             />
           </AuthField>

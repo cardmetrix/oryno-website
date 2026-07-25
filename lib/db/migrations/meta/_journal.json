@@ -8,6 +8,20 @@
       "when": 1785004934545,
       "tag": "0000_oryno_baseline",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1785008600000,
+      "tag": "0001_add_username",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785006511891,
+      "tag": "0002_curly_eternals",
+      "breakpoints": true
     }
   ]
 }

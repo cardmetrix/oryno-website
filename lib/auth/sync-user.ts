@@ -12,6 +12,7 @@ export type SyncedUser = typeof users.$inferSelect;
 
 export type ClerkUserLike = {
   id: string;
+  username?: string | null;
   firstName?: string | null;
   lastName?: string | null;
   fullName?: string | null;
@@ -100,6 +101,17 @@ function pickEmail(clerkUser: ClerkUserLike): string {
   );
 }
 
+function pickUsername(clerkUser: ClerkUserLike): string | null {
+  const meta =
+    typeof clerkUser.unsafeMetadata?.username === "string"
+      ? clerkUser.unsafeMetadata.username
+      : typeof clerkUser.publicMetadata?.username === "string"
+        ? clerkUser.publicMetadata.username
+        : null;
+  const value = (clerkUser.username || meta || "").trim().toLowerCase();
+  return value || null;
+}
+
 function pickPhone(clerkUser: ClerkUserLike): string | null {
   const metaPhone =
     typeof clerkUser.unsafeMetadata?.phone === "string"
@@ -145,6 +157,7 @@ function referralFromName(fullName: string) {
 
 type ClerkSdkUser = {
   id: string;
+  username: string | null;
   firstName: string | null;
   lastName: string | null;
   fullName: string | null;
@@ -165,6 +178,7 @@ type ClerkSdkUser = {
 export function mapClerkSdkUser(user: ClerkSdkUser): ClerkUserLike {
   return {
     id: user.id,
+    username: user.username,
     firstName: user.firstName,
     lastName: user.lastName,
     fullName: user.fullName,
@@ -197,6 +211,7 @@ export async function syncClerkUserToDb(
   }
 
   const fullName = pickFullName(clerkUser);
+  const username = pickUsername(clerkUser);
   const phone = pickPhone(clerkUser);
   const countryCode = countryFromPhone(phone);
   const emailVerifiedAt = isEmailVerified(clerkUser) ? new Date() : null;
@@ -223,6 +238,7 @@ export async function syncClerkUserToDb(
       .update(users)
       .set({
         clerkId: clerkUser.id,
+        username: username ?? existing.username,
         fullName,
         email,
         phone,
@@ -240,6 +256,7 @@ export async function syncClerkUserToDb(
       .insert(users)
       .values({
         clerkId: clerkUser.id,
+        username,
         fullName,
         email,
         phone,
