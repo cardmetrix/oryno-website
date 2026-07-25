@@ -17,10 +17,10 @@ const isPublicRoute = createRouteMatcher([
   "/admin(.*)",
 ]);
 
+// Don't auto-bounce /register or /otp — users may finish email OTP
+// after a session cookie appears mid-flow.
 const isAuthScreen = createRouteMatcher([
   "/login(.*)",
-  "/register(.*)",
-  "/otp(.*)",
   "/forgot-password(.*)",
   "/splash(.*)",
 ]);
