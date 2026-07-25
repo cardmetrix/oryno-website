@@ -1,0 +1,477 @@
+@import "tailwindcss";
+
+/* ─── ORYNO Brand Tokens ─── */
+:root {
+  /* Primary */
+  --oryno-orange: #ff6a00;
+  --oryno-orange-soft: #ff8c42;
+  --oryno-orange-muted: color-mix(in srgb, var(--oryno-orange) 12%, white);
+
+  /* Neutrals */
+  --oryno-charcoal: #1c1c1e;
+  --oryno-white: #ffffff;
+  --oryno-gray-light: #f5f5f7;
+  --oryno-gray-medium: #8e8e93;
+  --oryno-gray-divider: #e5e5ea;
+
+  /* Status */
+  --oryno-success: #34c759;
+  --oryno-warning: #ffcc00;
+  --oryno-error: #ff3b30;
+
+  /* Semantic surfaces */
+  --background: var(--oryno-white);
+  --foreground: var(--oryno-charcoal);
+  --muted: var(--oryno-gray-light);
+  --muted-foreground: var(--oryno-gray-medium);
+  --border: var(--oryno-gray-divider);
+  --primary: var(--oryno-orange);
+  --primary-foreground: var(--oryno-white);
+  --secondary: var(--oryno-white);
+  --secondary-foreground: var(--oryno-orange);
+  --accent: var(--oryno-gray-light);
+  --accent-foreground: var(--oryno-charcoal);
+  --input: var(--oryno-gray-divider);
+  --destructive: var(--oryno-error);
+  --destructive-foreground: var(--oryno-white);
+  --ring: var(--oryno-orange);
+
+  /* Radius */
+  --oryno-radius-sm: 12px;
+  --oryno-radius-md: 14px;
+  --oryno-radius-lg: 16px;
+  --oryno-radius-xl: 24px;
+  --oryno-radius-phone: 2rem;
+  --radius-sm: var(--oryno-radius-sm);
+  --radius-md: var(--oryno-radius-md);
+  --radius-lg: var(--oryno-radius-lg);
+  --radius-xl: var(--oryno-radius-xl);
+  --radius-phone: var(--oryno-radius-phone);
+
+  /* Shadows */
+  --oryno-shadow-soft: 0 4px 16px rgba(28, 28, 30, 0.06);
+  --oryno-shadow-md: 0 8px 24px rgba(28, 28, 30, 0.1);
+  --oryno-shadow-lg: 0 20px 50px rgba(28, 28, 30, 0.14);
+  --oryno-shadow-phone: 0 30px 80px rgba(28, 28, 30, 0.22);
+  --oryno-shadow-orange: 0 8px 24px rgba(255, 106, 0, 0.28);
+  --oryno-shadow-orange-lg: 0 16px 40px rgba(255, 106, 0, 0.35);
+  --shadow-soft: var(--oryno-shadow-soft);
+  --shadow-md: var(--oryno-shadow-md);
+  --shadow-lg: var(--oryno-shadow-lg);
+  --shadow-phone: var(--oryno-shadow-phone);
+  --shadow-orange: var(--oryno-shadow-orange);
+  --shadow-orange-lg: var(--oryno-shadow-orange-lg);
+
+  /* Gradients */
+  --gradient-brand: linear-gradient(
+    135deg,
+    var(--oryno-orange) 0%,
+    var(--oryno-orange-soft) 100%
+  );
+  --gradient-hero:
+    radial-gradient(
+      120% 80% at 80% 10%,
+      color-mix(in srgb, var(--oryno-orange) 22%, transparent) 0%,
+      transparent 55%
+    ),
+    radial-gradient(
+      90% 70% at 10% 90%,
+      color-mix(in srgb, var(--oryno-orange-soft) 16%, transparent) 0%,
+      transparent 50%
+    ),
+    linear-gradient(180deg, #ffffff 0%, #f7f7f9 48%, #ffffff 100%);
+  --gradient-cta: linear-gradient(
+    135deg,
+    var(--oryno-orange) 0%,
+    #ff7a1a 45%,
+    var(--oryno-orange-soft) 100%
+  );
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-input: var(--input);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-ring: var(--ring);
+
+  --color-oryno-orange: var(--oryno-orange);
+  --color-oryno-orange-soft: var(--oryno-orange-soft);
+  --color-oryno-orange-muted: var(--oryno-orange-muted);
+  --color-oryno-charcoal: var(--oryno-charcoal);
+  --color-oryno-white: var(--oryno-white);
+  --color-oryno-gray-light: var(--oryno-gray-light);
+  --color-oryno-gray-medium: var(--oryno-gray-medium);
+  --color-oryno-gray-divider: var(--oryno-gray-divider);
+  --color-oryno-success: var(--oryno-success);
+  --color-oryno-warning: var(--oryno-warning);
+  --color-oryno-error: var(--oryno-error);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  --radius-sm: var(--oryno-radius-sm);
+  --radius-md: var(--oryno-radius-md);
+  --radius-lg: var(--oryno-radius-lg);
+  --radius-xl: var(--oryno-radius-xl);
+
+  --shadow-soft: var(--oryno-shadow-soft);
+  --shadow-md: var(--oryno-shadow-md);
+  --shadow-lg: var(--oryno-shadow-lg);
+  --shadow-phone: var(--oryno-shadow-phone);
+  --shadow-orange: var(--oryno-shadow-orange);
+  --shadow-orange-lg: var(--oryno-shadow-orange-lg);
+}
+
+/* ─── Base ─── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), ui-sans-serif, sans-serif;
+  font-feature-settings: "ss01" on, "cv11" on;
+  line-height: 1.5;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--oryno-orange) 28%, white);
+  color: var(--oryno-charcoal);
+}
+
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+/* ─── Motion ─── */
+@keyframes float-soft {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-soft {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.animate-float-soft {
+  animation: float-soft 6s ease-in-out infinite;
+}
+
+.animate-fade-up {
+  animation: fade-up 0.7s ease-out both;
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 2.8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .animate-float-soft,
+  .animate-fade-up,
+  .animate-pulse-soft {
+    animation: none !important;
+  }
+
+  .store-btn,
+  .store-badge,
+  .btn-primary,
+  .btn-secondary,
+  .feature-tile {
+    transition: none !important;
+  }
+}
+
+/* ─── Surfaces & Atmosphere ─── */
+.hero-atmosphere {
+  background: var(--gradient-hero);
+}
+
+.surface-muted {
+  background: var(--muted);
+}
+
+.surface-white {
+  background: var(--oryno-white);
+}
+
+.brand-gradient {
+  background: var(--gradient-brand);
+}
+
+.cta-gradient {
+  background: var(--gradient-cta);
+}
+
+.dot-grid {
+  background-image: radial-gradient(
+    circle at 1px 1px,
+    rgba(28, 28, 30, 0.08) 1px,
+    transparent 0
+  );
+  background-size: 28px 28px;
+}
+
+.dot-grid-light {
+  background-image: radial-gradient(
+    circle at 1px 1px,
+    rgba(255, 255, 255, 0.35) 1px,
+    transparent 0
+  );
+  background-size: 24px 24px;
+}
+
+/* ─── Typography helpers ─── */
+.eyebrow {
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--oryno-orange);
+}
+
+.section-title {
+  margin-top: 0.75rem;
+  font-size: clamp(1.875rem, 3vw, 2.25rem);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+  color: var(--oryno-charcoal);
+}
+
+.section-copy {
+  margin-top: 1rem;
+  font-size: 1.0625rem;
+  line-height: 1.65;
+  color: var(--oryno-gray-medium);
+}
+
+/* ─── Buttons ─── */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: var(--radius-md);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-weight: 600;
+  box-shadow: var(--shadow-orange);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-orange-lg);
+  background: color-mix(in srgb, var(--oryno-orange) 92%, black);
+}
+
+.btn-primary:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: var(--radius-md);
+  border: 1.5px solid var(--oryno-orange);
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+  font-weight: 600;
+  transition:
+    transform 0.2s ease,
+    background-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.btn-secondary:hover {
+  transform: translateY(-2px);
+  background: var(--oryno-orange-muted);
+  box-shadow: var(--shadow-soft);
+}
+
+.btn-secondary:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.store-btn {
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.store-btn:hover {
+  transform: translateY(-2px);
+}
+
+.store-btn:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* Store download badges (Play / App Store) */
+.store-badge {
+  display: block;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--oryno-gray-light);
+  box-shadow: var(--shadow-soft);
+  transition:
+    background-color 0.25s ease,
+    border-color 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+.store-badge:hover {
+  background: color-mix(in srgb, var(--oryno-gray-light) 70%, white);
+  border-color: color-mix(in srgb, var(--oryno-orange) 35%, var(--border));
+  box-shadow: var(--shadow-md);
+}
+
+.store-badge-on-brand {
+  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 10px 30px rgba(28, 28, 30, 0.16);
+}
+
+.store-badge-on-brand:hover {
+  background: rgba(255, 255, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.4);
+  box-shadow: 0 14px 36px rgba(28, 28, 30, 0.2);
+}
+
+.feature-tile {
+  border-radius: var(--radius-lg);
+  border: 1px solid transparent;
+  padding: 1.25rem;
+  transition:
+    border-color 0.25s ease,
+    background-color 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+.feature-tile:hover {
+  border-color: var(--border);
+  background: color-mix(in srgb, var(--oryno-gray-light) 70%, white);
+  box-shadow: var(--shadow-soft);
+}
+
+/* ─── Icon tile ─── */
+.icon-tile {
+  display: inline-flex;
+  height: 2.75rem;
+  width: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  background: var(--oryno-gray-light);
+  color: var(--oryno-orange);
+}
+
+.icon-tile-on-muted {
+  background: var(--oryno-white);
+  box-shadow: var(--shadow-soft);
+}
+
+/* ─── Phone frame helpers ─── */
+.phone-shell {
+  border-radius: var(--radius-phone);
+  border: 1px solid var(--border);
+  background: var(--oryno-charcoal);
+  padding: 0.5rem;
+  box-shadow: var(--shadow-phone);
+}
+
+.phone-screen {
+  position: relative;
+  aspect-ratio: 9 / 19.5;
+  overflow: hidden;
+  border-radius: 1.55rem;
+  background: var(--oryno-gray-light);
+}
+
+.phone-notch {
+  position: absolute;
+  left: 50%;
+  top: 0.5rem;
+  z-index: 10;
+  height: 1.25rem;
+  width: 5rem;
+  translate: -50% 0;
+  border-radius: 9999px;
+  background: rgba(0, 0, 0, 0.8);
+}
+
+/* ─── Badge ─── */
+.badge-soon {
+  border-radius: 0.375rem;
+  background: var(--oryno-orange-muted);
+  padding: 0.125rem 0.5rem;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--oryno-orange);
+}
