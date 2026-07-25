@@ -84,16 +84,16 @@ export function WalletCard({
       >
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute -inset-3 rounded-[36px] bg-[radial-gradient(ellipse_at_25%_15%,rgba(255,106,0,0.45),transparent_55%),radial-gradient(ellipse_at_85%_90%,rgba(180,60,0,0.3),transparent_50%)] blur-xl"
+          className="pointer-events-none absolute -inset-3 rounded-[36px] bg-[radial-gradient(ellipse_at_25%_15%,rgba(255,129,36,0.45),transparent_55%),radial-gradient(ellipse_at_85%_90%,rgba(255,106,0,0.28),transparent_50%)] blur-xl"
         />
 
-        <div className="relative overflow-hidden rounded-[26px] shadow-[0_28px_60px_rgba(120,40,0,0.45)] ring-1 ring-white/15 sm:rounded-[28px]">
-          <div className="relative aspect-[1.72/1] min-h-[192px] w-full overflow-hidden text-white sm:min-h-[200px] md:aspect-[1.95/1] md:min-h-[168px] lg:aspect-[1.72/1] lg:min-h-[200px]">
-            {/* Dark orange face */}
-            <div className="absolute inset-0 bg-[linear-gradient(145deg,#9a3a00_0%,#c44d00_28%,#e85f00_55%,#b84300_78%,#7a2e00_100%)]" />
-            <div className="absolute inset-0 bg-[linear-gradient(210deg,rgba(0,0,0,0.35)_0%,transparent_45%,rgba(0,0,0,0.45)_100%)]" />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_10%,rgba(255,200,120,0.35),transparent_40%)]" />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_10%_90%,rgba(0,0,0,0.35),transparent_45%)]" />
+        <div className="relative overflow-hidden rounded-[26px] shadow-[0_24px_50px_rgba(255,106,0,0.32)] ring-1 ring-white/25 sm:rounded-[28px]">
+          <div className="relative min-h-[210px] w-full overflow-hidden text-white sm:min-h-[200px] sm:aspect-[1.72/1] md:aspect-[1.95/1] md:min-h-[168px] lg:aspect-[1.72/1] lg:min-h-[200px]">
+            {/* Light orange face — matches Fund button */}
+            <div className="absolute inset-0 bg-gradient-to-br from-[#ff8124] via-oryno-orange to-[#e85d00]" />
+            <div className="absolute inset-0 bg-[linear-gradient(210deg,rgba(255,255,255,0.18)_0%,transparent_42%,rgba(180,60,0,0.22)_100%)]" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_10%,rgba(255,230,180,0.45),transparent_40%)]" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_10%_90%,rgba(200,70,0,0.2),transparent_45%)]" />
 
             {/* Moving sheen */}
             <motion.div
@@ -105,30 +105,30 @@ export function WalletCard({
                 ease: "easeInOut",
                 repeatDelay: 2.2,
               }}
-              className="pointer-events-none absolute inset-y-0 w-1/3 skew-x-[-18deg] bg-gradient-to-r from-transparent via-white/18 to-transparent"
+              className="pointer-events-none absolute inset-y-0 w-1/3 skew-x-[-18deg] bg-gradient-to-r from-transparent via-white/30 to-transparent"
             />
 
             {/* Arc decor */}
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute -top-16 -right-10 h-44 w-44 rounded-full border border-white/15"
+              className="pointer-events-none absolute -top-16 -right-10 h-44 w-44 rounded-full border border-white/25"
             />
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute -top-8 -right-2 h-32 w-32 rounded-full border border-white/10"
+              className="pointer-events-none absolute -top-8 -right-2 h-32 w-32 rounded-full border border-white/15"
             />
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute -bottom-20 -left-14 h-48 w-48 rounded-full border border-black/20"
+              className="pointer-events-none absolute -bottom-20 -left-14 h-48 w-48 rounded-full border border-white/10"
             />
 
             {/* Micro grid */}
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute inset-0 opacity-[0.1]"
+              className="pointer-events-none absolute inset-0 opacity-[0.12]"
               style={{
                 backgroundImage:
-                  "linear-gradient(rgba(255,255,255,0.35) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.35) 1px, transparent 1px)",
+                  "linear-gradient(rgba(255,255,255,0.4) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.4) 1px, transparent 1px)",
                 backgroundSize: "28px 28px",
               }}
             />
