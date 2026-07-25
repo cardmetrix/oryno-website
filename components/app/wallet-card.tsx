@@ -90,7 +90,7 @@ export function WalletCard({
 
         <div className="relative overflow-hidden rounded-[26px] shadow-[0_24px_60px_rgba(0,0,0,0.45)] ring-1 ring-white/10 sm:rounded-[28px]">
           {/* Dark premium metal face */}
-          <div className="relative aspect-[1.68/1] min-h-[210px] w-full overflow-hidden bg-[#141416] text-white sm:min-h-[230px]">
+          <div className="relative aspect-[1.72/1] min-h-[188px] w-full overflow-hidden bg-[#141416] text-white sm:min-h-[200px] md:aspect-[1.95/1] md:min-h-[168px] lg:aspect-[1.72/1] lg:min-h-[200px]">
             <div className="absolute inset-0 bg-[linear-gradient(145deg,#1f1f22_0%,#121214_42%,#0c0c0e_100%)]" />
             <div className="absolute inset-0 bg-[linear-gradient(120deg,transparent_20%,rgba(255,106,0,0.14)_48%,transparent_72%)]" />
             <div
@@ -120,7 +120,7 @@ export function WalletCard({
               }}
             />
 
-            <div className="relative flex h-full flex-col justify-between p-5 sm:p-6">
+            <div className="relative flex h-full flex-col justify-between p-4 sm:p-5 md:p-4 lg:p-5">
               {/* Top row: brand + contactless */}
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -155,12 +155,12 @@ export function WalletCard({
               </div>
 
               {/* Chip + balance */}
-              <div className="mt-5 flex items-end justify-between gap-4">
+              <div className="mt-3 flex items-end justify-between gap-4 md:mt-2.5 lg:mt-4">
                 <div className="flex items-center gap-3">
                   {/* EMV chip */}
                   <div
                     aria-hidden="true"
-                    className="relative h-10 w-[46px] overflow-hidden rounded-[8px] bg-[linear-gradient(145deg,#f0d78c_0%,#c9a227_45%,#a8841a_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_6px_14px_rgba(0,0,0,0.35)] sm:h-11 sm:w-[52px]"
+                    className="relative h-9 w-[42px] overflow-hidden rounded-[8px] bg-[linear-gradient(145deg,#f0d78c_0%,#c9a227_45%,#a8841a_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_6px_14px_rgba(0,0,0,0.35)] md:h-8 md:w-[38px] lg:h-10 lg:w-[46px]"
                   >
                     <div className="absolute inset-[3px] rounded-[5px] border border-black/20" />
                     <div className="absolute top-1/2 right-0 left-0 h-px -translate-y-1/2 bg-black/25" />
@@ -178,7 +178,7 @@ export function WalletCard({
                         animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
                         exit={{ opacity: 0, y: -4, filter: "blur(4px)" }}
                         transition={{ duration: 0.22 }}
-                        className="mt-0.5 font-mono text-2xl font-bold tracking-tight text-white sm:text-[1.85rem]"
+                        className="mt-0.5 font-mono text-xl font-bold tracking-tight text-white sm:text-2xl md:text-[1.35rem] lg:text-[1.85rem]"
                       >
                         {hidden ? "••••••••" : balance}
                       </motion.p>
@@ -203,8 +203,8 @@ export function WalletCard({
               </div>
 
               {/* Embossed card number */}
-              <div className="mt-5">
-                <p className="font-mono text-[15px] tracking-[0.22em] text-white/90 sm:text-base sm:tracking-[0.28em]">
+              <div className="mt-3 md:mt-2 lg:mt-4">
+                <p className="font-mono text-[14px] tracking-[0.2em] text-white/90 sm:text-[15px] sm:tracking-[0.24em] md:text-[13px] lg:text-base lg:tracking-[0.28em]">
                   {formatCardNumber(accountNumber, hidden)}
                 </p>
               </div>
@@ -239,10 +239,10 @@ export function WalletCard({
               aria-hidden="true"
               className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(255,106,0,0.22),transparent_55%)] opacity-70"
             />
-            <span className="relative flex h-8 w-8 items-center justify-center rounded-full bg-white/10 ring-1 ring-white/15 transition-transform duration-300 group-hover:scale-110">
-              <ArrowUpRight className="h-4 w-4" strokeWidth={2.25} />
+            <span className="relative flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white ring-1 ring-white/15 transition-transform duration-300 group-hover:scale-110">
+              <ArrowUpRight className="h-4 w-4 text-white" strokeWidth={2.25} />
             </span>
-            <span className="relative tracking-wide">Withdraw</span>
+            <span className="relative tracking-wide text-white">Withdraw</span>
           </Link>
         </motion.div>
       </div>
