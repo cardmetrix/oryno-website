@@ -10,11 +10,14 @@ type ThemeToggleProps = {
   className?: string;
   /** Compact icon button for headers/sidebars */
   variant?: "switch" | "icon";
+  /** Optional callback after local theme change (e.g. persist to DB) */
+  onCheckedChangePersist?: (isDark: boolean) => void;
 };
 
 export function ThemeToggle({
   className,
   variant = "switch",
+  onCheckedChangePersist,
 }: ThemeToggleProps) {
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -22,6 +25,11 @@ export function ThemeToggle({
   useEffect(() => setMounted(true), []);
 
   const isDark = resolvedTheme === "dark";
+
+  function apply(nextDark: boolean) {
+    setTheme(nextDark ? "dark" : "light");
+    onCheckedChangePersist?.(nextDark);
+  }
 
   if (!mounted) {
     if (variant === "icon") {
@@ -42,7 +50,7 @@ export function ThemeToggle({
     return (
       <button
         type="button"
-        onClick={() => setTheme(isDark ? "light" : "dark")}
+        onClick={() => apply(!isDark)}
         className={cn(
           "inline-flex h-10 w-10 items-center justify-center rounded-[14px] border border-border bg-background shadow-[var(--shadow-soft)] transition hover:bg-muted",
           className,
@@ -61,7 +69,7 @@ export function ThemeToggle({
   return (
     <Switch
       checked={isDark}
-      onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
+      onCheckedChange={(checked) => apply(checked)}
       aria-label="Toggle dark mode"
       className={className}
     />

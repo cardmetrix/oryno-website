@@ -1,7 +1,14 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  Clock3,
+  XCircle,
+  CheckCircle2,
+} from "lucide-react";
+import type { AppTransaction } from "@/lib/transactions";
 import { cn } from "@/lib/utils";
 
 export type Transaction = {
@@ -13,26 +20,54 @@ export type Transaction = {
   status?: "Completed" | "Pending" | "Failed";
 };
 
-export function TransactionRow({ transaction }: { transaction: Transaction }) {
+type Props = {
+  transaction: Transaction | AppTransaction;
+  index?: number;
+  onClick?: () => void;
+};
+
+export function TransactionRow({ transaction, index = 0, onClick }: Props) {
   const credit = transaction.type === "credit";
-  const statusColor =
-    transaction.status === "Failed"
-      ? "text-oryno-error"
-      : transaction.status === "Pending"
-        ? "text-primary"
-        : "text-oryno-success";
+  const status = transaction.status ?? "Completed";
+
+  const statusMeta =
+    status === "Failed"
+      ? {
+          label: "Failed",
+          className: "bg-destructive/10 text-destructive",
+          Icon: XCircle,
+        }
+      : status === "Pending"
+        ? {
+            label: "Pending",
+            className: "bg-oryno-orange-muted text-primary",
+            Icon: Clock3,
+          }
+        : {
+            label: "Completed",
+            className: "bg-oryno-success/12 text-oryno-success",
+            Icon: CheckCircle2,
+          };
+
+  const StatusIcon = statusMeta.Icon;
 
   return (
-    <motion.div
-      whileHover={{ x: 2 }}
-      className="flex items-center gap-3 rounded-[14px] px-2 py-3.5 transition-colors hover:bg-muted/60"
+    <motion.button
+      type="button"
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: Math.min(index * 0.03, 0.24), duration: 0.28 }}
+      whileHover={{ y: -1 }}
+      whileTap={{ scale: 0.99 }}
+      onClick={onClick}
+      className="group flex w-full items-center gap-3 rounded-[18px] px-2.5 py-3 text-left transition-colors hover:bg-muted/70 active:bg-muted sm:px-3"
     >
-      <div
+      <span
         className={cn(
-          "flex h-11 w-11 shrink-0 items-center justify-center rounded-full",
+          "relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl shadow-[var(--shadow-soft)] ring-1 ring-black/5",
           credit
             ? "bg-oryno-success/12 text-oryno-success"
-            : "bg-oryno-error/10 text-oryno-error",
+            : "bg-oryno-orange-muted text-primary",
         )}
       >
         {credit ? (
@@ -40,30 +75,37 @@ export function TransactionRow({ transaction }: { transaction: Transaction }) {
         ) : (
           <ArrowUpRight className="h-5 w-5" strokeWidth={2} />
         )}
-      </div>
+      </span>
+
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-foreground">
-          {transaction.title}
-        </p>
-        <p className="truncate text-xs text-muted-foreground">
-          {transaction.subtitle}
-        </p>
-      </div>
-      <div className="text-right">
-        <p
-          className={cn(
-            "text-sm font-semibold",
-            credit ? "text-oryno-success" : "text-foreground",
-          )}
-        >
-          {transaction.amount}
-        </p>
-        {transaction.status ? (
-          <p className={cn("text-[11px] font-medium", statusColor)}>
-            • {transaction.status}
+        <div className="flex items-start justify-between gap-2">
+          <p className="truncate text-sm font-semibold text-foreground">
+            {transaction.title}
           </p>
-        ) : null}
+          <p
+            className={cn(
+              "shrink-0 text-sm font-bold tabular-nums",
+              credit ? "text-oryno-success" : "text-foreground",
+            )}
+          >
+            {transaction.amount}
+          </p>
+        </div>
+        <div className="mt-1 flex items-center justify-between gap-2">
+          <p className="truncate text-xs text-muted-foreground">
+            {transaction.subtitle}
+          </p>
+          <span
+            className={cn(
+              "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold",
+              statusMeta.className,
+            )}
+          >
+            <StatusIcon className="h-3 w-3" />
+            {statusMeta.label}
+          </span>
+        </div>
       </div>
-    </motion.div>
+    </motion.button>
   );
 }
