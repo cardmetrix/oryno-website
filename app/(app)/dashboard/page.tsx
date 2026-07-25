@@ -42,7 +42,6 @@ export default function DashboardPage() {
           <AdCarousel />
         </MotionSection>
       </div>
-
       <MotionSection delay={0.14} className="mt-6">
  
         <div className="space-y-4 sm:space-y-5">
