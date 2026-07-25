@@ -88,7 +88,7 @@ export function WalletCard({
         />
 
         <div className="relative overflow-hidden rounded-[26px] shadow-[0_28px_60px_rgba(120,40,0,0.45)] ring-1 ring-white/15 sm:rounded-[28px]">
-          <div className="relative aspect-[1.72/1] min-h-[188px] w-full overflow-hidden text-white sm:min-h-[200px] md:aspect-[1.95/1] md:min-h-[168px] lg:aspect-[1.72/1] lg:min-h-[200px]">
+          <div className="relative aspect-[1.72/1] min-h-[192px] w-full overflow-hidden text-white sm:min-h-[200px] md:aspect-[1.95/1] md:min-h-[168px] lg:aspect-[1.72/1] lg:min-h-[200px]">
             {/* Dark orange face */}
             <div className="absolute inset-0 bg-[linear-gradient(145deg,#9a3a00_0%,#c44d00_28%,#e85f00_55%,#b84300_78%,#7a2e00_100%)]" />
             <div className="absolute inset-0 bg-[linear-gradient(210deg,rgba(0,0,0,0.35)_0%,transparent_45%,rgba(0,0,0,0.45)_100%)]" />
