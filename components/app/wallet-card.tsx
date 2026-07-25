@@ -151,9 +151,7 @@ export function WalletCard({
                     <p className="mt-0.5 text-sm font-semibold tracking-wide text-white">
                       {walletLabel}
                     </p>
-                    <p className="mt-0.5 text-[11px] text-white/70">
-                      {flag} {countryName} · Dark Orange Edition
-                    </p>
+                 
                   </div>
                 </div>
 
