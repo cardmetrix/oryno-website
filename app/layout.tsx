@@ -30,16 +30,17 @@ export const metadata: Metadata = {
     icon: [
       { url: "/favicon.png", sizes: "32x32", type: "image/png" },
       { url: "/brand/favicon-32.png", sizes: "32x32", type: "image/png" },
-      { url: "/brand/oryno-logo.png", type: "image/png" },
+      { url: "/brand/oryno-icon.png", sizes: "512x512", type: "image/png" },
     ],
     apple: [{ url: "/brand/apple-touch-icon.png", sizes: "180x180" }],
+    shortcut: "/favicon.png",
   },
   openGraph: {
     title: "ORYNO — One App. Endless Possibilities.",
     description:
       "The premium digital services app for airtime, data, bills, virtual numbers, and more.",
     type: "website",
-    images: [{ url: "/brand/oryno-logo.png", width: 577, height: 592, alt: "ORYNO" }],
+    images: [{ url: "/brand/oryno-icon.png", width: 512, height: 512, alt: "ORYNO" }],
   },
 };
 
