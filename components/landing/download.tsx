@@ -64,10 +64,6 @@ export function Download() {
             />
           </motion.div>
 
-          <motion.p variants={fadeUp} className="mt-6 text-sm text-white/75">
-            Store links can be updated once your App Store and Play Store
-            listings go live.
-          </motion.p>
         </motion.div>
       </div>
     </section>

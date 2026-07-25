@@ -38,16 +38,16 @@ export function AuthSplitLayout({
         >
           <Image
             src="/brand/auth-panel.jpg"
-            alt="ORYNO digital wallet experience"
+            alt="African woman celebrating with ORYNO digital services"
             fill
             priority
-            className="object-cover"
+            className="object-cover object-center"
             sizes="(max-width: 1024px) 100vw, 50vw"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-oryno-charcoal via-oryno-charcoal/55 to-oryno-orange/35" />
+          <div className="absolute inset-0 bg-gradient-to-t from-oryno-charcoal/90 via-oryno-charcoal/35 to-transparent" />
           <div
             aria-hidden="true"
-            className="absolute inset-0 opacity-30"
+            className="absolute inset-0 opacity-20"
             style={{
               backgroundImage:
                 "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.28) 1px, transparent 0)",

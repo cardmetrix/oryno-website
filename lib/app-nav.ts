@@ -22,12 +22,12 @@ export const primaryNav = [
 ] as const;
 
 export const serviceNav = [
+  { href: "/services/gift-cards", label: "Gift Cards", icon: Gift },
+  { href: "/services/social", label: "Social Boost", icon: TrendingUp },
+  { href: "/services/virtual-numbers", label: "Numbers", icon: Phone },
   { href: "/services/airtime", label: "Airtime", icon: Smartphone },
   { href: "/services/data", label: "Data", icon: Wifi },
   { href: "/services/bills", label: "Bills", icon: Zap },
-  { href: "/services/social", label: "Social Boost", icon: TrendingUp },
-  { href: "/services/gift-cards", label: "Gift Cards", icon: Gift },
-  { href: "/services/virtual-numbers", label: "Numbers", icon: Phone },
   { href: "/services", label: "All Services", icon: LayoutGrid },
 ] as const;
 

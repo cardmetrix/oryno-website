@@ -136,7 +136,7 @@ export default function WalletPage() {
         </motion.div>
         <motion.div
           whileHover={{ y: -4 }}
-          className="min-w-[230px] flex-1 rounded-[22px] bg-[#2563EB] p-5 text-white shadow-[var(--shadow-md)] sm:min-w-0"
+          className="min-w-[230px] flex-1 rounded-[22px] bg-oryno-charcoal p-5 text-white shadow-[var(--shadow-md)] sm:min-w-0"
         >
           <p className="text-xs text-white/85">USD · Total balance</p>
           <p className="mt-2 text-2xl font-bold">$2,450.00</p>

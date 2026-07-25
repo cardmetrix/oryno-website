@@ -39,8 +39,8 @@ export function PageHeader({
         className,
       )}
     >
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
+      <div className="flex flex-nowrap items-center justify-between gap-2 sm:gap-3">
+        <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
           {/* Mobile: menu opens sidebar */}
           <button
             type="button"
@@ -83,7 +83,9 @@ export function PageHeader({
           </div>
         </div>
         {actions ? (
-          <div className="flex shrink-0 items-center gap-2">{actions}</div>
+          <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
+            {actions}
+          </div>
         ) : null}
       </div>
     </motion.header>
