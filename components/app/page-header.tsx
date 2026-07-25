@@ -35,7 +35,7 @@ export function PageHeader({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35 }}
       className={cn(
-        "sticky top-0 z-30 -mx-4 mb-6 border-b border-border/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.92)_0%,rgba(247,247,249,0.88)_100%)] px-4 py-3.5 backdrop-blur-xl sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8",
+        "sticky top-0 z-30 -mx-4 mb-6 border-b border-border/70 bg-[image:var(--header-surface)] px-4 py-3.5 backdrop-blur-xl sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8",
         className,
       )}
     >

@@ -4,6 +4,7 @@ import {
   Home,
   LayoutGrid,
   Phone,
+  Settings,
   Smartphone,
   User,
   Wallet,
@@ -16,6 +17,7 @@ export const primaryNav = [
   { href: "/wallet", label: "Wallet", icon: Wallet },
   { href: "/history", label: "History", icon: History },
   { href: "/profile", label: "Profile", icon: User },
+  { href: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
 export const serviceNav = [

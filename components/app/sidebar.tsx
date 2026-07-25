@@ -8,6 +8,7 @@ import { BrandLogo } from "@/components/brand-logo";
 import { isNavActive, primaryNav, serviceNav } from "@/lib/app-nav";
 import { AUTH_LINKS } from "@/lib/auth-links";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { useMobileNav } from "./mobile-nav-context";
 
 export function Sidebar() {
@@ -133,6 +134,7 @@ function SidebarContent({
       </nav>
 
       <div className="mt-auto space-y-3 border-t border-border pt-4">
+    
         <button
           type="button"
           onClick={onLogout}

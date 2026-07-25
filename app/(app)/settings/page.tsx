@@ -15,6 +15,7 @@ import {
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Switch } from "@/components/ui/switch";
 
 export default function SettingsPage() {
@@ -69,7 +70,7 @@ export default function SettingsPage() {
                 Dark Mode
               </span>
             </div>
-            <Switch />
+            <ThemeToggle />
           </div>
         </Section>
       </MotionSection>

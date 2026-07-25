@@ -15,7 +15,7 @@ type AppShellProps = {
 export function AppShell({ children, className }: AppShellProps) {
   return (
     <MobileNavProvider>
-      <div className="min-h-[100svh] bg-[linear-gradient(180deg,#ffffff_0%,#f7f7f9_100%)] text-foreground">
+      <div className="min-h-[100svh] bg-[image:var(--app-shell-gradient)] text-foreground">
         <Sidebar />
 
         <div className="md:pl-[260px]">
