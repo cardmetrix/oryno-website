@@ -1,9 +1,47 @@
 "use client";
 
+import { useState } from "react";
+import { useSignIn } from "@clerk/nextjs";
 import { motion } from "framer-motion";
+import { clerkErrorMessage } from "@/lib/auth/clerk-errors";
 import { cn } from "@/lib/utils";
 
-export function SocialAuth({ className }: { className?: string }) {
+type SocialAuthProps = {
+  className?: string;
+  mode?: "signIn" | "signUp";
+};
+
+export function SocialAuth({ className, mode = "signIn" }: SocialAuthProps) {
+  const { isLoaded, signIn } = useSignIn();
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState<"oauth_google" | "oauth_apple" | null>(
+    null,
+  );
+
+  async function startOAuth(strategy: "oauth_google" | "oauth_apple") {
+    if (!isLoaded || !signIn) return;
+    setError(null);
+    setPending(strategy);
+
+    try {
+      await signIn.authenticateWithRedirect({
+        strategy,
+        redirectUrl: "/sso-callback",
+        redirectUrlComplete: "/dashboard",
+      });
+    } catch (err) {
+      setPending(null);
+      setError(
+        clerkErrorMessage(
+          err,
+          mode === "signUp"
+            ? "Social sign-up failed. Try email instead."
+            : "Social sign-in failed. Try email instead.",
+        ),
+      );
+    }
+  }
+
   return (
     <div className={cn("w-full", className)}>
       <div className="mb-4 flex items-center gap-3">
@@ -15,23 +53,31 @@ export function SocialAuth({ className }: { className?: string }) {
       <div className="grid grid-cols-2 gap-3">
         <motion.button
           type="button"
+          disabled={!isLoaded || pending !== null}
           whileHover={{ y: -2 }}
           whileTap={{ scale: 0.98 }}
-          className="inline-flex h-12 items-center justify-center gap-2 rounded-[14px] border border-border bg-background text-sm font-semibold text-foreground shadow-[var(--shadow-soft)] transition-colors hover:bg-muted"
+          onClick={() => void startOAuth("oauth_google")}
+          className="inline-flex h-12 items-center justify-center gap-2 rounded-[14px] border border-border bg-background text-sm font-semibold text-foreground shadow-[var(--shadow-soft)] transition-colors hover:bg-muted disabled:opacity-60"
         >
           <GoogleIcon className="h-5 w-5" />
-          Google
+          {pending === "oauth_google" ? "…" : "Google"}
         </motion.button>
         <motion.button
           type="button"
+          disabled={!isLoaded || pending !== null}
           whileHover={{ y: -2 }}
           whileTap={{ scale: 0.98 }}
-          className="inline-flex h-12 items-center justify-center gap-2 rounded-[14px] border border-border bg-background text-sm font-semibold text-foreground shadow-[var(--shadow-soft)] transition-colors hover:bg-muted"
+          onClick={() => void startOAuth("oauth_apple")}
+          className="inline-flex h-12 items-center justify-center gap-2 rounded-[14px] border border-border bg-background text-sm font-semibold text-foreground shadow-[var(--shadow-soft)] transition-colors hover:bg-muted disabled:opacity-60"
         >
           <AppleIcon className="h-5 w-5" />
-          Apple
+          {pending === "oauth_apple" ? "…" : "Apple"}
         </motion.button>
       </div>
+
+      {error ? (
+        <p className="mt-3 text-center text-sm text-destructive">{error}</p>
+      ) : null}
     </div>
   );
 }
@@ -61,7 +107,12 @@ function GoogleIcon({ className }: { className?: string }) {
 
 function AppleIcon({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+    <svg
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className={className}
+      aria-hidden="true"
+    >
       <path d="M16.365 1.43c0 1.14-.437 2.21-1.207 3.02-.82.87-2.16 1.54-3.3 1.45-.14-1.1.4-2.27 1.16-3.05.83-.86 2.25-1.48 3.35-1.42zM20.5 17.2c-.6 1.38-.89 1.99-1.66 3.21-1.08 1.67-2.6 3.75-4.48 3.77-1.66.03-2.09-1.08-4.35-1.07-2.26.01-2.73 1.1-4.4 1.07-1.88-.03-3.32-1.9-4.4-3.57C-.58 16.9-.84 12.48.98 9.73c1.17-1.78 3.02-2.9 4.75-2.9 1.77 0 2.88 1.1 4.35 1.1 1.42 0 2.29-1.11 4.34-1.11 1.55 0 3.19.84 4.35 2.3-3.83 2.1-3.21 7.57.73 8.08z" />
     </svg>
   );

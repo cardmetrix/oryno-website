@@ -1,25 +1,52 @@
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
+import {
+  clerkMiddleware,
+  createRouteMatcher,
+} from "@clerk/nextjs/server";
 import { ADMIN_SESSION_COOKIE } from "@/lib/admin-auth";
 
-/**
- * Clerk is available as a dependency, but auth screens are currently custom.
- * Running `clerkMiddleware` without CLERK_* env keys causes
- * MIDDLEWARE_INVOCATION_FAILED (500) on Vercel.
- *
- * Use this lightweight middleware until Clerk keys + ClerkProvider are wired.
- * When ready for Clerk, swap back to clerkMiddleware and set:
- * - NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
- * - CLERK_SECRET_KEY
- */
-export function middleware(request: NextRequest) {
+const isPublicRoute = createRouteMatcher([
+  "/",
+  "/login(.*)",
+  "/register(.*)",
+  "/otp(.*)",
+  "/forgot-password(.*)",
+  "/splash(.*)",
+  "/sso-callback(.*)",
+  "/api/webhooks(.*)",
+  "/admin(.*)",
+]);
+
+const isAuthScreen = createRouteMatcher([
+  "/login(.*)",
+  "/register(.*)",
+  "/otp(.*)",
+  "/forgot-password(.*)",
+  "/splash(.*)",
+]);
+
+const isAppRoute = createRouteMatcher([
+  "/dashboard(.*)",
+  "/wallet(.*)",
+  "/fund(.*)",
+  "/withdraw(.*)",
+  "/history(.*)",
+  "/notifications(.*)",
+  "/profile(.*)",
+  "/settings(.*)",
+  "/services(.*)",
+  "/support(.*)",
+  "/about(.*)",
+]);
+
+export default clerkMiddleware(async (auth, request) => {
   const { pathname } = request.nextUrl;
 
-  // Keep UploadThing API open
   if (pathname.startsWith("/api/uploadthing")) {
     return NextResponse.next();
   }
 
+  // Admin uses a separate passcode cookie (not Clerk)
   const isAdminRoute = pathname.startsWith("/admin");
   const isAdminLogin = pathname === "/admin/login";
   const hasAdminSession =
@@ -33,8 +60,25 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/admin", request.url));
   }
 
+  if (isAdminRoute) {
+    return NextResponse.next();
+  }
+
+  if (isAppRoute(request)) {
+    await auth.protect({
+      unauthenticatedUrl: new URL("/login", request.url).toString(),
+    });
+  } else if (!isPublicRoute(request)) {
+    // Keep other non-public routes open for now (landing assets, etc.)
+  }
+
+  const { userId } = await auth();
+  if (userId && isAuthScreen(request)) {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
   return NextResponse.next();
-}
+});
 
 export const config = {
   matcher: [

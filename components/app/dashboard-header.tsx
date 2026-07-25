@@ -1,5 +1,6 @@
 "use client";
 
+import { useUser } from "@clerk/nextjs";
 import { Search } from "lucide-react";
 import { activeCountryConfig } from "@/lib/services-catalog";
 import { NotificationDropdown } from "./notification-dropdown";
@@ -18,9 +19,19 @@ const countryFlags: Record<string, string> = {
 };
 
 export function DashboardHeader({
-  name = "Chidi",
+  name,
   subtitle = "Welcome back to ORYNO",
 }: DashboardHeaderProps) {
+  const { user } = useUser();
+  const displayName =
+    name ||
+    user?.fullName ||
+    user?.firstName ||
+    (typeof user?.unsafeMetadata?.fullName === "string"
+      ? user.unsafeMetadata.fullName
+      : null) ||
+    "there";
+
   const { code, name: countryName, currency, currencySymbol } =
     activeCountryConfig;
   const flag = countryFlags[code] ?? "🌍";
@@ -28,7 +39,7 @@ export function DashboardHeader({
   return (
     <PageHeader
       title="Home"
-      subtitle={`Hello, ${name} · ${subtitle}`}
+      subtitle={`Hello, ${displayName} · ${subtitle}`}
       backHref="/"
       actions={
         <>

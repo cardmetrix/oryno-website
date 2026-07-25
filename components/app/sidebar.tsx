@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useClerk } from "@clerk/nextjs";
 import { AnimatePresence, motion } from "framer-motion";
 import { LogOut, X } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
@@ -14,10 +15,12 @@ import { useMobileNav } from "./mobile-nav-context";
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const { signOut } = useClerk();
   const { open, close } = useMobileNav();
 
-  function handleLogout() {
+  async function handleLogout() {
     close();
+    await signOut({ redirectUrl: AUTH_LINKS.signIn });
     router.push(AUTH_LINKS.signIn);
   }
 

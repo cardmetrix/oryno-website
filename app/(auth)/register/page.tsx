@@ -3,22 +3,74 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
+import { useSignUp } from "@clerk/nextjs";
 import { motion } from "framer-motion";
 import { AuthField, authInputClassName } from "@/components/auth/auth-field";
 import { AuthSplitLayout } from "@/components/auth/auth-split-layout";
 import { PasswordField } from "@/components/auth/password-field";
 import { SocialAuth } from "@/components/auth/social-auth";
 import { Checkbox } from "@/components/ui/checkbox";
+import { clerkErrorMessage } from "@/lib/auth/clerk-errors";
 import { AUTH_LINKS } from "@/lib/auth-links";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { isLoaded, signUp } = useSignUp();
   const [agreed, setAgreed] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  function onSubmit(e: FormEvent<HTMLFormElement>) {
+  async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!agreed) return;
-    router.push("/otp");
+    if (!agreed || !isLoaded || !signUp) return;
+
+    const form = new FormData(e.currentTarget);
+    const fullName = String(form.get("fullName") ?? "").trim();
+    const email = String(form.get("email") ?? "").trim().toLowerCase();
+    const phone = String(form.get("phone") ?? "").trim();
+    const password = String(form.get("password") ?? "");
+    const confirmPassword = String(form.get("confirmPassword") ?? "");
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+
+    const [firstName, ...rest] = fullName.split(/\s+/);
+    const lastName = rest.join(" ") || undefined;
+
+    setError(null);
+    setLoading(true);
+
+    try {
+      await signUp.create({
+        emailAddress: email,
+        password,
+        firstName: firstName || undefined,
+        lastName,
+        unsafeMetadata: {
+          fullName,
+          phone,
+        },
+      });
+
+      await signUp.prepareEmailAddressVerification({
+        strategy: "email_code",
+      });
+
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem(
+          "oryno_pending_verify",
+          JSON.stringify({ email, phone, fullName }),
+        );
+      }
+
+      router.push("/otp");
+    } catch (err) {
+      setError(clerkErrorMessage(err, "Could not create your account."));
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -98,17 +150,21 @@ export default function RegisterPage() {
           </span>
         </label>
 
+        {error ? (
+          <p className="mt-4 text-sm text-destructive">{error}</p>
+        ) : null}
+
         <motion.button
           type="submit"
-          disabled={!agreed}
+          disabled={!agreed || !isLoaded || loading}
           whileHover={agreed ? { y: -2 } : undefined}
           whileTap={agreed ? { scale: 0.985 } : undefined}
           className="btn-primary mt-6 h-12 w-full text-base disabled:opacity-50"
         >
-          Create Account
+          {loading ? "Creating account…" : "Create Account"}
         </motion.button>
 
-        <SocialAuth className="mt-7" />
+        <SocialAuth className="mt-7" mode="signUp" />
 
         <p className="pt-8 text-center text-sm text-muted-foreground">
           Already have an account?{" "}
