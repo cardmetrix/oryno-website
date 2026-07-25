@@ -26,7 +26,9 @@ export function StoreButtons({
     <div
       className={cn(
         "flex",
-        layout === "column" ? "flex-col gap-3" : "flex-row flex-wrap items-center gap-2.5",
+        layout === "column"
+          ? "w-full flex-col gap-3"
+          : "w-full flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:gap-2.5",
         className,
       )}
     >
@@ -37,10 +39,10 @@ export function StoreButtons({
         whileTap={{ scale: 0.98 }}
         transition={{ type: "spring", stiffness: 420, damping: 24 }}
         className={cn(
-          "store-badge group",
+          "store-badge group flex w-full items-center justify-center sm:w-auto sm:justify-start",
           onBrand && "store-badge-on-brand",
           isCompact && "min-w-0 px-2.5 py-1.5",
-          !isCompact && (isLarge ? "min-w-[200px] px-4 py-3" : "min-w-[180px] px-3.5 py-2.5"),
+          !isCompact && (isLarge ? "min-w-0 px-4 py-3 sm:min-w-[200px]" : "min-w-0 px-3.5 py-2.5 sm:min-w-[180px]"),
         )}
       >
         <div className={cn("flex items-center", isCompact ? "gap-2" : "gap-3.5")}>
@@ -78,10 +80,10 @@ export function StoreButtons({
         whileTap={{ scale: 0.98 }}
         transition={{ type: "spring", stiffness: 420, damping: 24 }}
         className={cn(
-          "store-badge group",
+          "store-badge group flex w-full items-center justify-center sm:w-auto sm:justify-start",
           onBrand && "store-badge-on-brand",
           isCompact && "min-w-0 px-2.5 py-1.5",
-          !isCompact && (isLarge ? "min-w-[200px] px-4 py-3" : "min-w-[180px] px-3.5 py-2.5"),
+          !isCompact && (isLarge ? "min-w-0 px-4 py-3 sm:min-w-[200px]" : "min-w-0 px-3.5 py-2.5 sm:min-w-[180px]"),
         )}
       >
         <div className={cn("flex items-center", isCompact ? "gap-2" : "gap-3.5")}>

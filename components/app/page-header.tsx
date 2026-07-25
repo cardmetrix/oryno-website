@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useMobileNav } from "./mobile-nav-context";
 
 type PageHeaderProps = {
   title: string;
@@ -26,6 +27,7 @@ export function PageHeader({
   className,
 }: PageHeaderProps) {
   const router = useRouter();
+  const { toggle } = useMobileNav();
 
   return (
     <motion.header
@@ -39,11 +41,22 @@ export function PageHeader({
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
+          {/* Mobile: menu opens sidebar */}
+          <button
+            type="button"
+            onClick={toggle}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] border border-border bg-background shadow-[var(--shadow-soft)] transition hover:bg-muted md:hidden"
+            aria-label="Open menu"
+          >
+            <Menu className="h-5 w-5" strokeWidth={1.75} />
+          </button>
+
+          {/* Desktop: back control */}
           {useHistoryBack ? (
             <button
               type="button"
               onClick={() => router.back()}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] border border-border bg-background shadow-[var(--shadow-soft)] transition hover:bg-muted"
+              className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-[14px] border border-border bg-background shadow-[var(--shadow-soft)] transition hover:bg-muted md:flex"
               aria-label="Back"
             >
               <ArrowLeft className="h-5 w-5" strokeWidth={1.75} />
@@ -51,12 +64,13 @@ export function PageHeader({
           ) : (
             <Link
               href={backHref}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] border border-border bg-background shadow-[var(--shadow-soft)] transition hover:bg-muted"
+              className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-[14px] border border-border bg-background shadow-[var(--shadow-soft)] transition hover:bg-muted md:flex"
               aria-label="Back"
             >
               <ArrowLeft className="h-5 w-5" strokeWidth={1.75} />
             </Link>
           )}
+
           <div className="min-w-0">
             <h1 className="truncate text-xl font-bold tracking-tight text-foreground sm:text-2xl">
               {title}

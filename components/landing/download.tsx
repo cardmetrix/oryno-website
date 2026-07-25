@@ -55,9 +55,13 @@ export function Download() {
 
           <motion.div
             variants={fadeUp}
-            className="mt-8 flex justify-center"
+            className="mt-8 flex w-full justify-center"
           >
-            <StoreButtons size="large" variant="onBrand" />
+            <StoreButtons
+              size="large"
+              variant="onBrand"
+              className="w-full max-w-md sm:max-w-none sm:w-auto"
+            />
           </motion.div>
 
           <motion.p variants={fadeUp} className="mt-6 text-sm text-white/75">
