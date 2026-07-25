@@ -32,13 +32,7 @@ export function Screenshots({ shots }: ScreenshotsProps) {
           <motion.h2 variants={fadeUp} className="section-title">
             Clean screens. Confident actions.
           </motion.h2>
-          <motion.p variants={fadeUp} className="section-copy">
-            Drop app screenshots into{" "}
-            <span className="font-medium text-foreground">
-              public/screenshots/
-            </span>{" "}
-            and they appear here automatically.
-          </motion.p>
+        
         </motion.div>
 
         <div className="mt-14 grid grid-cols-2 gap-6 md:grid-cols-4 md:gap-8">
