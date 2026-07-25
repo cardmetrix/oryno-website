@@ -277,6 +277,12 @@ img {
   }
 }
 
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
 .animate-float-soft {
   animation: float-soft 6s ease-in-out infinite;
 }

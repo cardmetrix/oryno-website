@@ -272,6 +272,7 @@ export const users = pgTable(
     fullName: varchar("full_name", { length: 160 }).notNull(),
     email: varchar("email", { length: 255 }).notNull().unique(),
     phone: varchar("phone", { length: 32 }),
+    avatarUrl: text("avatar_url"),
     passwordHash: text("password_hash"),
     countryCode: varchar("country_code", { length: 2 }).references(
       () => countries.code,

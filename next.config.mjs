@@ -32,6 +32,21 @@ const nextConfig = {
         hostname: '*.uploadthing.com',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'ufs.sh',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.ufs.sh',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'img.clerk.com',
+        pathname: '/**',
+      },
     ],
   },
 }

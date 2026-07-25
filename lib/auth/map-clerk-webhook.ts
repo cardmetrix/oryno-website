@@ -12,6 +12,7 @@ export function mapClerkWebhookUser(data: UserJSON): ClerkUserLike {
   return {
     id: data.id,
     username: data.username,
+    imageUrl: data.image_url,
     firstName: data.first_name,
     lastName: data.last_name,
     fullName: [data.first_name, data.last_name].filter(Boolean).join(" ") || null,

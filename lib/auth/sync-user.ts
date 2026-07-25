@@ -13,6 +13,7 @@ export type SyncedUser = typeof users.$inferSelect;
 export type ClerkUserLike = {
   id: string;
   username?: string | null;
+  imageUrl?: string | null;
   firstName?: string | null;
   lastName?: string | null;
   fullName?: string | null;
@@ -112,6 +113,16 @@ function pickUsername(clerkUser: ClerkUserLike): string | null {
   return value || null;
 }
 
+function pickAvatarUrl(clerkUser: ClerkUserLike): string | null {
+  const meta =
+    typeof clerkUser.publicMetadata?.avatarUrl === "string"
+      ? clerkUser.publicMetadata.avatarUrl
+      : typeof clerkUser.unsafeMetadata?.avatarUrl === "string"
+        ? clerkUser.unsafeMetadata.avatarUrl
+        : null;
+  return meta || clerkUser.imageUrl || null;
+}
+
 function pickPhone(clerkUser: ClerkUserLike): string | null {
   const metaPhone =
     typeof clerkUser.unsafeMetadata?.phone === "string"
@@ -158,6 +169,7 @@ function referralFromName(fullName: string) {
 type ClerkSdkUser = {
   id: string;
   username: string | null;
+  imageUrl: string;
   firstName: string | null;
   lastName: string | null;
   fullName: string | null;
@@ -179,6 +191,7 @@ export function mapClerkSdkUser(user: ClerkSdkUser): ClerkUserLike {
   return {
     id: user.id,
     username: user.username,
+    imageUrl: user.imageUrl,
     firstName: user.firstName,
     lastName: user.lastName,
     fullName: user.fullName,
@@ -213,6 +226,7 @@ export async function syncClerkUserToDb(
   const fullName = pickFullName(clerkUser);
   const username = pickUsername(clerkUser);
   const phone = pickPhone(clerkUser);
+  const avatarUrl = pickAvatarUrl(clerkUser);
   const countryCode = countryFromPhone(phone);
   const emailVerifiedAt = isEmailVerified(clerkUser) ? new Date() : null;
 
@@ -242,6 +256,7 @@ export async function syncClerkUserToDb(
         fullName,
         email,
         phone,
+        avatarUrl: existing.avatarUrl ?? avatarUrl,
         countryCode: existing.countryCode ?? countryCode,
         emailVerifiedAt: existing.emailVerifiedAt ?? emailVerifiedAt,
         lastLoginAt: options?.touchLogin ? now : existing.lastLoginAt,
@@ -260,6 +275,7 @@ export async function syncClerkUserToDb(
         fullName,
         email,
         phone,
+        avatarUrl,
         countryCode,
         emailVerifiedAt,
         lastLoginAt: options?.touchLogin ? now : null,

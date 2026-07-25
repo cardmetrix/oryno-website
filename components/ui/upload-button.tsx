@@ -60,6 +60,7 @@ export const UploadButton: React.FC<UploadButtonProps> = ({
   const getAcceptTypes = () => {
     const acceptTypesMap: Record<string, string> = {
       imageUploader: "image/*",
+      profileImage: "image/*",
       subAgentProfile: "image/*",
       subAgentDocuments: "image/*,.pdf",
       documentUploader: ".pdf,.doc,.docx,.xls,.xlsx,.txt",
