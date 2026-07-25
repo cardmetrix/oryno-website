@@ -64,13 +64,13 @@ export function SiteHeader() {
         </nav>
 
         <div className="hidden items-center gap-2.5 md:flex">
-          <ThemeToggle variant="icon" />
+      
           <StoreButtons size="compact" />
           <AuthButtons />
         </div>
 
         <div className="flex items-center gap-1.5 md:hidden">
-          <ThemeToggle variant="icon" />
+  
           <button
             type="button"
             className="inline-flex h-10 w-10 items-center justify-center rounded-[var(--radius-sm)] text-foreground"
