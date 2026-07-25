@@ -11,6 +11,7 @@ import {
   Eye,
   EyeOff,
   Plus,
+  Sparkles,
   Wifi,
 } from "lucide-react";
 import { activeCountryConfig } from "@/lib/services-catalog";
@@ -77,99 +78,110 @@ export function WalletCard({
   return (
     <div className={cn("space-y-3", className)}>
       <motion.div
-        whileHover={{ y: -3, rotateX: 1.5 }}
+        whileHover={{ y: -3 }}
         transition={{ type: "spring", stiffness: 280, damping: 22 }}
-        style={{ perspective: 1200 }}
         className="relative"
       >
-        {/* Soft ambient glow */}
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute -inset-3 rounded-[36px] bg-[radial-gradient(ellipse_at_30%_20%,rgba(255,106,0,0.28),transparent_55%),radial-gradient(ellipse_at_80%_90%,rgba(255,106,0,0.12),transparent_50%)] blur-xl"
+          className="pointer-events-none absolute -inset-3 rounded-[36px] bg-[radial-gradient(ellipse_at_25%_15%,rgba(255,106,0,0.45),transparent_55%),radial-gradient(ellipse_at_85%_90%,rgba(180,60,0,0.3),transparent_50%)] blur-xl"
         />
 
-        <div className="relative overflow-hidden rounded-[26px] shadow-[0_24px_60px_rgba(0,0,0,0.45)] ring-1 ring-white/10 sm:rounded-[28px]">
-          {/* Dark premium metal face */}
-          <div className="relative aspect-[1.72/1] min-h-[188px] w-full overflow-hidden bg-[#141416] text-white sm:min-h-[200px] md:aspect-[1.95/1] md:min-h-[168px] lg:aspect-[1.72/1] lg:min-h-[200px]">
-            <div className="absolute inset-0 bg-[linear-gradient(145deg,#1f1f22_0%,#121214_42%,#0c0c0e_100%)]" />
-            <div className="absolute inset-0 bg-[linear-gradient(120deg,transparent_20%,rgba(255,106,0,0.14)_48%,transparent_72%)]" />
-            <div
+        <div className="relative overflow-hidden rounded-[26px] shadow-[0_28px_60px_rgba(120,40,0,0.45)] ring-1 ring-white/15 sm:rounded-[28px]">
+          <div className="relative aspect-[1.72/1] min-h-[188px] w-full overflow-hidden text-white sm:min-h-[200px] md:aspect-[1.95/1] md:min-h-[168px] lg:aspect-[1.72/1] lg:min-h-[200px]">
+            {/* Dark orange face */}
+            <div className="absolute inset-0 bg-[linear-gradient(145deg,#9a3a00_0%,#c44d00_28%,#e85f00_55%,#b84300_78%,#7a2e00_100%)]" />
+            <div className="absolute inset-0 bg-[linear-gradient(210deg,rgba(0,0,0,0.35)_0%,transparent_45%,rgba(0,0,0,0.45)_100%)]" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_10%,rgba(255,200,120,0.35),transparent_40%)]" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_10%_90%,rgba(0,0,0,0.35),transparent_45%)]" />
+
+            {/* Moving sheen */}
+            <motion.div
               aria-hidden="true"
-              className="pointer-events-none absolute inset-0 opacity-[0.07]"
-              style={{
-                backgroundImage:
-                  "linear-gradient(115deg, transparent 40%, rgba(255,255,255,0.35) 50%, transparent 60%)",
+              animate={{ x: ["-40%", "140%"] }}
+              transition={{
+                duration: 5.5,
+                repeat: Infinity,
+                ease: "easeInOut",
+                repeatDelay: 2.2,
               }}
+              className="pointer-events-none absolute inset-y-0 w-1/3 skew-x-[-18deg] bg-gradient-to-r from-transparent via-white/18 to-transparent"
+            />
+
+            {/* Arc decor */}
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute -top-16 -right-10 h-44 w-44 rounded-full border border-white/15"
             />
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute -top-24 -right-16 h-56 w-56 rounded-full bg-oryno-orange/25 blur-3xl"
+              className="pointer-events-none absolute -top-8 -right-2 h-32 w-32 rounded-full border border-white/10"
             />
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute -bottom-28 -left-10 h-56 w-56 rounded-full bg-white/5 blur-3xl"
+              className="pointer-events-none absolute -bottom-20 -left-14 h-48 w-48 rounded-full border border-black/20"
             />
-            {/* Fine card texture */}
+
+            {/* Micro grid */}
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute inset-0 opacity-[0.12]"
+              className="pointer-events-none absolute inset-0 opacity-[0.1]"
               style={{
                 backgroundImage:
-                  "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.45) 1px, transparent 0)",
-                backgroundSize: "16px 16px",
+                  "linear-gradient(rgba(255,255,255,0.35) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.35) 1px, transparent 1px)",
+                backgroundSize: "28px 28px",
               }}
             />
 
             <div className="relative flex h-full flex-col justify-between p-4 sm:p-5 md:p-4 lg:p-5">
-              {/* Top row: brand + contactless */}
+              {/* Top */}
               <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-[11px] font-semibold tracking-[0.22em] text-white/55 uppercase">
-                    ORYNO
-                  </p>
-                  <p className="mt-1 text-sm font-semibold tracking-wide text-white">
-                    {walletLabel}
-                  </p>
-                  <p className="mt-0.5 text-[11px] text-white/50">
-                    {flag} {countryName} · Premium
-                  </p>
+                <div className="flex items-center gap-2.5">
+                  <span className="relative flex h-10 w-10 items-center justify-center rounded-2xl bg-black/25 text-lg font-black tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] ring-1 ring-white/25 backdrop-blur-md">
+                    O
+                    <span className="absolute -right-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full bg-[#ffd29a] ring-2 ring-[#b84300]" />
+                  </span>
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-[11px] font-bold tracking-[0.22em] text-white/90 uppercase">
+                        ORYNO
+                      </p>
+                      <Sparkles className="h-3 w-3 text-[#ffd29a]" />
+                    </div>
+                    <p className="mt-0.5 text-sm font-semibold tracking-wide text-white">
+                      {walletLabel}
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-white/70">
+                      {flag} {countryName} · Dark Orange Edition
+                    </p>
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <span className="rounded-full bg-oryno-orange/20 px-2.5 py-1 text-[10px] font-bold tracking-wide text-oryno-orange ring-1 ring-oryno-orange/35">
+                  <span className="rounded-full bg-black/25 px-2.5 py-1 text-[10px] font-bold tracking-wide text-[#ffd29a] ring-1 ring-white/20 backdrop-blur-md">
                     PREMIUM
                   </span>
                   <motion.span
-                    animate={{ opacity: [0.55, 1, 0.55] }}
+                    animate={{ opacity: [0.45, 1, 0.45] }}
                     transition={{
-                      duration: 2.8,
+                      duration: 2.6,
                       repeat: Infinity,
                       ease: "easeInOut",
                     }}
-                    className="flex h-9 w-9 items-center justify-center rounded-full bg-white/5 ring-1 ring-white/15"
+                    className="flex h-9 w-9 items-center justify-center rounded-full bg-black/20 ring-1 ring-white/20 backdrop-blur-md"
                     aria-hidden="true"
                   >
-                    <Wifi className="h-4 w-4 rotate-90 text-white/80" />
+                    <Wifi className="h-4 w-4 rotate-90 text-white/90" />
                   </motion.span>
                 </div>
               </div>
 
-              {/* Chip + balance */}
-              <div className="mt-3 flex items-end justify-between gap-4 md:mt-2.5 lg:mt-4">
-                <div className="flex items-center gap-3">
-                  {/* EMV chip */}
-                  <div
-                    aria-hidden="true"
-                    className="relative h-9 w-[42px] overflow-hidden rounded-[8px] bg-[linear-gradient(145deg,#f0d78c_0%,#c9a227_45%,#a8841a_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_6px_14px_rgba(0,0,0,0.35)] md:h-8 md:w-[38px] lg:h-10 lg:w-[46px]"
-                  >
-                    <div className="absolute inset-[3px] rounded-[5px] border border-black/20" />
-                    <div className="absolute top-1/2 right-0 left-0 h-px -translate-y-1/2 bg-black/25" />
-                    <div className="absolute top-0 bottom-0 left-1/3 w-px bg-black/25" />
-                    <div className="absolute top-0 bottom-0 left-2/3 w-px bg-black/25" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-medium tracking-[0.16em] text-white/45 uppercase">
-                      Available
+              {/* Balance panel */}
+              <div className="mt-3 rounded-[18px] border border-white/15 bg-black/20 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-md md:mt-2.5 md:p-2.5 lg:mt-3 lg:p-3">
+                <div className="flex items-end justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-medium tracking-[0.16em] text-white/65 uppercase">
+                      Available balance
                     </p>
                     <AnimatePresence mode="wait">
                       <motion.p
@@ -178,35 +190,73 @@ export function WalletCard({
                         animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
                         exit={{ opacity: 0, y: -4, filter: "blur(4px)" }}
                         transition={{ duration: 0.22 }}
-                        className="mt-0.5 font-mono text-xl font-bold tracking-tight text-white sm:text-2xl md:text-[1.35rem] lg:text-[1.85rem]"
+                        className="mt-0.5 truncate font-mono text-xl font-bold tracking-tight text-white sm:text-2xl md:text-[1.35rem] lg:text-[1.85rem]"
                       >
                         {hidden ? "••••••••" : balance}
                       </motion.p>
                     </AnimatePresence>
                   </div>
-                </div>
 
-                <motion.button
-                  type="button"
-                  whileHover={{ scale: 1.06 }}
-                  whileTap={{ scale: 0.94 }}
-                  onClick={() => setHidden((v) => !v)}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/8 ring-1 ring-white/15 backdrop-blur-md"
-                  aria-label={hidden ? "Show balance" : "Hide balance"}
-                >
-                  {hidden ? (
-                    <EyeOff className="h-4 w-4 text-white/80" />
-                  ) : (
-                    <Eye className="h-4 w-4 text-white/80" />
-                  )}
-                </motion.button>
+                  <motion.button
+                    type="button"
+                    whileHover={{ scale: 1.06 }}
+                    whileTap={{ scale: 0.94 }}
+                    onClick={() => setHidden((v) => !v)}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/12 ring-1 ring-white/25 backdrop-blur-md"
+                    aria-label={hidden ? "Show balance" : "Hide balance"}
+                  >
+                    {hidden ? (
+                      <EyeOff className="h-4 w-4 text-white" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-white" />
+                    )}
+                  </motion.button>
+                </div>
               </div>
 
-              {/* Embossed card number */}
-              <div className="mt-3 md:mt-2 lg:mt-4">
-                <p className="font-mono text-[14px] tracking-[0.2em] text-white/90 sm:text-[15px] sm:tracking-[0.24em] md:text-[13px] lg:text-base lg:tracking-[0.28em]">
-                  {formatCardNumber(accountNumber, hidden)}
-                </p>
+              {/* Number + meta */}
+              <div className="mt-3 flex items-end justify-between gap-3 md:mt-2 lg:mt-3">
+                <div className="min-w-0">
+                  <p className="font-mono text-[14px] tracking-[0.2em] text-white sm:text-[15px] sm:tracking-[0.24em] md:text-[13px] lg:text-base lg:tracking-[0.28em]">
+                    {formatCardNumber(accountNumber, hidden)}
+                  </p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <p className="truncate text-[10px] font-semibold tracking-[0.14em] text-white/85 uppercase">
+                      {displayHolder}
+                    </p>
+                    <span className="h-1 w-1 rounded-full bg-white/40" />
+                    <p className="text-[10px] font-medium text-white/70">
+                      {bankName}
+                    </p>
+                    <motion.button
+                      type="button"
+                      whileTap={{ scale: 0.95 }}
+                      onClick={handleCopy}
+                      className="inline-flex items-center gap-1 rounded-full bg-black/20 px-2 py-0.5 text-[10px] font-semibold text-white ring-1 ring-white/20"
+                    >
+                      {copied ? (
+                        <>
+                          <Check className="h-3 w-3 text-[#ffd29a]" />
+                          Copied
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-3 w-3" />
+                          Copy
+                        </>
+                      )}
+                    </motion.button>
+                  </div>
+                </div>
+
+                <div className="flex shrink-0 flex-col items-end">
+                  <span className="rounded-md bg-black/25 px-2 py-1 text-[10px] font-bold tracking-[0.18em] text-[#ffd29a] ring-1 ring-white/15">
+                    {currencyCode}
+                  </span>
+                  <span className="mt-1 text-[9px] font-medium tracking-[0.16em] text-white/60 uppercase">
+                    Virtual
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -233,11 +283,11 @@ export function WalletCard({
         <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }}>
           <Link
             href="/withdraw"
-            className="group relative flex h-[52px] w-full items-center justify-center gap-2.5 overflow-hidden rounded-[18px] bg-[#141416] px-3 text-sm font-bold text-white shadow-[0_14px_32px_rgba(0,0,0,0.28)] ring-1 ring-white/10"
+            className="group relative flex h-[52px] w-full items-center justify-center gap-2.5 overflow-hidden rounded-[18px] bg-[#1a120c] px-3 text-sm font-bold text-white shadow-[0_14px_32px_rgba(0,0,0,0.28)] ring-1 ring-white/10"
           >
             <span
               aria-hidden="true"
-              className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(255,106,0,0.22),transparent_55%)] opacity-70"
+              className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(255,106,0,0.28),transparent_55%)] opacity-80"
             />
             <span className="relative flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white ring-1 ring-white/15 transition-transform duration-300 group-hover:scale-110">
               <ArrowUpRight className="h-4 w-4 text-white" strokeWidth={2.25} />
