@@ -1,4 +1,5 @@
 import { detectUserCountry } from "@/lib/geo/client-detect";
+import { getCountryInfo } from "@/lib/country";
 
 export async function syncSessionToDatabase(): Promise<{
   ok: boolean;
@@ -6,10 +7,9 @@ export async function syncSessionToDatabase(): Promise<{
   code?: string;
   countryCode?: string;
   currency?: string;
+  countryName?: string;
 }> {
   let countryCode: string | undefined;
-  let lat: number | undefined;
-  let lng: number | undefined;
 
   try {
     const detected = await detectUserCountry();
@@ -25,9 +25,7 @@ export async function syncSessionToDatabase(): Promise<{
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       countryCode,
-      lat,
-      lng,
-      forceCountry: true,
+      forceCountry: Boolean(countryCode),
     }),
   });
 
@@ -44,15 +42,18 @@ export async function syncSessionToDatabase(): Promise<{
   }
 
   const json = (await res.json()) as {
-    country?: { code?: string; currency?: string };
+    country?: { code?: string; currency?: string; name?: string };
   };
 
-  if (typeof window !== "undefined" && json.country?.code) {
+  const resolvedCode = json.country?.code ?? countryCode;
+  const info = resolvedCode ? getCountryInfo(resolvedCode) : null;
+
+  if (typeof window !== "undefined" && info) {
     window.localStorage.setItem(
       "oryno_country",
       JSON.stringify({
-        countryCode: json.country.code,
-        currency: json.country.currency,
+        countryCode: info.code,
+        currency: info.currency,
         updatedAt: Date.now(),
       }),
     );
@@ -60,7 +61,8 @@ export async function syncSessionToDatabase(): Promise<{
 
   return {
     ok: true,
-    countryCode: json.country?.code,
-    currency: json.country?.currency,
+    countryCode: info?.code,
+    currency: info?.currency ?? json.country?.currency,
+    countryName: info?.name ?? json.country?.name,
   };
 }

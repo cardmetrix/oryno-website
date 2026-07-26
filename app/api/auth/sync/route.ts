@@ -17,9 +17,17 @@ export async function POST(req: Request) {
       forceCountry?: boolean;
     };
 
+    // Geo must never take down sync — fall back to NG if Google fails
     const detected = await detectCountryWithGoogle({
       lat: typeof body.lat === "number" ? body.lat : undefined,
       lng: typeof body.lng === "number" ? body.lng : undefined,
+    }).catch((geoError) => {
+      console.error("[auth-sync-geo]", geoError);
+      return {
+        countryCode: resolveCountryCode("NG"),
+        detectedIso: null,
+        source: "fallback" as const,
+      };
     });
 
     const countryCode = body.countryCode
@@ -36,7 +44,7 @@ export async function POST(req: Request) {
     const user = await ensureAppUser({
       touchLogin: true,
       countryCode,
-      forceCountry: body.forceCountry !== false && confident,
+      forceCountry: body.forceCountry === true && confident,
     });
 
     if (!user) {

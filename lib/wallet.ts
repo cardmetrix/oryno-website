@@ -107,52 +107,91 @@ export async function ensurePrimaryWallet(
   userId: string,
   currency = "NGN",
 ): Promise<WalletRow> {
-  // Demote other wallets so the country currency stays primary
-  await db
-    .update(wallets)
-    .set({ isPrimary: false, updatedAt: new Date() })
-    .where(and(eq(wallets.userId, userId), eq(wallets.isPrimary, true)));
-
   const existing = await db.query.wallets.findFirst({
     where: and(eq(wallets.userId, userId), eq(wallets.currency, currency)),
   });
 
   if (existing) {
-    const [updated] = await db
-      .update(wallets)
-      .set({ isPrimary: true, updatedAt: new Date() })
-      .where(eq(wallets.id, existing.id))
-      .returning();
-    return issueCardNumber(updated ?? { ...existing, isPrimary: true });
+    if (!existing.isPrimary) {
+      // Demote others first, then promote — order avoids brief "no primary" races
+      await db
+        .update(wallets)
+        .set({ isPrimary: false, updatedAt: new Date() })
+        .where(
+          and(
+            eq(wallets.userId, userId),
+            eq(wallets.isPrimary, true),
+          ),
+        );
+      const [updated] = await db
+        .update(wallets)
+        .set({ isPrimary: true, updatedAt: new Date() })
+        .where(eq(wallets.id, existing.id))
+        .returning();
+      return issueCardNumber(updated ?? { ...existing, isPrimary: true });
+    }
+    return issueCardNumber(existing);
   }
 
   const cardNumber = generateWalletCardNumber(userId, currency);
-  const [created] = await db
-    .insert(wallets)
-    .values({
-      userId,
-      currency,
-      balance: "0",
-      isPrimary: true,
-      cardNumber,
-    })
-    .onConflictDoNothing()
-    .returning();
 
-  if (created) return issueCardNumber(created);
+  // Soft-demote before insert so new wallet can be primary
+  await db
+    .update(wallets)
+    .set({ isPrimary: false, updatedAt: new Date() })
+    .where(and(eq(wallets.userId, userId), eq(wallets.isPrimary, true)));
+
+  try {
+    const [created] = await db
+      .insert(wallets)
+      .values({
+        userId,
+        currency,
+        balance: "0",
+        isPrimary: true,
+        cardNumber,
+      })
+      .onConflictDoNothing()
+      .returning();
+
+    if (created) return issueCardNumber(created);
+  } catch (error) {
+    // Unique card_number collision — retry with random suffix
+    console.error("[ensure-primary-wallet-insert]", error);
+    const fallback = `${cardNumber.slice(0, 8)}${Math.floor(10 + Math.random() * 89)}`;
+    const [created] = await db
+      .insert(wallets)
+      .values({
+        userId,
+        currency,
+        balance: "0",
+        isPrimary: true,
+        cardNumber: fallback,
+      })
+      .onConflictDoNothing()
+      .returning();
+    if (created) return issueCardNumber(created);
+  }
 
   const again = await db.query.wallets.findFirst({
     where: and(eq(wallets.userId, userId), eq(wallets.currency, currency)),
   });
   if (!again) throw new Error("Unable to create wallet");
 
-  const [updated] = await db
-    .update(wallets)
-    .set({ isPrimary: true, updatedAt: new Date() })
-    .where(eq(wallets.id, again.id))
-    .returning();
+  if (!again.isPrimary) {
+    await db
+      .update(wallets)
+      .set({ isPrimary: false, updatedAt: new Date() })
+      .where(and(eq(wallets.userId, userId), eq(wallets.isPrimary, true)));
+    const [updated] = await db
+      .update(wallets)
+      .set({ isPrimary: true, updatedAt: new Date() })
+      .where(eq(wallets.id, again.id))
+      .returning();
+    return issueCardNumber(updated ?? { ...again, isPrimary: true });
+  }
 
-  return issueCardNumber(updated ?? { ...again, isPrimary: true });
+  return issueCardNumber(again);
 }
 
 export async function listUserWallets(userId: string) {

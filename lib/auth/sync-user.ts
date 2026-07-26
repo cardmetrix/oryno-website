@@ -5,7 +5,6 @@ import {
   referralCodes,
   userSecurity,
   users,
-  wallets,
 } from "@/lib/db/schema";
 import { createNotification } from "@/lib/notifications-service";
 import {
@@ -265,44 +264,88 @@ export async function syncClerkUserToDb(
             existing.countryCode ?? detectedCountry ?? phoneCountry,
           );
 
-    const [updated] = await db
-      .update(users)
-      .set({
-        clerkId: clerkUser.id,
-        username: username ?? existing.username,
-        fullName,
-        email,
-        phone,
-        avatarUrl: existing.avatarUrl ?? avatarUrl,
-        countryCode: nextCountry,
-        emailVerifiedAt: existing.emailVerifiedAt ?? emailVerifiedAt,
-        lastLoginAt: options?.touchLogin ? now : existing.lastLoginAt,
-        updatedAt: now,
-        status: existing.status === "deleted" ? "active" : existing.status,
-      })
-      .where(eq(users.id, existing.id))
-      .returning();
-    dbUser = updated;
+    try {
+      const [updated] = await db
+        .update(users)
+        .set({
+          clerkId: clerkUser.id,
+          username: username ?? existing.username,
+          fullName,
+          email,
+          phone,
+          avatarUrl: existing.avatarUrl ?? avatarUrl,
+          countryCode: nextCountry,
+          emailVerifiedAt: existing.emailVerifiedAt ?? emailVerifiedAt,
+          lastLoginAt: options?.touchLogin ? now : existing.lastLoginAt,
+          updatedAt: now,
+          status: existing.status === "deleted" ? "active" : existing.status,
+        })
+        .where(eq(users.id, existing.id))
+        .returning();
+      dbUser = updated;
+    } catch (updateError) {
+      // Username unique collision — retry without overwriting username
+      console.error("[sync-user-update]", updateError);
+      const [updated] = await db
+        .update(users)
+        .set({
+          clerkId: clerkUser.id,
+          fullName,
+          email,
+          phone,
+          avatarUrl: existing.avatarUrl ?? avatarUrl,
+          countryCode: nextCountry,
+          emailVerifiedAt: existing.emailVerifiedAt ?? emailVerifiedAt,
+          lastLoginAt: options?.touchLogin ? now : existing.lastLoginAt,
+          updatedAt: now,
+          status: existing.status === "deleted" ? "active" : existing.status,
+        })
+        .where(eq(users.id, existing.id))
+        .returning();
+      if (!updated) throw updateError;
+      dbUser = updated;
+    }
   } else {
     const countryCode = resolveCountryCode(
       detectedCountry ?? phoneCountry ?? "NG",
     );
 
-    const [created] = await db
-      .insert(users)
-      .values({
-        clerkId: clerkUser.id,
-        username,
-        fullName,
-        email,
-        phone,
-        avatarUrl,
-        countryCode,
-        emailVerifiedAt,
-        lastLoginAt: options?.touchLogin ? now : null,
-      })
-      .returning();
-    dbUser = created;
+    try {
+      const [created] = await db
+        .insert(users)
+        .values({
+          clerkId: clerkUser.id,
+          username,
+          fullName,
+          email,
+          phone,
+          avatarUrl,
+          countryCode,
+          emailVerifiedAt,
+          lastLoginAt: options?.touchLogin ? now : null,
+        })
+        .returning();
+      dbUser = created;
+    } catch (insertError) {
+      // Username taken — create without username
+      console.error("[sync-user-insert]", insertError);
+      const [created] = await db
+        .insert(users)
+        .values({
+          clerkId: clerkUser.id,
+          username: null,
+          fullName,
+          email,
+          phone,
+          avatarUrl,
+          countryCode,
+          emailVerifiedAt,
+          lastLoginAt: options?.touchLogin ? now : null,
+        })
+        .returning();
+      if (!created) throw insertError;
+      dbUser = created;
+    }
 
     try {
       await createNotification({
@@ -330,19 +373,24 @@ export async function syncClerkUserToDb(
     .onConflictDoNothing();
 
   const currency = currencyForCountry(dbUser.countryCode);
-  const { ensurePrimaryWallet } = await import("@/lib/wallet");
-  await ensurePrimaryWallet(dbUser.id, currency);
+  try {
+    const { ensurePrimaryWallet } = await import("@/lib/wallet");
+    await ensurePrimaryWallet(dbUser.id, currency);
+  } catch (walletError) {
+    // Parallel dashboard requests can race on wallet promote/create — retry once.
+    console.error("[sync-user-wallet]", walletError);
+    const { ensurePrimaryWallet } = await import("@/lib/wallet");
+    await ensurePrimaryWallet(dbUser.id, currency);
+  }
 
-  const hasReferral = await db.query.referralCodes.findFirst({
-    where: eq(referralCodes.userId, dbUser.id),
-  });
-
-  if (!hasReferral) {
-    await db.insert(referralCodes).values({
+  // Parallel ensureAppUser calls on dashboard load — ignore duplicate user/code
+  await db
+    .insert(referralCodes)
+    .values({
       userId: dbUser.id,
       code: referralFromName(fullName),
-    });
-  }
+    })
+    .onConflictDoNothing({ target: referralCodes.userId });
 
   return dbUser;
 }
