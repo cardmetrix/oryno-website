@@ -205,7 +205,7 @@ export function WalletCard({
                         animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
                         exit={{ opacity: 0, y: -4, filter: "blur(4px)" }}
                         transition={{ duration: 0.22 }}
-                        className="mt-0.5 truncate font-mono text-xl font-bold tracking-tight text-white sm:text-2xl md:text-[1.35rem] lg:text-[1.85rem]"
+                        className="mt-0.5 truncate text-xl font-bold tracking-tight text-white sm:text-2xl md:text-[1.35rem] lg:text-[1.85rem]"
                       >
                         {hidden ? "••••••••" : balance}
                       </motion.p>

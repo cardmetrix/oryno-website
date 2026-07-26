@@ -182,7 +182,7 @@ export default function WalletPage() {
                       initial={{ opacity: 0, y: 8, filter: "blur(4px)" }}
                       animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
                       exit={{ opacity: 0, y: -6 }}
-                      className="mt-2 font-mono text-3xl font-bold tracking-tight sm:text-4xl"
+                      className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl"
                     >
                       {hidden ? "••••••••" : data.primary.balanceFormatted}
                     </motion.p>
