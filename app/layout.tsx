@@ -55,8 +55,10 @@ export default function RootLayout({
     <ClerkProvider
       signInUrl="/login"
       signUpUrl="/register"
-      afterSignInUrl="/dashboard"
-      afterSignUpUrl="/dashboard"
+      signInFallbackRedirectUrl="/dashboard"
+      signUpFallbackRedirectUrl="/dashboard"
+      signInForceRedirectUrl="/dashboard"
+      signUpForceRedirectUrl="/dashboard"
     >
       <html lang="en" suppressHydrationWarning>
         <body
@@ -64,7 +66,7 @@ export default function RootLayout({
         >
           <ThemeProvider>
             {children}
-            <Toaster richColors position="top-center" />
+            <Toaster richColors position="top-right" closeButton />
           </ThemeProvider>
         </body>
       </html>

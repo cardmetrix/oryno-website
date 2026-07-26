@@ -10,9 +10,6 @@ import {
 
 export async function requireClerkAuth() {
   const { userId } = await auth();
-  if (!userId) {
-    return null;
-  }
   return userId;
 }
 
@@ -24,6 +21,20 @@ export async function ensureAppUser(options?: {
 }): Promise<SyncedUser | null> {
   const clerkUser = await currentUser();
   if (!clerkUser) return null;
+
+  const needsFullSync =
+    Boolean(options?.forceCountry) ||
+    Boolean(options?.touchLogin) ||
+    Boolean(options?.countryCode);
+
+  // Fast path for dashboard fan-out (wallet / notifications / country / settings)
+  // so parallel GETs don't all rewrite users/wallets/countries.
+  if (!needsFullSync) {
+    const existing = await db.query.users.findFirst({
+      where: eq(users.clerkId, clerkUser.id),
+    });
+    if (existing) return existing;
+  }
 
   return syncClerkUserToDb(mapClerkSdkUser(clerkUser), {
     touchLogin: options?.touchLogin,

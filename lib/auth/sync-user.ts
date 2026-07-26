@@ -152,10 +152,23 @@ function isEmailVerified(clerkUser: ClerkUserLike): boolean {
   );
 }
 
+/** One shared seed promise — parallel ensureAppUser calls were deadlocking on countries inserts. */
+let countriesReady: Promise<void> | null = null;
+
 async function ensureDefaultCountries() {
-  for (const country of DEFAULT_COUNTRIES) {
-    await db.insert(countries).values(country).onConflictDoNothing();
+  if (!countriesReady) {
+    countriesReady = db
+      .insert(countries)
+      .values(DEFAULT_COUNTRIES)
+      .onConflictDoNothing()
+      .then(() => undefined)
+      .catch((error) => {
+        countriesReady = null;
+        // Countries are usually already seeded; never fail auth/sync on this.
+        console.error("[ensure-default-countries]", error);
+      });
   }
+  await countriesReady;
 }
 
 function referralFromName(fullName: string) {
@@ -392,13 +405,17 @@ export async function syncClerkUserToDb(
   }
 
   // Parallel ensureAppUser calls on dashboard load — ignore duplicate user/code
-  await db
-    .insert(referralCodes)
-    .values({
-      userId: dbUser.id,
-      code: referralFromName(fullName),
-    })
-    .onConflictDoNothing({ target: referralCodes.userId });
+  try {
+    await db
+      .insert(referralCodes)
+      .values({
+        userId: dbUser.id,
+        code: referralFromName(fullName),
+      })
+      .onConflictDoNothing({ target: referralCodes.userId });
+  } catch (referralError) {
+    console.error("[sync-user-referral]", referralError);
+  }
 
   return dbUser;
 }
