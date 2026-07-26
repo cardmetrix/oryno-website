@@ -1,29 +1,69 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, type PanInfo } from "framer-motion";
 import { Bell, CheckCheck, X } from "lucide-react";
 import {
-  notifications as initialNotifications,
-  type AppNotification,
-} from "@/lib/notifications";
+  NotificationsDropdownEmpty,
+  NotificationsDropdownSkeleton,
+} from "@/components/app/notification-states";
+import type {
+  AppNotificationDto,
+  NotificationsPayload,
+} from "@/lib/notification-types";
+import { notificationVisual } from "@/lib/notifications";
 import { cn } from "@/lib/utils";
 
 type Filter = "all" | "unread";
 
 export function NotificationDropdown() {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState<Filter>("all");
-  const [items, setItems] = useState<AppNotification[]>(initialNotifications);
+  const [items, setItems] = useState<AppNotificationDto[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const fetchedOnce = useRef(false);
 
-  const unreadCount = useMemo(
-    () => items.filter((n) => n.unread).length,
-    [items],
+  const applyPayload = useCallback((json: NotificationsPayload) => {
+    setItems(json.items);
+    setUnreadCount(json.unreadCount);
+  }, []);
+
+  const load = useCallback(
+    async (opts?: { soft?: boolean }) => {
+      if (!opts?.soft) setLoading(true);
+      try {
+        const res = await fetch("/api/notifications", { cache: "no-store" });
+        if (!res.ok) throw new Error("Failed");
+        applyPayload((await res.json()) as NotificationsPayload);
+      } catch {
+        if (!fetchedOnce.current) {
+          setItems([]);
+          setUnreadCount(0);
+        }
+      } finally {
+        setLoading(false);
+        fetchedOnce.current = true;
+      }
+    },
+    [applyPayload],
   );
+
+  useEffect(() => {
+    setMounted(true);
+    void load();
+  }, [load]);
+
+  useEffect(() => {
+    if (!open) return;
+    void load({ soft: true });
+  }, [open, load]);
 
   const visible = useMemo(
     () => (filter === "unread" ? items.filter((n) => n.unread) : items),
@@ -31,14 +71,9 @@ export function NotificationDropdown() {
   );
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
     if (!open) return;
 
     function onPointerDown(event: MouseEvent | TouchEvent) {
-      // Desktop dropdown only — mobile uses full-screen portal + backdrop
       if (window.matchMedia("(min-width: 768px)").matches) {
         if (!rootRef.current?.contains(event.target as Node)) {
           setOpen(false);
@@ -68,8 +103,29 @@ export function NotificationDropdown() {
     };
   }, [open]);
 
-  function markAllRead() {
-    setItems((prev) => prev.map((n) => ({ ...n, unread: false })));
+  async function markAllRead() {
+    const res = await fetch("/api/notifications", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ markAll: true }),
+    });
+    if (!res.ok) return;
+    applyPayload((await res.json()) as NotificationsPayload);
+  }
+
+  async function openItem(item: AppNotificationDto) {
+    if (item.unread) {
+      const res = await fetch("/api/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: item.id }),
+      });
+      if (res.ok) {
+        applyPayload((await res.json()) as NotificationsPayload);
+      }
+    }
+    setOpen(false);
+    if (item.href) router.push(item.href);
   }
 
   function onDragEnd(_: unknown, info: PanInfo) {
@@ -80,21 +136,14 @@ export function NotificationDropdown() {
 
   const list = (
     <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-1.5 [-webkit-overflow-scrolling:touch] md:max-h-[340px] md:flex-none">
-      {visible.length === 0 ? (
-        <div className="flex flex-col items-center justify-center px-6 py-14 text-center">
-          <span className="mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-muted text-muted-foreground">
-            <Bell className="h-6 w-6" strokeWidth={1.75} />
-          </span>
-          <p className="text-sm font-semibold text-foreground">All caught up</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {filter === "unread"
-              ? "No unread notifications right now."
-              : "You don’t have any notifications yet."}
-          </p>
-        </div>
+      {loading && items.length === 0 ? (
+        <NotificationsDropdownSkeleton />
+      ) : visible.length === 0 ? (
+        <NotificationsDropdownEmpty filter={filter} />
       ) : (
-        visible.map((item, index) => {
-          const Icon = item.icon;
+        visible.slice(0, 12).map((item, index) => {
+          const visual = notificationVisual(item.type);
+          const Icon = visual.icon;
           return (
             <motion.button
               key={item.id}
@@ -102,14 +151,7 @@ export function NotificationDropdown() {
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: Math.min(index * 0.03, 0.18) }}
-              onClick={() => {
-                setItems((prev) =>
-                  prev.map((n) =>
-                    n.id === item.id ? { ...n, unread: false } : n,
-                  ),
-                );
-                setOpen(false);
-              }}
+              onClick={() => void openItem(item)}
               className={cn(
                 "mb-1 flex w-full items-start gap-3 rounded-[18px] px-3 py-3.5 text-left transition active:bg-muted/80 md:py-3 md:hover:bg-muted/70",
                 item.unread && "bg-oryno-orange-muted/40",
@@ -118,7 +160,7 @@ export function NotificationDropdown() {
               <span
                 className={cn(
                   "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl md:h-10 md:w-10 md:rounded-full",
-                  item.color,
+                  visual.color,
                 )}
               >
                 <Icon className="h-5 w-5" strokeWidth={1.75} />
@@ -174,7 +216,7 @@ export function NotificationDropdown() {
         <div className="flex items-center gap-1.5">
           <button
             type="button"
-            onClick={markAllRead}
+            onClick={() => void markAllRead()}
             disabled={unreadCount === 0}
             className="inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-xs font-semibold text-primary transition enabled:hover:bg-oryno-orange-muted disabled:opacity-40 md:h-auto md:rounded-none md:px-0 md:hover:bg-transparent"
           >
@@ -192,12 +234,14 @@ export function NotificationDropdown() {
         </div>
       </div>
 
-      {/* Mobile filters */}
       <div className="mt-3 flex gap-2 md:hidden">
         {(
           [
             { id: "all", label: "All" },
-            { id: "unread", label: `Unread${unreadCount ? ` · ${unreadCount}` : ""}` },
+            {
+              id: "unread",
+              label: `Unread${unreadCount ? ` · ${unreadCount}` : ""}`,
+            },
           ] as const
         ).map((tab) => (
           <button
@@ -282,7 +326,6 @@ export function NotificationDropdown() {
         ) : null}
       </motion.button>
 
-      {/* Desktop dropdown */}
       <AnimatePresence>
         {open ? (
           <motion.div

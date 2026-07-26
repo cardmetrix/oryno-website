@@ -405,11 +405,14 @@ export const wallets = pgTable(
       .default("0"),
     status: walletStatusEnum("status").notNull().default("healthy"),
     isPrimary: boolean("is_primary").notNull().default(false),
+    /** Unique virtual debit card number issued per wallet */
+    cardNumber: varchar("card_number", { length: 16 }),
     dailyLimit: numeric("daily_limit", { precision: 18, scale: 2 }),
     ...timestamps,
   },
   (t) => [
     uniqueIndex("wallets_user_currency_uidx").on(t.userId, t.currency),
+    uniqueIndex("wallets_card_number_uidx").on(t.cardNumber),
     index("wallets_status_idx").on(t.status),
   ],
 );

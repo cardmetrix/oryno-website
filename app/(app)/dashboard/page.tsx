@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
@@ -14,10 +15,13 @@ import {
 import { AdCarousel } from "@/components/app/ad-carousel";
 import { AppShell } from "@/components/app/app-shell";
 import { DashboardHeader } from "@/components/app/dashboard-header";
+import { HistoryEmpty } from "@/components/app/history-states";
 import { MotionSection } from "@/components/app/motion-section";
 import { TransactionRow } from "@/components/app/transaction-row";
 import { WalletCard } from "@/components/app/wallet-card";
-import { recentTransactions } from "@/lib/demo-data";
+import { Skeleton } from "@/components/ui/skeleton";
+import type { AppTransaction } from "@/lib/transactions";
+import type { WalletPayload } from "@/lib/wallet-types";
 
 const quickActions = [
   { href: "/services/gift-cards", label: "Gift Cards", icon: Gift },
@@ -29,6 +33,29 @@ const quickActions = [
 ];
 
 export default function DashboardPage() {
+  const [recent, setRecent] = useState<AppTransaction[]>([]);
+  const [cardNumber, setCardNumber] = useState<string | null>(null);
+  const [loadingTx, setLoadingTx] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoadingTx(true);
+    try {
+      const res = await fetch("/api/wallet", { cache: "no-store" });
+      if (!res.ok) throw new Error("Failed");
+      const json = (await res.json()) as WalletPayload;
+      setRecent(json.recent.slice(0, 5));
+      setCardNumber(json.primary.cardNumber);
+    } catch {
+      setRecent([]);
+    } finally {
+      setLoadingTx(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
   return (
     <AppShell>
       <DashboardHeader />
@@ -36,14 +63,22 @@ export default function DashboardPage() {
       <div className="grid items-stretch gap-4 sm:gap-5 lg:grid-cols-[1.35fr_0.85fr] lg:gap-6">
         <MotionSection delay={0.04} className="min-w-0">
           <WalletCard />
+          {cardNumber ? (
+            <p className="mt-2 px-1 text-[11px] text-muted-foreground">
+              Your personal ORYNO virtual card · ending{" "}
+              <span className="font-semibold text-foreground">
+                {cardNumber.slice(-4)}
+              </span>
+            </p>
+          ) : null}
         </MotionSection>
 
         <MotionSection delay={0.08} className="min-w-0 lg:h-full">
           <AdCarousel />
         </MotionSection>
       </div>
+
       <MotionSection delay={0.14} className="mt-6">
- 
         <div className="space-y-4 sm:space-y-5">
           <MotionSection
             delay={0.1}
@@ -111,11 +146,29 @@ export default function DashboardPage() {
             </Link>
           </motion.div>
         </div>
-        <div className="divide-y divide-border">
-          {recentTransactions.map((tx) => (
-            <TransactionRow key={tx.id} transaction={tx} />
-          ))}
-        </div>
+
+        {loadingTx ? (
+          <div className="space-y-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3 py-2">
+                <Skeleton className="h-11 w-11 rounded-2xl" />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <Skeleton className="h-3.5 w-2/3 rounded-full" />
+                  <Skeleton className="h-3 w-1/3 rounded-full" />
+                </div>
+                <Skeleton className="h-4 w-16 rounded-full" />
+              </div>
+            ))}
+          </div>
+        ) : recent.length === 0 ? (
+          <HistoryEmpty />
+        ) : (
+          <div className="divide-y divide-border">
+            {recent.map((tx, i) => (
+              <TransactionRow key={tx.id} transaction={tx} index={i} />
+            ))}
+          </div>
+        )}
       </MotionSection>
     </AppShell>
   );

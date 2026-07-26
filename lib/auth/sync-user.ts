@@ -7,6 +7,7 @@ import {
   users,
   wallets,
 } from "@/lib/db/schema";
+import { createNotification } from "@/lib/notifications-service";
 
 export type SyncedUser = typeof users.$inferSelect;
 
@@ -282,6 +283,25 @@ export async function syncClerkUserToDb(
       })
       .returning();
     dbUser = created;
+
+    try {
+      await createNotification({
+        userId: dbUser.id,
+        title: "Welcome to ORYNO",
+        body: "Your wallet is ready. Fund it to pay for airtime, data, bills, and more.",
+        type: "system",
+        metadata: { href: "/fund", kind: "welcome" },
+      });
+      await createNotification({
+        userId: dbUser.id,
+        title: "Your ORYNO card is ready",
+        body: "A personal virtual card was issued for your wallet. Open Home to view your card number.",
+        type: "success",
+        metadata: { href: "/dashboard", kind: "card_issued" },
+      });
+    } catch {
+      // non-blocking
+    }
   }
 
   await db
@@ -293,6 +313,7 @@ export async function syncClerkUserToDb(
     DEFAULT_COUNTRIES.find((c) => c.code === (dbUser.countryCode ?? "NG"))
       ?.currency ?? "NGN";
 
+  const { generateWalletCardNumber } = await import("@/lib/wallet");
   await db
     .insert(wallets)
     .values({
@@ -300,6 +321,7 @@ export async function syncClerkUserToDb(
       currency,
       balance: "0",
       isPrimary: true,
+      cardNumber: generateWalletCardNumber(dbUser.id, currency),
     })
     .onConflictDoNothing();
 
