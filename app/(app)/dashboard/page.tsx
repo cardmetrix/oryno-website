@@ -63,14 +63,7 @@ export default function DashboardPage() {
       <div className="grid items-stretch gap-4 sm:gap-5 lg:grid-cols-[1.35fr_0.85fr] lg:gap-6">
         <MotionSection delay={0.04} className="min-w-0">
           <WalletCard />
-          {cardNumber ? (
-            <p className="mt-2 px-1 text-[11px] text-muted-foreground">
-              Your personal ORYNO virtual card · ending{" "}
-              <span className="font-semibold text-foreground">
-                {cardNumber.slice(-4)}
-              </span>
-            </p>
-          ) : null}
+         
         </MotionSection>
 
         <MotionSection delay={0.08} className="min-w-0 lg:h-full">
