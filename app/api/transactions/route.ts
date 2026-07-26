@@ -4,10 +4,8 @@ import { ensureAppUser } from "@/lib/auth/current-user";
 import { db } from "@/lib/db";
 import { transactions } from "@/lib/db/schema";
 import {
-  formatMoney,
   groupTransactionsByDate,
-  mapDbStatus,
-  type AppTransaction,
+  toAppTransaction,
 } from "@/lib/transactions";
 
 export const runtime = "nodejs";
@@ -25,21 +23,7 @@ export async function GET() {
       limit: 100,
     });
 
-    const items: AppTransaction[] = rows.map((row) => {
-      const credit = row.type === "credit";
-      const signed = formatMoney(row.amount, row.currency);
-      return {
-        id: row.id,
-        title: row.title,
-        subtitle: row.subtitle || row.category.replace(/_/g, " "),
-        amount: `${credit ? "+" : "-"}${signed}`,
-        type: credit ? "credit" : "debit",
-        status: mapDbStatus(row.status),
-        category: row.category,
-        currency: row.currency,
-        createdAt: row.createdAt.toISOString(),
-      };
-    });
+    const items = rows.map(toAppTransaction);
 
     return NextResponse.json({
       items,

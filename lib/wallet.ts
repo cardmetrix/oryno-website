@@ -7,7 +7,11 @@ import {
   wallets,
   withdrawals,
 } from "@/lib/db/schema";
-import { formatMoney, mapDbStatus, type AppTransaction } from "@/lib/transactions";
+import {
+  formatMoney,
+  toAppTransaction,
+  type AppTransaction,
+} from "@/lib/transactions";
 import { currencyForCountry as currencyFromCountryLib } from "@/lib/country";
 import type {
   BankAccountSummary,
@@ -228,20 +232,7 @@ export async function recentWalletTransactions(
     limit,
   });
 
-  return rows.map((row) => {
-    const credit = row.type === "credit";
-    return {
-      id: row.id,
-      title: row.title,
-      subtitle: row.subtitle || row.category.replace(/_/g, " "),
-      amount: `${credit ? "+" : "-"}${formatMoney(row.amount, row.currency)}`,
-      type: credit ? ("credit" as const) : ("debit" as const),
-      status: mapDbStatus(row.status),
-      category: row.category,
-      currency: row.currency,
-      createdAt: row.createdAt.toISOString(),
-    };
-  });
+  return rows.map(toAppTransaction);
 }
 
 function assertHealthy(wallet: WalletRow) {
