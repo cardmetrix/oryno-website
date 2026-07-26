@@ -11,6 +11,7 @@ import {
   countryFromPhone as countryFromPhoneLib,
   currencyForCountry,
   resolveCountryCode,
+  resolveLanguageForCountry,
   type SupportedCountryCode,
 } from "@/lib/country";
 
@@ -264,6 +265,11 @@ export async function syncClerkUserToDb(
             existing.countryCode ?? detectedCountry ?? phoneCountry,
           );
 
+    const nextLanguage = resolveLanguageForCountry(
+      existing.language,
+      nextCountry,
+    );
+
     try {
       const [updated] = await db
         .update(users)
@@ -275,6 +281,7 @@ export async function syncClerkUserToDb(
           phone,
           avatarUrl: existing.avatarUrl ?? avatarUrl,
           countryCode: nextCountry,
+          language: nextLanguage,
           emailVerifiedAt: existing.emailVerifiedAt ?? emailVerifiedAt,
           lastLoginAt: options?.touchLogin ? now : existing.lastLoginAt,
           updatedAt: now,
@@ -295,6 +302,7 @@ export async function syncClerkUserToDb(
           phone,
           avatarUrl: existing.avatarUrl ?? avatarUrl,
           countryCode: nextCountry,
+          language: nextLanguage,
           emailVerifiedAt: existing.emailVerifiedAt ?? emailVerifiedAt,
           lastLoginAt: options?.touchLogin ? now : existing.lastLoginAt,
           updatedAt: now,

@@ -26,7 +26,12 @@ import { PageHeader } from "@/components/app/page-header";
 import { SettingsSkeleton } from "@/components/app/settings-skeleton";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Switch } from "@/components/ui/switch";
+import { useCountry } from "@/components/providers/country-provider";
 import { AUTH_LINKS } from "@/lib/auth-links";
+import {
+  languageLabel as resolveLanguageLabel,
+  languagesForCountry,
+} from "@/lib/country";
 import type { ProfileDto } from "@/lib/profile";
 import { cn } from "@/lib/utils";
 
@@ -44,20 +49,16 @@ type SettingsPayload = {
   };
 };
 
-const LANGUAGES = [
-  { code: "en", label: "English" },
-  { code: "fr", label: "Français" },
-  { code: "ha", label: "Hausa" },
-  { code: "yo", label: "Yorùbá" },
-  { code: "ig", label: "Igbo" },
-];
-
 export default function SettingsPage() {
   const { isLoaded } = useUser();
   const { signOut } = useClerk();
   const { setTheme } = useTheme();
+  const { country } = useCountry();
   const [data, setData] = useState<SettingsPayload | null>(null);
   const [loading, setLoading] = useState(true);
+  const languages = languagesForCountry(
+    data?.profile.countryCode ?? country.code,
+  );
 
   const load = useCallback(async () => {
     try {
@@ -144,9 +145,11 @@ export default function SettingsPage() {
     );
   }
 
-  const languageLabel =
-    LANGUAGES.find((l) => l.code === data.preferences.language)?.label ||
-    "English";
+  const countryCode = data.profile.countryCode ?? country.code;
+  const languageLabel = resolveLanguageLabel(
+    data.preferences.language,
+    countryCode,
+  );
 
   return (
     <AppShell>
@@ -228,11 +231,13 @@ export default function SettingsPage() {
               <IconBubble icon={Languages} />
               <div>
                 <p className="text-sm font-semibold text-foreground">Language</p>
-                <p className="text-xs text-muted-foreground">{languageLabel}</p>
+                <p className="text-xs text-muted-foreground">
+                  {languageLabel} · {country.name}
+                </p>
               </div>
             </div>
             <div className="flex flex-wrap gap-2 pl-12">
-              {LANGUAGES.map((lang) => (
+              {languages.map((lang) => (
                 <button
                   key={lang.code}
                   type="button"

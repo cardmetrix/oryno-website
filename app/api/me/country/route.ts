@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { clerkClient, currentUser } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
 import { ensureAppUser } from "@/lib/auth/current-user";
-import { getCountryInfo, resolveCountryCode } from "@/lib/country";
+import {
+  getCountryInfo,
+  resolveCountryCode,
+  resolveLanguageForCountry,
+} from "@/lib/country";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { currencyForCountry, ensurePrimaryWallet } from "@/lib/wallet";
@@ -58,7 +62,11 @@ export async function PATCH(req: Request) {
 
     const [updated] = await db
       .update(users)
-      .set({ countryCode: country.code, updatedAt: new Date() })
+      .set({
+        countryCode: country.code,
+        language: resolveLanguageForCountry(user.language, country.code),
+        updatedAt: new Date(),
+      })
       .where(eq(users.id, user.id))
       .returning();
 

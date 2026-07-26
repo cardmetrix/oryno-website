@@ -216,9 +216,9 @@ export default function WalletPage() {
                 <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }}>
                   <Link
                     href="/fund"
-                    className="flex h-[50px] items-center justify-center gap-2 rounded-[16px] bg-white font-bold text-primary shadow-[0_10px_24px_rgba(0,0,0,0.12)]"
+                    className="flex h-[50px] items-center justify-center gap-2 rounded-[16px] bg-white font-bold text-black shadow-[0_10px_24px_rgba(0,0,0,0.12)]"
                   >
-                    <Plus className="h-4 w-4" strokeWidth={2.5} />
+                    <Plus className="h-4 w-4 text-black" strokeWidth={2.5} />
                     Fund
                   </Link>
                 </motion.div>

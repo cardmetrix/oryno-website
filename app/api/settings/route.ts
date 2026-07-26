@@ -3,6 +3,10 @@ import { currentUser } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { ensureAppUser } from "@/lib/auth/current-user";
+import {
+  isLanguageAllowedForCountry,
+  resolveLanguageForCountry,
+} from "@/lib/country";
 import { db } from "@/lib/db";
 import { userSecurity, users } from "@/lib/db/schema";
 import { toProfileDto } from "@/lib/profile";
@@ -87,12 +91,27 @@ export async function PATCH(req: Request) {
 
     const security = await getOrCreateSecurity(dbUser.id);
 
+    if (typeof body.language === "string") {
+      const nextLanguage = body.language.trim().toLowerCase();
+      if (!isLanguageAllowedForCountry(nextLanguage, dbUser.countryCode)) {
+        return NextResponse.json(
+          {
+            error:
+              "That language isn’t available for your current country. English is always available.",
+          },
+          { status: 400 },
+        );
+      }
+    }
+
     if (body.theme || body.language) {
       await db
         .update(users)
         .set({
           theme: body.theme ?? dbUser.theme,
-          language: body.language?.trim() || dbUser.language,
+          language: body.language
+            ? resolveLanguageForCountry(body.language, dbUser.countryCode)
+            : dbUser.language,
           updatedAt: new Date(),
         })
         .where(eq(users.id, dbUser.id));

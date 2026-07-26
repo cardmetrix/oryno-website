@@ -135,3 +135,69 @@ export function countryFromPhone(phone?: string | null): SupportedCountryCode | 
   if (normalized.startsWith("+27") || normalized.startsWith("27")) return "ZA";
   return null;
 }
+
+export type AppLanguage = {
+  code: string;
+  label: string;
+};
+
+export const ENGLISH_LANGUAGE: AppLanguage = {
+  code: "en",
+  label: "English",
+};
+
+/** Local languages shown in Settings (English is always available separately). */
+export const COUNTRY_LANGUAGES: Record<SupportedCountryCode, AppLanguage[]> = {
+  NG: [
+    { code: "ha", label: "Hausa" },
+    { code: "yo", label: "Yorùbá" },
+    { code: "ig", label: "Igbo" },
+  ],
+  GH: [
+    { code: "tw", label: "Twi" },
+    { code: "ee", label: "Ewe" },
+    { code: "gaa", label: "Ga" },
+  ],
+  KE: [{ code: "sw", label: "Kiswahili" }],
+  ZA: [
+    { code: "af", label: "Afrikaans" },
+    { code: "zu", label: "isiZulu" },
+    { code: "xh", label: "isiXhosa" },
+  ],
+};
+
+/** English + country-specific languages for the detected market. */
+export function languagesForCountry(code?: string | null): AppLanguage[] {
+  const country = resolveCountryCode(code);
+  return [ENGLISH_LANGUAGE, ...COUNTRY_LANGUAGES[country]];
+}
+
+export function isLanguageAllowedForCountry(
+  language: string | null | undefined,
+  countryCode?: string | null,
+): boolean {
+  if (!language) return false;
+  const code = language.trim().toLowerCase();
+  return languagesForCountry(countryCode).some((l) => l.code === code);
+}
+
+/** Keep English / allowed local langs; otherwise fall back to English. */
+export function resolveLanguageForCountry(
+  language: string | null | undefined,
+  countryCode?: string | null,
+): string {
+  const code = language?.trim().toLowerCase();
+  if (code && isLanguageAllowedForCountry(code, countryCode)) return code;
+  return ENGLISH_LANGUAGE.code;
+}
+
+export function languageLabel(
+  language: string | null | undefined,
+  countryCode?: string | null,
+): string {
+  const code = resolveLanguageForCountry(language, countryCode);
+  return (
+    languagesForCountry(countryCode).find((l) => l.code === code)?.label ??
+    ENGLISH_LANGUAGE.label
+  );
+}
