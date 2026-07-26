@@ -172,24 +172,6 @@ export function WalletCard({
                     </p>
                   </div>
                 </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="rounded-full bg-black/25 px-2.5 py-1 text-[10px] font-bold tracking-wide text-[#ffd29a] ring-1 ring-white/20 backdrop-blur-md">
-                    PREMIUM
-                  </span>
-                  <motion.span
-                    animate={{ opacity: [0.45, 1, 0.45] }}
-                    transition={{
-                      duration: 2.6,
-                      repeat: Infinity,
-                      ease: "easeInOut",
-                    }}
-                    className="flex h-9 w-9 items-center justify-center rounded-full bg-black/20 ring-1 ring-white/20 backdrop-blur-md"
-                    aria-hidden="true"
-                  >
-                    <Wifi className="h-4 w-4 rotate-90 text-white/90" />
-                  </motion.span>
-                </div>
               </div>
 
               <div className="mt-3 rounded-[18px] border border-white/15 bg-black/20 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-md md:mt-2.5 md:p-2.5 lg:mt-3 lg:p-3">
@@ -268,7 +250,7 @@ export function WalletCard({
                     {displayCurrency}
                   </span>
                   <span className="mt-1 text-[9px] font-medium tracking-[0.16em] text-white/60 uppercase">
-                    Virtual card
+                     card
                   </span>
                 </div>
               </div>
