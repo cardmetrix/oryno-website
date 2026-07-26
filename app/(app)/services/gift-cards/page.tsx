@@ -67,7 +67,7 @@ export default function GiftCardsPage() {
           {!giftCardsEnabled ? (
             <p className="mt-4 inline-flex items-center gap-2 text-xs font-medium text-muted-foreground">
               <Sparkles className="h-3.5 w-3.5 text-primary" />
-              Disabled in country config until launch
+              Disabled in your country until launch
             </p>
           ) : null}
         </div>

@@ -281,16 +281,16 @@ export function WalletCard({
         <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }}>
           <Link
             href="/fund"
-            className="group relative flex h-[52px] w-full items-center justify-center gap-2.5 overflow-hidden rounded-[18px] bg-gradient-to-br from-[#ff8124] via-oryno-orange to-[#e85d00] px-3 text-sm font-bold text-white shadow-[0_14px_32px_rgba(255,106,0,0.35)] ring-1 ring-white/20"
+            className="group relative flex h-[52px] w-full items-center justify-center gap-2.5 overflow-hidden rounded-[18px] bg-gradient-to-br from-[#ff8124] via-oryno-orange to-[#e85d00] px-3 text-sm font-bold text-black shadow-[0_14px_32px_rgba(255,106,0,0.35)] ring-1 ring-white/20"
           >
             <span
               aria-hidden="true"
               className="pointer-events-none absolute inset-0 bg-[linear-gradient(120deg,transparent_30%,rgba(255,255,255,0.22)_50%,transparent_70%)] opacity-0 transition-opacity duration-300 group-hover:opacity-100"
             />
-            <span className="relative flex h-8 w-8 items-center justify-center rounded-full bg-white/20 ring-1 ring-white/30 backdrop-blur-sm transition-transform duration-300 group-hover:rotate-90">
-              <Plus className="h-4 w-4" strokeWidth={2.5} />
+            <span className="relative flex h-8 w-8 items-center justify-center rounded-full bg-black/10 ring-1 ring-black/15 backdrop-blur-sm transition-transform duration-300 group-hover:rotate-90">
+              <Plus className="h-4 w-4 text-black" strokeWidth={2.5} />
             </span>
-            <span className="relative tracking-wide">Fund</span>
+            <span className="relative tracking-wide text-black">Fund</span>
           </Link>
         </motion.div>
 
