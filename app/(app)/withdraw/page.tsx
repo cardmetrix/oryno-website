@@ -85,11 +85,18 @@ export default function WithdrawPage() {
         amountFormatted?: string;
         reference?: string | null;
         pending?: boolean;
+        transactionId?: string;
         wallet?: WalletSummary;
         bank?: { bankName: string };
       };
       if (!res.ok) throw new Error(json.error || "Withdrawal failed");
       if (json.wallet) setWallet(json.wallet);
+
+      if (json.transactionId) {
+        router.replace(`/history/${json.transactionId}`);
+        return;
+      }
+
       setSuccess({
         amountFormatted: json.amountFormatted ?? amount,
         reference: json.reference,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Check, Copy, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
@@ -35,6 +36,7 @@ const FUND_INSTRUCTIONS = [
 ];
 
 export default function FundPage() {
+  const router = useRouter();
   const [wallet, setWallet] = useState<WalletSummary | null>(null);
   const [deposit, setDeposit] = useState<DepositAccount | null>(null);
   const [demoMode, setDemoMode] = useState(true);
@@ -44,6 +46,30 @@ export default function FundPage() {
   const [copied, setCopied] = useState<"number" | "name" | null>(null);
   const [demoAmount, setDemoAmount] = useState("5000");
   const lastBalanceRef = useRef<string | null>(null);
+  const redirectedRef = useRef(false);
+
+  const goToLatestFundReceipt = useCallback(async () => {
+    if (redirectedRef.current) return;
+    try {
+      const res = await fetch("/api/wallet", { cache: "no-store" });
+      if (!res.ok) return;
+      const json = (await res.json()) as {
+        recent?: Array<{ id: string; type: string; category?: string }>;
+      };
+      const latest =
+        json.recent?.find(
+          (tx) =>
+            tx.type === "credit" &&
+            (!tx.category || tx.category === "fund"),
+        ) ?? json.recent?.find((tx) => tx.type === "credit");
+      if (latest?.id) {
+        redirectedRef.current = true;
+        router.replace(`/history/${latest.id}`);
+      }
+    } catch {
+      // keep user on fund page if receipt lookup fails
+    }
+  }, [router]);
 
   const refreshWallet = useCallback(async (opts?: { silent?: boolean }) => {
     try {
@@ -61,6 +87,7 @@ export default function FundPage() {
         toast.success("Payment received", {
           description: `Your wallet is now ${next.balanceFormatted}`,
         });
+        void goToLatestFundReceipt();
       }
 
       lastBalanceRef.current = next.balance;
@@ -70,7 +97,7 @@ export default function FundPage() {
         // keep existing balance on soft poll failures
       }
     }
-  }, []);
+  }, [goToLatestFundReceipt]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -161,6 +188,7 @@ export default function FundPage() {
         amountFormatted?: string;
         wallet?: WalletSummary;
         reference?: string;
+        transactionId?: string;
       };
       if (!res.ok) throw new Error(json.error || "Could not process demo funding");
 
@@ -171,9 +199,16 @@ export default function FundPage() {
         await refreshWallet({ silent: true });
       }
 
+      if (json.transactionId) {
+        redirectedRef.current = true;
+        router.replace(`/history/${json.transactionId}`);
+        return;
+      }
+
       toast.success("Demo funding successful", {
         description: `${json.amountFormatted ?? `₦${amount.toLocaleString()}`} added to your wallet`,
       });
+      await goToLatestFundReceipt();
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Could not process demo funding";
