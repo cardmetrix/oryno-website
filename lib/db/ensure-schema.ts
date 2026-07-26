@@ -26,6 +26,37 @@ export async function ensureWalletSchema() {
         ALTER TABLE "users"
         ADD COLUMN IF NOT EXISTS "username" varchar(64)
       `);
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS "user_deposit_accounts" (
+          "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+          "user_id" uuid NOT NULL UNIQUE REFERENCES "users"("id") ON DELETE cascade,
+          "provider" varchar(40) DEFAULT 'paystack' NOT NULL,
+          "currency" varchar(3) DEFAULT 'NGN' NOT NULL,
+          "account_number" varchar(32) NOT NULL,
+          "account_name" varchar(160) NOT NULL,
+          "bank_name" varchar(120) NOT NULL,
+          "bank_slug" varchar(80),
+          "paystack_customer_code" varchar(80),
+          "paystack_account_id" varchar(80),
+          "status" varchar(32) DEFAULT 'active' NOT NULL,
+          "metadata" jsonb,
+          "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+          "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+        )
+      `);
+      await db.execute(sql`
+        CREATE UNIQUE INDEX IF NOT EXISTS "user_deposit_accounts_number_uidx"
+        ON "user_deposit_accounts" USING btree ("account_number")
+      `);
+      await db.execute(sql`
+        CREATE INDEX IF NOT EXISTS "user_deposit_accounts_customer_idx"
+        ON "user_deposit_accounts" USING btree ("paystack_customer_code")
+      `);
+      await db.execute(sql`
+        CREATE UNIQUE INDEX IF NOT EXISTS "wallet_fundings_external_ref_uidx"
+        ON "wallet_fundings" USING btree ("external_ref")
+        WHERE "external_ref" IS NOT NULL
+      `);
     })().catch((error) => {
       ready = null;
       console.error("[ensure-wallet-schema]", error);

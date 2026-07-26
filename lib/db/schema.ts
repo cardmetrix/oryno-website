@@ -390,6 +390,33 @@ export const userBankAccounts = pgTable(
   ],
 );
 
+/** Paystack Dedicated Virtual Account for wallet deposits */
+export const userDepositAccounts = pgTable(
+  "user_deposit_accounts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" })
+      .unique(),
+    provider: varchar("provider", { length: 40 }).notNull().default("paystack"),
+    currency: varchar("currency", { length: 3 }).notNull().default("NGN"),
+    accountNumber: varchar("account_number", { length: 32 }).notNull(),
+    accountName: varchar("account_name", { length: 160 }).notNull(),
+    bankName: varchar("bank_name", { length: 120 }).notNull(),
+    bankSlug: varchar("bank_slug", { length: 80 }),
+    paystackCustomerCode: varchar("paystack_customer_code", { length: 80 }),
+    paystackAccountId: varchar("paystack_account_id", { length: 80 }),
+    status: varchar("status", { length: 32 }).notNull().default("active"),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex("user_deposit_accounts_number_uidx").on(t.accountNumber),
+    index("user_deposit_accounts_customer_idx").on(t.paystackCustomerCode),
+  ],
+);
+
 // ─── 3. Wallets & ledger ─────────────────────────────────────────────────────
 
 export const wallets = pgTable(
@@ -473,7 +500,10 @@ export const walletFundings = pgTable(
     metadata: jsonb("metadata").$type<Record<string, unknown>>(),
     ...timestamps,
   },
-  (t) => [index("wallet_fundings_user_idx").on(t.userId)],
+  (t) => [
+    index("wallet_fundings_user_idx").on(t.userId),
+    uniqueIndex("wallet_fundings_external_ref_uidx").on(t.externalRef),
+  ],
 );
 
 export const withdrawals = pgTable(
@@ -1083,6 +1113,10 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   }),
   wallets: many(wallets),
   bankAccounts: many(userBankAccounts),
+  depositAccount: one(userDepositAccounts, {
+    fields: [users.id],
+    references: [userDepositAccounts.userId],
+  }),
   transactions: many(transactions),
   notifications: many(notifications),
   referralCode: one(referralCodes, {
@@ -1090,6 +1124,16 @@ export const usersRelations = relations(users, ({ one, many }) => ({
     references: [referralCodes.userId],
   }),
 }));
+
+export const userDepositAccountsRelations = relations(
+  userDepositAccounts,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [userDepositAccounts.userId],
+      references: [users.id],
+    }),
+  }),
+);
 
 export const walletsRelations = relations(wallets, ({ one, many }) => ({
   user: one(users, { fields: [wallets.userId], references: [users.id] }),
