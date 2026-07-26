@@ -16,6 +16,7 @@ import {
   InputOTPGroup,
   InputOTPSlot,
 } from "@/components/ui/input-otp";
+import { applyMissingSignUpFields } from "@/lib/auth/complete-signup";
 import { clerkErrorMessage } from "@/lib/auth/clerk-errors";
 import { syncSessionToDatabase } from "@/lib/auth/client-sync";
 import {
@@ -23,7 +24,6 @@ import {
   normalizeUsername,
 } from "@/lib/auth/username";
 import { AUTH_LINKS } from "@/lib/auth-links";
-import { cn } from "@/lib/utils";
 
 type Step = "details" | "otp";
 
@@ -46,7 +46,27 @@ function RegisterForm() {
   const [otp, setOtp] = useState("");
   const [seconds, setSeconds] = useState(54);
 
-  // Resume OTP step after /otp redirect or refresh when Clerk still has a SignUp.
+  const [fullName, setFullName] = useState("");
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  const normalizedUsername = normalizeUsername(username);
+  const passwordsMatch =
+    password.length > 0 && password === confirmPassword;
+  const canCreate =
+    isLoaded &&
+    !loading &&
+    agreed &&
+    fullName.trim().length >= 2 &&
+    isValidUsername(normalizedUsername) &&
+    email.includes("@") &&
+    phone.trim().length >= 7 &&
+    password.length >= 8 &&
+    passwordsMatch;
+
   useEffect(() => {
     if (!isLoaded) return;
 
@@ -75,55 +95,52 @@ function RegisterForm() {
   }, [step, seconds]);
 
   const destination = useMemo(() => {
-    const email = pending?.email || signUp?.emailAddress || "";
-    if (!email) return "your email";
-    const [user, domain] = email.split("@");
-    if (!domain) return email;
+    const value = pending?.email || signUp?.emailAddress || email || "";
+    if (!value) return "your email";
+    const [user, domain] = value.split("@");
+    if (!domain) return value;
     const masked =
       user.length <= 2 ? `${user[0] ?? "*"}***` : `${user.slice(0, 2)}***`;
     return `${masked}@${domain}`;
-  }, [pending?.email, signUp?.emailAddress]);
+  }, [pending?.email, signUp?.emailAddress, email]);
 
   async function onCreateAccount(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!agreed || !isLoaded || !signUp) return;
+    if (!canCreate || !signUp) return;
 
-    const form = new FormData(e.currentTarget);
-    const fullName = String(form.get("fullName") ?? "").trim();
-    const username = normalizeUsername(String(form.get("username") ?? ""));
-    const email = String(form.get("email") ?? "").trim().toLowerCase();
-    const phone = String(form.get("phone") ?? "").trim();
-    const password = String(form.get("password") ?? "");
-    const confirmPassword = String(form.get("confirmPassword") ?? "");
-
-    if (!isValidUsername(username)) {
-      setError("Username must be 3–32 characters (letters, numbers, _).");
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      setError("Passwords do not match.");
-      return;
-    }
-
-    const [firstName, ...rest] = fullName.split(/\s+/);
+    const [firstName, ...rest] = fullName.trim().split(/\s+/);
     const lastName = rest.join(" ") || undefined;
 
     setError(null);
     setLoading(true);
 
     try {
-      await signUp.create({
-        emailAddress: email,
-        username,
+      const createPayload: Parameters<typeof signUp.create>[0] = {
+        emailAddress: email.trim().toLowerCase(),
+        username: normalizedUsername,
         password,
         firstName: firstName || undefined,
         lastName,
         unsafeMetadata: {
-          fullName,
-          phone,
-          username,
+          fullName: fullName.trim(),
+          phone: phone.trim(),
+          username: normalizedUsername,
         },
+      };
+
+      try {
+        await signUp.create({ ...createPayload, legalAccepted: true });
+      } catch {
+        // legalAccepted may be disabled in Clerk dashboard
+        await signUp.create(createPayload);
+      }
+
+      // Ensure required fields are on the SignUp resource
+      await applyMissingSignUpFields(signUp, {
+        username: normalizedUsername,
+        fullName: fullName.trim(),
+        phone: phone.trim(),
+        legalAccepted: true,
       });
 
       try {
@@ -134,19 +151,29 @@ function RegisterForm() {
         await signUp.prepareEmailAddressVerification();
       }
 
-      const nextPending = { email, phone, fullName, username };
+      const nextPending: PendingVerify = {
+        email: email.trim().toLowerCase(),
+        phone: phone.trim(),
+        fullName: fullName.trim(),
+        username: normalizedUsername,
+      };
       setPending(nextPending);
       sessionStorage.setItem(
         "oryno_pending_verify",
         JSON.stringify({ ...nextPending, signUpId: signUp.id }),
       );
 
-      // Stay on this page so Clerk keeps the active SignUp in memory.
       setOtp("");
       setSeconds(54);
       setStep("otp");
     } catch (err) {
-      setError(clerkErrorMessage(err, "Could not create your account."));
+      const message = clerkErrorMessage(err, "Could not create your account.");
+      // Common when username is taken or Clerk needs continue flow
+      if (/additional information|missing/i.test(message) && signUp?.id) {
+        router.push("/continue");
+        return;
+      }
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -184,29 +211,32 @@ function RegisterForm() {
     try {
       let result = await signUp.attemptEmailAddressVerification({ code });
 
-      if (
-        result.status === "missing_requirements" &&
-        result.missingFields?.includes("username") &&
-        pending?.username
-      ) {
-        result = await signUp.update({ username: pending.username });
-      }
+      result = (await applyMissingSignUpFields(result as typeof signUp, {
+        username: pending?.username ?? normalizedUsername,
+        fullName: pending?.fullName ?? fullName,
+        phone: pending?.phone ?? phone,
+        legalAccepted: true,
+      })) as typeof result;
 
       if (result.status === "complete") {
         await completeSession(result.createdSessionId);
         return;
       }
 
-      // Resource may have updated on the hook instance after attempt.
       if (signUp.status === "complete" && signUp.createdSessionId) {
         await completeSession(signUp.createdSessionId);
+        return;
+      }
+
+      if (result.status === "missing_requirements") {
+        router.push("/continue");
         return;
       }
 
       const missing = result.missingFields?.join(", ");
       setError(
         missing
-          ? `Almost done — still need: ${missing}.`
+          ? `Almost done — still need: ${missing.replace(/_/g, " ")}.`
           : "Verification incomplete. Request a new code and try again.",
       );
     } catch (err) {
@@ -269,32 +299,25 @@ function RegisterForm() {
           <InputOTP
             maxLength={6}
             value={otp}
-            onChange={(next) => {
-              setOtp(next.replace(/\D/g, ""));
-              setError(null);
-            }}
+            onChange={setOtp}
             containerClassName="justify-between gap-2"
           >
-            <InputOTPGroup className="flex w-full justify-between gap-2">
-              {Array.from({ length: 6 }).map((_, index) => (
+            <InputOTPGroup className="w-full justify-between gap-2">
+              {Array.from({ length: 6 }).map((_, i) => (
                 <InputOTPSlot
-                  key={index}
-                  index={index}
-                  className={cn(
-                    "h-14 w-12 rounded-[14px] border border-oryno-gray-divider bg-muted/40 text-lg font-semibold shadow-none first:rounded-[14px] first:border-l last:rounded-[14px]",
-                    "ring-offset-0 first:rounded-[14px] last:rounded-[14px]",
-                  )}
+                  key={i}
+                  index={i}
+                  className="h-12 w-11 rounded-[12px] border border-border text-base sm:h-14 sm:w-12"
                 />
               ))}
             </InputOTPGroup>
           </InputOTP>
 
-          <p className="mt-5 text-sm text-muted-foreground">
-            Didn&apos;t receive code?{" "}
+          <p className="mt-5 text-center text-sm text-muted-foreground">
+            Didn&apos;t get a code?{" "}
             {seconds > 0 ? (
-              <span className="font-semibold text-primary">
-                Resend in {String(Math.floor(seconds / 60))}:
-                {String(seconds % 60).padStart(2, "0")}
+              <span className="font-semibold text-foreground">
+                Resend in {seconds}s
               </span>
             ) : (
               <button
@@ -318,6 +341,7 @@ function RegisterForm() {
           >
             {loading ? "Verifying…" : "Verify & Proceed"}
           </button>
+          <div id="clerk-captcha" className="mt-4" />
         </form>
       </AuthSplitLayout>
     );
@@ -336,6 +360,8 @@ function RegisterForm() {
             <input
               type="text"
               name="fullName"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
               placeholder="e.g. Chidi Benson"
               autoComplete="name"
               required
@@ -347,6 +373,8 @@ function RegisterForm() {
             <input
               type="text"
               name="username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               placeholder="e.g. chidi_b"
               autoComplete="username"
               required
@@ -362,6 +390,8 @@ function RegisterForm() {
             <input
               type="email"
               name="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               placeholder="e.g. chidi@oryno.com"
               autoComplete="email"
               required
@@ -373,6 +403,8 @@ function RegisterForm() {
             <input
               type="tel"
               name="phone"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
               placeholder="e.g. +234 801 234 5678"
               autoComplete="tel"
               required
@@ -386,6 +418,9 @@ function RegisterForm() {
             placeholder="Create robust password"
             autoComplete="new-password"
             required
+            minLength={8}
+            value={password}
+            onChange={setPassword}
           />
 
           <PasswordField
@@ -394,8 +429,17 @@ function RegisterForm() {
             placeholder="Repeat password"
             autoComplete="new-password"
             required
+            minLength={8}
+            value={confirmPassword}
+            onChange={setConfirmPassword}
           />
         </div>
+
+        {password && confirmPassword && !passwordsMatch ? (
+          <p className="mt-3 text-sm text-destructive">
+            Passwords do not match.
+          </p>
+        ) : null}
 
         <label className="mt-5 flex items-start gap-3 text-sm leading-relaxed text-muted-foreground">
           <Checkbox
@@ -421,13 +465,19 @@ function RegisterForm() {
 
         <motion.button
           type="submit"
-          disabled={!agreed || !isLoaded || loading}
-          whileHover={agreed ? { y: -2 } : undefined}
-          whileTap={agreed ? { scale: 0.985 } : undefined}
-          className="btn-primary mt-6 h-12 w-full text-base disabled:opacity-50"
+          disabled={!canCreate}
+          whileHover={canCreate ? { y: -2 } : undefined}
+          whileTap={canCreate ? { scale: 0.985 } : undefined}
+          className="btn-primary mt-6 h-12 w-full text-base disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {loading ? "Creating account…" : "Create Account"}
+          {loading
+            ? "Creating account…"
+            : !isLoaded
+              ? "Loading…"
+              : "Create Account"}
         </motion.button>
+
+        <div id="clerk-captcha" className="mt-3" />
 
         <SocialAuth className="mt-7" mode="signUp" />
 

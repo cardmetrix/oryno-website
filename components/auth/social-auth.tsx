@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useSignIn } from "@clerk/nextjs";
+import { useSignIn, useSignUp } from "@clerk/nextjs";
 import { motion } from "framer-motion";
 import { clerkErrorMessage } from "@/lib/auth/clerk-errors";
 import { cn } from "@/lib/utils";
@@ -12,22 +12,39 @@ type SocialAuthProps = {
 };
 
 export function SocialAuth({ className, mode = "signIn" }: SocialAuthProps) {
-  const { isLoaded, signIn } = useSignIn();
+  const { isLoaded: signInLoaded, signIn } = useSignIn();
+  const { isLoaded: signUpLoaded, signUp } = useSignUp();
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<"oauth_google" | "oauth_apple" | null>(
     null,
   );
 
+  const isLoaded = mode === "signUp" ? signUpLoaded : signInLoaded;
+
   async function startOAuth(strategy: "oauth_google" | "oauth_apple") {
-    if (!isLoaded || !signIn) return;
     setError(null);
     setPending(strategy);
 
     try {
+      const redirectUrl = "/sso-callback";
+      const redirectUrlComplete = "/dashboard";
+
+      if (mode === "signUp") {
+        if (!signUpLoaded || !signUp) return;
+        await signUp.authenticateWithRedirect({
+          strategy,
+          redirectUrl,
+          redirectUrlComplete,
+          continueSignUp: true,
+        });
+        return;
+      }
+
+      if (!signInLoaded || !signIn) return;
       await signIn.authenticateWithRedirect({
         strategy,
-        redirectUrl: "/sso-callback",
-        redirectUrlComplete: "/dashboard",
+        redirectUrl,
+        redirectUrlComplete,
       });
     } catch (err) {
       setPending(null);

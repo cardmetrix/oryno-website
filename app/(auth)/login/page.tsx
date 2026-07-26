@@ -19,6 +19,14 @@ function LoginForm() {
   const { isLoaded, signIn, setActive } = useSignIn();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
+
+  const canSubmit =
+    isLoaded &&
+    !loading &&
+    identifier.trim().length > 2 &&
+    password.length >= 1;
 
   const banner = useMemo(() => {
     const code = searchParams.get("error");
@@ -28,22 +36,24 @@ function LoginForm() {
     if (code === "sync_failed") {
       return "We couldn’t finish signing you in. Please try again.";
     }
+    if (code === "additional_info") {
+      return "Finish the missing account details to continue.";
+    }
     return null;
   }, [searchParams]);
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!isLoaded || !signIn || !setActive) return;
-
-    const form = new FormData(e.currentTarget);
-    const identifier = String(form.get("identifier") ?? "").trim();
-    const password = String(form.get("password") ?? "");
+    if (!canSubmit || !signIn || !setActive) return;
 
     setError(null);
     setLoading(true);
 
     try {
-      const result = await signIn.create({ identifier, password });
+      const result = await signIn.create({
+        identifier: identifier.trim(),
+        password,
+      });
 
       if (result.status === "complete") {
         await setActive({ session: result.createdSessionId });
@@ -59,9 +69,32 @@ function LoginForm() {
         return;
       }
 
-      setError("Additional verification is required. Check your email/phone.");
+      // OAuth/transfer or incomplete sign-in that became a sign-up
+      if (
+        result.status === "needs_new_password" ||
+        result.status === "needs_first_factor" ||
+        result.status === "needs_second_factor"
+      ) {
+        setError(
+          result.status === "needs_second_factor"
+            ? "Additional verification is required. Check your email or authenticator app."
+            : "Additional steps are required to finish signing in.",
+        );
+        return;
+      }
+
+      // Missing profile fields after identifier auth — continue page
+      router.push("/continue");
     } catch (err) {
-      setError(clerkErrorMessage(err, "Invalid email/phone or password."));
+      const message = clerkErrorMessage(
+        err,
+        "Invalid email/phone or password.",
+      );
+      if (/additional information|missing_requirements|continue/i.test(message)) {
+        router.push("/continue");
+        return;
+      }
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -86,6 +119,8 @@ function LoginForm() {
             <input
               type="text"
               name="identifier"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
               placeholder="e.g. chidi@oryno.com"
               autoComplete="username"
               required
@@ -99,6 +134,8 @@ function LoginForm() {
               name="password"
               autoComplete="current-password"
               required
+              value={password}
+              onChange={setPassword}
             />
             <div className="mt-2 flex justify-end">
               <Link
@@ -117,13 +154,15 @@ function LoginForm() {
 
         <motion.button
           type="submit"
-          disabled={!isLoaded || loading}
-          whileHover={{ y: -2 }}
-          whileTap={{ scale: 0.985 }}
-          className="btn-primary mt-7 h-12 w-full text-base disabled:opacity-60"
+          disabled={!canSubmit}
+          whileHover={canSubmit ? { y: -2 } : undefined}
+          whileTap={canSubmit ? { scale: 0.985 } : undefined}
+          className="btn-primary mt-7 h-12 w-full text-base disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {loading ? "Signing in…" : "Sign In"}
+          {loading ? "Signing in…" : !isLoaded ? "Loading…" : "Sign In"}
         </motion.button>
+
+        <div id="clerk-captcha" className="mt-3" />
 
         <SocialAuth className="mt-7" mode="signIn" />
 

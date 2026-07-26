@@ -11,6 +11,9 @@ type PasswordFieldProps = {
   placeholder?: string;
   autoComplete?: string;
   required?: boolean;
+  value?: string;
+  minLength?: number;
+  onChange?: (value: string) => void;
 };
 
 export function PasswordField({
@@ -19,6 +22,9 @@ export function PasswordField({
   placeholder,
   autoComplete,
   required,
+  value,
+  minLength,
+  onChange,
 }: PasswordFieldProps) {
   const [visible, setVisible] = useState(false);
 
@@ -28,9 +34,12 @@ export function PasswordField({
         <input
           type={visible ? "text" : "password"}
           name={name}
+          value={value}
+          onChange={(e) => onChange?.(e.target.value)}
           placeholder={placeholder}
           autoComplete={autoComplete}
           required={required}
+          minLength={minLength}
           className={cn(authInputClassName, "pr-12")}
         />
         <button
