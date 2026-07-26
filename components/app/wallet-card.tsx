@@ -48,7 +48,6 @@ export function WalletCard({
   const { user } = useUser();
   const { country } = useCountry();
   const currencyCode = country.currency;
-  const flag = country.flagEmoji;
 
   const [payload, setPayload] = useState<WalletPayload | null>(null);
   const [loading, setLoading] = useState(!staticMode);
@@ -92,6 +91,8 @@ export function WalletCard({
     user?.firstName ||
     "ORYNO MEMBER";
   const displayCurrency = payload?.primary.currency ?? currencyCode;
+  const countryName = payload?.country?.name ?? country.name;
+  const flag = payload?.country?.flagEmoji ?? country.flagEmoji;
 
   function handleCopy() {
     void navigator.clipboard?.writeText(cardNumber);
@@ -141,8 +142,12 @@ export function WalletCard({
             <div className="relative flex h-full flex-col justify-between p-4 sm:p-5 md:p-4 lg:p-5">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-2.5">
-                  <span className="relative flex h-10 w-10 items-center justify-center rounded-2xl bg-black/25 text-lg font-black tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] ring-1 ring-white/25 backdrop-blur-md">
-                    O
+                  <span
+                    className="relative flex h-10 w-10 items-center justify-center rounded-2xl bg-black/25 text-[22px] leading-none shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] ring-1 ring-white/25 backdrop-blur-md"
+                    aria-label={`${countryName} flag`}
+                    title={countryName}
+                  >
+                    {flag}
                     <span className="absolute -right-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full bg-[#ffd29a] ring-2 ring-[#b84300]" />
                   </span>
                   <div>
@@ -153,7 +158,7 @@ export function WalletCard({
                       <Sparkles className="h-3 w-3 text-[#ffd29a]" />
                     </div>
                     <p className="mt-0.5 text-sm font-semibold tracking-wide text-white">
-                      {walletLabel} {flag}
+                      {walletLabel}
                     </p>
                   </div>
                 </div>
