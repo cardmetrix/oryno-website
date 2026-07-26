@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Check, Copy, RefreshCw } from "lucide-react";
+import { Check, Copy, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
@@ -10,6 +10,8 @@ import { PageHeader } from "@/components/app/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { WalletSummary } from "@/lib/wallet-types";
 import { cn } from "@/lib/utils";
+
+const DEMO_AMOUNTS = ["1000", "2000", "5000", "10000"];
 
 type DepositAccount = {
   id: string;
@@ -35,9 +37,12 @@ const FUND_INSTRUCTIONS = [
 export default function FundPage() {
   const [wallet, setWallet] = useState<WalletSummary | null>(null);
   const [deposit, setDeposit] = useState<DepositAccount | null>(null);
+  const [demoMode, setDemoMode] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<"number" | "name" | null>(null);
+  const [demoAmount, setDemoAmount] = useState("5000");
   const lastBalanceRef = useRef<string | null>(null);
 
   const refreshWallet = useCallback(async (opts?: { silent?: boolean }) => {
@@ -83,8 +88,12 @@ export default function FundPage() {
       }
 
       if (depositRes.ok) {
-        const json = (await depositRes.json()) as { account: DepositAccount };
+        const json = (await depositRes.json()) as {
+          account: DepositAccount;
+          demoMode?: boolean;
+        };
         setDeposit(json.account);
+        setDemoMode(Boolean(json.demoMode ?? json.account.demoMode));
       } else {
         const json = (await depositRes.json().catch(() => ({}))) as {
           error?: string;
@@ -122,6 +131,67 @@ export default function FundPage() {
       toast.error("Could not copy");
     }
   }
+
+  async function onIHaveFunded() {
+    if (!demoMode) {
+      toast.message("Waiting for Paystack", {
+        description:
+          "Transfer to the account above. Your balance updates when payment is confirmed.",
+      });
+      void refreshWallet({ silent: true });
+      return;
+    }
+
+    const amount = Number(demoAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError("Enter a valid demo amount");
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/wallet/fund/simulate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount }),
+      });
+      const json = (await res.json()) as {
+        error?: string;
+        amountFormatted?: string;
+        wallet?: WalletSummary;
+        reference?: string;
+      };
+      if (!res.ok) throw new Error(json.error || "Could not process demo funding");
+
+      if (json.wallet) {
+        lastBalanceRef.current = json.wallet.balance;
+        setWallet(json.wallet);
+      } else {
+        await refreshWallet({ silent: true });
+      }
+
+      toast.success("Demo funding successful", {
+        description: `${json.amountFormatted ?? `₦${amount.toLocaleString()}`} added to your wallet`,
+      });
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Could not process demo funding";
+      setError(message);
+      toast.error(message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const symbol =
+    wallet?.currency === "GHS"
+      ? "GH₵"
+      : wallet?.currency === "KES"
+        ? "KSh"
+        : wallet?.currency === "ZAR"
+          ? "R"
+          : "₦";
 
   return (
     <AppShell hideNav>
@@ -227,6 +297,67 @@ export default function FundPage() {
               ))}
             </ol>
           </MotionSection>
+
+          {demoMode ? (
+            <MotionSection
+              delay={0.12}
+              className="mt-5 rounded-[22px] border border-border bg-background p-5 shadow-[var(--shadow-soft)]"
+            >
+              <h2 className="text-base font-semibold text-foreground">
+                I have funded
+              </h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Demo only — confirms a Paystack-style deposit and credits your
+                wallet now.
+              </p>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                {DEMO_AMOUNTS.map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setDemoAmount(preset)}
+                    className={cn(
+                      "rounded-full px-3.5 py-1.5 text-xs font-semibold transition",
+                      demoAmount === preset
+                        ? "bg-oryno-charcoal text-white"
+                        : "bg-muted text-muted-foreground hover:bg-oryno-orange-muted hover:text-primary",
+                    )}
+                  >
+                    {symbol}
+                    {Number(preset).toLocaleString()}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                disabled={submitting || !deposit}
+                onClick={() => void onIHaveFunded()}
+                className="btn-primary mt-4 inline-flex h-12 w-full items-center justify-center gap-2 text-base disabled:opacity-50 md:max-w-sm"
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Processing…
+                  </>
+                ) : (
+                  "I’ve funded"
+                )}
+              </button>
+            </MotionSection>
+          ) : (
+            <MotionSection delay={0.12} className="mt-5 md:max-w-sm">
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={() => void onIHaveFunded()}
+                className="btn-primary inline-flex h-12 w-full items-center justify-center gap-2 text-base disabled:opacity-50"
+              >
+                I’ve funded — check balance
+              </button>
+            </MotionSection>
+          )}
 
           {error ? (
             <p className="mt-4 text-sm font-medium text-destructive">{error}</p>
