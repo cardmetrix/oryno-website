@@ -29,7 +29,7 @@ export function DashboardHeader({
   return (
     <PageHeader
       title="Home"
-      subtitle={`Hello, ${displayName} · ${subtitle}`}
+      subtitle={`Hello, ${displayName} 👋`}
       backHref="/"
       actions={
         <>
