@@ -10,6 +10,7 @@ import {
   Eye,
   EyeOff,
   Landmark,
+  Loader2,
   Plus,
   RefreshCw,
   ShieldCheck,
@@ -23,8 +24,16 @@ import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
 import { TransactionRow } from "@/components/app/transaction-row";
 import { WalletSkeleton } from "@/components/app/wallet-skeleton";
-import { DEMO_BANKS, type WalletPayload } from "@/lib/wallet-types";
+import type { BankOption, WalletPayload } from "@/lib/wallet-types";
 import { cn } from "@/lib/utils";
+
+const ADD_BANK_INSTRUCTIONS = [
+  "Select your bank from the Paystack bank list.",
+  "Enter your 10-digit NUBAN account number.",
+  "We verify the account name with Paystack before saving.",
+  "Confirm the resolved name matches your bank records.",
+  "Save the account — it becomes available for withdrawals.",
+];
 
 export default function WalletPage() {
   const [data, setData] = useState<WalletPayload | null>(null);
@@ -33,7 +42,9 @@ export default function WalletPage() {
   const [hidden, setHidden] = useState(false);
   const [adding, setAdding] = useState(false);
   const [savingBank, setSavingBank] = useState(false);
-  const [bankName, setBankName] = useState<string>(DEMO_BANKS[0]);
+  const [resolving, setResolving] = useState(false);
+  const [bankOptions, setBankOptions] = useState<BankOption[]>([]);
+  const [bankCode, setBankCode] = useState("");
   const [accountName, setAccountName] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
   const [flash, setFlash] = useState<string | null>(null);
@@ -43,11 +54,22 @@ export default function WalletPage() {
     if (!opts?.soft) setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/wallet", { cache: "no-store" });
-      if (!res.ok) throw new Error("Failed to load wallet");
-      const json = (await res.json()) as WalletPayload;
+      const [walletRes, banksRes] = await Promise.all([
+        fetch("/api/wallet", { cache: "no-store" }),
+        fetch("/api/wallet/banks", { cache: "no-store" }),
+      ]);
+      if (!walletRes.ok) throw new Error("Failed to load wallet");
+      const json = (await walletRes.json()) as WalletPayload;
       setData(json);
-      setAccountName((prev) => prev || json.user.fullName || "");
+
+      if (banksRes.ok) {
+        const banksJson = (await banksRes.json()) as {
+          options?: BankOption[];
+        };
+        const options = banksJson.options ?? [];
+        setBankOptions(options);
+        setBankCode((prev) => prev || options[0]?.code || "");
+      }
     } catch {
       setError("Couldn’t load your wallet. Pull to retry.");
       setData(null);
@@ -60,21 +82,59 @@ export default function WalletPage() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    if (!adding || accountNumber.length < 10 || !bankCode) return;
+
+    const timer = window.setTimeout(async () => {
+      setResolving(true);
+      setBankError(null);
+      try {
+        const res = await fetch("/api/wallet/banks/resolve", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ bankCode, accountNumber }),
+        });
+        const json = (await res.json()) as {
+          error?: string;
+          accountName?: string;
+        };
+        if (!res.ok) throw new Error(json.error || "Could not verify account");
+        setAccountName(json.accountName ?? "");
+      } catch (err) {
+        setAccountName("");
+        setBankError(
+          err instanceof Error ? err.message : "Could not verify account",
+        );
+      } finally {
+        setResolving(false);
+      }
+    }, 450);
+
+    return () => window.clearTimeout(timer);
+  }, [adding, accountNumber, bankCode]);
+
   async function onAddAccount(e: FormEvent) {
     e.preventDefault();
     setSavingBank(true);
     setBankError(null);
     try {
+      const selected = bankOptions.find((b) => b.code === bankCode);
       const res = await fetch("/api/wallet/banks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bankName, accountName, accountNumber }),
+        body: JSON.stringify({
+          bankCode,
+          bankName: selected?.name,
+          accountName,
+          accountNumber,
+        }),
       });
       const json = (await res.json()) as { error?: string };
       if (!res.ok) throw new Error(json.error || "Failed to save");
       setAccountNumber("");
+      setAccountName("");
       setAdding(false);
-      setFlash("Bank account added");
+      setFlash("Bank account verified & saved");
       window.setTimeout(() => setFlash(null), 2200);
       await load({ soft: true });
     } catch (err) {
@@ -340,27 +400,19 @@ export default function WalletPage() {
                         Bank
                       </span>
                       <select
-                        value={bankName}
-                        onChange={(e) => setBankName(e.target.value)}
+                        value={bankCode}
+                        onChange={(e) => {
+                          setBankCode(e.target.value);
+                          setAccountName("");
+                        }}
                         className="mt-2 h-12 w-full rounded-[14px] border border-border bg-background px-4 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
                       >
-                        {DEMO_BANKS.map((bank) => (
-                          <option key={bank} value={bank}>
-                            {bank}
+                        {bankOptions.map((bank) => (
+                          <option key={bank.code} value={bank.code}>
+                            {bank.name}
                           </option>
                         ))}
                       </select>
-                    </label>
-                    <label className="block">
-                      <span className="text-sm font-semibold text-foreground">
-                        Account name
-                      </span>
-                      <input
-                        value={accountName}
-                        onChange={(e) => setAccountName(e.target.value)}
-                        required
-                        className="mt-2 h-12 w-full rounded-[14px] border border-border bg-background px-4 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
-                      />
                     </label>
                     <label className="block">
                       <span className="text-sm font-semibold text-foreground">
@@ -369,22 +421,49 @@ export default function WalletPage() {
                       <input
                         inputMode="numeric"
                         value={accountNumber}
-                        onChange={(e) =>
+                        onChange={(e) => {
                           setAccountNumber(
                             e.target.value.replace(/[^\d]/g, "").slice(0, 10),
-                          )
-                        }
+                          );
+                          setAccountName("");
+                        }}
                         placeholder="10-digit account number"
                         required
                         className="mt-2 h-12 w-full rounded-[14px] border border-border bg-background px-4 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
                       />
                     </label>
+                    <label className="block">
+                      <span className="text-sm font-semibold text-foreground">
+                        Account name
+                      </span>
+                      <div className="relative mt-2">
+                        <input
+                          value={accountName}
+                          readOnly
+                          placeholder={
+                            resolving
+                              ? "Verifying with Paystack…"
+                              : "Resolved after account number"
+                          }
+                          className="h-12 w-full rounded-[14px] border border-border bg-background px-4 pr-10 text-sm outline-none"
+                        />
+                        {resolving ? (
+                          <Loader2 className="absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 animate-spin text-primary" />
+                        ) : null}
+                      </div>
+                    </label>
                     <button
                       type="submit"
-                      disabled={savingBank || accountNumber.length < 10}
+                      disabled={
+                        savingBank ||
+                        resolving ||
+                        accountNumber.length < 10 ||
+                        !accountName ||
+                        !bankCode
+                      }
                       className="btn-primary h-11 w-full text-sm disabled:opacity-50"
                     >
-                      {savingBank ? "Saving…" : "Save bank account"}
+                      {savingBank ? "Saving…" : "Verify & save bank"}
                     </button>
                   </div>
                 </motion.form>
@@ -458,7 +537,7 @@ export default function WalletPage() {
                     No bank accounts yet
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Add a local bank to withdraw from your wallet.
+                    Add a Paystack-verified bank to withdraw from your wallet.
                   </p>
                   <button
                     type="button"
@@ -470,6 +549,30 @@ export default function WalletPage() {
                 </div>
               ) : null}
             </div>
+          </MotionSection>
+
+          <MotionSection
+            delay={0.12}
+            className="mt-5 rounded-[22px] border border-border bg-background p-5 shadow-[var(--shadow-soft)]"
+          >
+            <h2 className="text-base font-semibold text-foreground">
+              Instructions
+            </h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              How to add a payout bank with Paystack
+            </p>
+            <ol className="mt-4 space-y-3">
+              {ADD_BANK_INSTRUCTIONS.map((step, index) => (
+                <li key={step} className="flex gap-3">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-oryno-orange-muted text-xs font-bold text-primary">
+                    {index + 1}
+                  </span>
+                  <p className="pt-1 text-sm leading-relaxed text-foreground">
+                    {step}
+                  </p>
+                </li>
+              ))}
+            </ol>
           </MotionSection>
 
           <MotionSection

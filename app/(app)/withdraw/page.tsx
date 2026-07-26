@@ -17,6 +17,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { BankAccountSummary, WalletSummary } from "@/lib/wallet-types";
 import { cn } from "@/lib/utils";
 
+const WITHDRAW_INSTRUCTIONS = [
+  "Add and verify a payout bank on Wallet if you haven’t already.",
+  "Enter the amount you want to withdraw from your ORYNO wallet.",
+  "Select the bank account Paystack should pay into.",
+  "Confirm the withdrawal. We debit your wallet and send the transfer via Paystack.",
+  "When Paystack confirms delivery, the withdrawal is marked complete.",
+];
+
 export default function WithdrawPage() {
   const router = useRouter();
   const [wallet, setWallet] = useState<WalletSummary | null>(null);
@@ -30,6 +38,7 @@ export default function WithdrawPage() {
     amountFormatted: string;
     reference?: string | null;
     bankName?: string;
+    pending?: boolean;
   } | null>(null);
 
   useEffect(() => {
@@ -75,6 +84,7 @@ export default function WithdrawPage() {
         error?: string;
         amountFormatted?: string;
         reference?: string | null;
+        pending?: boolean;
         wallet?: WalletSummary;
         bank?: { bankName: string };
       };
@@ -84,6 +94,7 @@ export default function WithdrawPage() {
         amountFormatted: json.amountFormatted ?? amount,
         reference: json.reference,
         bankName: json.bank?.bankName,
+        pending: Boolean(json.pending),
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Withdrawal failed");
@@ -105,7 +116,7 @@ export default function WithdrawPage() {
     <AppShell hideNav>
       <PageHeader
         title="Withdraw"
-        subtitle="Send funds to your local bank"
+        subtitle="Send funds to your bank via Paystack"
         backHref="/wallet"
       />
 
@@ -131,7 +142,7 @@ export default function WithdrawPage() {
                 <CheckCircle2 className="h-8 w-8" />
               </span>
               <p className="mt-4 text-xl font-bold text-foreground">
-                Withdrawal sent
+                {success.pending ? "Withdrawal processing" : "Withdrawal sent"}
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
                 {success.amountFormatted}
@@ -140,6 +151,12 @@ export default function WithdrawPage() {
               {success.reference ? (
                 <p className="mt-2 font-mono text-xs text-muted-foreground">
                   Ref · {success.reference}
+                </p>
+              ) : null}
+              {success.pending ? (
+                <p className="mt-3 text-xs text-muted-foreground">
+                  Paystack is delivering this transfer. You’ll get a
+                  notification when it lands.
                 </p>
               ) : null}
               {wallet ? (
@@ -205,7 +222,8 @@ export default function WithdrawPage() {
                         No bank account saved
                       </p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        Add a payout account before withdrawing.
+                        Add a Paystack-verified payout account before
+                        withdrawing.
                       </p>
                       <Link
                         href="/wallet"
@@ -256,6 +274,30 @@ export default function WithdrawPage() {
                     </div>
                   )}
                 </div>
+              </MotionSection>
+
+              <MotionSection
+                delay={0.06}
+                className="mt-5 rounded-[22px] border border-border bg-background p-5 shadow-[var(--shadow-soft)]"
+              >
+                <h2 className="text-base font-semibold text-foreground">
+                  Instructions
+                </h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Follow these steps to withdraw with Paystack
+                </p>
+                <ol className="mt-4 space-y-3">
+                  {WITHDRAW_INSTRUCTIONS.map((step, index) => (
+                    <li key={step} className="flex gap-3">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-oryno-orange-muted text-xs font-bold text-primary">
+                        {index + 1}
+                      </span>
+                      <p className="pt-1 text-sm leading-relaxed text-foreground">
+                        {step}
+                      </p>
+                    </li>
+                  ))}
+                </ol>
               </MotionSection>
 
               {error ? (

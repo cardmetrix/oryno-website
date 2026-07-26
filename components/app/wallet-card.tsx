@@ -112,41 +112,39 @@ export function WalletCard({
                 </div>
               </div>
 
-              <div className="rounded-[16px] border border-white/15 bg-black/20 p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-md sm:p-3">
-                <div className="flex items-end justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-medium tracking-[0.16em] text-white/65 uppercase">
-                      Available balance
-                    </p>
-                    <AnimatePresence mode="wait">
-                      <motion.p
-                        key={hidden ? "hidden" : balance}
-                        initial={{ opacity: 0, y: 6, filter: "blur(4px)" }}
-                        animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                        exit={{ opacity: 0, y: -4, filter: "blur(4px)" }}
-                        transition={{ duration: 0.22 }}
-                        className="mt-0.5 truncate text-xl font-bold tracking-tight text-white sm:text-2xl"
-                      >
-                        {hidden ? "••••••••" : balance}
-                      </motion.p>
-                    </AnimatePresence>
-                  </div>
-
-                  <motion.button
-                    type="button"
-                    whileHover={{ scale: 1.06 }}
-                    whileTap={{ scale: 0.94 }}
-                    onClick={() => setHidden((v) => !v)}
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/12 ring-1 ring-white/25 backdrop-blur-md"
-                    aria-label={hidden ? "Show balance" : "Hide balance"}
-                  >
-                    {hidden ? (
-                      <EyeOff className="h-4 w-4 text-white" />
-                    ) : (
-                      <Eye className="h-4 w-4 text-white" />
-                    )}
-                  </motion.button>
+              <div className="flex items-end justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-medium tracking-[0.16em] text-white/65 uppercase">
+                    Available balance
+                  </p>
+                  <AnimatePresence mode="wait">
+                    <motion.p
+                      key={hidden ? "hidden" : balance}
+                      initial={{ opacity: 0, y: 6, filter: "blur(4px)" }}
+                      animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                      exit={{ opacity: 0, y: -4, filter: "blur(4px)" }}
+                      transition={{ duration: 0.22 }}
+                      className="mt-0.5 truncate text-xl font-bold tracking-tight text-white sm:text-2xl"
+                    >
+                      {hidden ? "••••••••" : balance}
+                    </motion.p>
+                  </AnimatePresence>
                 </div>
+
+                <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.06 }}
+                  whileTap={{ scale: 0.94 }}
+                  onClick={() => setHidden((v) => !v)}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/12 ring-1 ring-white/25 backdrop-blur-md"
+                  aria-label={hidden ? "Show balance" : "Hide balance"}
+                >
+                  {hidden ? (
+                    <EyeOff className="h-4 w-4 text-white" />
+                  ) : (
+                    <Eye className="h-4 w-4 text-white" />
+                  )}
+                </motion.button>
               </div>
             </div>
           </div>

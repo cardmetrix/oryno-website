@@ -4,6 +4,7 @@ import {
   creditWalletFromDeposit,
   findUserIdForPaystackCharge,
 } from "@/lib/paystack/deposit-accounts";
+import { settlePaystackTransfer } from "@/lib/paystack/transfers";
 import { ensureWalletSchema } from "@/lib/db/ensure-schema";
 
 export const runtime = "nodejs";
@@ -13,11 +14,13 @@ type PaystackWebhookBody = {
   data?: {
     id?: number;
     reference?: string;
+    transfer_code?: string;
     amount?: number;
     currency?: string;
     channel?: string;
     status?: string;
     paid_at?: string;
+    reason?: string | null;
     customer?: { customer_code?: string; email?: string };
     authorization?: { receiver_bank_account_number?: string };
     metadata?: Record<string, unknown> | null;
@@ -36,42 +39,75 @@ export async function POST(req: Request) {
     await ensureWalletSchema();
 
     const body = JSON.parse(rawBody) as PaystackWebhookBody;
-    if (body.event !== "charge.success" || !body.data) {
-      return NextResponse.json({ ok: true, ignored: true });
-    }
-
+    const event = body.event;
     const data = body.data;
-    if (data.status && data.status !== "success") {
+
+    if (!event || !data) {
       return NextResponse.json({ ok: true, ignored: true });
     }
 
-    const reference =
-      data.reference || (data.id != null ? `PSK_${data.id}` : null);
-    if (!reference || !data.amount) {
-      return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
-    }
+    if (event === "charge.success") {
+      if (data.status && data.status !== "success") {
+        return NextResponse.json({ ok: true, ignored: true });
+      }
 
-    const userId = await findUserIdForPaystackCharge(data);
-    if (!userId) {
-      console.error("[paystack-webhook] unmatched customer", {
-        customer: data.customer?.customer_code,
-        email: data.customer?.email,
-        account: data.authorization?.receiver_bank_account_number,
+      const reference =
+        data.reference || (data.id != null ? `PSK_${data.id}` : null);
+      if (!reference || !data.amount) {
+        return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+      }
+
+      const userId = await findUserIdForPaystackCharge(data);
+      if (!userId) {
+        console.error("[paystack-webhook] unmatched customer", {
+          customer: data.customer?.customer_code,
+          email: data.customer?.email,
+          account: data.authorization?.receiver_bank_account_number,
+        });
+        return NextResponse.json({ error: "User not found" }, { status: 404 });
+      }
+
+      const result = await creditWalletFromDeposit({
+        userId,
+        amountKobo: data.amount,
+        currency: data.currency,
+        reference,
+        channel: data.channel,
+        paidAt: data.paid_at,
+        raw: data as unknown as Record<string, unknown>,
       });
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+
+      return NextResponse.json({ ok: true, ...result });
     }
 
-    const result = await creditWalletFromDeposit({
-      userId,
-      amountKobo: data.amount,
-      currency: data.currency,
-      reference,
-      channel: data.channel,
-      paidAt: data.paid_at,
-      raw: data as unknown as Record<string, unknown>,
-    });
+    if (
+      event === "transfer.success" ||
+      event === "transfer.failed" ||
+      event === "transfer.reversed"
+    ) {
+      const reference = data.reference;
+      if (!reference) {
+        return NextResponse.json({ error: "Missing reference" }, { status: 400 });
+      }
 
-    return NextResponse.json({ ok: true, ...result });
+      const status =
+        event === "transfer.success"
+          ? ("success" as const)
+          : event === "transfer.reversed"
+            ? ("reversed" as const)
+            : ("failed" as const);
+
+      const result = await settlePaystackTransfer({
+        reference,
+        status,
+        transferCode: data.transfer_code ?? null,
+        failureReason: data.reason ?? data.status ?? null,
+      });
+
+      return NextResponse.json(result);
+    }
+
+    return NextResponse.json({ ok: true, ignored: true });
   } catch (error) {
     console.error("[paystack-webhook]", error);
     return NextResponse.json(

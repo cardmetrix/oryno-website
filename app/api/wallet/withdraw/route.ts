@@ -46,11 +46,14 @@ export async function POST(req: Request) {
       result.withdrawal.currency,
     );
 
+    const pending = Boolean(result.pending);
     try {
       await createNotification({
         userId: user.id,
-        title: "Withdrawal completed",
-        body: `${amountFormatted} sent to ${result.bank.bankName}. Ref ${result.withdrawal.providerRef ?? "—"}`,
+        title: pending ? "Withdrawal processing" : "Withdrawal completed",
+        body: pending
+          ? `${amountFormatted} is on the way to ${result.bank.bankName}. Ref ${result.withdrawal.providerRef ?? "—"}`
+          : `${amountFormatted} sent to ${result.bank.bankName}. Ref ${result.withdrawal.providerRef ?? "—"}`,
         type: "withdraw",
         metadata: {
           href: "/wallet",
@@ -64,7 +67,9 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       ok: true,
-      message: "Withdrawal completed",
+      message: pending ? "Withdrawal processing" : "Withdrawal completed",
+      pending,
+      status: result.withdrawal.status,
       wallet: toWalletSummary(result.wallet),
       withdrawalId: result.withdrawal.id,
       transactionId: result.transaction.id,

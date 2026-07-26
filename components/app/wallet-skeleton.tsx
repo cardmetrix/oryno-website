@@ -84,7 +84,7 @@ export function WalletCardSkeleton({ className }: { className?: string }) {
             <Skeleton className="mt-1.5 h-3.5 w-24 rounded-full bg-white/30" />
           </div>
         </div>
-        <div className="mt-3 rounded-[16px] border border-white/10 bg-black/10 p-2.5 sm:p-3">
+        <div className="mt-3">
           <Skeleton className="h-2.5 w-28 rounded-full bg-white/20" />
           <Skeleton className="mt-2 h-6 w-36 rounded-full bg-white/35 sm:h-7" />
         </div>

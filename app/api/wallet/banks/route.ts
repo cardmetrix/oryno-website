@@ -2,12 +2,15 @@ import { NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { ensureAppUser } from "@/lib/auth/current-user";
 import { db } from "@/lib/db";
+import { ensureWalletSchema } from "@/lib/db/ensure-schema";
 import { userBankAccounts } from "@/lib/db/schema";
 import {
-  DEMO_BANKS,
-  listBankAccounts,
-  toBankSummary,
-} from "@/lib/wallet";
+  createOrReuseTransferRecipient,
+  listNigerianBanks,
+  resolveBankAccount,
+} from "@/lib/paystack/banks";
+import { isPaystackDemoMode } from "@/lib/paystack/client";
+import { listBankAccounts, toBankSummary } from "@/lib/wallet";
 
 export const runtime = "nodejs";
 
@@ -18,10 +21,16 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const banks = await listBankAccounts(user.id);
+    await ensureWalletSchema();
+    const [banks, options] = await Promise.all([
+      listBankAccounts(user.id),
+      listNigerianBanks(),
+    ]);
+
     return NextResponse.json({
       banks: banks.map(toBankSummary),
-      options: DEMO_BANKS,
+      options: options.map((b) => ({ name: b.name, code: b.code })),
+      demoMode: isPaystackDemoMode(),
     });
   } catch (error) {
     console.error("[wallet-banks-get]", error);
@@ -39,20 +48,22 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    await ensureWalletSchema();
+
     const body = (await req.json()) as {
+      bankCode?: string;
       bankName?: string;
       accountName?: string;
       accountNumber?: string;
       makePrimary?: boolean;
     };
 
-    const bankName = (body.bankName ?? "").trim();
-    const accountName = (body.accountName ?? "").trim();
+    const bankCode = (body.bankCode ?? "").trim();
     const accountNumber = (body.accountNumber ?? "").replace(/\D/g, "");
 
-    if (!bankName || !accountName) {
+    if (!bankCode) {
       return NextResponse.json(
-        { error: "Bank name and account name are required" },
+        { error: "Select a bank" },
         { status: 400 },
       );
     }
@@ -62,6 +73,35 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
+
+    const resolved = await resolveBankAccount({
+      accountNumber,
+      bankCode,
+    });
+
+    // Prefer Paystack-resolved name; allow client override only if empty.
+    const accountName =
+      resolved.accountName ||
+      (body.accountName ?? "").trim();
+    if (!accountName) {
+      return NextResponse.json(
+        { error: "Could not resolve account name" },
+        { status: 400 },
+      );
+    }
+
+    const recipient = await createOrReuseTransferRecipient({
+      accountName,
+      accountNumber: resolved.accountNumber,
+      bankCode,
+      currency: "NGN",
+    });
+
+    const bankName =
+      recipient.bankName ||
+      resolved.bankName ||
+      (body.bankName ?? "").trim() ||
+      "Bank";
 
     const existing = await listBankAccounts(user.id);
     const makePrimary = body.makePrimary || existing.length === 0;
@@ -78,8 +118,10 @@ export async function POST(req: Request) {
       .values({
         userId: user.id,
         bankName,
-        accountName,
-        accountNumber: accountNumber.slice(0, 10),
+        bankCode,
+        accountName: recipient.accountName || accountName,
+        accountNumber: resolved.accountNumber.slice(0, 10),
+        paystackRecipientCode: recipient.recipientCode,
         isPrimary: makePrimary,
         verified: true,
       })
@@ -88,11 +130,14 @@ export async function POST(req: Request) {
     return NextResponse.json({
       ok: true,
       bank: toBankSummary(created),
+      demoMode: isPaystackDemoMode(),
     });
   } catch (error) {
     const message =
-      error instanceof Error && error.message.includes("unique")
-        ? "This account number is already saved"
+      error instanceof Error
+        ? error.message.includes("unique")
+          ? "This account number is already saved"
+          : error.message
         : "Failed to add bank account";
     console.error("[wallet-banks-post]", error);
     return NextResponse.json({ error: message }, { status: 400 });
@@ -182,7 +227,10 @@ export async function DELETE(req: Request) {
   } catch (error) {
     console.error("[wallet-banks-delete]", error);
     return NextResponse.json(
-      { error: "Failed to remove bank account. It may be linked to a withdrawal." },
+      {
+        error:
+          "Failed to remove bank account. It may be linked to a withdrawal.",
+      },
       { status: 400 },
     );
   }

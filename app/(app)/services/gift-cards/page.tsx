@@ -34,11 +34,7 @@ export default function GiftCardsPage() {
         <div className="relative">
           <span className="badge-soon">Coming soon</span>
           <div className="mt-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-oryno-orange to-oryno-orange-soft text-white shadow-[var(--shadow-orange)]">
-            <GiftCardIcon
-              className="h-7 w-7"
-              strokeWidth={1.75}
-              bowColor="#BBF7D0"
-            />
+            <GiftCardIcon className="h-7 w-7 text-white" strokeWidth={1.75} />
           </div>
           <h2 className="mt-5 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
             Gift cards are almost here

@@ -100,6 +100,7 @@ export function toBankSummary(account: BankAccountRow): BankAccountSummary {
   return {
     id: account.id,
     bankName: account.bankName,
+    bankCode: account.bankCode,
     accountName: account.accountName,
     accountNumber: account.accountNumber,
     isPrimary: account.isPrimary,
@@ -363,6 +364,10 @@ export async function withdrawWallet(input: {
   currency?: string;
   fee?: number;
 }) {
+  const { sendPaystackWithdrawal } = await import("@/lib/paystack/transfers");
+  const { ensureWalletSchema } = await import("@/lib/db/ensure-schema");
+  await ensureWalletSchema();
+
   const currency =
     input.currency ?? currencyForCountry(input.countryCode);
   const countryCode = (input.countryCode ?? "NG").toUpperCase();
@@ -371,8 +376,9 @@ export async function withdrawWallet(input: {
   const total = Math.round((amount + fee) * 100) / 100;
   const amountStr = amount.toFixed(2);
   const feeStr = fee.toFixed(2);
+  const reference = `WDR_${Date.now().toString(36).toUpperCase()}_${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
 
-  return db.transaction(async (tx) => {
+  const prepared = await db.transaction(async (tx) => {
     const bank = await tx.query.userBankAccounts.findFirst({
       where: and(
         eq(userBankAccounts.id, input.bankAccountId),
@@ -380,6 +386,9 @@ export async function withdrawWallet(input: {
       ),
     });
     if (!bank) throw new Error("Bank account not found.");
+    if (!bank.bankCode && !bank.paystackRecipientCode) {
+      throw new Error("Re-add this bank account so Paystack can verify it.");
+    }
 
     const wallet = await tx.query.wallets.findFirst({
       where: and(
@@ -407,9 +416,9 @@ export async function withdrawWallet(input: {
         subtitle: `${bank.bankName} · ${maskAccountNumber(bank.accountNumber)}`,
         amount: amountStr,
         currency,
-        status: "completed",
+        status: "processing",
         balanceAfter: nextBalance,
-        metadata: { fee: feeStr, bankAccountId: bank.id },
+        metadata: { fee: feeStr, bankAccountId: bank.id, reference },
       })
       .returning();
 
@@ -432,10 +441,9 @@ export async function withdrawWallet(input: {
         fee: feeStr,
         currency,
         countryCode,
-        status: "completed",
-        providerRef: `WDR-${Date.now().toString(36).toUpperCase()}`,
+        status: "processing",
+        providerRef: reference,
         transactionId: txRow.id,
-        processedAt: new Date(),
       })
       .returning();
 
@@ -444,6 +452,100 @@ export async function withdrawWallet(input: {
       transaction: txRow,
       wallet: updated ?? { ...wallet, balance: nextBalance },
       bank,
+      nextBalance,
     };
   });
+
+  try {
+    const payout = await sendPaystackWithdrawal({
+      bank: prepared.bank,
+      amount,
+      currency,
+      reference,
+    });
+
+    const transferStatus = payout.transfer.status;
+    // success/demo → completed; pending/otp/received → await webhook.
+    const nextWithdrawalStatus =
+      transferStatus === "success" || payout.simulated
+        ? ("completed" as const)
+        : ("sent_to_provider" as const);
+    const nextTxStatus =
+      nextWithdrawalStatus === "completed"
+        ? ("completed" as const)
+        : ("processing" as const);
+
+    const [withdrawal] = await db
+      .update(withdrawals)
+      .set({
+        status: nextWithdrawalStatus,
+        processedAt:
+          nextWithdrawalStatus === "completed" ? new Date() : null,
+        updatedAt: new Date(),
+      })
+      .where(eq(withdrawals.id, prepared.withdrawal.id))
+      .returning();
+
+    const [txRow] = await db
+      .update(transactions)
+      .set({
+        status: nextTxStatus,
+        updatedAt: new Date(),
+        metadata: {
+          fee: feeStr,
+          bankAccountId: prepared.bank.id,
+          reference,
+          paystackTransferCode: payout.transfer.transferCode,
+          simulated: Boolean(payout.simulated),
+        },
+      })
+      .where(eq(transactions.id, prepared.transaction.id))
+      .returning();
+
+    return {
+      withdrawal: withdrawal ?? prepared.withdrawal,
+      transaction: txRow ?? prepared.transaction,
+      wallet: prepared.wallet,
+      bank: prepared.bank,
+      pending: nextWithdrawalStatus !== "completed",
+    };
+  } catch (error) {
+    // Reverse debit if Paystack transfer could not be started.
+    await db.transaction(async (tx) => {
+      const wallet = await tx.query.wallets.findFirst({
+        where: eq(wallets.id, prepared.wallet.id),
+      });
+      if (wallet) {
+        const restored = (
+          Number(wallet.balance) +
+          amount +
+          fee
+        ).toFixed(2);
+        await tx
+          .update(wallets)
+          .set({ balance: restored, updatedAt: new Date() })
+          .where(eq(wallets.id, wallet.id));
+      }
+
+      await tx
+        .update(withdrawals)
+        .set({
+          status: "failed",
+          failureReason:
+            error instanceof Error ? error.message : "Transfer failed",
+          processedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(withdrawals.id, prepared.withdrawal.id));
+
+      await tx
+        .update(transactions)
+        .set({ status: "failed", updatedAt: new Date() })
+        .where(eq(transactions.id, prepared.transaction.id));
+    });
+
+    throw error instanceof Error
+      ? error
+      : new Error("Withdrawal transfer failed");
+  }
 }

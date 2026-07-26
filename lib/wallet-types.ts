@@ -14,11 +14,17 @@ export type WalletSummary = {
 export type BankAccountSummary = {
   id: string;
   bankName: string;
+  bankCode?: string | null;
   accountName: string;
   accountNumber: string;
   isPrimary: boolean;
   verified: boolean;
   maskedNumber: string;
+};
+
+export type BankOption = {
+  name: string;
+  code: string;
 };
 
 export type FundingMethod =

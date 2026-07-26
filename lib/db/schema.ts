@@ -375,14 +375,17 @@ export const userBankAccounts = pgTable(
       onDelete: "set null",
     }),
     bankName: varchar("bank_name", { length: 120 }).notNull(),
+    bankCode: varchar("bank_code", { length: 20 }),
     accountName: varchar("account_name", { length: 160 }).notNull(),
     accountNumber: varchar("account_number", { length: 32 }).notNull(),
+    paystackRecipientCode: varchar("paystack_recipient_code", { length: 80 }),
     isPrimary: boolean("is_primary").notNull().default(false),
     verified: boolean("verified").notNull().default(false),
     ...timestamps,
   },
   (t) => [
     index("user_bank_accounts_user_idx").on(t.userId),
+    index("user_bank_accounts_recipient_idx").on(t.paystackRecipientCode),
     uniqueIndex("user_bank_accounts_user_number_uidx").on(
       t.userId,
       t.accountNumber,

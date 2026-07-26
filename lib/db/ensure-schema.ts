@@ -57,6 +57,23 @@ export async function ensureWalletSchema() {
         ON "wallet_fundings" USING btree ("external_ref")
         WHERE "external_ref" IS NOT NULL
       `);
+      await db.execute(sql`
+        ALTER TABLE "user_bank_accounts"
+        ADD COLUMN IF NOT EXISTS "bank_code" varchar(20)
+      `);
+      await db.execute(sql`
+        ALTER TABLE "user_bank_accounts"
+        ADD COLUMN IF NOT EXISTS "paystack_recipient_code" varchar(80)
+      `);
+      await db.execute(sql`
+        CREATE INDEX IF NOT EXISTS "user_bank_accounts_recipient_idx"
+        ON "user_bank_accounts" USING btree ("paystack_recipient_code")
+      `);
+      await db.execute(sql`
+        CREATE UNIQUE INDEX IF NOT EXISTS "withdrawals_provider_ref_uidx"
+        ON "withdrawals" USING btree ("provider_ref")
+        WHERE "provider_ref" IS NOT NULL
+      `);
     })().catch((error) => {
       ready = null;
       console.error("[ensure-wallet-schema]", error);
