@@ -155,7 +155,6 @@ export function WalletCard({
                       <p className="text-[11px] font-bold tracking-[0.22em] text-white/90 uppercase">
                         ORYNO
                       </p>
-                      <Sparkles className="h-3 w-3 text-[#ffd29a]" />
                     </div>
                     <p className="mt-0.5 text-sm font-semibold tracking-wide text-white">
                       {walletLabel}
@@ -198,50 +197,6 @@ export function WalletCard({
                       <Eye className="h-4 w-4 text-white" />
                     )}
                   </motion.button>
-                </div>
-              </div>
-
-              <div className="mt-3 flex items-end justify-between gap-3 md:mt-2 lg:mt-3">
-                <div className="min-w-0">
-                  <p className="font-mono text-[14px] tracking-[0.2em] text-white sm:text-[15px] sm:tracking-[0.24em] md:text-[13px] lg:text-base lg:tracking-[0.28em]">
-                    {formatCardNumber(cardNumber, hidden)}
-                  </p>
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <p className="truncate text-[10px] font-semibold tracking-[0.14em] text-white/85 uppercase">
-                      {displayHolder}
-                    </p>
-                    <span className="h-1 w-1 rounded-full bg-white/40" />
-                    <p className="text-[10px] font-medium text-white/70">
-                      {bankProp}
-                    </p>
-                    <motion.button
-                      type="button"
-                      whileTap={{ scale: 0.95 }}
-                      onClick={handleCopy}
-                      className="inline-flex items-center gap-1 rounded-full bg-black/20 px-2 py-0.5 text-[10px] font-semibold text-white ring-1 ring-white/20"
-                    >
-                      {copied ? (
-                        <>
-                          <Check className="h-3 w-3 text-[#ffd29a]" />
-                          Copied
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="h-3 w-3" />
-                          Copy
-                        </>
-                      )}
-                    </motion.button>
-                  </div>
-                </div>
-
-                <div className="flex shrink-0 flex-col items-end">
-                  <span className="rounded-md bg-black/25 px-2 py-1 text-[10px] font-bold tracking-[0.18em] text-[#ffd29a] ring-1 ring-white/15">
-                    {displayCurrency}
-                  </span>
-                  <span className="mt-1 text-[9px] font-medium tracking-[0.16em] text-white/60 uppercase">
-                     card
-                  </span>
                 </div>
               </div>
             </div>
