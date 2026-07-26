@@ -76,11 +76,18 @@ export function WalletSkeleton() {
 export function WalletCardSkeleton({ className }: { className?: string }) {
   return (
     <div className={className}>
-      <div className="relative overflow-hidden rounded-[26px] bg-gradient-to-br from-[#ff8124]/50 via-oryno-orange/40 to-[#e85d00]/50 p-5 shadow-[var(--shadow-orange)] sm:rounded-[28px]">
-        <Skeleton className="h-10 w-10 rounded-2xl bg-white/25" />
-        <Skeleton className="mt-6 h-3 w-28 rounded-full bg-white/25" />
-        <Skeleton className="mt-2 h-8 w-44 rounded-full bg-white/35" />
-        <Skeleton className="mt-6 h-4 w-52 rounded-full bg-white/20" />
+      <div className="relative overflow-hidden rounded-[22px] bg-gradient-to-br from-[#ff8124]/50 via-oryno-orange/40 to-[#e85d00]/50 p-3.5 shadow-[var(--shadow-orange)] sm:rounded-[24px] sm:p-4">
+        <div className="flex items-center gap-2.5">
+          <Skeleton className="h-9 w-9 rounded-xl bg-white/25" />
+          <div>
+            <Skeleton className="h-2.5 w-14 rounded-full bg-white/25" />
+            <Skeleton className="mt-1.5 h-3.5 w-24 rounded-full bg-white/30" />
+          </div>
+        </div>
+        <div className="mt-3 rounded-[16px] border border-white/10 bg-black/10 p-2.5 sm:p-3">
+          <Skeleton className="h-2.5 w-28 rounded-full bg-white/20" />
+          <Skeleton className="mt-2 h-6 w-36 rounded-full bg-white/35 sm:h-7" />
+        </div>
       </div>
       <div className="mt-3 grid grid-cols-2 gap-2.5">
         <Skeleton className="h-[52px] rounded-[18px]" />

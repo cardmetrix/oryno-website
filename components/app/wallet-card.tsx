@@ -1,20 +1,12 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useUser } from "@clerk/nextjs";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  ArrowUpRight,
-  Check,
-  Copy,
-  Eye,
-  EyeOff,
-  Plus,
-  Sparkles,
-  Wifi,
-} from "lucide-react";
+import { ArrowUpRight, Eye, EyeOff, Plus } from "lucide-react";
 import { WalletCardSkeleton } from "@/components/app/wallet-skeleton";
+import { BRAND_LOGO_SRC } from "@/components/brand-logo";
 import { useCountry } from "@/components/providers/country-provider";
 import type { WalletPayload } from "@/lib/wallet-types";
 import { cn } from "@/lib/utils";
@@ -22,37 +14,23 @@ import { cn } from "@/lib/utils";
 type WalletCardProps = {
   currency?: string;
   balance?: string;
-  accountNumber?: string;
-  bankName?: string;
-  holderName?: string;
   className?: string;
   /** When true, skip fetch and use props/demo defaults */
   staticMode?: boolean;
 };
 
-function formatCardNumber(raw: string, hidden: boolean) {
-  const digits = raw.replace(/\D/g, "").padStart(10, "0").slice(-10);
-  if (hidden) return "••••  ••••  ••••";
-  return `${digits.slice(0, 4)}  ${digits.slice(4, 8)}  ${digits.slice(8)}`;
-}
-
 export function WalletCard({
   currency,
   balance: balanceProp,
-  accountNumber: accountProp,
-  bankName: bankProp = "ORYNO",
-  holderName,
   className,
   staticMode = false,
 }: WalletCardProps) {
-  const { user } = useUser();
   const { country } = useCountry();
   const currencyCode = country.currency;
 
   const [payload, setPayload] = useState<WalletPayload | null>(null);
   const [loading, setLoading] = useState(!staticMode);
   const [hidden, setHidden] = useState(false);
-  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (staticMode) return;
@@ -80,25 +58,8 @@ export function WalletCard({
 
   const balance =
     balanceProp ?? payload?.primary.balanceFormatted ?? "₦0.00";
-  const cardNumber =
-    accountProp ?? payload?.primary.cardNumber ?? "8000000000";
   const walletLabel =
     currency ?? `${payload?.primary.currency ?? currencyCode} Wallet`;
-  const displayHolder =
-    holderName ||
-    payload?.user.fullName ||
-    user?.fullName ||
-    user?.firstName ||
-    "ORYNO MEMBER";
-  const displayCurrency = payload?.primary.currency ?? currencyCode;
-  const countryName = payload?.country?.name ?? country.name;
-  const flag = payload?.country?.flagEmoji ?? country.flagEmoji;
-
-  function handleCopy() {
-    void navigator.clipboard?.writeText(cardNumber);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1600);
-  }
 
   return (
     <div className={cn("space-y-3", className)}>
@@ -109,14 +70,14 @@ export function WalletCard({
       >
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute -inset-3 rounded-[36px] bg-[radial-gradient(ellipse_at_25%_15%,rgba(255,129,36,0.45),transparent_55%),radial-gradient(ellipse_at_85%_90%,rgba(255,106,0,0.28),transparent_50%)] blur-xl"
+          className="pointer-events-none absolute -inset-2 rounded-[32px] bg-[radial-gradient(ellipse_at_25%_15%,rgba(255,129,36,0.4),transparent_55%),radial-gradient(ellipse_at_85%_90%,rgba(255,106,0,0.24),transparent_50%)] blur-xl"
         />
 
-        <div className="relative overflow-hidden rounded-[26px] shadow-[0_24px_50px_rgba(255,106,0,0.32)] ring-1 ring-white/25 sm:rounded-[28px]">
-          <div className="relative min-h-[210px] w-full overflow-hidden text-white sm:min-h-[200px] sm:aspect-[1.72/1] md:aspect-[1.95/1] md:min-h-[168px] lg:aspect-[1.72/1] lg:min-h-[200px]">
+        <div className="relative overflow-hidden rounded-[22px] shadow-[0_18px_40px_rgba(255,106,0,0.3)] ring-1 ring-white/25 sm:rounded-[24px]">
+          <div className="relative w-full overflow-hidden text-white">
             <div className="absolute inset-0 bg-gradient-to-br from-[#ff8124] via-oryno-orange to-[#e85d00]" />
             <div className="absolute inset-0 bg-[linear-gradient(210deg,rgba(255,255,255,0.18)_0%,transparent_42%,rgba(180,60,0,0.22)_100%)]" />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_10%,rgba(255,230,180,0.45),transparent_40%)]" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_10%,rgba(255,230,180,0.4),transparent_40%)]" />
 
             <motion.div
               aria-hidden="true"
@@ -127,43 +88,31 @@ export function WalletCard({
                 ease: "easeInOut",
                 repeatDelay: 2.2,
               }}
-              className="pointer-events-none absolute inset-y-0 w-1/3 skew-x-[-18deg] bg-gradient-to-r from-transparent via-white/30 to-transparent"
+              className="pointer-events-none absolute inset-y-0 w-1/3 skew-x-[-18deg] bg-gradient-to-r from-transparent via-white/25 to-transparent"
             />
 
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute -top-16 -right-10 h-44 w-44 rounded-full border border-white/25"
-            />
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute -bottom-20 -left-14 h-48 w-48 rounded-full border border-white/10"
-            />
-
-            <div className="relative flex h-full flex-col justify-between p-4 sm:p-5 md:p-4 lg:p-5">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-2.5">
-                  <span
-                    className="relative flex h-10 w-10 items-center justify-center rounded-2xl bg-black/25 text-[22px] leading-none shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] ring-1 ring-white/25 backdrop-blur-md"
-                    aria-label={`${countryName} flag`}
-                    title={countryName}
-                  >
-                    {flag}
-                    <span className="absolute -right-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full bg-[#ffd29a] ring-2 ring-[#b84300]" />
-                  </span>
-                  <div>
-                    <div className="flex items-center gap-1.5">
-                      <p className="text-[11px] font-bold tracking-[0.22em] text-white/90 uppercase">
-                        ORYNO
-                      </p>
-                    </div>
-                    <p className="mt-0.5 text-sm font-semibold tracking-wide text-white">
-                      {walletLabel}
-                    </p>
-                  </div>
+            <div className="relative flex flex-col gap-3 p-3.5 sm:p-4">
+              <div className="flex items-center gap-2.5">
+                <span className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-black/20 ring-1 ring-white/25 backdrop-blur-md">
+                  <Image
+                    src={BRAND_LOGO_SRC}
+                    alt="ORYNO"
+                    width={36}
+                    height={36}
+                    className="h-full w-full object-cover"
+                  />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[11px] font-bold tracking-[0.22em] text-white/90 uppercase">
+                    ORYNO
+                  </p>
+                  <p className="mt-0.5 text-sm font-semibold tracking-wide text-white">
+                    {walletLabel}
+                  </p>
                 </div>
               </div>
 
-              <div className="mt-3 rounded-[18px] border border-white/15 bg-black/20 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-md md:mt-2.5 md:p-2.5 lg:mt-3 lg:p-3">
+              <div className="rounded-[16px] border border-white/15 bg-black/20 p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-md sm:p-3">
                 <div className="flex items-end justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-[10px] font-medium tracking-[0.16em] text-white/65 uppercase">
@@ -176,7 +125,7 @@ export function WalletCard({
                         animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
                         exit={{ opacity: 0, y: -4, filter: "blur(4px)" }}
                         transition={{ duration: 0.22 }}
-                        className="mt-0.5 truncate text-xl font-bold tracking-tight text-white sm:text-2xl md:text-[1.35rem] lg:text-[1.85rem]"
+                        className="mt-0.5 truncate text-xl font-bold tracking-tight text-white sm:text-2xl"
                       >
                         {hidden ? "••••••••" : balance}
                       </motion.p>
@@ -188,7 +137,7 @@ export function WalletCard({
                     whileHover={{ scale: 1.06 }}
                     whileTap={{ scale: 0.94 }}
                     onClick={() => setHidden((v) => !v)}
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/12 ring-1 ring-white/25 backdrop-blur-md"
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/12 ring-1 ring-white/25 backdrop-blur-md"
                     aria-label={hidden ? "Show balance" : "Hide balance"}
                   >
                     {hidden ? (
