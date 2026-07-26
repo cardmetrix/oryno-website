@@ -5,7 +5,6 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   ArrowRight,
-  Gift,
   MoreHorizontal,
   Phone,
   Smartphone,
@@ -19,12 +18,13 @@ import { HistoryEmpty } from "@/components/app/history-states";
 import { MotionSection } from "@/components/app/motion-section";
 import { TransactionRow } from "@/components/app/transaction-row";
 import { WalletCard } from "@/components/app/wallet-card";
+import { GiftCardIcon } from "@/components/icons/gift-card-icon";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { AppTransaction } from "@/lib/transactions";
 import type { WalletPayload } from "@/lib/wallet-types";
 
 const quickActions = [
-  { href: "/services/gift-cards", label: "Gift Cards", icon: Gift },
+  { href: "/services/gift-cards", label: "Gift Cards", icon: GiftCardIcon },
   { href: "/services/social", label: "Boosting", icon: TrendingUp },
   { href: "/services/virtual-numbers", label: "Numbers", icon: Phone },
   { href: "/services/airtime", label: "Airtime", icon: Smartphone },

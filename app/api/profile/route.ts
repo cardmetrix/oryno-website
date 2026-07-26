@@ -5,7 +5,9 @@ import { ensureAppUser } from "@/lib/auth/current-user";
 import { normalizeUsername, isValidUsername } from "@/lib/auth/username";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
+import { resolveCountryCode } from "@/lib/country";
 import { toProfileDto } from "@/lib/profile";
+import { currencyForCountry, ensurePrimaryWallet } from "@/lib/wallet";
 
 export const runtime = "nodejs";
 
@@ -69,7 +71,7 @@ export async function PATCH(req: Request) {
       typeof body.avatarUrl === "string" ? body.avatarUrl : dbUser.avatarUrl;
     const countryCode =
       typeof body.countryCode === "string"
-        ? body.countryCode.toUpperCase().slice(0, 2)
+        ? resolveCountryCode(body.countryCode)
         : dbUser.countryCode;
 
     const [nameFirst, ...rest] = fullName.split(/\s+/);
@@ -85,12 +87,14 @@ export async function PATCH(req: Request) {
         fullName,
         phone,
         avatarUrl,
+        countryCode: countryCode ?? undefined,
       },
       unsafeMetadata: {
         ...clerkUser.unsafeMetadata,
         fullName,
         phone,
         username,
+        countryCode: countryCode ?? undefined,
       },
     });
 
@@ -106,6 +110,13 @@ export async function PATCH(req: Request) {
       })
       .where(eq(users.id, dbUser.id))
       .returning();
+
+    if (countryCode) {
+      await ensurePrimaryWallet(
+        dbUser.id,
+        currencyForCountry(countryCode),
+      );
+    }
 
     return NextResponse.json({
       profile: toProfileDto(updated, {

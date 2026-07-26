@@ -62,4 +62,11 @@ export type WalletPayload = {
     txCount: number;
   };
   user: { fullName: string; countryCode: string };
+  country?: {
+    code: string;
+    name: string;
+    currency: string;
+    currencySymbol: string;
+    flagEmoji: string;
+  };
 };

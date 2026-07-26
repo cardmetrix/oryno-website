@@ -7,14 +7,14 @@ import {
   Tv,
   Phone,
   Megaphone,
-  Gift,
   ShieldCheck,
 } from "lucide-react";
 import { motion } from "framer-motion";
+import { GiftCardIcon } from "@/components/icons/gift-card-icon";
 import { fadeUp, stagger } from "./motion";
 
 const features: {
-  icon: typeof Smartphone;
+  icon: typeof Smartphone | typeof GiftCardIcon;
   title: string;
   description: string;
   soon?: boolean;
@@ -55,7 +55,7 @@ const features: {
       "Grow your presence with simple, built-in social media boosting tools.",
   },
   {
-    icon: Gift,
+    icon: GiftCardIcon,
     title: "Gift Cards",
     description: "Buy and sell gift cards — launching soon inside ORYNO.",
     soon: true,

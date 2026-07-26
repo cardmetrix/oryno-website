@@ -54,6 +54,10 @@ export type CountryServiceConfig = {
 };
 
 /** Active demo config — swap/add countries via config, not code rewrites */
+/**
+ * Demo catalog seeded for Nigeria.
+ * Live currency/country for the signed-in user comes from `useCountry()`.
+ */
 export const activeCountryConfig: CountryServiceConfig = {
   code: "NG",
   name: "Nigeria",

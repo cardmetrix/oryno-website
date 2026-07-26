@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useUser } from "@clerk/nextjs";
@@ -16,8 +15,7 @@ import {
   Wifi,
 } from "lucide-react";
 import { WalletCardSkeleton } from "@/components/app/wallet-skeleton";
-import { BRAND_LOGO_SRC } from "@/components/brand-logo";
-import { activeCountryConfig } from "@/lib/services-catalog";
+import { useCountry } from "@/components/providers/country-provider";
 import type { WalletPayload } from "@/lib/wallet-types";
 import { cn } from "@/lib/utils";
 
@@ -30,13 +28,6 @@ type WalletCardProps = {
   className?: string;
   /** When true, skip fetch and use props/demo defaults */
   staticMode?: boolean;
-};
-
-const countryFlags: Record<string, string> = {
-  NG: "🇳🇬",
-  GH: "🇬🇭",
-  ZA: "🇿🇦",
-  KE: "🇰🇪",
 };
 
 function formatCardNumber(raw: string, hidden: boolean) {
@@ -55,8 +46,9 @@ export function WalletCard({
   staticMode = false,
 }: WalletCardProps) {
   const { user } = useUser();
-  const { code, currency: currencyCode } = activeCountryConfig;
-  const flag = countryFlags[code] ?? "🌍";
+  const { country } = useCountry();
+  const currencyCode = country.currency;
+  const flag = country.flagEmoji;
 
   const [payload, setPayload] = useState<WalletPayload | null>(null);
   const [loading, setLoading] = useState(!staticMode);
@@ -149,15 +141,8 @@ export function WalletCard({
             <div className="relative flex h-full flex-col justify-between p-4 sm:p-5 md:p-4 lg:p-5">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-2.5">
-                  <span className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-[0_6px_16px_rgba(0,0,0,0.18)] ring-1 ring-white/40">
-                    <Image
-                      src={BRAND_LOGO_SRC}
-                      alt="ORYNO"
-                      width={40}
-                      height={40}
-                      className="h-full w-full object-cover"
-                      priority
-                    />
+                  <span className="relative flex h-10 w-10 items-center justify-center rounded-2xl bg-black/25 text-lg font-black tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] ring-1 ring-white/25 backdrop-blur-md">
+                    O
                     <span className="absolute -right-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full bg-[#ffd29a] ring-2 ring-[#b84300]" />
                   </span>
                   <div>

@@ -13,6 +13,7 @@ import {
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
+import { useCountry } from "@/components/providers/country-provider";
 import {
   activeCountryConfig,
   billCategories,
@@ -23,7 +24,9 @@ import { cn } from "@/lib/utils";
 const amountPresets = ["1000", "2000", "5000", "10000"];
 
 export default function BillsPage() {
-  const { billProviders, currencySymbol } = activeCountryConfig;
+  const { country } = useCountry();
+  const { billProviders } = activeCountryConfig;
+  const currencySymbol = country.currencySymbol;
   const [category, setCategory] =
     useState<(typeof billCategories)[number]>("All");
   const [providerId, setProviderId] = useState(billProviders[0]?.id ?? "");

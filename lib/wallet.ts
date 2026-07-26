@@ -8,6 +8,7 @@ import {
   withdrawals,
 } from "@/lib/db/schema";
 import { formatMoney, mapDbStatus, type AppTransaction } from "@/lib/transactions";
+import { currencyForCountry as currencyFromCountryLib } from "@/lib/country";
 import type {
   BankAccountSummary,
   FundingMethod,
@@ -24,15 +25,8 @@ export { DEMO_BANKS } from "@/lib/wallet-types";
 export type WalletRow = typeof wallets.$inferSelect;
 export type BankAccountRow = typeof userBankAccounts.$inferSelect;
 
-const CURRENCY_BY_COUNTRY: Record<string, string> = {
-  NG: "NGN",
-  GH: "GHS",
-  KE: "KES",
-  ZA: "ZAR",
-};
-
 export function currencyForCountry(countryCode?: string | null) {
-  return CURRENCY_BY_COUNTRY[countryCode ?? "NG"] ?? "NGN";
+  return currencyFromCountryLib(countryCode);
 }
 
 export function maskAccountNumber(accountNumber: string) {
@@ -113,21 +107,23 @@ export async function ensurePrimaryWallet(
   userId: string,
   currency = "NGN",
 ): Promise<WalletRow> {
+  // Demote other wallets so the country currency stays primary
+  await db
+    .update(wallets)
+    .set({ isPrimary: false, updatedAt: new Date() })
+    .where(and(eq(wallets.userId, userId), eq(wallets.isPrimary, true)));
+
   const existing = await db.query.wallets.findFirst({
     where: and(eq(wallets.userId, userId), eq(wallets.currency, currency)),
   });
 
   if (existing) {
-    let wallet = existing;
-    if (!wallet.isPrimary) {
-      const [updated] = await db
-        .update(wallets)
-        .set({ isPrimary: true, updatedAt: new Date() })
-        .where(eq(wallets.id, wallet.id))
-        .returning();
-      wallet = updated ?? { ...wallet, isPrimary: true };
-    }
-    return issueCardNumber(wallet);
+    const [updated] = await db
+      .update(wallets)
+      .set({ isPrimary: true, updatedAt: new Date() })
+      .where(eq(wallets.id, existing.id))
+      .returning();
+    return issueCardNumber(updated ?? { ...existing, isPrimary: true });
   }
 
   const cardNumber = generateWalletCardNumber(userId, currency);
@@ -149,7 +145,14 @@ export async function ensurePrimaryWallet(
     where: and(eq(wallets.userId, userId), eq(wallets.currency, currency)),
   });
   if (!again) throw new Error("Unable to create wallet");
-  return issueCardNumber(again);
+
+  const [updated] = await db
+    .update(wallets)
+    .set({ isPrimary: true, updatedAt: new Date() })
+    .where(eq(wallets.id, again.id))
+    .returning();
+
+  return issueCardNumber(updated ?? { ...again, isPrimary: true });
 }
 
 export async function listUserWallets(userId: string) {

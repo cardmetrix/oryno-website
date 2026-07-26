@@ -4,7 +4,6 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   ArrowRight,
-  Gift,
   Globe2,
   Megaphone,
   Phone,
@@ -20,6 +19,7 @@ import { BrandLogo } from "@/components/brand-logo";
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
+import { GiftCardIcon } from "@/components/icons/gift-card-icon";
 
 const pillars = [
   {
@@ -76,7 +76,7 @@ const services = [
     description: "Grow followers, likes, views, and engagement.",
   },
   {
-    icon: Gift,
+    icon: GiftCardIcon,
     title: "Gift Cards",
     description: "Buy & sell marketplace — coming soon.",
     soon: true,

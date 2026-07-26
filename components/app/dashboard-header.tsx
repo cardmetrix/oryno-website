@@ -2,7 +2,7 @@
 
 import { useUser } from "@clerk/nextjs";
 import { Search } from "lucide-react";
-import { activeCountryConfig } from "@/lib/services-catalog";
+import { useCountry } from "@/components/providers/country-provider";
 import { NotificationDropdown } from "./notification-dropdown";
 import { PageHeader } from "./page-header";
 
@@ -11,18 +11,12 @@ type DashboardHeaderProps = {
   subtitle?: string;
 };
 
-const countryFlags: Record<string, string> = {
-  NG: "🇳🇬",
-  GH: "🇬🇭",
-  ZA: "🇿🇦",
-  KE: "🇰🇪",
-};
-
 export function DashboardHeader({
   name,
   subtitle = "Welcome back to ORYNO",
 }: DashboardHeaderProps) {
   const { user } = useUser();
+  const { country } = useCountry();
   const displayName =
     name ||
     user?.fullName ||
@@ -31,10 +25,6 @@ export function DashboardHeader({
       ? user.unsafeMetadata.fullName
       : null) ||
     "there";
-
-  const { code, name: countryName, currency, currencySymbol } =
-    activeCountryConfig;
-  const flag = countryFlags[code] ?? "🌍";
 
   return (
     <PageHeader
@@ -45,18 +35,18 @@ export function DashboardHeader({
         <>
           <div
             className="inline-flex max-w-[7.5rem] items-center gap-1.5 rounded-[14px] border border-border bg-background px-2 py-1.5 shadow-[var(--shadow-soft)] sm:max-w-none sm:gap-2 sm:px-3"
-            title={`${countryName} · ${currency}`}
+            title={`${country.name} · ${country.currency}`}
           >
-            <span className="text-base leading-none">{flag}</span>
+            <span className="text-base leading-none">{country.flagEmoji}</span>
             <div className="min-w-0 leading-tight">
               <p className="truncate text-[11px] font-bold text-foreground sm:text-xs">
-                {currency}
+                {country.currency}
               </p>
               <p className="truncate text-[10px] text-muted-foreground">
                 <span className="sm:hidden">
-                  {code} · {currencySymbol}
+                  {country.code} · {country.currencySymbol}
                 </span>
-                <span className="hidden sm:inline">{countryName}</span>
+                <span className="hidden sm:inline">{country.name}</span>
               </p>
             </div>
           </div>

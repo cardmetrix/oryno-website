@@ -19,12 +19,16 @@ export async function requireClerkAuth() {
 /** Ensures the signed-in Clerk user exists in Postgres and returns the DB row. */
 export async function ensureAppUser(options?: {
   touchLogin?: boolean;
+  countryCode?: string | null;
+  forceCountry?: boolean;
 }): Promise<SyncedUser | null> {
   const clerkUser = await currentUser();
   if (!clerkUser) return null;
 
   return syncClerkUserToDb(mapClerkSdkUser(clerkUser), {
     touchLogin: options?.touchLogin,
+    countryCode: options?.countryCode,
+    forceCountry: options?.forceCountry,
   });
 }
 

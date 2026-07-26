@@ -1,11 +1,12 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ArrowRight, Bell, Gift, Sparkles } from "lucide-react";
+import { ArrowRight, Bell, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
+import { GiftCardIcon } from "@/components/icons/gift-card-icon";
 import { activeCountryConfig } from "@/lib/services-catalog";
 
 export default function GiftCardsPage() {
@@ -32,7 +33,7 @@ export default function GiftCardsPage() {
         <div className="relative">
           <span className="badge-soon">Coming soon</span>
           <div className="mt-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-oryno-orange to-oryno-orange-soft text-white shadow-[var(--shadow-orange)]">
-            <Gift className="h-7 w-7" strokeWidth={1.75} />
+            <GiftCardIcon className="h-7 w-7" strokeWidth={1.75} bowColor="#BBF7D0" />
           </div>
           <h2 className="mt-5 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
             Gift cards are almost here

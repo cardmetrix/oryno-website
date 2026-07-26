@@ -1,12 +1,43 @@
 import { NextResponse } from "next/server";
+import { clerkClient, currentUser } from "@clerk/nextjs/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
+import { getCountryInfo, resolveCountryCode } from "@/lib/country";
+import { detectCountryWithGoogle } from "@/lib/geo/google-country";
+import { currencyForCountry, ensurePrimaryWallet } from "@/lib/wallet";
 
 export const runtime = "nodejs";
 
-/** Called after login / OTP / OAuth to upsert the Postgres user row. */
-export async function POST() {
+/** Called after login / OTP / OAuth to upsert the Postgres user + country/wallet. */
+export async function POST(req: Request) {
   try {
-    const user = await ensureAppUser({ touchLogin: true });
+    const body = (await req.json().catch(() => ({}))) as {
+      countryCode?: string;
+      lat?: number;
+      lng?: number;
+      forceCountry?: boolean;
+    };
+
+    const detected = await detectCountryWithGoogle({
+      lat: typeof body.lat === "number" ? body.lat : undefined,
+      lng: typeof body.lng === "number" ? body.lng : undefined,
+    });
+
+    const countryCode = body.countryCode
+      ? resolveCountryCode(body.countryCode)
+      : detected.countryCode;
+
+    // Only overwrite an existing country when Google actually resolved an ISO code
+    // (or the client explicitly sent one). Avoid resetting users when geo fails.
+    const confident =
+      Boolean(body.countryCode) ||
+      Boolean(detected.detectedIso) ||
+      detected.source === "latlng";
+
+    const user = await ensureAppUser({
+      touchLogin: true,
+      countryCode,
+      forceCountry: body.forceCountry !== false && confident,
+    });
 
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -19,6 +50,33 @@ export async function POST() {
       );
     }
 
+    const country = getCountryInfo(user.countryCode ?? countryCode);
+    const wallet = await ensurePrimaryWallet(
+      user.id,
+      currencyForCountry(country.code),
+    );
+
+    try {
+      const clerkUser = await currentUser();
+      if (clerkUser) {
+        const client = await clerkClient();
+        await client.users.updateUser(clerkUser.id, {
+          publicMetadata: {
+            ...clerkUser.publicMetadata,
+            countryCode: country.code,
+            currency: country.currency,
+          },
+          unsafeMetadata: {
+            ...clerkUser.unsafeMetadata,
+            countryCode: country.code,
+            currency: country.currency,
+          },
+        });
+      }
+    } catch (metaError) {
+      console.error("[auth-sync-metadata]", metaError);
+    }
+
     return NextResponse.json({
       ok: true,
       user: {
@@ -26,9 +84,15 @@ export async function POST() {
         fullName: user.fullName,
         email: user.email,
         phone: user.phone,
-        countryCode: user.countryCode,
+        countryCode: country.code,
         status: user.status,
         kycStatus: user.kycStatus,
+      },
+      country,
+      wallet: {
+        id: wallet.id,
+        currency: wallet.currency,
+        balance: wallet.balance,
       },
     });
   } catch (error) {

@@ -5,7 +5,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowRight,
-  Gift,
   Phone,
   Search,
   SearchX,
@@ -16,6 +15,7 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
+import { GiftCardIcon } from "@/components/icons/gift-card-icon";
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
@@ -28,13 +28,13 @@ import {
 } from "@/lib/services-directory";
 import { cn } from "@/lib/utils";
 
-const ICON_MAP: Record<string, LucideIcon> = {
+const ICON_MAP: Record<string, LucideIcon | typeof GiftCardIcon> = {
   airtime: Smartphone,
   data: Wifi,
   bills: Zap,
   social: TrendingUp,
   "virtual-numbers": Phone,
-  "gift-cards": Gift,
+  "gift-cards": GiftCardIcon,
 };
 
 type ApiService = Omit<ServiceDirectoryItem, "icon"> & {

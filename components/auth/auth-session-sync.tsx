@@ -19,6 +19,17 @@ export function AuthSessionSync() {
       const result = await syncSessionToDatabase();
       if (!result.ok && result.code === "account_disabled") {
         router.replace("/login?error=account_disabled");
+        return;
+      }
+      if (result.ok) {
+        window.dispatchEvent(
+          new CustomEvent("oryno:country-updated", {
+            detail: {
+              countryCode: result.countryCode,
+              currency: result.currency,
+            },
+          }),
+        );
       }
     })();
   }, [isLoaded, isSignedIn, router]);

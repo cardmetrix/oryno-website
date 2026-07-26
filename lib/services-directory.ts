@@ -1,12 +1,12 @@
 import type { LucideIcon } from "lucide-react";
 import {
-  Gift,
   Phone,
   Smartphone,
   TrendingUp,
   Wifi,
   Zap,
 } from "lucide-react";
+import { GiftCardIcon } from "@/components/icons/gift-card-icon";
 import { activeCountryConfig } from "@/lib/services-catalog";
 
 export type ServiceCategory =
@@ -28,7 +28,7 @@ export type ServiceDirectoryItem = {
   accent: string;
   popular?: boolean;
   soon?: boolean;
-  icon: LucideIcon;
+  icon: LucideIcon | typeof GiftCardIcon;
   stats?: string;
 };
 
@@ -124,7 +124,7 @@ export const servicesDirectory: ServiceDirectoryItem[] = [
     eta: "Soon",
     accent: "#FF6A00",
     soon: true,
-    icon: Gift,
+    icon: GiftCardIcon,
     stats: `${currencySymbol} rates live soon`,
   },
 ];

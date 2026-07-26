@@ -1,11 +1,5 @@
 import type { SyncedUser } from "@/lib/auth/sync-user";
-
-const COUNTRY_NAMES: Record<string, string> = {
-  NG: "Nigeria",
-  GH: "Ghana",
-  KE: "Kenya",
-  ZA: "South Africa",
-};
+import { formatCountryMoney, getCountryInfo } from "@/lib/country";
 
 const KYC_LABELS: Record<string, string> = {
   unverified: "Unverified",
@@ -14,11 +8,11 @@ const KYC_LABELS: Record<string, string> = {
   rejected: "Rejected",
 };
 
-const DAILY_LIMITS: Record<string, string> = {
-  unverified: "₦50,000.00",
-  pending: "₦200,000.00",
-  verified: "₦5,000,000.00",
-  rejected: "₦0.00",
+const DAILY_LIMIT_AMOUNTS: Record<string, number> = {
+  unverified: 50_000,
+  pending: 200_000,
+  verified: 5_000_000,
+  rejected: 0,
 };
 
 export type ProfileDto = {
@@ -60,12 +54,15 @@ export function toProfileDto(
     avatarUrl: user.avatarUrl || extras?.clerkImageUrl || null,
     countryCode: user.countryCode,
     countryName: user.countryCode
-      ? (COUNTRY_NAMES[user.countryCode] ?? user.countryCode)
+      ? getCountryInfo(user.countryCode).name
       : "Not set",
     kycStatus: user.kycStatus,
     kycLabel: KYC_LABELS[user.kycStatus] ?? user.kycStatus,
     status: user.status,
-    dailyLimitLabel: DAILY_LIMITS[user.kycStatus] ?? "₦50,000.00",
+    dailyLimitLabel: formatCountryMoney(
+      DAILY_LIMIT_AMOUNTS[user.kycStatus] ?? 50_000,
+      user.countryCode,
+    ),
     emailVerified: Boolean(user.emailVerifiedAt),
     initials: initials || "OR",
   };

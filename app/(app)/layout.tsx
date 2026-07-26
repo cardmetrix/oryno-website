@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
 import { AuthSessionSync } from "@/components/auth/auth-session-sync";
+import { CountryProvider } from "@/components/providers/country-provider";
 import { ensureAppUser } from "@/lib/auth/current-user";
 
 export default async function AppLayout({
@@ -30,9 +31,9 @@ export default async function AppLayout({
   }
 
   return (
-    <>
+    <CountryProvider>
       <AuthSessionSync />
       {children}
-    </>
+    </CountryProvider>
   );
 }

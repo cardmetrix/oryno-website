@@ -1,5 +1,4 @@
 import {
-  Gift,
   History,
   Home,
   LayoutGrid,
@@ -12,6 +11,7 @@ import {
   Wifi,
   Zap,
 } from "lucide-react";
+import { GiftCardIcon } from "@/components/icons/gift-card-icon";
 
 export const primaryNav = [
   { href: "/dashboard", label: "Home", icon: Home },
@@ -22,7 +22,7 @@ export const primaryNav = [
 ] as const;
 
 export const serviceNav = [
-  { href: "/services/gift-cards", label: "Gift Cards", icon: Gift },
+  { href: "/services/gift-cards", label: "Gift Cards", icon: GiftCardIcon },
   { href: "/services/social", label: "Social Boost", icon: TrendingUp },
   { href: "/services/virtual-numbers", label: "Numbers", icon: Phone },
   { href: "/services/airtime", label: "Airtime", icon: Smartphone },

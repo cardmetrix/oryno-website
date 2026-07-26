@@ -15,6 +15,7 @@ const isPublicRoute = createRouteMatcher([
   "/splash(.*)",
   "/sso-callback(.*)",
   "/api/webhooks(.*)",
+  "/api/geo(.*)",
   "/admin(.*)",
 ]);
 

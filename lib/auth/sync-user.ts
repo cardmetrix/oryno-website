@@ -8,6 +8,12 @@ import {
   wallets,
 } from "@/lib/db/schema";
 import { createNotification } from "@/lib/notifications-service";
+import {
+  countryFromPhone as countryFromPhoneLib,
+  currencyForCountry,
+  resolveCountryCode,
+  type SupportedCountryCode,
+} from "@/lib/country";
 
 export type SyncedUser = typeof users.$inferSelect;
 
@@ -67,14 +73,8 @@ const DEFAULT_COUNTRIES = [
   },
 ];
 
-function countryFromPhone(phone?: string | null): string {
-  if (!phone) return "NG";
-  const normalized = phone.replace(/\s+/g, "");
-  if (normalized.startsWith("+234") || normalized.startsWith("234")) return "NG";
-  if (normalized.startsWith("+233") || normalized.startsWith("233")) return "GH";
-  if (normalized.startsWith("+254") || normalized.startsWith("254")) return "KE";
-  if (normalized.startsWith("+27") || normalized.startsWith("27")) return "ZA";
-  return "NG";
+function countryFromPhone(phone?: string | null): SupportedCountryCode {
+  return countryFromPhoneLib(phone) ?? resolveCountryCode("NG");
 }
 
 function pickFullName(clerkUser: ClerkUserLike): string {
@@ -217,7 +217,13 @@ export function mapClerkSdkUser(user: ClerkSdkUser): ClerkUserLike {
 
 export async function syncClerkUserToDb(
   clerkUser: ClerkUserLike,
-  options?: { touchLogin?: boolean },
+  options?: {
+    touchLogin?: boolean;
+    /** Google / client detected country — preferred for new users & when forceCountry */
+    countryCode?: string | null;
+    /** Overwrite existing country with detected value */
+    forceCountry?: boolean;
+  },
 ): Promise<SyncedUser> {
   const email = pickEmail(clerkUser).toLowerCase().trim();
   if (!email) {
@@ -228,7 +234,10 @@ export async function syncClerkUserToDb(
   const username = pickUsername(clerkUser);
   const phone = pickPhone(clerkUser);
   const avatarUrl = pickAvatarUrl(clerkUser);
-  const countryCode = countryFromPhone(phone);
+  const phoneCountry = countryFromPhone(phone);
+  const detectedCountry = options?.countryCode
+    ? resolveCountryCode(options.countryCode)
+    : null;
   const emailVerifiedAt = isEmailVerified(clerkUser) ? new Date() : null;
 
   await ensureDefaultCountries();
@@ -249,6 +258,13 @@ export async function syncClerkUserToDb(
   let dbUser: SyncedUser;
 
   if (existing) {
+    const nextCountry =
+      options?.forceCountry && detectedCountry
+        ? detectedCountry
+        : resolveCountryCode(
+            existing.countryCode ?? detectedCountry ?? phoneCountry,
+          );
+
     const [updated] = await db
       .update(users)
       .set({
@@ -258,7 +274,7 @@ export async function syncClerkUserToDb(
         email,
         phone,
         avatarUrl: existing.avatarUrl ?? avatarUrl,
-        countryCode: existing.countryCode ?? countryCode,
+        countryCode: nextCountry,
         emailVerifiedAt: existing.emailVerifiedAt ?? emailVerifiedAt,
         lastLoginAt: options?.touchLogin ? now : existing.lastLoginAt,
         updatedAt: now,
@@ -268,6 +284,10 @@ export async function syncClerkUserToDb(
       .returning();
     dbUser = updated;
   } else {
+    const countryCode = resolveCountryCode(
+      detectedCountry ?? phoneCountry ?? "NG",
+    );
+
     const [created] = await db
       .insert(users)
       .values({
@@ -309,21 +329,9 @@ export async function syncClerkUserToDb(
     .values({ userId: dbUser.id })
     .onConflictDoNothing();
 
-  const currency =
-    DEFAULT_COUNTRIES.find((c) => c.code === (dbUser.countryCode ?? "NG"))
-      ?.currency ?? "NGN";
-
-  const { generateWalletCardNumber } = await import("@/lib/wallet");
-  await db
-    .insert(wallets)
-    .values({
-      userId: dbUser.id,
-      currency,
-      balance: "0",
-      isPrimary: true,
-      cardNumber: generateWalletCardNumber(dbUser.id, currency),
-    })
-    .onConflictDoNothing();
+  const currency = currencyForCountry(dbUser.countryCode);
+  const { ensurePrimaryWallet } = await import("@/lib/wallet");
+  await ensurePrimaryWallet(dbUser.id, currency);
 
   const hasReferral = await db.query.referralCodes.findFirst({
     where: eq(referralCodes.userId, dbUser.id),

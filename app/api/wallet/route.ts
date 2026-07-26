@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
+import { getCountryInfo } from "@/lib/country";
 import {
   currencyForCountry,
   ensurePrimaryWallet,
@@ -55,6 +56,7 @@ export async function GET() {
           fullName: user.fullName,
           countryCode: user.countryCode ?? "NG",
         },
+        country: getCountryInfo(user.countryCode),
       },
       {
         headers: {
