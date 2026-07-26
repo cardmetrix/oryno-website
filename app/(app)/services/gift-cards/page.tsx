@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { motion } from "framer-motion";
 import { ArrowRight, Bell, Sparkles } from "lucide-react";
 import Link from "next/link";
@@ -33,7 +34,11 @@ export default function GiftCardsPage() {
         <div className="relative">
           <span className="badge-soon">Coming soon</span>
           <div className="mt-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-oryno-orange to-oryno-orange-soft text-white shadow-[var(--shadow-orange)]">
-            <GiftCardIcon className="h-7 w-7" strokeWidth={1.75} bowColor="#BBF7D0" />
+            <GiftCardIcon
+              className="h-7 w-7"
+              strokeWidth={1.75}
+              bowColor="#BBF7D0"
+            />
           </div>
           <h2 className="mt-5 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
             Gift cards are almost here
@@ -86,23 +91,28 @@ export default function GiftCardsPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 + index * 0.04 }}
               whileHover={{ y: -3 }}
-              className="relative overflow-hidden rounded-[20px] border border-border bg-background p-4 shadow-[var(--shadow-soft)]"
+              className="relative overflow-hidden rounded-[20px] border border-border bg-background shadow-[var(--shadow-soft)]"
             >
-              <div
-                className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl text-sm font-bold text-white"
-                style={{ background: brand.color }}
-              >
-                {brand.name.slice(0, 1)}
+              <div className="relative aspect-[3/4] w-full bg-muted">
+                <Image
+                  src={brand.image}
+                  alt={`${brand.name} gift card`}
+                  fill
+                  sizes="(max-width: 640px) 50vw, 25vw"
+                  className="object-cover"
+                />
+                <span className="absolute top-2.5 right-2.5 rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
+                  Soon
+                </span>
               </div>
-              <p className="text-sm font-semibold text-foreground">
-                {brand.name}
-              </p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                {brand.category}
-              </p>
-              <span className="absolute top-3 right-3 rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                Soon
-              </span>
+              <div className="p-3">
+                <p className="text-sm font-semibold text-foreground">
+                  {brand.name}
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {brand.category}
+                </p>
+              </div>
             </motion.div>
           ))}
         </div>

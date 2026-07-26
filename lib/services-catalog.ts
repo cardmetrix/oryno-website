@@ -39,6 +39,8 @@ export type GiftCardBrand = {
   name: string;
   category: string;
   color: string;
+  /** Path under /public, e.g. /gift-cards/amazon.png */
+  image: string;
 };
 
 export type CountryServiceConfig = {
@@ -254,24 +256,62 @@ export const activeCountryConfig: CountryServiceConfig = {
     },
   ],
   giftCardBrands: [
-    { id: "amazon", name: "Amazon", category: "Shopping", color: "#FF9900" },
-    { id: "apple", name: "Apple", category: "Apps & Media", color: "#1C1C1E" },
+    {
+      id: "amazon",
+      name: "Amazon",
+      category: "Shopping",
+      color: "#FF9900",
+      image: "/gift-cards/amazon.png",
+    },
+    {
+      id: "apple",
+      name: "Apple",
+      category: "Apps & Media",
+      color: "#1C1C1E",
+      image: "/gift-cards/apple.png",
+    },
     {
       id: "google-play",
       name: "Google Play",
       category: "Apps & Games",
       color: "#34A853",
+      image: "/gift-cards/google-play.png",
     },
-    { id: "steam", name: "Steam", category: "Gaming", color: "#1B2838" },
+    {
+      id: "steam",
+      name: "Steam",
+      category: "Gaming",
+      color: "#1B2838",
+      image: "/gift-cards/steam.png",
+    },
     {
       id: "playstation",
       name: "PlayStation",
       category: "Gaming",
       color: "#003087",
+      image: "/gift-cards/playstation.png",
     },
-    { id: "xbox", name: "Xbox", category: "Gaming", color: "#107C10" },
-    { id: "netflix", name: "Netflix", category: "Streaming", color: "#E50914" },
-    { id: "spotify", name: "Spotify", category: "Music", color: "#1DB954" },
+    {
+      id: "xbox",
+      name: "Xbox",
+      category: "Gaming",
+      color: "#107C10",
+      image: "/gift-cards/xbox.png",
+    },
+    {
+      id: "netflix",
+      name: "Netflix",
+      category: "Streaming",
+      color: "#E50914",
+      image: "/gift-cards/netflix.png",
+    },
+    {
+      id: "spotify",
+      name: "Spotify",
+      category: "Music",
+      color: "#1DB954",
+      image: "/gift-cards/spotify.png",
+    },
   ],
 };
 
