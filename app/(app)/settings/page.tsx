@@ -221,7 +221,7 @@ export default function SettingsPage() {
               </div>
             </div>
             <Switch
-              checked={data.preferences.notificationsEnabled}
+              checked={Boolean(data.preferences.notificationsEnabled)}
               onCheckedChange={(v) => void onNotifications(v)}
             />
           </div>

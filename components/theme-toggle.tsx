@@ -43,7 +43,8 @@ export function ThemeToggle({
         />
       );
     }
-    return <Switch disabled className={className} />;
+    // Always controlled — avoids React warning when theme hydrates
+    return <Switch disabled checked={false} className={className} />;
   }
 
   if (variant === "icon") {

@@ -237,7 +237,7 @@ function SecurityRow({
         </div>
       </div>
       <Switch
-        checked={checked}
+        checked={Boolean(checked)}
         disabled={disabled}
         onCheckedChange={onCheckedChange}
       />

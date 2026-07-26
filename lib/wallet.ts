@@ -80,14 +80,19 @@ async function issueCardNumber(wallet: WalletRow): Promise<WalletRow> {
       .returning();
     return updated ?? { ...wallet, cardNumber };
   } catch {
-    // Unique collision — append random suffix digits
-    const fallback = `${cardNumber.slice(0, 8)}${Math.floor(10 + Math.random() * 89)}`;
-    const [updated] = await db
-      .update(wallets)
-      .set({ cardNumber: fallback, updatedAt: new Date() })
-      .where(eq(wallets.id, wallet.id))
-      .returning();
-    return updated ?? { ...wallet, cardNumber: fallback };
+    try {
+      // Unique collision — append random suffix digits
+      const fallback = `${cardNumber.slice(0, 8)}${Math.floor(10 + Math.random() * 89)}`;
+      const [updated] = await db
+        .update(wallets)
+        .set({ cardNumber: fallback, updatedAt: new Date() })
+        .where(eq(wallets.id, wallet.id))
+        .returning();
+      return updated ?? { ...wallet, cardNumber: fallback };
+    } catch {
+      // Schema/connection issues — still return a display number
+      return { ...wallet, cardNumber };
+    }
   }
 }
 
@@ -202,10 +207,14 @@ export async function listUserWallets(userId: string) {
 }
 
 export async function listBankAccounts(userId: string) {
-  return db.query.userBankAccounts.findMany({
-    where: eq(userBankAccounts.userId, userId),
-    orderBy: [desc(userBankAccounts.isPrimary), desc(userBankAccounts.createdAt)],
-  });
+  return db
+    .select()
+    .from(userBankAccounts)
+    .where(eq(userBankAccounts.userId, userId))
+    .orderBy(
+      desc(userBankAccounts.isPrimary),
+      desc(userBankAccounts.createdAt),
+    );
 }
 
 export async function recentWalletTransactions(

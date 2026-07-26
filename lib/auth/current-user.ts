@@ -19,7 +19,13 @@ export async function ensureAppUser(options?: {
   countryCode?: string | null;
   forceCountry?: boolean;
 }): Promise<SyncedUser | null> {
-  const clerkUser = await currentUser();
+  let clerkUser;
+  try {
+    clerkUser = await currentUser();
+  } catch (error) {
+    console.error("[ensureAppUser-clerk]", error);
+    return null;
+  }
   if (!clerkUser) return null;
 
   const needsFullSync =
@@ -30,10 +36,15 @@ export async function ensureAppUser(options?: {
   // Fast path for dashboard fan-out (wallet / notifications / country / settings)
   // so parallel GETs don't all rewrite users/wallets/countries.
   if (!needsFullSync) {
-    const existing = await db.query.users.findFirst({
-      where: eq(users.clerkId, clerkUser.id),
-    });
-    if (existing) return existing;
+    try {
+      const existing = await db.query.users.findFirst({
+        where: eq(users.clerkId, clerkUser.id),
+      });
+      if (existing) return existing;
+    } catch (error) {
+      console.error("[ensureAppUser-lookup]", error);
+      // Fall through to full sync
+    }
   }
 
   return syncClerkUserToDb(mapClerkSdkUser(clerkUser), {
