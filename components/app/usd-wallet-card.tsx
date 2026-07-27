@@ -239,23 +239,13 @@ export function UsdWalletCard({
                   {hidden ? "••••••••" : (usd?.balanceFormatted ?? "$0.00")}
                 </motion.p>
               </AnimatePresence>
-              <p className="mt-1.5 text-sm text-white/70">
-                Charcoal USD balance · convert anytime
-              </p>
+            
             </div>
             <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-bold text-white/90 ring-1 ring-white/15">
               <ShieldCheck className="h-3.5 w-3.5 text-oryno-orange" />
               USD
             </span>
           </div>
-
-          {liveFx ? (
-            <p className="mt-4 text-[11px] text-white/55">
-              Mid {liveFx.midRate.toFixed(2)} {localCurrency}/USD · Buy{" "}
-              {liveFx.buyRate.toFixed(2)} · Sell {liveFx.sellRate.toFixed(2)} ·
-              +{liveFx.commissionPercent}% fee · {liveFx.provider}
-            </p>
-          ) : null}
 
           <div className="relative mt-5 grid grid-cols-2 gap-2.5">
             <button

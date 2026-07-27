@@ -283,12 +283,15 @@ function WalletPageContent() {
         </MotionSection>
       ) : data ? (
         <>
-          <div className="-mx-4 sm:-mx-6 lg:-mx-8">
+          <div className="-mx-4 sm:-mx-6 md:mx-0">
             <div
-              className="flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 [-ms-overflow-style:none] [scrollbar-width:none] sm:px-6 lg:px-8 [&::-webkit-scrollbar]:hidden"
+              className={cn(
+                "flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 [-ms-overflow-style:none] [scrollbar-width:none] sm:px-6 [&::-webkit-scrollbar]:hidden",
+                "md:grid md:grid-cols-2 md:gap-4 md:overflow-visible md:px-0 md:pb-0",
+              )}
               style={{ WebkitOverflowScrolling: "touch" }}
             >
-              <MotionSection className="w-[min(88vw,22.5rem)] shrink-0 snap-center overflow-hidden rounded-[28px] border border-border bg-background shadow-[var(--shadow-soft)] sm:w-[min(80vw,26rem)]">
+              <MotionSection className="w-[min(88vw,22.5rem)] shrink-0 snap-center overflow-hidden rounded-[28px] border border-border bg-background shadow-[var(--shadow-soft)] sm:w-[min(80vw,26rem)] md:w-full md:min-w-0 md:shrink">
                 <div className="relative overflow-hidden bg-gradient-to-br from-[#ff8124] via-oryno-orange to-[#e85d00] px-5 py-5 text-white sm:px-6 sm:py-6">
                   <div
                     aria-hidden="true"
@@ -373,7 +376,7 @@ function WalletPageContent() {
                 </div>
               </MotionSection>
 
-              <div className="w-[min(88vw,22.5rem)] shrink-0 snap-center sm:w-[min(80vw,26rem)]">
+              <div className="w-[min(88vw,22.5rem)] shrink-0 snap-center sm:w-[min(80vw,26rem)] md:w-full md:min-w-0 md:shrink">
                 <UsdWalletCard
                   usd={data.usd}
                   localCurrency={currency}
@@ -384,7 +387,7 @@ function WalletPageContent() {
                 />
               </div>
             </div>
-            <p className="mt-1 px-4 text-center text-[11px] text-muted-foreground sm:px-6 lg:px-8">
+            <p className="mt-1 px-4 text-center text-[11px] text-muted-foreground sm:px-6 md:hidden">
               Swipe for USD wallet
             </p>
           </div>
