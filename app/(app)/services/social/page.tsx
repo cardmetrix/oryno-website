@@ -12,6 +12,7 @@ import {
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
+import { ServiceInstructions } from "@/components/app/service-instructions";
 import {
   activeCountryConfig,
   formatMoney,
@@ -285,6 +286,8 @@ export default function SocialBoostPage() {
                 </div>
               </div>
             </MotionSection>
+
+            <ServiceInstructions service="social" delay={0.14} />
 
             <MotionSection delay={0.18}>
               <motion.button

@@ -7,6 +7,7 @@ import Link from "next/link";
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
+import { ServiceInstructions } from "@/components/app/service-instructions";
 import { GiftCardIcon } from "@/components/icons/gift-card-icon";
 import { activeCountryConfig } from "@/lib/services-catalog";
 
@@ -113,6 +114,8 @@ export default function GiftCardsPage() {
           ))}
         </div>
       </MotionSection>
+
+      <ServiceInstructions service="gift-cards" className="mt-5" delay={0.12} />
     </AppShell>
   );
 }

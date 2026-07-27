@@ -13,6 +13,7 @@ import {
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
+import { ServiceInstructions } from "@/components/app/service-instructions";
 import { useCountry } from "@/components/providers/country-provider";
 import { formatCountryMoney } from "@/lib/country";
 import { cn } from "@/lib/utils";
@@ -396,6 +397,8 @@ export default function VirtualNumbersPage() {
                 </div>
               </div>
             </MotionSection>
+
+            <ServiceInstructions service="virtual-numbers" delay={0.12} />
 
             {error ? (
               <p className="rounded-[14px] bg-red-50 px-4 py-3 text-sm text-red-600">

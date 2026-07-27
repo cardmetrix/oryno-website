@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
 import { createNotification } from "@/lib/notifications-service";
 import { formatMoney } from "@/lib/transactions";
-import { purchaseEmailActivation } from "@/lib/herosms";
+import { herosmsErrorToEnglish, purchaseEmailActivation } from "@/lib/herosms";
 
 export const runtime = "nodejs";
 
@@ -70,11 +70,10 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     console.error("[herosms-purchase-email]", error);
+    const raw =
+      error instanceof Error ? error.message : "Failed to rent email";
     return NextResponse.json(
-      {
-        error:
-          error instanceof Error ? error.message : "Failed to rent email",
-      },
+      { error: herosmsErrorToEnglish(raw) },
       { status: 400 },
     );
   }

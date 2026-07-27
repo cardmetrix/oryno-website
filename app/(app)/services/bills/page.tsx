@@ -12,6 +12,7 @@ import {
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
+import { ServiceInstructions } from "@/components/app/service-instructions";
 import {
   VtpassServicePicker,
   type VtpassServiceOption,
@@ -222,6 +223,7 @@ export default function BillsPage() {
             Buy airtime instead
           </a>
         </MotionSection>
+        <ServiceInstructions service="bills" className="mt-5" />
       </AppShell>
     );
   }
@@ -466,6 +468,8 @@ export default function BillsPage() {
                 </div>
               </div>
             </MotionSection>
+
+            <ServiceInstructions service="bills" delay={0.12} />
 
             {error ? (
               <p className="rounded-[14px] bg-red-50 px-4 py-3 text-sm text-red-600">

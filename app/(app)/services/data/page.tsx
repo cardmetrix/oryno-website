@@ -6,6 +6,7 @@ import { CheckCircle2, Wallet, Wifi } from "lucide-react";
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
+import { ServiceInstructions } from "@/components/app/service-instructions";
 import {
   VtpassServicePicker,
   type VtpassServiceOption,
@@ -379,6 +380,8 @@ export default function DataPage() {
                 </div>
               </div>
             </MotionSection>
+
+            <ServiceInstructions service="data" delay={0.12} />
 
             {error ? (
               <p className="rounded-[14px] bg-red-50 px-4 py-3 text-sm text-red-600">

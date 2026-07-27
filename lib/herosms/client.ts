@@ -1,4 +1,5 @@
 import { mapHeroCountry, type HeroCountry, type HeroService } from "./catalog";
+import { herosmsErrorToEnglish } from "./errors";
 
 const DEFAULT_BASE = "https://hero-sms.com/stubs/handler_api.php";
 const EMAIL_BASE = "https://hero-sms.com/api/v1";
@@ -193,11 +194,12 @@ async function emailFetch(
   const key = herosmsApiKey();
   if (!key) throw new Error("HEROSMS_API_KEY is not configured");
 
+  // Email API docs use: Authorization: YOUR_SECRET_TOKEN (raw key)
   const res = await fetch(`${herosmsEmailBaseUrl()}${path}`, {
     ...init,
     headers: {
       Accept: "application/json",
-      Authorization: `ApiKey ${key}`,
+      Authorization: key,
       ...(init?.body ? { "Content-Type": "application/json" } : {}),
       ...(init?.headers ?? {}),
     },
@@ -208,14 +210,20 @@ async function emailFetch(
     data?: unknown;
     meta?: unknown;
     title?: string;
-    details?: string;
+    details?: string | Record<string, unknown>;
     message?: string;
   } | null;
 
   if (!res.ok) {
-    throw new Error(
-      json?.details || json?.message || json?.title || `HeroSMS email error (${res.status})`,
-    );
+    const details =
+      typeof json?.details === "string"
+        ? json.details
+        : json?.details
+          ? JSON.stringify(json.details)
+          : null;
+    const raw =
+      details || json?.message || json?.title || `HeroSMS email error (${res.status})`;
+    throw new Error(herosmsErrorToEnglish(raw));
   }
   return json;
 }

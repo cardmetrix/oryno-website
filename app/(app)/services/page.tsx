@@ -20,6 +20,7 @@ import { GiftCardIcon } from "@/components/icons/gift-card-icon";
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
+import { ServiceInstructions } from "@/components/app/service-instructions";
 import { ServicesSkeleton } from "@/components/app/services-skeleton";
 import {
   filterServices,
@@ -198,6 +199,8 @@ export default function ServicesPage() {
               )}
             </AnimatePresence>
           </div>
+
+          <ServiceInstructions service="catalog" className="mt-6" delay={0.1} />
         </>
       )}
     </AppShell>
