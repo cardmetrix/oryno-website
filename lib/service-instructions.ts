@@ -51,11 +51,11 @@ export const SERVICE_INSTRUCTIONS: Record<
   social: {
     subtitle: "Follow these steps to boost your social account",
     steps: [
-      "Choose the platform (Instagram, TikTok, YouTube, and more).",
-      "Pick a package for followers, likes, views, or other metrics.",
+      "Fund your wallet — boosts are paid from your ORYNO balance.",
+      "Choose a platform (Instagram, TikTok, YouTube, and more).",
+      "Search and pick a JustAnotherPanel service, then set quantity (within min–max).",
       "Paste your public profile or post link exactly as shown on the app.",
-      "Confirm and pay from your wallet — delivery starts within the stated ETA.",
-      "Keep your account public while the order is processing.",
+      "Confirm and pay — track status on the success screen; keep the account public while processing.",
     ],
   },
   "virtual-numbers": {

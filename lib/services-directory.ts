@@ -36,7 +36,6 @@ export type ServiceDirectoryItem = {
 const {
   currencySymbol,
   billProviders,
-  socialPackages,
   virtualNumbers,
   emailRentals,
 } = activeCountryConfig;
@@ -96,14 +95,14 @@ export const servicesDirectory: ServiceDirectoryItem[] = [
     label: "Social Boost",
     shortDescription: "Followers, likes & views",
     longDescription:
-      "Grow Instagram, TikTok, YouTube and more with packages that start delivering within hours.",
+      "Grow Instagram, TikTok, YouTube and more via JustAnotherPanel — live services, wallet checkout, and order tracking.",
     category: "Lifestyle",
-    tags: ["Instagram", "TikTok", "YouTube"],
-    eta: socialPackages[0]?.delivery ?? "6–24 hrs",
+    tags: ["Instagram", "TikTok", "YouTube", "JAP"],
+    eta: "Provider ETA",
     accent: "#C44D00",
     popular: true,
     icon: TrendingUp,
-    stats: `${socialPackages.length} packages`,
+    stats: `Live JAP catalog`,
   },
   {
     id: "virtual-numbers",
