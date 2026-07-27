@@ -27,6 +27,7 @@ type Props = {
   usd: WalletSummary | null | undefined;
   localCurrency: string;
   localBalanceFormatted: string;
+  holderName?: string;
   fx?: FxQuote | null;
   hidden?: boolean;
   onUpdated?: () => void;
@@ -39,6 +40,7 @@ export function UsdWalletCard({
   usd,
   localCurrency,
   localBalanceFormatted,
+  holderName,
   fx,
   hidden,
   onUpdated,
@@ -247,13 +249,9 @@ export function UsdWalletCard({
             </span>
           </div>
 
-          {liveFx ? (
-            <p className="mt-4 text-[11px] text-white/55">
-              Mid {liveFx.midRate.toFixed(2)} {localCurrency}/USD · Buy{" "}
-              {liveFx.buyRate.toFixed(2)} · Sell {liveFx.sellRate.toFixed(2)} ·
-              +{liveFx.commissionPercent}% fee · {liveFx.provider}
-            </p>
-          ) : null}
+          <p className="mt-1.5 text-sm text-white/70">
+            {holderName ? `${holderName} · USD wallet` : "USD wallet"}
+          </p>
 
           <div className="relative mt-5 grid grid-cols-2 gap-2.5">
             <button

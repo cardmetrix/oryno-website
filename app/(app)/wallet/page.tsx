@@ -381,6 +381,7 @@ function WalletPageContent() {
                   usd={data.usd}
                   localCurrency={currency}
                   localBalanceFormatted={data.primary.balanceFormatted}
+                  holderName={data.user.fullName}
                   fx={data.fx}
                   hidden={hidden}
                   onUpdated={() => void load({ soft: true })}
