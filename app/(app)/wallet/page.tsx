@@ -283,97 +283,111 @@ function WalletPageContent() {
         </MotionSection>
       ) : data ? (
         <>
-          <MotionSection className="overflow-hidden rounded-[28px] border border-border bg-background shadow-[var(--shadow-soft)]">
-            <div className="relative overflow-hidden bg-gradient-to-br from-[#ff8124] via-oryno-orange to-[#e85d00] px-5 py-5 text-white sm:px-6 sm:py-6">
-              <div
-                aria-hidden="true"
-                className="pointer-events-none absolute -top-12 -right-10 h-40 w-40 rounded-full bg-white/15 blur-2xl"
-              />
-              <motion.div
-                aria-hidden="true"
-                animate={{ x: ["-30%", "130%"] }}
-                transition={{
-                  duration: 4.8,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                  repeatDelay: 2,
-                }}
-                className="pointer-events-none absolute inset-y-0 w-1/3 skew-x-[-18deg] bg-gradient-to-r from-transparent via-white/25 to-transparent"
-              />
+          <div className="-mx-4 sm:-mx-6 lg:-mx-8">
+            <div
+              className="flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 [-ms-overflow-style:none] [scrollbar-width:none] sm:px-6 lg:px-8 [&::-webkit-scrollbar]:hidden"
+              style={{ WebkitOverflowScrolling: "touch" }}
+            >
+              <MotionSection className="w-[min(88vw,22.5rem)] shrink-0 snap-center overflow-hidden rounded-[28px] border border-border bg-background shadow-[var(--shadow-soft)] sm:w-[min(80vw,26rem)]">
+                <div className="relative overflow-hidden bg-gradient-to-br from-[#ff8124] via-oryno-orange to-[#e85d00] px-5 py-5 text-white sm:px-6 sm:py-6">
+                  <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute -top-12 -right-10 h-40 w-40 rounded-full bg-white/15 blur-2xl"
+                  />
+                  <motion.div
+                    aria-hidden="true"
+                    animate={{ x: ["-30%", "130%"] }}
+                    transition={{
+                      duration: 4.8,
+                      repeat: Infinity,
+                      ease: "easeInOut",
+                      repeatDelay: 2,
+                    }}
+                    className="pointer-events-none absolute inset-y-0 w-1/3 skew-x-[-18deg] bg-gradient-to-r from-transparent via-white/25 to-transparent"
+                  />
 
-              <div className="relative flex items-start justify-between gap-3">
-                <div>
-                  <p className="inline-flex items-center gap-1.5 text-[11px] font-bold tracking-[0.16em] text-white/80 uppercase">
-                    <Sparkles className="h-3.5 w-3.5 text-[#ffd29a]" />
-                    Primary · {currency}
-                  </p>
-                  <AnimatePresence mode="wait">
-                    <motion.p
-                      key={hidden ? "h" : data.primary.balanceFormatted}
-                      initial={{ opacity: 0, y: 8, filter: "blur(4px)" }}
-                      animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                      exit={{ opacity: 0, y: -6 }}
-                      className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl"
-                    >
-                      {hidden ? "••••••••" : data.primary.balanceFormatted}
-                    </motion.p>
-                  </AnimatePresence>
-                  <p className="mt-1.5 text-sm text-white/85">
-                    {data.user.fullName} · {data.user.countryCode} wallet
-                  </p>
+                  <div className="relative flex items-start justify-between gap-3">
+                    <div>
+                      <p className="inline-flex items-center gap-1.5 text-[11px] font-bold tracking-[0.16em] text-white/80 uppercase">
+                        <Sparkles className="h-3.5 w-3.5 text-[#ffd29a]" />
+                        Primary · {currency}
+                      </p>
+                      <AnimatePresence mode="wait">
+                        <motion.p
+                          key={hidden ? "h" : data.primary.balanceFormatted}
+                          initial={{ opacity: 0, y: 8, filter: "blur(4px)" }}
+                          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                          exit={{ opacity: 0, y: -6 }}
+                          className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl"
+                        >
+                          {hidden ? "••••••••" : data.primary.balanceFormatted}
+                        </motion.p>
+                      </AnimatePresence>
+                      <p className="mt-1.5 text-sm text-white/85">
+                        {data.user.fullName} · {data.user.countryCode} wallet
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col items-end gap-2">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-black/20 px-2.5 py-1 text-[11px] font-bold text-[#ffd29a] ring-1 ring-white/20">
+                        <ShieldCheck className="h-3.5 w-3.5" />
+                        {data.primary.status === "healthy"
+                          ? "Protected"
+                          : data.primary.status}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setHidden((v) => !v)}
+                        className="flex h-9 w-9 items-center justify-center rounded-full bg-black/20 ring-1 ring-white/20"
+                        aria-label={hidden ? "Show balance" : "Hide balance"}
+                      >
+                        {hidden ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="relative mt-5 grid grid-cols-2 gap-2.5">
+                    <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }}>
+                      <Link
+                        href="/fund"
+                        className="flex h-[50px] items-center justify-center gap-2 rounded-[16px] bg-white font-bold text-black shadow-[0_10px_24px_rgba(0,0,0,0.12)]"
+                      >
+                        <Plus className="h-4 w-4 text-black" strokeWidth={2.5} />
+                        <span className="text-black">Fund</span>
+                      </Link>
+                    </motion.div>
+                    <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }}>
+                      <Link
+                        href="/withdraw"
+                        className="flex h-[50px] items-center justify-center gap-2 rounded-[16px] bg-black/25 font-bold text-white ring-1 ring-white/25 backdrop-blur-md"
+                      >
+                        <ArrowUpRight className="h-4 w-4" />
+                        Withdraw
+                      </Link>
+                    </motion.div>
+                  </div>
                 </div>
+              </MotionSection>
 
-                <div className="flex flex-col items-end gap-2">
-                  <span className="inline-flex items-center gap-1 rounded-full bg-black/20 px-2.5 py-1 text-[11px] font-bold text-[#ffd29a] ring-1 ring-white/20">
-                    <ShieldCheck className="h-3.5 w-3.5" />
-                    {data.primary.status === "healthy" ? "Protected" : data.primary.status}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setHidden((v) => !v)}
-                    className="flex h-9 w-9 items-center justify-center rounded-full bg-black/20 ring-1 ring-white/20"
-                    aria-label={hidden ? "Show balance" : "Hide balance"}
-                  >
-                    {hidden ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              <div className="relative mt-5 grid grid-cols-2 gap-2.5">
-                <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }}>
-                  <Link
-                    href="/fund"
-                    className="flex h-[50px] items-center justify-center gap-2 rounded-[16px] bg-white font-bold text-black shadow-[0_10px_24px_rgba(0,0,0,0.12)]"
-                  >
-                    <Plus className="h-4 w-4 text-black" strokeWidth={2.5} />
-                    <span className="text-black">Fund</span>
-                  </Link>
-                </motion.div>
-                <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }}>
-                  <Link
-                    href="/withdraw"
-                    className="flex h-[50px] items-center justify-center gap-2 rounded-[16px] bg-black/25 font-bold text-white ring-1 ring-white/25 backdrop-blur-md"
-                  >
-                    <ArrowUpRight className="h-4 w-4" />
-                    Withdraw
-                  </Link>
-                </motion.div>
+              <div className="w-[min(88vw,22.5rem)] shrink-0 snap-center sm:w-[min(80vw,26rem)]">
+                <UsdWalletCard
+                  usd={data.usd}
+                  localCurrency={currency}
+                  localBalanceFormatted={data.primary.balanceFormatted}
+                  fx={data.fx}
+                  hidden={hidden}
+                  onUpdated={() => void load({ soft: true })}
+                />
               </div>
             </div>
-          </MotionSection>
-
-          <UsdWalletCard
-            usd={data.usd}
-            localCurrency={currency}
-            localBalanceFormatted={data.primary.balanceFormatted}
-            fx={data.fx}
-            hidden={hidden}
-            onUpdated={() => void load({ soft: true })}
-          />
+            <p className="mt-1 px-4 text-center text-[11px] text-muted-foreground sm:px-6 lg:px-8">
+              Swipe for USD wallet
+            </p>
+          </div>
 
           <MotionSection delay={0.06} className="mt-4 grid grid-cols-3 gap-3">
             {[

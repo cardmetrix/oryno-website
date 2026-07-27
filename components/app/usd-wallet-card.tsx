@@ -30,6 +30,7 @@ type Props = {
   fx?: FxQuote | null;
   hidden?: boolean;
   onUpdated?: () => void;
+  className?: string;
 };
 
 const USD_PRESETS = ["5", "10", "20", "50", "100"];
@@ -41,6 +42,7 @@ export function UsdWalletCard({
   fx,
   hidden,
   onUpdated,
+  className,
 }: Props) {
   const router = useRouter();
   const [panel, setPanel] = useState<"none" | "fund" | "convert">("none");
@@ -200,11 +202,11 @@ export function UsdWalletCard({
   }
 
   return (
-    <div className="mt-4 space-y-3">
+    <div className={cn("space-y-3", className)}>
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#1C1C1E] shadow-[0_18px_40px_rgba(0,0,0,0.28)]"
+        className="relative h-full overflow-hidden rounded-[28px] border border-white/10 bg-[#1C1C1E] shadow-[0_18px_40px_rgba(0,0,0,0.28)]"
       >
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_85%_10%,rgba(255,106,0,0.22),transparent_45%),radial-gradient(circle_at_10%_90%,rgba(255,255,255,0.06),transparent_40%)]" />
         <motion.div
