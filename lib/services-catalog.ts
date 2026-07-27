@@ -23,6 +23,19 @@ export type VirtualNumberOffer = {
   smsCapable: boolean;
 };
 
+/** Temporary email rentals (HeroSMS-style verification inboxes) */
+export type EmailRentOffer = {
+  id: string;
+  provider: string;
+  domain: string;
+  category: string;
+  price: number;
+  duration: string;
+  /** Platforms this inbox works well with */
+  worksFor: string[];
+  popular?: boolean;
+};
+
 export type SocialPackage = {
   id: string;
   platform: string;
@@ -51,6 +64,7 @@ export type CountryServiceConfig = {
   billProviders: ServiceProvider[];
   socialPackages: SocialPackage[];
   virtualNumbers: VirtualNumberOffer[];
+  emailRentals: EmailRentOffer[];
   giftCardBrands: GiftCardBrand[];
   giftCardsEnabled: boolean;
 };
@@ -253,6 +267,65 @@ export const activeCountryConfig: CountryServiceConfig = {
       price: 900,
       duration: "24 hours",
       smsCapable: true,
+    },
+  ],
+  emailRentals: [
+    {
+      id: "email-any-10m",
+      provider: "Any mailbox",
+      domain: "random",
+      category: "Quick OTP",
+      price: 200,
+      duration: "10 minutes",
+      worksFor: ["Any service"],
+      popular: true,
+    },
+    {
+      id: "email-any-1h",
+      provider: "Any mailbox",
+      domain: "random",
+      category: "Standard OTP",
+      price: 350,
+      duration: "1 hour",
+      worksFor: ["Any service"],
+      popular: true,
+    },
+    {
+      id: "email-gmail-1h",
+      provider: "Gmail-style",
+      domain: "gmail.com",
+      category: "Google / apps",
+      price: 800,
+      duration: "1 hour",
+      worksFor: ["Google", "Discord", "OpenAI"],
+    },
+    {
+      id: "email-outlook-1h",
+      provider: "Outlook-style",
+      domain: "outlook.com",
+      category: "Microsoft / apps",
+      price: 750,
+      duration: "1 hour",
+      worksFor: ["Microsoft", "LinkedIn", "GitHub"],
+    },
+    {
+      id: "email-any-24h",
+      provider: "Any mailbox",
+      domain: "random",
+      category: "Extended rental",
+      price: 1200,
+      duration: "24 hours",
+      worksFor: ["Any service"],
+    },
+    {
+      id: "email-custom-24h",
+      provider: "Premium domain",
+      domain: "custom",
+      category: "High deliverability",
+      price: 2500,
+      duration: "24 hours",
+      worksFor: ["Banks", "Crypto", "Marketplaces"],
+      popular: true,
     },
   ],
   giftCardBrands: [

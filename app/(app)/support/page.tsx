@@ -60,6 +60,7 @@ const topics = [
   "Airtime / Data",
   "Bill Payments",
   "Virtual Numbers",
+  "Rent Email",
   "Account & Security",
   "Other",
 ];

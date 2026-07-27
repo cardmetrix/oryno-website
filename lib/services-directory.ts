@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import {
+  Mail,
   Phone,
   Smartphone,
   TrendingUp,
@@ -32,8 +33,13 @@ export type ServiceDirectoryItem = {
   stats?: string;
 };
 
-const { currencySymbol, billProviders, socialPackages, virtualNumbers } =
-  activeCountryConfig;
+const {
+  currencySymbol,
+  billProviders,
+  socialPackages,
+  virtualNumbers,
+  emailRentals,
+} = activeCountryConfig;
 
 export const servicesDirectory: ServiceDirectoryItem[] = [
   {
@@ -111,6 +117,21 @@ export const servicesDirectory: ServiceDirectoryItem[] = [
     accent: "#9A3A00",
     icon: Phone,
     stats: `${virtualNumbers.length}+ offers`,
+  },
+  {
+    id: "emails",
+    href: "/services/emails",
+    label: "Rent Email",
+    shortDescription: "Temporary inboxes for OTP",
+    longDescription:
+      "Rent HeroSMS temporary emails for sign-ups and verification — pick a duration and grab codes from your inbox.",
+    category: "Lifestyle",
+    tags: ["Rent", "OTP", "HeroSMS"],
+    eta: "Instant inbox",
+    accent: "#7A2E00",
+    popular: true,
+    icon: Mail,
+    stats: `${emailRentals.length} rentals`,
   },
   {
     id: "gift-cards",

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowRight,
+  Mail,
   Phone,
   Search,
   SearchX,
@@ -34,6 +35,7 @@ const ICON_MAP: Record<string, LucideIcon | typeof GiftCardIcon> = {
   bills: Zap,
   social: TrendingUp,
   "virtual-numbers": Phone,
+  emails: Mail,
   "gift-cards": GiftCardIcon,
 };
 
