@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
 import { getCountryInfo } from "@/lib/country";
 import { ensureWalletSchema } from "@/lib/db/ensure-schema";
+import { quoteLocalUsd } from "@/lib/fx/rates";
 import {
   currencyForCountry,
   ensurePrimaryWallet,
@@ -12,6 +13,7 @@ import {
   toWalletSummary,
   type WalletRow,
 } from "@/lib/wallet";
+import { ensureUsdWallet } from "@/lib/wallet-usd";
 import { formatMoney } from "@/lib/transactions";
 
 export const runtime = "nodejs";
@@ -41,10 +43,14 @@ export async function GET() {
       primary = found;
     }
 
-    // Sequential on serverless (max:1 pool) — parallel queries can flake
+    const usdRow = await ensureUsdWallet(user.id).catch((error) => {
+      console.error("[wallet-get-usd]", error);
+      return null;
+    });
+
     const walletRows = await listUserWallets(user.id).catch((error) => {
       console.error("[wallet-get-list]", error);
-      return [primary];
+      return [primary, ...(usdRow ? [usdRow] : [])];
     });
     const bankRows = await listBankAccounts(user.id).catch((error) => {
       console.error("[wallet-get-banks]", error);
@@ -61,22 +67,32 @@ export async function GET() {
     const primarySummary =
       walletsSummary.find((w) => w.id === primary.id) ??
       toWalletSummary(primary);
+    const usdSummary =
+      (usdRow && walletsSummary.find((w) => w.id === usdRow.id)) ||
+      (usdRow ? toWalletSummary(usdRow) : null) ||
+      walletsSummary.find((w) => w.currency === "USD") ||
+      null;
 
-    const totalBalance = walletsSummary.reduce(
-      (sum, w) => sum + Number(w.balance),
-      0,
-    );
+    const fx = await quoteLocalUsd(currency).catch((error) => {
+      console.error("[wallet-get-fx]", error);
+      return null;
+    });
 
     return NextResponse.json(
       {
         primary: primarySummary,
+        usd: usdSummary,
         wallets: walletsSummary,
         banks: bankRows.map(toBankSummary),
         recent,
+        fx,
         totals: {
-          balance: totalBalance.toFixed(2),
-          balanceFormatted: formatMoney(totalBalance, currency),
+          balance: primarySummary.balance,
+          balanceFormatted: primarySummary.balanceFormatted,
           currency,
+          usdBalance: usdSummary?.balance ?? "0.00",
+          usdBalanceFormatted:
+            usdSummary?.balanceFormatted ?? formatMoney(0, "USD"),
           bankCount: bankRows.length,
           txCount: recent.length,
         },

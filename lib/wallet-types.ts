@@ -47,6 +47,7 @@ export const DEMO_BANKS = [
 
 export type WalletPayload = {
   primary: WalletSummary;
+  usd?: WalletSummary | null;
   wallets: WalletSummary[];
   banks: BankAccountSummary[];
   recent: Array<{
@@ -60,10 +61,22 @@ export type WalletPayload = {
     currency?: string;
     createdAt: string;
   }>;
+  fx?: {
+    base: string;
+    quote: string;
+    midRate: number;
+    buyRate: number;
+    sellRate: number;
+    commissionPercent: number;
+    provider: string;
+    asOf: string;
+  } | null;
   totals: {
     balance: string;
     balanceFormatted: string;
     currency: string;
+    usdBalance?: string;
+    usdBalanceFormatted?: string;
     bankCount: number;
     txCount: number;
   };

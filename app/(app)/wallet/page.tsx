@@ -1,7 +1,8 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowUpRight,
@@ -19,10 +20,12 @@ import {
   X,
   Zap,
 } from "lucide-react";
+import { toast } from "sonner";
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
 import { TransactionRow } from "@/components/app/transaction-row";
+import { UsdWalletCard } from "@/components/app/usd-wallet-card";
 import { WalletSkeleton } from "@/components/app/wallet-skeleton";
 import type { BankOption, WalletPayload } from "@/lib/wallet-types";
 import { cn } from "@/lib/utils";
@@ -36,6 +39,29 @@ const ADD_BANK_INSTRUCTIONS = [
 ];
 
 export default function WalletPage() {
+  return (
+    <Suspense fallback={<WalletPageFallback />}>
+      <WalletPageContent />
+    </Suspense>
+  );
+}
+
+function WalletPageFallback() {
+  return (
+    <AppShell>
+      <PageHeader
+        title="My Wallet"
+        subtitle="Balance, payout banks & recent activity"
+        backHref="/dashboard"
+      />
+      <WalletSkeleton />
+    </AppShell>
+  );
+}
+
+function WalletPageContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [data, setData] = useState<WalletPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -81,6 +107,51 @@ export default function WalletPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Paystack USD funding callback: /wallet?usd_fund=1&reference=...
+  useEffect(() => {
+    const usdFund = searchParams.get("usd_fund");
+    const reference =
+      searchParams.get("reference") || searchParams.get("trxref");
+    if (!usdFund || !reference) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/wallet/usd/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reference }),
+        });
+        const json = (await res.json()) as {
+          error?: string;
+          transactionId?: string;
+          amountFormatted?: string;
+        };
+        if (!res.ok) throw new Error(json.error || "Could not verify payment");
+        if (cancelled) return;
+        toast.success("USD wallet funded", {
+          description: json.amountFormatted,
+        });
+        await load({ soft: true });
+        router.replace(
+          json.transactionId
+            ? `/history/${json.transactionId}`
+            : "/wallet",
+        );
+      } catch (err) {
+        if (cancelled) return;
+        toast.error(
+          err instanceof Error ? err.message : "USD payment verification failed",
+        );
+        router.replace("/wallet");
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams, load, router]);
 
   useEffect(() => {
     if (!adding || accountNumber.length < 10 || !bankCode) return;
@@ -294,6 +365,15 @@ export default function WalletPage() {
               </div>
             </div>
           </MotionSection>
+
+          <UsdWalletCard
+            usd={data.usd}
+            localCurrency={currency}
+            localBalanceFormatted={data.primary.balanceFormatted}
+            fx={data.fx}
+            hidden={hidden}
+            onUpdated={() => void load({ soft: true })}
+          />
 
           <MotionSection delay={0.06} className="mt-4 grid grid-cols-3 gap-3">
             {[

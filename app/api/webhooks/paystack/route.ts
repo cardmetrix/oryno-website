@@ -5,6 +5,7 @@ import {
   findUserIdForPaystackCharge,
 } from "@/lib/paystack/deposit-accounts";
 import { settlePaystackTransfer } from "@/lib/paystack/transfers";
+import { creditUsdWalletFromFunding } from "@/lib/wallet-usd";
 import { ensureWalletSchema } from "@/lib/db/ensure-schema";
 
 export const runtime = "nodejs";
@@ -57,6 +58,24 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
       }
 
+      const purpose = data.metadata?.purpose ?? data.metadata?.Purpose;
+      if (purpose === "usd_fund") {
+        const userId =
+          (typeof data.metadata?.oryno_user_id === "string"
+            ? data.metadata.oryno_user_id
+            : null) || (await findUserIdForPaystackCharge(data));
+        if (!userId) {
+          return NextResponse.json({ error: "User not found" }, { status: 404 });
+        }
+        const usdAmount = Number(data.metadata?.usd_amount ?? 0);
+        const result = await creditUsdWalletFromFunding({
+          userId,
+          reference,
+          usdAmount: usdAmount > 0 ? usdAmount : undefined,
+        });
+        return NextResponse.json({ ok: true, purpose: "usd_fund", ...result });
+      }
+
       const userId = await findUserIdForPaystackCharge(data);
       if (!userId) {
         console.error("[paystack-webhook] unmatched customer", {
@@ -87,7 +106,10 @@ export async function POST(req: Request) {
     ) {
       const reference = data.reference;
       if (!reference) {
-        return NextResponse.json({ error: "Missing reference" }, { status: 400 });
+        return NextResponse.json(
+          { error: "Missing reference" },
+          { status: 400 },
+        );
       }
 
       const status =
