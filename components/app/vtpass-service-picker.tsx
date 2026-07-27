@@ -72,7 +72,7 @@ export function VtpassServicePicker({
               />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold text-foreground">
-                  {service.name.replace(/\s+(VTU|Data|Payment|Subscription).*$/i, "")}
+                  {service.name}
                 </p>
                 <p className="text-[11px] text-muted-foreground">
                   {selected ? "Selected" : "Tap to select"}

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
 import {
+  cleanNetworkName,
   getIntlAirtimeOperators,
   isVtpassDemoMode,
 } from "@/lib/vtpass";
@@ -40,7 +41,10 @@ export async function GET(req: Request) {
       demo: isVtpassDemoMode(),
       code,
       productTypeId,
-      operators,
+      operators: operators.map((op) => ({
+        ...op,
+        name: cleanNetworkName(op.name),
+      })),
     });
   } catch (error) {
     console.error("[vtpass-intl-operators]", error);

@@ -2,13 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import {
-  CheckCircle2,
-  Gift,
-  Globe2,
-  Smartphone,
-  Wallet,
-} from "lucide-react";
+import { CheckCircle2, Gift, Smartphone, Wallet } from "lucide-react";
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
@@ -16,10 +10,10 @@ import {
   VtpassServicePicker,
   type VtpassServiceOption,
 } from "@/components/app/vtpass-service-picker";
-import { ServiceLogo } from "@/components/app/service-logo";
 import { useCountry } from "@/components/providers/country-provider";
 import { airtimePresets, estimateAirtimeCashback } from "@/lib/telecom";
 import { formatCountryMoney } from "@/lib/country";
+import { cleanNetworkName } from "@/lib/vtpass/catalog";
 import { cn } from "@/lib/utils";
 
 type Variation = {
@@ -29,27 +23,14 @@ type Variation = {
   fixedPrice: boolean;
 };
 
-type IntlCountry = {
-  code: string;
-  flag: string;
-  name: string;
-  currency: string;
-  prefix: string;
-};
-
-type IntlOperator = {
-  operator_id: string;
-  name: string;
-  operator_image?: string;
-};
-
 export default function AirtimePage() {
-  const { country } = useCountry();
-  const isNigeria = (country?.code || "NG") === "NG";
+  const { country, loading: countryLoading } = useCountry();
+  const countryCode = country?.code || "NG";
+  const isNigeria = countryCode === "NG";
 
-  const [services, setServices] = useState<VtpassServiceOption[]>([]);
-  const [loadingServices, setLoadingServices] = useState(true);
-  const [serviceID, setServiceID] = useState("");
+  const [networks, setNetworks] = useState<VtpassServiceOption[]>([]);
+  const [loadingNetworks, setLoadingNetworks] = useState(true);
+  const [networkId, setNetworkId] = useState("");
   const [phone, setPhone] = useState("");
   const [amount, setAmount] = useState("500");
   const [saveBeneficiary, setSaveBeneficiary] = useState(true);
@@ -59,20 +40,16 @@ export default function AirtimePage() {
   const [walletLabel, setWalletLabel] = useState<string | null>(null);
   const [receiptAmount, setReceiptAmount] = useState("");
 
-  // International
-  const [intlCountries, setIntlCountries] = useState<IntlCountry[]>([]);
-  const [countryIso, setCountryIso] = useState<string>(country?.code || "GH");
-  const [operators, setOperators] = useState<IntlOperator[]>([]);
-  const [operatorId, setOperatorId] = useState("");
+  // Non-NG: package variations from foreign-airtime
   const [variations, setVariations] = useState<Variation[]>([]);
   const [variationCode, setVariationCode] = useState("");
-  const [loadingIntl, setLoadingIntl] = useState(false);
+  const [productTypeId, setProductTypeId] = useState(1);
+  const [loadingPackages, setLoadingPackages] = useState(false);
 
-  const selectedService = services.find((s) => s.serviceID === serviceID);
+  const selectedNetwork = networks.find((n) => n.serviceID === networkId);
   const selectedVariation = variations.find(
     (v) => v.variationCode === variationCode,
   );
-  const selectedOperator = operators.find((o) => o.operator_id === operatorId);
 
   const amountNumber = isNigeria
     ? Number(amount) || 0
@@ -81,142 +58,108 @@ export default function AirtimePage() {
 
   const canSubmit = useMemo(() => {
     const digits = phone.replace(/\D/g, "").length >= 10;
-    if (!digits || submitting) return false;
-    if (isNigeria) return Boolean(serviceID) && amountNumber >= 50;
-    return Boolean(operatorId && variationCode && amountNumber > 0);
+    if (!digits || submitting || !networkId) return false;
+    if (isNigeria) return amountNumber >= 50;
+    return Boolean(variationCode && amountNumber > 0);
   }, [
     phone,
     submitting,
+    networkId,
     isNigeria,
-    serviceID,
     amountNumber,
-    operatorId,
     variationCode,
   ]);
 
+  // Load networks: NG = local VTU; elsewhere = operators for user country
   useEffect(() => {
-    if (!isNigeria) return;
+    if (countryLoading) return;
     let cancelled = false;
+
     (async () => {
-      setLoadingServices(true);
+      setLoadingNetworks(true);
+      setError(null);
+      setNetworks([]);
+      setNetworkId("");
+      setVariations([]);
+      setVariationCode("");
+
       try {
-        const res = await fetch("/api/vtpass/services?identifier=airtime");
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Failed to load networks");
-        if (cancelled) return;
-        setServices(data.services ?? []);
-        if (data.services?.[0]?.serviceID) {
-          setServiceID(data.services[0].serviceID);
+        if (isNigeria) {
+          const res = await fetch("/api/vtpass/services?identifier=airtime");
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Failed to load networks");
+          if (cancelled) return;
+          const list: VtpassServiceOption[] = data.services ?? [];
+          setNetworks(list);
+          if (list[0]?.serviceID) setNetworkId(list[0].serviceID);
+        } else {
+          const typesRes = await fetch(
+            `/api/vtpass/international/product-types?code=${encodeURIComponent(countryCode)}`,
+          );
+          const typesData = await typesRes.json();
+          if (!typesRes.ok) {
+            throw new Error(typesData.error || "Failed to load networks");
+          }
+          const topUp =
+            (
+              typesData.productTypes as {
+                product_type_id: number;
+                name: string;
+              }[]
+            )?.find((t) => /top\s*up|airtime/i.test(t.name)) ||
+            typesData.productTypes?.[0];
+          if (!topUp) throw new Error("No airtime products for your country");
+
+          setProductTypeId(topUp.product_type_id);
+
+          const opRes = await fetch(
+            `/api/vtpass/international/operators?code=${encodeURIComponent(countryCode)}&product_type_id=${topUp.product_type_id}`,
+          );
+          const opData = await opRes.json();
+          if (!opRes.ok) {
+            throw new Error(opData.error || "Failed to load networks");
+          }
+          if (cancelled) return;
+
+          const list: VtpassServiceOption[] = (
+            opData.operators as {
+              operator_id: string;
+              name: string;
+              operator_image?: string;
+            }[]
+          ).map((op) => ({
+            serviceID: String(op.operator_id),
+            name: cleanNetworkName(op.name),
+            image: op.operator_image ?? null,
+          }));
+          setNetworks(list);
+          if (list[0]?.serviceID) setNetworkId(list[0].serviceID);
         }
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : "Failed to load networks");
         }
       } finally {
-        if (!cancelled) setLoadingServices(false);
+        if (!cancelled) setLoadingNetworks(false);
       }
     })();
+
     return () => {
       cancelled = true;
     };
-  }, [isNigeria]);
+  }, [countryLoading, isNigeria, countryCode]);
 
+  // Non-NG packages for selected operator
   useEffect(() => {
-    if (isNigeria) return;
+    if (isNigeria || !networkId) return;
     let cancelled = false;
-    (async () => {
-      setLoadingIntl(true);
-      try {
-        const res = await fetch("/api/vtpass/international/countries");
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Failed to load countries");
-        if (cancelled) return;
-        const list: IntlCountry[] = data.countries ?? [];
-        setIntlCountries(list);
-        const preferred =
-          list.find((c) => c.code === country?.code)?.code ||
-          list.find((c) => c.code !== "NG")?.code ||
-          list[0]?.code ||
-          "GH";
-        setCountryIso(preferred);
-      } catch (e) {
-        if (!cancelled) {
-          setError(e instanceof Error ? e.message : "Failed to load countries");
-        }
-      } finally {
-        if (!cancelled) setLoadingIntl(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [isNigeria, country?.code]);
 
-  useEffect(() => {
-    if (isNigeria || !countryIso) return;
-    let cancelled = false;
     (async () => {
-      setLoadingIntl(true);
-      setOperators([]);
-      setOperatorId("");
-      setVariations([]);
+      setLoadingPackages(true);
       setVariationCode("");
       try {
-        const typesRes = await fetch(
-          `/api/vtpass/international/product-types?code=${countryIso}`,
-        );
-        const typesData = await typesRes.json();
-        if (!typesRes.ok) throw new Error(typesData.error);
-        const topUp =
-          (typesData.productTypes as { product_type_id: number; name: string }[])?.find(
-            (t) => /top\s*up|airtime/i.test(t.name),
-          ) || typesData.productTypes?.[0];
-        if (!topUp) return;
-
-        const opRes = await fetch(
-          `/api/vtpass/international/operators?code=${countryIso}&product_type_id=${topUp.product_type_id}`,
-        );
-        const opData = await opRes.json();
-        if (!opRes.ok) throw new Error(opData.error);
-        if (cancelled) return;
-        setOperators(opData.operators ?? []);
-        if (opData.operators?.[0]?.operator_id) {
-          setOperatorId(opData.operators[0].operator_id);
-        }
-        setProductTypeId(topUp.product_type_id);
-      } catch (e) {
-        if (!cancelled) {
-          setError(e instanceof Error ? e.message : "Failed to load operators");
-        }
-      } finally {
-        if (!cancelled) setLoadingIntl(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [isNigeria, countryIso]);
-
-  const [productTypeId, setProductTypeId] = useState<number>(1);
-
-  useEffect(() => {
-    if (isNigeria || !countryIso || !operatorId) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const typesRes = await fetch(
-          `/api/vtpass/international/product-types?code=${countryIso}`,
-        );
-        const typesData = await typesRes.json();
-        const topUp =
-          (typesData.productTypes as { product_type_id: number; name: string }[])?.find(
-            (t) => /top\s*up|airtime/i.test(t.name),
-          ) || typesData.productTypes?.[0];
-        const pt = topUp?.product_type_id ?? 1;
-        setProductTypeId(pt);
-
         const res = await fetch(
-          `/api/vtpass/variations?serviceID=foreign-airtime&operator_id=${operatorId}&product_type_id=${pt}`,
+          `/api/vtpass/variations?serviceID=foreign-airtime&operator_id=${encodeURIComponent(networkId)}&product_type_id=${productTypeId}`,
         );
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Failed to load packages");
@@ -229,12 +172,15 @@ export default function AirtimePage() {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : "Failed to load packages");
         }
+      } finally {
+        if (!cancelled) setLoadingPackages(false);
       }
     })();
+
     return () => {
       cancelled = true;
     };
-  }, [isNigeria, countryIso, operatorId]);
+  }, [isNigeria, networkId, productTypeId]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -249,7 +195,7 @@ export default function AirtimePage() {
           isNigeria
             ? {
                 mode: "local",
-                serviceID,
+                serviceID: networkId,
                 phone,
                 amount: amountNumber,
                 saveBeneficiary,
@@ -258,8 +204,8 @@ export default function AirtimePage() {
                 mode: "international",
                 phone,
                 amount: amountNumber,
-                operatorId,
-                countryIso,
+                operatorId: networkId,
+                countryIso: countryCode,
                 productTypeId,
                 variationCode,
                 saveBeneficiary,
@@ -278,18 +224,13 @@ export default function AirtimePage() {
     }
   }
 
-  const money = (n: number) =>
-    formatCountryMoney(n, country?.code || "NG");
+  const money = (n: number) => formatCountryMoney(n, countryCode);
 
   return (
     <AppShell hideNav>
       <PageHeader
         title="Buy Airtime"
-        subtitle={
-          isNigeria
-            ? "MTN, Airtel, Glo & 9mobile via VTpass"
-            : "International airtime for your country"
-        }
+        subtitle="Top up any network instantly"
         backHref="/dashboard"
       />
 
@@ -309,11 +250,7 @@ export default function AirtimePage() {
               </h2>
               <p className="mt-2 text-sm text-muted-foreground">
                 {receiptAmount || money(amountNumber)} sent to {phone}
-                {isNigeria && selectedService
-                  ? ` · ${selectedService.name}`
-                  : selectedOperator
-                    ? ` · ${selectedOperator.name}`
-                    : ""}
+                {selectedNetwork ? ` · ${selectedNetwork.name}` : ""}
               </p>
               {isNigeria ? (
                 <p className="mt-3 text-sm font-semibold text-primary">
@@ -343,91 +280,38 @@ export default function AirtimePage() {
             </motion.div>
           </MotionSection>
         ) : (
-          <form key="form" onSubmit={onSubmit} className="space-y-4 sm:space-y-5">
-            {!isNigeria ? (
-              <MotionSection className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6">
-                <div className="mb-4 flex items-center gap-3">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-oryno-orange-muted text-primary">
-                    <Globe2 className="h-5 w-5" />
-                  </span>
-                  <div>
-                    <h2 className="text-base font-semibold">International airtime</h2>
-                    <p className="text-xs text-muted-foreground">
-                      Based on your country · VTpass foreign-airtime
-                    </p>
-                  </div>
+          <form
+            key="form"
+            onSubmit={onSubmit}
+            className="space-y-4 sm:space-y-5"
+          >
+            <MotionSection className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6">
+              <div className="mb-4 flex items-center gap-3">
+                <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-oryno-orange-muted text-primary">
+                  <Smartphone className="h-5 w-5" />
+                </span>
+                <div>
+                  <h2 className="text-base font-semibold">Select network</h2>
+                  <p className="text-xs text-muted-foreground">
+                    Networks for {country?.name || "your country"}
+                  </p>
                 </div>
-
-                <label className="mb-2 block text-sm font-medium">Country</label>
-                <select
-                  value={countryIso}
-                  onChange={(e) => setCountryIso(e.target.value)}
-                  className="mb-4 h-12 w-full rounded-[14px] border border-border bg-background px-3 text-sm"
-                >
-                  {intlCountries.map((c) => (
-                    <option key={c.code} value={c.code}>
-                      {c.name} (+{c.prefix})
-                    </option>
-                  ))}
-                </select>
-
-                <label className="mb-2 block text-sm font-medium">Operator</label>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  {loadingIntl
-                    ? Array.from({ length: 2 }).map((_, i) => (
-                        <div
-                          key={i}
-                          className="h-16 animate-pulse rounded-[16px] bg-muted"
-                        />
-                      ))
-                    : operators.map((op) => (
-                        <button
-                          key={op.operator_id}
-                          type="button"
-                          onClick={() => setOperatorId(op.operator_id)}
-                          className={cn(
-                            "flex items-center gap-3 rounded-[16px] border px-3 py-3 text-left",
-                            operatorId === op.operator_id
-                              ? "border-primary bg-oryno-orange-muted"
-                              : "border-border",
-                          )}
-                        >
-                          <ServiceLogo
-                            src={op.operator_image}
-                            alt={op.name}
-                          />
-                          <span className="text-sm font-semibold">{op.name}</span>
-                        </button>
-                      ))}
-                </div>
-              </MotionSection>
-            ) : (
-              <MotionSection className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6">
-                <div className="mb-4 flex items-center gap-3">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-oryno-orange-muted text-primary">
-                    <Smartphone className="h-5 w-5" />
-                  </span>
-                  <div>
-                    <h2 className="text-base font-semibold">Select network</h2>
-                    <p className="text-xs text-muted-foreground">
-                      Logos from VTpass · Airtime VTU
-                    </p>
-                  </div>
-                </div>
-                <VtpassServicePicker
-                  services={services}
-                  value={serviceID}
-                  onChange={setServiceID}
-                  loading={loadingServices}
-                />
-              </MotionSection>
-            )}
+              </div>
+              <VtpassServicePicker
+                services={networks}
+                value={networkId}
+                onChange={setNetworkId}
+                loading={loadingNetworks || countryLoading}
+              />
+            </MotionSection>
 
             <MotionSection
               delay={0.05}
               className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6"
             >
-              <label className="mb-2 block text-sm font-medium">Phone number</label>
+              <label className="mb-2 block text-sm font-medium">
+                Phone number
+              </label>
               <input
                 type="tel"
                 value={phone}
@@ -491,31 +375,36 @@ export default function AirtimePage() {
                 delay={0.08}
                 className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6"
               >
-                <h2 className="mb-3 text-base font-semibold">Top-up packages</h2>
+                <h2 className="mb-3 text-base font-semibold">Select package</h2>
                 <div className="grid gap-2">
-                  {variations.map((v) => (
-                    <button
-                      key={v.variationCode}
-                      type="button"
-                      onClick={() => setVariationCode(v.variationCode)}
-                      className={cn(
-                        "flex items-center justify-between rounded-[16px] border px-4 py-3 text-left",
-                        variationCode === v.variationCode
-                          ? "border-primary bg-oryno-orange-muted"
-                          : "border-border",
-                      )}
-                    >
-                      <span className="text-sm font-semibold">{v.name}</span>
-                      <span className="text-sm font-bold text-primary">
-                        {money(v.amount)}
-                      </span>
-                    </button>
-                  ))}
-                  {!variations.length ? (
+                  {loadingPackages
+                    ? Array.from({ length: 3 }).map((_, i) => (
+                        <div
+                          key={i}
+                          className="h-14 animate-pulse rounded-[16px] bg-muted"
+                        />
+                      ))
+                    : variations.map((v) => (
+                        <button
+                          key={v.variationCode}
+                          type="button"
+                          onClick={() => setVariationCode(v.variationCode)}
+                          className={cn(
+                            "flex items-center justify-between rounded-[16px] border px-4 py-3 text-left",
+                            variationCode === v.variationCode
+                              ? "border-primary bg-oryno-orange-muted"
+                              : "border-border",
+                          )}
+                        >
+                          <span className="text-sm font-semibold">{v.name}</span>
+                          <span className="text-sm font-bold text-primary">
+                            {money(v.amount)}
+                          </span>
+                        </button>
+                      ))}
+                  {!loadingPackages && !variations.length ? (
                     <p className="py-4 text-center text-sm text-muted-foreground">
-                      {loadingIntl
-                        ? "Loading packages…"
-                        : "No packages for this operator"}
+                      No packages for this network
                     </p>
                   ) : null}
                 </div>
@@ -528,14 +417,7 @@ export default function AirtimePage() {
             >
               <h2 className="text-base font-semibold">Order summary</h2>
               <div className="mt-3 space-y-2 text-sm">
-                <Row
-                  label="Network"
-                  value={
-                    isNigeria
-                      ? selectedService?.name ?? "—"
-                      : selectedOperator?.name ?? "—"
-                  }
-                />
+                <Row label="Network" value={selectedNetwork?.name ?? "—"} />
                 <Row label="Phone" value={phone || "—"} />
                 <Row label="Amount" value={money(amountNumber)} accent />
                 <div className="flex items-center justify-between border-t border-border pt-3">

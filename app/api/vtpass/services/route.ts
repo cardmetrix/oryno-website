@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
 import {
+  cleanNetworkName,
   fallbackServicesFor,
   getVtpassServices,
   isVtpassDemoMode,
@@ -43,17 +44,23 @@ export async function GET(req: Request) {
       services = fallbackServicesFor(identifier);
     }
 
+    // Local airtime/data lists should not include foreign-airtime product
+    const filtered = services.filter(
+      (s) => s.serviceID !== "foreign-airtime",
+    );
+
     return NextResponse.json({
       ok: true,
       demo: isVtpassDemoMode(),
       identifier,
-      services: services.map((s) => ({
+      services: filtered.map((s) => ({
         serviceID: s.serviceID,
-        name: s.name,
+        name: cleanNetworkName(s.name),
+        rawName: s.name,
         minAmount: Number(s.minimium_amount) || undefined,
         maxAmount: Number(s.maximum_amount) || undefined,
         convenienceFee: s.convinience_fee,
-        image: resolveServiceImage(s.image),
+        image: resolveServiceImage(s.image, s.serviceID),
       })),
     });
   } catch (error) {

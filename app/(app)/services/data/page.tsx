@@ -2,18 +2,17 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { CheckCircle2, Globe2, Wallet, Wifi } from "lucide-react";
+import { CheckCircle2, Wallet, Wifi } from "lucide-react";
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
-import { ServiceLogo } from "@/components/app/service-logo";
 import {
   VtpassServicePicker,
   type VtpassServiceOption,
 } from "@/components/app/vtpass-service-picker";
 import { useCountry } from "@/components/providers/country-provider";
 import { formatCountryMoney } from "@/lib/country";
-import { inferDataPlanCategory } from "@/lib/vtpass/catalog";
+import { cleanNetworkName, inferDataPlanCategory } from "@/lib/vtpass/catalog";
 import { cn } from "@/lib/utils";
 
 type Variation = {
@@ -23,29 +22,16 @@ type Variation = {
   fixedPrice: boolean;
 };
 
-type IntlCountry = {
-  code: string;
-  flag: string;
-  name: string;
-  currency: string;
-  prefix: string;
-};
-
-type IntlOperator = {
-  operator_id: string;
-  name: string;
-  operator_image?: string;
-};
-
 const FILTERS = ["All", "Daily", "Weekly", "Monthly"] as const;
 
 export default function DataPage() {
-  const { country } = useCountry();
-  const isNigeria = (country?.code || "NG") === "NG";
+  const { country, loading: countryLoading } = useCountry();
+  const countryCode = country?.code || "NG";
+  const isNigeria = countryCode === "NG";
 
-  const [services, setServices] = useState<VtpassServiceOption[]>([]);
-  const [loadingServices, setLoadingServices] = useState(true);
-  const [serviceID, setServiceID] = useState("");
+  const [networks, setNetworks] = useState<VtpassServiceOption[]>([]);
+  const [loadingNetworks, setLoadingNetworks] = useState(true);
+  const [networkId, setNetworkId] = useState("");
   const [phone, setPhone] = useState("");
   const [variations, setVariations] = useState<Variation[]>([]);
   const [loadingPlans, setLoadingPlans] = useState(false);
@@ -55,17 +41,10 @@ export default function DataPage() {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [receipt, setReceipt] = useState("");
-
-  const [intlCountries, setIntlCountries] = useState<IntlCountry[]>([]);
-  const [countryIso, setCountryIso] = useState<string>(country?.code || "GH");
-  const [operators, setOperators] = useState<IntlOperator[]>([]);
-  const [operatorId, setOperatorId] = useState("");
   const [productTypeId, setProductTypeId] = useState(4);
-  const [loadingIntl, setLoadingIntl] = useState(false);
 
   const selected = variations.find((v) => v.variationCode === variationCode);
-  const selectedService = services.find((s) => s.serviceID === serviceID);
-  const selectedOperator = operators.find((o) => o.operator_id === operatorId);
+  const selectedNetwork = networks.find((n) => n.serviceID === networkId);
 
   const filtered = useMemo(() => {
     if (filter === "All") return variations;
@@ -79,56 +58,94 @@ export default function DataPage() {
     if (phone.replace(/\D/g, "").length < 10 || !selected || submitting) {
       return false;
     }
-    if (isNigeria) return Boolean(serviceID);
-    return Boolean(operatorId && countryIso && productTypeId);
-  }, [
-    phone,
-    selected,
-    submitting,
-    isNigeria,
-    serviceID,
-    operatorId,
-    countryIso,
-    productTypeId,
-  ]);
+    return Boolean(networkId);
+  }, [phone, selected, submitting, networkId]);
 
   useEffect(() => {
-    if (!isNigeria) return;
+    if (countryLoading) return;
     let cancelled = false;
+
     (async () => {
-      setLoadingServices(true);
+      setLoadingNetworks(true);
+      setError(null);
+      setNetworks([]);
+      setNetworkId("");
+      setVariations([]);
+      setVariationCode("");
+
       try {
-        const res = await fetch("/api/vtpass/services?identifier=data");
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Failed to load networks");
-        if (cancelled) return;
-        setServices(data.services ?? []);
-        if (data.services?.[0]?.serviceID) {
-          setServiceID(data.services[0].serviceID);
+        if (isNigeria) {
+          const res = await fetch("/api/vtpass/services?identifier=data");
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Failed to load networks");
+          if (cancelled) return;
+          const list: VtpassServiceOption[] = data.services ?? [];
+          setNetworks(list);
+          if (list[0]?.serviceID) setNetworkId(list[0].serviceID);
+        } else {
+          const typesRes = await fetch(
+            `/api/vtpass/international/product-types?code=${encodeURIComponent(countryCode)}`,
+          );
+          const typesData = await typesRes.json();
+          if (!typesRes.ok) throw new Error(typesData.error);
+          const dataType =
+            (
+              typesData.productTypes as {
+                product_type_id: number;
+                name: string;
+              }[]
+            )?.find((t) => /data/i.test(t.name)) ||
+            typesData.productTypes?.[0];
+          if (!dataType) throw new Error("No data products for your country");
+          setProductTypeId(dataType.product_type_id);
+
+          const opRes = await fetch(
+            `/api/vtpass/international/operators?code=${encodeURIComponent(countryCode)}&product_type_id=${dataType.product_type_id}`,
+          );
+          const opData = await opRes.json();
+          if (!opRes.ok) throw new Error(opData.error);
+          if (cancelled) return;
+
+          const list: VtpassServiceOption[] = (
+            opData.operators as {
+              operator_id: string;
+              name: string;
+              operator_image?: string;
+            }[]
+          ).map((op) => ({
+            serviceID: String(op.operator_id),
+            name: cleanNetworkName(op.name),
+            image: op.operator_image ?? null,
+          }));
+          setNetworks(list);
+          if (list[0]?.serviceID) setNetworkId(list[0].serviceID);
         }
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : "Failed to load networks");
         }
       } finally {
-        if (!cancelled) setLoadingServices(false);
+        if (!cancelled) setLoadingNetworks(false);
       }
     })();
+
     return () => {
       cancelled = true;
     };
-  }, [isNigeria]);
+  }, [countryLoading, isNigeria, countryCode]);
 
   useEffect(() => {
-    if (!isNigeria || !serviceID) return;
+    if (!networkId) return;
     let cancelled = false;
+
     (async () => {
       setLoadingPlans(true);
       setVariationCode("");
       try {
-        const res = await fetch(
-          `/api/vtpass/variations?serviceID=${encodeURIComponent(serviceID)}`,
-        );
+        const url = isNigeria
+          ? `/api/vtpass/variations?serviceID=${encodeURIComponent(networkId)}`
+          : `/api/vtpass/variations?serviceID=foreign-airtime&operator_id=${encodeURIComponent(networkId)}&product_type_id=${productTypeId}`;
+        const res = await fetch(url);
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Failed to load plans");
         if (cancelled) return;
@@ -144,114 +161,11 @@ export default function DataPage() {
         if (!cancelled) setLoadingPlans(false);
       }
     })();
+
     return () => {
       cancelled = true;
     };
-  }, [isNigeria, serviceID]);
-
-  useEffect(() => {
-    if (isNigeria) return;
-    let cancelled = false;
-    (async () => {
-      setLoadingIntl(true);
-      try {
-        const res = await fetch("/api/vtpass/international/countries");
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error);
-        if (cancelled) return;
-        const list: IntlCountry[] = data.countries ?? [];
-        setIntlCountries(list);
-        const preferred =
-          list.find((c) => c.code === country?.code)?.code ||
-          list.find((c) => c.code !== "NG")?.code ||
-          list[0]?.code ||
-          "GH";
-        setCountryIso(preferred);
-      } catch (e) {
-        if (!cancelled) {
-          setError(e instanceof Error ? e.message : "Failed to load countries");
-        }
-      } finally {
-        if (!cancelled) setLoadingIntl(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [isNigeria, country?.code]);
-
-  useEffect(() => {
-    if (isNigeria || !countryIso) return;
-    let cancelled = false;
-    (async () => {
-      setLoadingIntl(true);
-      setOperators([]);
-      setOperatorId("");
-      setVariations([]);
-      try {
-        const typesRes = await fetch(
-          `/api/vtpass/international/product-types?code=${countryIso}`,
-        );
-        const typesData = await typesRes.json();
-        if (!typesRes.ok) throw new Error(typesData.error);
-        const dataType =
-          (typesData.productTypes as { product_type_id: number; name: string }[])?.find(
-            (t) => /data/i.test(t.name),
-          ) || typesData.productTypes?.[0];
-        if (!dataType) return;
-        setProductTypeId(dataType.product_type_id);
-
-        const opRes = await fetch(
-          `/api/vtpass/international/operators?code=${countryIso}&product_type_id=${dataType.product_type_id}`,
-        );
-        const opData = await opRes.json();
-        if (!opRes.ok) throw new Error(opData.error);
-        if (cancelled) return;
-        setOperators(opData.operators ?? []);
-        if (opData.operators?.[0]?.operator_id) {
-          setOperatorId(opData.operators[0].operator_id);
-        }
-      } catch (e) {
-        if (!cancelled) {
-          setError(e instanceof Error ? e.message : "Failed to load operators");
-        }
-      } finally {
-        if (!cancelled) setLoadingIntl(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [isNigeria, countryIso]);
-
-  useEffect(() => {
-    if (isNigeria || !countryIso || !operatorId) return;
-    let cancelled = false;
-    (async () => {
-      setLoadingPlans(true);
-      try {
-        const res = await fetch(
-          `/api/vtpass/variations?serviceID=foreign-airtime&operator_id=${operatorId}&product_type_id=${productTypeId}`,
-        );
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Failed to load plans");
-        if (cancelled) return;
-        setVariations(data.variations ?? []);
-        if (data.variations?.[0]?.variationCode) {
-          setVariationCode(data.variations[0].variationCode);
-        }
-      } catch (e) {
-        if (!cancelled) {
-          setError(e instanceof Error ? e.message : "Failed to load plans");
-        }
-      } finally {
-        if (!cancelled) setLoadingPlans(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [isNigeria, countryIso, operatorId, productTypeId]);
+  }, [isNigeria, networkId, productTypeId]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -266,7 +180,7 @@ export default function DataPage() {
           isNigeria
             ? {
                 mode: "local",
-                serviceID,
+                serviceID: networkId,
                 phone,
                 variationCode: selected.variationCode,
                 variationName: selected.name,
@@ -278,8 +192,8 @@ export default function DataPage() {
                 variationCode: selected.variationCode,
                 variationName: selected.name,
                 amount: selected.amount,
-                operatorId,
-                countryIso,
+                operatorId: networkId,
+                countryIso: countryCode,
                 productTypeId,
               },
         ),
@@ -295,17 +209,13 @@ export default function DataPage() {
     }
   }
 
-  const money = (n: number) => formatCountryMoney(n, country?.code || "NG");
+  const money = (n: number) => formatCountryMoney(n, countryCode);
 
   return (
     <AppShell hideNav>
       <PageHeader
         title="Buy Data"
-        subtitle={
-          isNigeria
-            ? "All networks · live VTpass plans"
-            : "International data for your country"
-        }
+        subtitle="Daily, weekly & monthly plans"
         backHref="/dashboard"
       />
 
@@ -342,81 +252,39 @@ export default function DataPage() {
             </motion.div>
           </MotionSection>
         ) : (
-          <form key="form" onSubmit={onSubmit} className="space-y-4 sm:space-y-5">
-            {isNigeria ? (
-              <MotionSection className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6">
-                <div className="mb-4 flex items-center gap-3">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-oryno-orange-muted text-primary">
-                    <Wifi className="h-5 w-5" />
-                  </span>
-                  <div>
-                    <h2 className="text-base font-semibold">Select network</h2>
-                    <p className="text-xs text-muted-foreground">
-                      MTN, Airtel, Glo, 9mobile, Smile, Spectranet & SME
-                    </p>
-                  </div>
+          <form
+            key="form"
+            onSubmit={onSubmit}
+            className="space-y-4 sm:space-y-5"
+          >
+            <MotionSection className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6">
+              <div className="mb-4 flex items-center gap-3">
+                <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-oryno-orange-muted text-primary">
+                  <Wifi className="h-5 w-5" />
+                </span>
+                <div>
+                  <h2 className="text-base font-semibold">Select network</h2>
+                  <p className="text-xs text-muted-foreground">
+                    Networks for {country?.name || "your country"}
+                  </p>
                 </div>
-                <VtpassServicePicker
-                  services={services}
-                  value={serviceID}
-                  onChange={setServiceID}
-                  loading={loadingServices}
-                  columns="grid-cols-2 sm:grid-cols-3 lg:grid-cols-4"
-                />
-              </MotionSection>
-            ) : (
-              <MotionSection className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6">
-                <div className="mb-4 flex items-center gap-3">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-oryno-orange-muted text-primary">
-                    <Globe2 className="h-5 w-5" />
-                  </span>
-                  <div>
-                    <h2 className="text-base font-semibold">International data</h2>
-                    <p className="text-xs text-muted-foreground">
-                      VTpass foreign-airtime · Mobile Data
-                    </p>
-                  </div>
-                </div>
-                <label className="mb-2 block text-sm font-medium">Country</label>
-                <select
-                  value={countryIso}
-                  onChange={(e) => setCountryIso(e.target.value)}
-                  className="mb-4 h-12 w-full rounded-[14px] border border-border bg-background px-3 text-sm"
-                >
-                  {intlCountries.map((c) => (
-                    <option key={c.code} value={c.code}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {loadingIntl
-                    ? null
-                    : operators.map((op) => (
-                        <button
-                          key={op.operator_id}
-                          type="button"
-                          onClick={() => setOperatorId(op.operator_id)}
-                          className={cn(
-                            "flex items-center gap-3 rounded-[16px] border px-3 py-3 text-left",
-                            operatorId === op.operator_id
-                              ? "border-primary bg-oryno-orange-muted"
-                              : "border-border",
-                          )}
-                        >
-                          <ServiceLogo src={op.operator_image} alt={op.name} />
-                          <span className="text-sm font-semibold">{op.name}</span>
-                        </button>
-                      ))}
-                </div>
-              </MotionSection>
-            )}
+              </div>
+              <VtpassServicePicker
+                services={networks}
+                value={networkId}
+                onChange={setNetworkId}
+                loading={loadingNetworks || countryLoading}
+                columns="grid-cols-2 sm:grid-cols-3 lg:grid-cols-4"
+              />
+            </MotionSection>
 
             <MotionSection
               delay={0.05}
               className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6"
             >
-              <label className="mb-2 block text-sm font-medium">Phone number</label>
+              <label className="mb-2 block text-sm font-medium">
+                Phone number
+              </label>
               <input
                 type="tel"
                 value={phone}
@@ -497,14 +365,7 @@ export default function DataPage() {
             >
               <h2 className="text-base font-semibold">Order summary</h2>
               <div className="mt-3 space-y-2 text-sm">
-                <Row
-                  label="Network"
-                  value={
-                    isNigeria
-                      ? selectedService?.name ?? "—"
-                      : selectedOperator?.name ?? "—"
-                  }
-                />
+                <Row label="Network" value={selectedNetwork?.name ?? "—"} />
                 <Row label="Plan" value={selected?.name ?? "—"} />
                 <Row label="Phone" value={phone || "—"} />
                 <Row

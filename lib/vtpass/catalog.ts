@@ -465,9 +465,63 @@ export function inferDataPlanCategory(
   return "monthly";
 }
 
-/** Prefer live VTpass CDN host when available; keep absolute URLs. */
-export function resolveServiceImage(image?: string | null) {
+/** Prefer live VTpass CDN host; repair known broken filenames from their API. */
+const SERVICE_IMAGE_OVERRIDES: Record<string, string> = {
+  // API returns *-Airtime-VTU.jpg which 404s; working files omit -VTU
+  mtn: `${IMG}/MTN-Airtime.jpg`,
+  airtel: `${IMG}/Airtel-Airtime.jpg`,
+  glo: `${IMG}/GLO-Airtime.jpg`,
+  etisalat: `${IMG}/9mobile-Airtime.jpg`,
+  "mtn-data": `${IMG}/MTN-Data.jpg`,
+  "airtel-data": `${IMG}/Airtel-Data.jpg`,
+  "glo-data": `${IMG}/GLO-Data.jpg`,
+  "etisalat-data": `${IMG}/9mobile-Data.jpg`,
+  "smile-direct": `${IMG}/Smile-Payment.jpg`,
+  dstv: `${IMG}/Pay-DSTV-Subscription.jpg`,
+  gotv: `${IMG}/Gotv-Payment.jpg`,
+  startimes: `${IMG}/Startimes-Subscription.jpg`,
+  "ikeja-electric": `${IMG}/Ikeja-Electric-Payment-PHCN.jpg`,
+  "eko-electric": `${IMG}/Eko-Electric-Payment-PHCN.jpg`,
+  "abuja-electric": `${IMG}/Abuja-Electric.jpg`,
+  "kano-electric": `${IMG}/Kano-Electric.jpg`,
+  "portharcourt-electric": `${IMG}/Port-Harcourt-Electric.jpg`,
+  "jos-electric": `${IMG}/Jos-Electric-JED.jpg`,
+  "kaduna-electric": `${IMG}/Kaduna-Electric-KAEDCO.jpg`,
+  "enugu-electric": `${IMG}/Enugu-Electric-EEDC.jpg`,
+};
+
+/** Strip product words so UI shows only the network / brand name. */
+export function cleanNetworkName(name: string) {
+  return name
+    .replace(/\bAirtime\b/gi, "")
+    .replace(/\bVTU\b/gi, "")
+    .replace(/\bData\b/gi, "")
+    .replace(/\bPayment\b/gi, "")
+    .replace(/\bSubscription\b/gi, "")
+    .replace(/\bInternet\b/gi, "")
+    .replace(/\b\(SME\)\b/gi, "SME")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export function resolveServiceImage(
+  image?: string | null,
+  serviceID?: string | null,
+) {
+  if (serviceID && SERVICE_IMAGE_OVERRIDES[serviceID]) {
+    return SERVICE_IMAGE_OVERRIDES[serviceID];
+  }
+
   if (!image) return null;
-  if (image.startsWith("http")) return image;
-  return `https://sandbox.vtpass.com${image.startsWith("/") ? "" : "/"}${image}`;
+
+  let url = image.startsWith("http")
+    ? image
+    : `https://sandbox.vtpass.com${image.startsWith("/") ? "" : "/"}${image}`;
+
+  // VTpass often returns Airtime-VTU.jpg which 404s — fall back to Airtime.jpg
+  url = url
+    .replace(/-Airtime-VTU\.jpg$/i, "-Airtime.jpg")
+    .replace(/-VTU\.jpg$/i, ".jpg");
+
+  return url;
 }
