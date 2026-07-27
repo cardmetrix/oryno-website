@@ -1,346 +1,542 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import {
-  CheckCircle2,
-  ContactRound,
-  Sparkles,
-  Wifi,
-  Wallet,
-} from "lucide-react";
+import { CheckCircle2, Globe2, Wallet, Wifi } from "lucide-react";
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
-import { NetworkPicker } from "@/components/app/network-picker";
 import { PageHeader } from "@/components/app/page-header";
+import { ServiceLogo } from "@/components/app/service-logo";
 import {
-  dataCategories,
-  dataPlans,
-  formatNaira,
-  NetworkId,
-  networks,
-} from "@/lib/telecom";
+  VtpassServicePicker,
+  type VtpassServiceOption,
+} from "@/components/app/vtpass-service-picker";
+import { useCountry } from "@/components/providers/country-provider";
+import { formatCountryMoney } from "@/lib/country";
+import { inferDataPlanCategory } from "@/lib/vtpass/catalog";
 import { cn } from "@/lib/utils";
 
+type Variation = {
+  variationCode: string;
+  name: string;
+  amount: number;
+  fixedPrice: boolean;
+};
+
+type IntlCountry = {
+  code: string;
+  flag: string;
+  name: string;
+  currency: string;
+  prefix: string;
+};
+
+type IntlOperator = {
+  operator_id: string;
+  name: string;
+  operator_image?: string;
+};
+
+const FILTERS = ["All", "Daily", "Weekly", "Monthly"] as const;
+
 export default function DataPage() {
-  const [network, setNetwork] = useState<NetworkId>("mtn");
-  const [phone, setPhone] = useState("0803 111 2222");
-  const [category, setCategory] =
-    useState<(typeof dataCategories)[number]>("Daily");
-  const [planId, setPlanId] = useState("mtn-d1");
+  const { country } = useCountry();
+  const isNigeria = (country?.code || "NG") === "NG";
+
+  const [services, setServices] = useState<VtpassServiceOption[]>([]);
+  const [loadingServices, setLoadingServices] = useState(true);
+  const [serviceID, setServiceID] = useState("");
+  const [phone, setPhone] = useState("");
+  const [variations, setVariations] = useState<Variation[]>([]);
+  const [loadingPlans, setLoadingPlans] = useState(false);
+  const [variationCode, setVariationCode] = useState("");
+  const [filter, setFilter] = useState<(typeof FILTERS)[number]>("All");
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [receipt, setReceipt] = useState("");
 
-  const selectedNetwork = networks.find((n) => n.id === network)!;
-  const walletBalance = 1245600;
+  const [intlCountries, setIntlCountries] = useState<IntlCountry[]>([]);
+  const [countryIso, setCountryIso] = useState<string>(country?.code || "GH");
+  const [operators, setOperators] = useState<IntlOperator[]>([]);
+  const [operatorId, setOperatorId] = useState("");
+  const [productTypeId, setProductTypeId] = useState(4);
+  const [loadingIntl, setLoadingIntl] = useState(false);
 
-  const filteredPlans = useMemo(
-    () =>
-      dataPlans.filter(
-        (plan) => plan.network === network && plan.category === category,
-      ),
-    [network, category],
-  );
+  const selected = variations.find((v) => v.variationCode === variationCode);
+  const selectedService = services.find((s) => s.serviceID === serviceID);
+  const selectedOperator = operators.find((o) => o.operator_id === operatorId);
 
-  const selectedPlan =
-    filteredPlans.find((plan) => plan.id === planId) ?? filteredPlans[0];
+  const filtered = useMemo(() => {
+    if (filter === "All") return variations;
+    return variations.filter((v) => {
+      const cat = inferDataPlanCategory(v.name);
+      return cat === filter.toLowerCase();
+    });
+  }, [variations, filter]);
 
-  const canSubmit = useMemo(
-    () =>
-      phone.replace(/\D/g, "").length >= 10 && Boolean(selectedPlan),
-    [phone, selectedPlan],
-  );
+  const canSubmit = useMemo(() => {
+    if (phone.replace(/\D/g, "").length < 10 || !selected || submitting) {
+      return false;
+    }
+    if (isNigeria) return Boolean(serviceID);
+    return Boolean(operatorId && countryIso && productTypeId);
+  }, [
+    phone,
+    selected,
+    submitting,
+    isNigeria,
+    serviceID,
+    operatorId,
+    countryIso,
+    productTypeId,
+  ]);
 
-  function handleNetworkChange(id: NetworkId) {
-    setNetwork(id);
-    const next = dataPlans.find(
-      (plan) => plan.network === id && plan.category === category,
-    );
-    if (next) setPlanId(next.id);
-  }
+  useEffect(() => {
+    if (!isNigeria) return;
+    let cancelled = false;
+    (async () => {
+      setLoadingServices(true);
+      try {
+        const res = await fetch("/api/vtpass/services?identifier=data");
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to load networks");
+        if (cancelled) return;
+        setServices(data.services ?? []);
+        if (data.services?.[0]?.serviceID) {
+          setServiceID(data.services[0].serviceID);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : "Failed to load networks");
+        }
+      } finally {
+        if (!cancelled) setLoadingServices(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isNigeria]);
 
-  function handleCategoryChange(next: (typeof dataCategories)[number]) {
-    setCategory(next);
-    const match = dataPlans.find(
-      (plan) => plan.network === network && plan.category === next,
-    );
-    if (match) setPlanId(match.id);
-  }
+  useEffect(() => {
+    if (!isNigeria || !serviceID) return;
+    let cancelled = false;
+    (async () => {
+      setLoadingPlans(true);
+      setVariationCode("");
+      try {
+        const res = await fetch(
+          `/api/vtpass/variations?serviceID=${encodeURIComponent(serviceID)}`,
+        );
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to load plans");
+        if (cancelled) return;
+        setVariations(data.variations ?? []);
+        if (data.variations?.[0]?.variationCode) {
+          setVariationCode(data.variations[0].variationCode);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : "Failed to load plans");
+        }
+      } finally {
+        if (!cancelled) setLoadingPlans(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isNigeria, serviceID]);
 
-  function onSubmit(e: FormEvent) {
+  useEffect(() => {
+    if (isNigeria) return;
+    let cancelled = false;
+    (async () => {
+      setLoadingIntl(true);
+      try {
+        const res = await fetch("/api/vtpass/international/countries");
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        if (cancelled) return;
+        const list: IntlCountry[] = data.countries ?? [];
+        setIntlCountries(list);
+        const preferred =
+          list.find((c) => c.code === country?.code)?.code ||
+          list.find((c) => c.code !== "NG")?.code ||
+          list[0]?.code ||
+          "GH";
+        setCountryIso(preferred);
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : "Failed to load countries");
+        }
+      } finally {
+        if (!cancelled) setLoadingIntl(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isNigeria, country?.code]);
+
+  useEffect(() => {
+    if (isNigeria || !countryIso) return;
+    let cancelled = false;
+    (async () => {
+      setLoadingIntl(true);
+      setOperators([]);
+      setOperatorId("");
+      setVariations([]);
+      try {
+        const typesRes = await fetch(
+          `/api/vtpass/international/product-types?code=${countryIso}`,
+        );
+        const typesData = await typesRes.json();
+        if (!typesRes.ok) throw new Error(typesData.error);
+        const dataType =
+          (typesData.productTypes as { product_type_id: number; name: string }[])?.find(
+            (t) => /data/i.test(t.name),
+          ) || typesData.productTypes?.[0];
+        if (!dataType) return;
+        setProductTypeId(dataType.product_type_id);
+
+        const opRes = await fetch(
+          `/api/vtpass/international/operators?code=${countryIso}&product_type_id=${dataType.product_type_id}`,
+        );
+        const opData = await opRes.json();
+        if (!opRes.ok) throw new Error(opData.error);
+        if (cancelled) return;
+        setOperators(opData.operators ?? []);
+        if (opData.operators?.[0]?.operator_id) {
+          setOperatorId(opData.operators[0].operator_id);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : "Failed to load operators");
+        }
+      } finally {
+        if (!cancelled) setLoadingIntl(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isNigeria, countryIso]);
+
+  useEffect(() => {
+    if (isNigeria || !countryIso || !operatorId) return;
+    let cancelled = false;
+    (async () => {
+      setLoadingPlans(true);
+      try {
+        const res = await fetch(
+          `/api/vtpass/variations?serviceID=foreign-airtime&operator_id=${operatorId}&product_type_id=${productTypeId}`,
+        );
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to load plans");
+        if (cancelled) return;
+        setVariations(data.variations ?? []);
+        if (data.variations?.[0]?.variationCode) {
+          setVariationCode(data.variations[0].variationCode);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : "Failed to load plans");
+        }
+      } finally {
+        if (!cancelled) setLoadingPlans(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isNigeria, countryIso, operatorId, productTypeId]);
+
+  async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!canSubmit || submitting || !selectedPlan) return;
+    if (!canSubmit || !selected) return;
     setSubmitting(true);
-    window.setTimeout(() => {
-      setSubmitting(false);
+    setError(null);
+    try {
+      const res = await fetch("/api/vtpass/purchase/data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          isNigeria
+            ? {
+                mode: "local",
+                serviceID,
+                phone,
+                variationCode: selected.variationCode,
+                variationName: selected.name,
+                amount: selected.amount,
+              }
+            : {
+                mode: "international",
+                phone,
+                variationCode: selected.variationCode,
+                variationName: selected.name,
+                amount: selected.amount,
+                operatorId,
+                countryIso,
+                productTypeId,
+              },
+        ),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Purchase failed");
+      setReceipt(data.amountFormatted);
       setSuccess(true);
-    }, 900);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Purchase failed");
+    } finally {
+      setSubmitting(false);
+    }
   }
+
+  const money = (n: number) => formatCountryMoney(n, country?.code || "NG");
 
   return (
     <AppShell hideNav>
       <PageHeader
         title="Buy Data"
-        subtitle="Pick a fast bundle and activate instantly"
+        subtitle={
+          isNigeria
+            ? "All networks · live VTpass plans"
+            : "International data for your country"
+        }
         backHref="/dashboard"
       />
 
       <AnimatePresence mode="wait">
-        {success && selectedPlan ? (
+        {success && selected ? (
           <MotionSection key="success">
             <motion.div
               initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="rounded-[28px] border border-border bg-background p-8 text-center shadow-[var(--shadow-soft)]"
+              className="rounded-2xl border border-border bg-background p-5 text-center shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-8"
             >
-              <motion.span
-                initial={{ scale: 0.6, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ type: "spring", stiffness: 320, damping: 18 }}
-                className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-oryno-orange-muted text-primary"
-              >
-                <CheckCircle2 className="h-8 w-8" strokeWidth={1.75} />
-              </motion.span>
-              <h2 className="mt-5 text-2xl font-bold text-foreground">
-                Data activated
-              </h2>
+              <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-oryno-orange-muted text-[var(--oryno-success)]">
+                <CheckCircle2 className="h-7 w-7" />
+              </span>
+              <h2 className="mt-4 text-xl font-bold sm:text-2xl">Data sent</h2>
               <p className="mt-2 text-sm text-muted-foreground">
-                {selectedPlan.size} · {selectedPlan.validity} on{" "}
-                {selectedNetwork.name} was sent to {phone}.
+                {selected.name} · {receipt || money(selected.amount)} to {phone}
               </p>
-              <p className="mt-3 text-sm font-semibold text-primary">
-                Charged {formatNaira(selectedPlan.price)} from wallet
-              </p>
-              <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:justify-center">
-                <motion.button
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
+                <button
                   type="button"
-                  whileHover={{ y: -2 }}
-                  whileTap={{ scale: 0.98 }}
                   onClick={() => setSuccess(false)}
-                  className="btn-primary h-12 px-6"
+                  className="btn-primary h-12 w-full px-6 sm:w-auto"
                 >
                   Buy again
-                </motion.button>
-                <motion.a
+                </button>
+                <a
                   href="/dashboard"
-                  whileHover={{ y: -2 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="btn-secondary inline-flex h-12 items-center justify-center px-6"
+                  className="btn-secondary inline-flex h-12 w-full items-center justify-center px-6 sm:w-auto"
                 >
                   Back to Home
-                </motion.a>
+                </a>
               </div>
             </motion.div>
           </MotionSection>
         ) : (
-          <form key="form" onSubmit={onSubmit} className="space-y-5">
-            <MotionSection className="rounded-[28px] border border-border bg-background p-5 shadow-[var(--shadow-soft)] sm:p-6">
-              <div className="mb-4 flex items-center gap-3">
-                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-oryno-orange-muted text-primary">
-                  <Wifi className="h-5 w-5" strokeWidth={1.75} />
-                </span>
-                <div>
-                  <h2 className="text-base font-semibold text-foreground">
-                    Select Network
-                  </h2>
-                  <p className="text-sm text-muted-foreground">
-                    Bundles update for your network
-                  </p>
+          <form key="form" onSubmit={onSubmit} className="space-y-4 sm:space-y-5">
+            {isNigeria ? (
+              <MotionSection className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6">
+                <div className="mb-4 flex items-center gap-3">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-oryno-orange-muted text-primary">
+                    <Wifi className="h-5 w-5" />
+                  </span>
+                  <div>
+                    <h2 className="text-base font-semibold">Select network</h2>
+                    <p className="text-xs text-muted-foreground">
+                      MTN, Airtel, Glo, 9mobile, Smile, Spectranet & SME
+                    </p>
+                  </div>
                 </div>
-              </div>
-              <NetworkPicker value={network} onChange={handleNetworkChange} />
+                <VtpassServicePicker
+                  services={services}
+                  value={serviceID}
+                  onChange={setServiceID}
+                  loading={loadingServices}
+                  columns="grid-cols-2 sm:grid-cols-3 lg:grid-cols-4"
+                />
+              </MotionSection>
+            ) : (
+              <MotionSection className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6">
+                <div className="mb-4 flex items-center gap-3">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-oryno-orange-muted text-primary">
+                    <Globe2 className="h-5 w-5" />
+                  </span>
+                  <div>
+                    <h2 className="text-base font-semibold">International data</h2>
+                    <p className="text-xs text-muted-foreground">
+                      VTpass foreign-airtime · Mobile Data
+                    </p>
+                  </div>
+                </div>
+                <label className="mb-2 block text-sm font-medium">Country</label>
+                <select
+                  value={countryIso}
+                  onChange={(e) => setCountryIso(e.target.value)}
+                  className="mb-4 h-12 w-full rounded-[14px] border border-border bg-background px-3 text-sm"
+                >
+                  {intlCountries.map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {loadingIntl
+                    ? null
+                    : operators.map((op) => (
+                        <button
+                          key={op.operator_id}
+                          type="button"
+                          onClick={() => setOperatorId(op.operator_id)}
+                          className={cn(
+                            "flex items-center gap-3 rounded-[16px] border px-3 py-3 text-left",
+                            operatorId === op.operator_id
+                              ? "border-primary bg-oryno-orange-muted"
+                              : "border-border",
+                          )}
+                        >
+                          <ServiceLogo src={op.operator_image} alt={op.name} />
+                          <span className="text-sm font-semibold">{op.name}</span>
+                        </button>
+                      ))}
+                </div>
+              </MotionSection>
+            )}
+
+            <MotionSection
+              delay={0.05}
+              className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6"
+            >
+              <label className="mb-2 block text-sm font-medium">Phone number</label>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="0803 000 0000"
+                className="h-12 w-full rounded-[14px] border border-border bg-background px-4 text-sm outline-none focus:border-primary"
+              />
             </MotionSection>
 
             <MotionSection
-              delay={0.06}
-              className="rounded-[28px] border border-border bg-background p-5 shadow-[var(--shadow-soft)] sm:p-6"
+              delay={0.08}
+              className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6"
             >
-              <label className="block">
-                <span className="text-sm font-semibold text-foreground">
-                  Phone Number
-                </span>
-                <div className="mt-2 flex h-14 items-center gap-3 rounded-[16px] border border-border bg-muted/40 px-4 transition focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/15">
-                  <ContactRound
-                    className="h-5 w-5 shrink-0 text-muted-foreground"
-                    strokeWidth={1.75}
-                  />
-                  <input
-                    type="tel"
-                    inputMode="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="e.g. 0803 111 2222"
-                    required
-                    className="w-full bg-transparent text-base font-medium text-foreground outline-none placeholder:text-muted-foreground"
-                  />
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-base font-semibold">Data plans</h2>
+                <div className="flex gap-1 overflow-x-auto">
+                  {FILTERS.map((f) => (
+                    <button
+                      key={f}
+                      type="button"
+                      onClick={() => setFilter(f)}
+                      className={cn(
+                        "shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold",
+                        filter === f
+                          ? "bg-primary text-white"
+                          : "bg-muted text-foreground",
+                      )}
+                    >
+                      {f}
+                    </button>
+                  ))}
                 </div>
-              </label>
+              </div>
+
+              <div className="grid max-h-[420px] gap-2 overflow-y-auto pr-1">
+                {loadingPlans ? (
+                  Array.from({ length: 4 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="h-16 animate-pulse rounded-[16px] bg-muted"
+                    />
+                  ))
+                ) : filtered.length ? (
+                  filtered.map((v) => (
+                    <button
+                      key={v.variationCode}
+                      type="button"
+                      onClick={() => setVariationCode(v.variationCode)}
+                      className={cn(
+                        "flex items-start justify-between gap-3 rounded-[16px] border px-4 py-3 text-left",
+                        variationCode === v.variationCode
+                          ? "border-primary bg-oryno-orange-muted"
+                          : "border-border hover:bg-muted/50",
+                      )}
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold">{v.name}</p>
+                        <p className="mt-0.5 text-[11px] capitalize text-muted-foreground">
+                          {inferDataPlanCategory(v.name)}
+                        </p>
+                      </div>
+                      <p className="shrink-0 text-sm font-bold text-primary">
+                        {money(v.amount)}
+                      </p>
+                    </button>
+                  ))
+                ) : (
+                  <p className="py-6 text-center text-sm text-muted-foreground">
+                    No plans match this filter
+                  </p>
+                )}
+              </div>
             </MotionSection>
 
             <MotionSection
               delay={0.1}
-              className="rounded-[28px] border border-border bg-background p-5 shadow-[var(--shadow-soft)] sm:p-6"
+              className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6"
             >
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-base font-semibold text-foreground">
-                    Choose a plan
-                  </h2>
-                  <p className="text-sm text-muted-foreground">
-                    Daily, weekly, or monthly packs
-                  </p>
-                </div>
-                <Sparkles className="h-5 w-5 text-primary" strokeWidth={1.75} />
-              </div>
-
-              <div className="mb-4 grid grid-cols-3 gap-2 rounded-[16px] bg-muted/70 p-1.5">
-                {dataCategories.map((item) => {
-                  const active = category === item;
-                  return (
-                    <button
-                      key={item}
-                      type="button"
-                      onClick={() => handleCategoryChange(item)}
-                      className={cn(
-                        "relative rounded-[12px] px-2 py-2.5 text-sm font-semibold transition-colors",
-                        active
-                          ? "text-primary"
-                          : "text-muted-foreground hover:text-foreground",
-                      )}
-                    >
-                      {active ? (
-                        <motion.span
-                          layoutId="data-category"
-                          className="absolute inset-0 rounded-[12px] bg-background shadow-[var(--shadow-soft)]"
-                          transition={{
-                            type: "spring",
-                            stiffness: 380,
-                            damping: 30,
-                          }}
-                        />
-                      ) : null}
-                      <span className="relative z-10">{item}</span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className="grid gap-3">
-                <AnimatePresence mode="popLayout">
-                  {filteredPlans.map((plan, index) => {
-                    const active = selectedPlan?.id === plan.id;
-                    return (
-                      <motion.button
-                        key={plan.id}
-                        type="button"
-                        layout
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -6 }}
-                        transition={{ delay: index * 0.04, duration: 0.3 }}
-                        whileHover={{ y: -2 }}
-                        whileTap={{ scale: 0.985 }}
-                        onClick={() => setPlanId(plan.id)}
-                        className={cn(
-                          "relative overflow-hidden rounded-[20px] border px-4 py-4 text-left transition-colors",
-                          active
-                            ? "border-primary bg-oryno-orange-muted shadow-[var(--shadow-soft)]"
-                            : "border-border bg-background hover:bg-muted/50",
-                        )}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <p className="text-lg font-bold tracking-tight text-foreground">
-                                {plan.size}
-                              </p>
-                              {plan.popular ? (
-                                <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold tracking-wide text-white uppercase">
-                                  Popular
-                                </span>
-                              ) : null}
-                            </div>
-                            <p className="mt-1 text-sm font-medium text-foreground">
-                              {plan.name}
-                            </p>
-                            <p className="mt-0.5 text-xs text-muted-foreground">
-                              Valid for {plan.validity}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-base font-bold text-primary">
-                              {formatNaira(plan.price)}
-                            </p>
-                            <p className="mt-1 text-[11px] text-muted-foreground">
-                              {active ? "Selected" : "Tap to select"}
-                            </p>
-                          </div>
-                        </div>
-                      </motion.button>
-                    );
-                  })}
-                </AnimatePresence>
-
-                {filteredPlans.length === 0 ? (
-                  <p className="rounded-[16px] bg-muted/60 px-4 py-6 text-center text-sm text-muted-foreground">
-                    No plans available for this filter.
-                  </p>
-                ) : null}
-              </div>
-            </MotionSection>
-
-            <MotionSection
-              delay={0.14}
-              className="rounded-[28px] border border-border bg-background p-5 shadow-[var(--shadow-soft)] sm:p-6"
-            >
-              <h2 className="text-base font-semibold text-foreground">
-                Order summary
-              </h2>
-              <div className="mt-4 space-y-3 text-sm">
-                <SummaryRow label="Network" value={selectedNetwork.name} />
-                <SummaryRow label="Phone" value={phone || "—"} />
-                <SummaryRow
-                  label="Plan"
+              <h2 className="text-base font-semibold">Order summary</h2>
+              <div className="mt-3 space-y-2 text-sm">
+                <Row
+                  label="Network"
                   value={
-                    selectedPlan
-                      ? `${selectedPlan.size} · ${selectedPlan.validity}`
-                      : "—"
+                    isNigeria
+                      ? selectedService?.name ?? "—"
+                      : selectedOperator?.name ?? "—"
                   }
                 />
-                <SummaryRow
+                <Row label="Plan" value={selected?.name ?? "—"} />
+                <Row label="Phone" value={phone || "—"} />
+                <Row
                   label="Amount"
-                  value={
-                    selectedPlan ? formatNaira(selectedPlan.price) : formatNaira(0)
-                  }
+                  value={selected ? money(selected.amount) : money(0)}
                   accent
                 />
-                <div className="flex items-center justify-between border-t border-border pt-3">
-                  <span className="inline-flex items-center gap-2 font-semibold text-foreground">
-                    <Wallet className="h-4 w-4 text-primary" />
-                    Wallet balance
-                  </span>
-                  <span className="font-semibold text-foreground">
-                    {formatNaira(walletBalance)}
-                  </span>
+                <div className="flex items-center gap-2 border-t border-border pt-3 font-semibold">
+                  <Wallet className="h-4 w-4 text-primary" />
+                  Pay from wallet
                 </div>
               </div>
             </MotionSection>
 
-            <MotionSection delay={0.18}>
-              <motion.button
-                type="submit"
-                disabled={!canSubmit || submitting}
-                whileHover={canSubmit ? { y: -2 } : undefined}
-                whileTap={canSubmit ? { scale: 0.985 } : undefined}
-                className="btn-primary h-12 w-full text-base disabled:opacity-50 sm:max-w-md"
-              >
-                {submitting
-                  ? "Processing…"
-                  : selectedPlan
-                    ? `Buy Data · ${formatNaira(selectedPlan.price)}`
-                    : "Buy Data"}
-              </motion.button>
-            </MotionSection>
+            {error ? (
+              <p className="rounded-[14px] bg-red-50 px-4 py-3 text-sm text-red-600">
+                {error}
+              </p>
+            ) : null}
+
+            <motion.button
+              type="submit"
+              disabled={!canSubmit}
+              whileTap={canSubmit ? { scale: 0.985 } : undefined}
+              className="btn-primary h-12 w-full text-base disabled:opacity-50 sm:max-w-md"
+            >
+              {submitting
+                ? "Processing…"
+                : selected
+                  ? `Buy data · ${money(selected.amount)}`
+                  : "Select a plan"}
+            </motion.button>
           </form>
         )}
       </AnimatePresence>
@@ -348,7 +544,7 @@ export default function DataPage() {
   );
 }
 
-function SummaryRow({
+function Row({
   label,
   value,
   accent,
@@ -358,11 +554,11 @@ function SummaryRow({
   accent?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3">
+    <div className="flex items-start justify-between gap-3">
       <span className="text-muted-foreground">{label}</span>
       <span
         className={cn(
-          "text-right font-semibold",
+          "max-w-[60%] text-right font-semibold break-words",
           accent ? "text-primary" : "text-foreground",
         )}
       >

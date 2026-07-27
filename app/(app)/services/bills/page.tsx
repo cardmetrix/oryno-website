@@ -1,11 +1,10 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   CheckCircle2,
-  Hash,
-  Receipt,
+  Search,
   Tv,
   Wallet,
   Zap,
@@ -13,323 +12,477 @@ import {
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
-import { useCountry } from "@/components/providers/country-provider";
 import {
-  activeCountryConfig,
-  billCategories,
-  formatMoney,
-} from "@/lib/services-catalog";
+  VtpassServicePicker,
+  type VtpassServiceOption,
+} from "@/components/app/vtpass-service-picker";
+import { useCountry } from "@/components/providers/country-provider";
+import { formatCountryMoney } from "@/lib/country";
 import { cn } from "@/lib/utils";
+
+type BillCategory = "tv" | "electricity";
+
+type Variation = {
+  variationCode: string;
+  name: string;
+  amount: number;
+  fixedPrice: boolean;
+};
 
 const amountPresets = ["1000", "2000", "5000", "10000"];
 
 export default function BillsPage() {
   const { country } = useCountry();
-  const { billProviders } = activeCountryConfig;
-  const currencySymbol = country.currencySymbol;
-  const [category, setCategory] =
-    useState<(typeof billCategories)[number]>("All");
-  const [providerId, setProviderId] = useState(billProviders[0]?.id ?? "");
-  const [meterOrSmartcard, setMeterOrSmartcard] = useState("4578129034");
-  const [amount, setAmount] = useState("5000");
+  const isNigeria = (country?.code || "NG") === "NG";
+
+  const [category, setCategory] = useState<BillCategory>("tv");
+  const [services, setServices] = useState<VtpassServiceOption[]>([]);
+  const [loadingServices, setLoadingServices] = useState(true);
+  const [serviceID, setServiceID] = useState("");
+  const [variations, setVariations] = useState<Variation[]>([]);
+  const [loadingPlans, setLoadingPlans] = useState(false);
+  const [variationCode, setVariationCode] = useState("");
+  const [customerRef, setCustomerRef] = useState("");
+  const [phone, setPhone] = useState("");
+  const [amount, setAmount] = useState("2000");
+  const [verifying, setVerifying] = useState(false);
+  const [customerName, setCustomerName] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [receipt, setReceipt] = useState("");
 
-  const providers = useMemo(
-    () =>
-      category === "All"
-        ? billProviders
-        : billProviders.filter((p) => p.category === category),
-    [category, billProviders],
+  const selectedService = services.find((s) => s.serviceID === serviceID);
+  const selectedVariation = variations.find(
+    (v) => v.variationCode === variationCode,
   );
 
-  const provider =
-    providers.find((p) => p.id === providerId) ?? providers[0] ?? null;
-  const amountNumber = Number(amount) || 0;
-  const walletBalance = 1245600;
-  const isTv = provider?.category === "TV";
+  const amountNumber = useMemo(() => {
+    if (category === "tv" && selectedVariation?.fixedPrice) {
+      return selectedVariation.amount;
+    }
+    return Number(amount) || 0;
+  }, [category, selectedVariation, amount]);
 
-  const canSubmit =
-    Boolean(provider) &&
-    meterOrSmartcard.trim().length >= 6 &&
-    amountNumber >= 100;
+  const canSubmit = useMemo(() => {
+    return (
+      Boolean(serviceID && variationCode && customerRef.trim().length >= 6) &&
+      amountNumber >= 100 &&
+      !submitting &&
+      isNigeria
+    );
+  }, [serviceID, variationCode, customerRef, amountNumber, submitting, isNigeria]);
 
-  function onCategoryChange(next: (typeof billCategories)[number]) {
-    setCategory(next);
-    const list =
-      next === "All"
-        ? billProviders
-        : billProviders.filter((p) => p.category === next);
-    if (list[0]) setProviderId(list[0].id);
+  useEffect(() => {
+    if (!isNigeria) return;
+    let cancelled = false;
+    (async () => {
+      setLoadingServices(true);
+      setServiceID("");
+      setVariations([]);
+      setVariationCode("");
+      setCustomerName(null);
+      try {
+        const identifier =
+          category === "tv" ? "tv-subscription" : "electricity-bill";
+        const res = await fetch(
+          `/api/vtpass/services?identifier=${identifier}`,
+        );
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to load providers");
+        if (cancelled) return;
+        setServices(data.services ?? []);
+        if (data.services?.[0]?.serviceID) {
+          setServiceID(data.services[0].serviceID);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setError(
+            e instanceof Error ? e.message : "Failed to load providers",
+          );
+        }
+      } finally {
+        if (!cancelled) setLoadingServices(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [category, isNigeria]);
+
+  useEffect(() => {
+    if (!serviceID) return;
+    let cancelled = false;
+    (async () => {
+      setLoadingPlans(true);
+      setVariationCode("");
+      try {
+        const res = await fetch(
+          `/api/vtpass/variations?serviceID=${encodeURIComponent(serviceID)}`,
+        );
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to load plans");
+        if (cancelled) return;
+        setVariations(data.variations ?? []);
+        if (data.variations?.[0]?.variationCode) {
+          setVariationCode(data.variations[0].variationCode);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : "Failed to load plans");
+        }
+      } finally {
+        if (!cancelled) setLoadingPlans(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [serviceID]);
+
+  async function verifyCustomer() {
+    if (!serviceID || customerRef.trim().length < 6) return;
+    setVerifying(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/vtpass/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          billersCode: customerRef.trim(),
+          serviceID,
+          type: category === "electricity" ? variationCode : undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Verification failed");
+      setCustomerName(data.customerName || "Verified customer");
+      if (data.renewalAmount) {
+        setAmount(String(Math.round(Number(data.renewalAmount))));
+      }
+    } catch (e) {
+      setCustomerName(null);
+      setError(e instanceof Error ? e.message : "Verification failed");
+    } finally {
+      setVerifying(false);
+    }
   }
 
-  function onSubmit(e: FormEvent) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!canSubmit || submitting) return;
+    if (!canSubmit || !selectedService) return;
     setSubmitting(true);
-    window.setTimeout(() => {
-      setSubmitting(false);
+    setError(null);
+    try {
+      const res = await fetch("/api/vtpass/purchase/bill", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          serviceID,
+          serviceName: selectedService.name,
+          category,
+          customerRef: customerRef.trim(),
+          phone,
+          amount: amountNumber,
+          variationCode,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Payment failed");
+      setReceipt(data.amountFormatted);
+      setToken(data.token || null);
       setSuccess(true);
-    }, 900);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Payment failed");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const money = (n: number) => formatCountryMoney(n, country?.code || "NG");
+
+  if (!isNigeria) {
+    return (
+      <AppShell hideNav>
+        <PageHeader
+          title="Bill Payments"
+          subtitle="TV & electricity"
+          backHref="/services"
+        />
+        <MotionSection className="rounded-2xl border border-border bg-background p-6 text-center shadow-[var(--shadow-soft)]">
+          <Zap className="mx-auto h-10 w-10 text-primary" />
+          <h2 className="mt-4 text-lg font-bold">Nigeria bills via VTpass</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            DSTV, GOtv, Startimes, Showmax and all electricity discos are
+            available when your account country is Nigeria. Switch country in
+            settings, or use international airtime/data for your market.
+          </p>
+          <a href="/services/airtime" className="btn-primary mt-6 inline-flex h-12 items-center px-6">
+            Buy airtime instead
+          </a>
+        </MotionSection>
+      </AppShell>
+    );
   }
 
   return (
     <AppShell hideNav>
       <PageHeader
         title="Bill Payments"
-        subtitle="Electricity & TV — paid from your wallet"
+        subtitle="TV subscriptions & electricity · VTpass"
         backHref="/services"
       />
 
       <AnimatePresence mode="wait">
-        {success && provider ? (
+        {success ? (
           <MotionSection key="success">
             <motion.div
               initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="rounded-[28px] border border-border bg-background p-8 text-center shadow-[var(--shadow-soft)]"
+              className="rounded-2xl border border-border bg-background p-5 text-center shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-8"
             >
-              <motion.span
-                initial={{ scale: 0.6, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ type: "spring", stiffness: 320, damping: 18 }}
-                className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-oryno-orange-muted text-[var(--oryno-success)]"
-              >
-                <CheckCircle2 className="h-8 w-8" strokeWidth={1.75} />
-              </motion.span>
-              <h2 className="mt-5 text-2xl font-bold text-foreground">
-                Payment successful
-              </h2>
+              <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-oryno-orange-muted text-[var(--oryno-success)]">
+                <CheckCircle2 className="h-7 w-7" />
+              </span>
+              <h2 className="mt-4 text-xl font-bold sm:text-2xl">Bill paid</h2>
               <p className="mt-2 text-sm text-muted-foreground">
-                {formatMoney(amountNumber)} paid to {provider.name} for{" "}
-                {meterOrSmartcard}.
+                {selectedService?.name} · {receipt || money(amountNumber)}
               </p>
-              <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:justify-center">
-                <motion.button
+              {token ? (
+                <p className="mt-3 break-all rounded-[14px] bg-muted px-3 py-2 text-xs font-medium">
+                  Token / receipt: {token}
+                </p>
+              ) : null}
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
+                <button
                   type="button"
-                  whileHover={{ y: -2 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => setSuccess(false)}
-                  className="btn-primary h-12 px-6"
+                  onClick={() => {
+                    setSuccess(false);
+                    setToken(null);
+                  }}
+                  className="btn-primary h-12 w-full px-6 sm:w-auto"
                 >
                   Pay another bill
-                </motion.button>
-                <motion.a
+                </button>
+                <a
                   href="/dashboard"
-                  whileHover={{ y: -2 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="btn-secondary inline-flex h-12 items-center justify-center px-6"
+                  className="btn-secondary inline-flex h-12 w-full items-center justify-center px-6 sm:w-auto"
                 >
                   Back to Home
-                </motion.a>
+                </a>
               </div>
             </motion.div>
           </MotionSection>
         ) : (
-          <form key="form" onSubmit={onSubmit} className="space-y-5">
-            <MotionSection className="rounded-[28px] border border-border bg-background p-5 shadow-[var(--shadow-soft)] sm:p-6">
-              <div className="mb-4 flex items-center gap-3">
-                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-oryno-orange-muted text-primary">
-                  <Receipt className="h-5 w-5" strokeWidth={1.75} />
-                </span>
-                <div>
-                  <h2 className="text-base font-semibold text-foreground">
-                    Select provider
-                  </h2>
-                  <p className="text-sm text-muted-foreground">
-                    From your country service configuration
-                  </p>
-                </div>
-              </div>
-
-              <div className="mb-4 grid grid-cols-3 gap-2 rounded-[16px] bg-muted/70 p-1.5">
-                {billCategories.map((item) => {
-                  const active = category === item;
+          <form key="form" onSubmit={onSubmit} className="space-y-4 sm:space-y-5">
+            <MotionSection className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6">
+              <div className="grid grid-cols-2 gap-2 rounded-[14px] bg-muted/70 p-1">
+                {(
+                  [
+                    { id: "tv" as const, label: "TV", icon: Tv },
+                    { id: "electricity" as const, label: "Electricity", icon: Zap },
+                  ] as const
+                ).map((tab) => {
+                  const active = category === tab.id;
+                  const Icon = tab.icon;
                   return (
                     <button
-                      key={item}
+                      key={tab.id}
                       type="button"
-                      onClick={() => onCategoryChange(item)}
+                      onClick={() => setCategory(tab.id)}
                       className={cn(
-                        "relative rounded-[12px] px-2 py-2.5 text-sm font-semibold transition-colors",
-                        active
-                          ? "text-primary"
-                          : "text-muted-foreground hover:text-foreground",
+                        "relative flex items-center justify-center gap-2 rounded-[12px] px-3 py-2.5 text-sm font-semibold",
+                        active ? "text-primary" : "text-muted-foreground",
                       )}
                     >
                       {active ? (
                         <motion.span
-                          layoutId="bill-category"
+                          layoutId="bill-cat"
                           className="absolute inset-0 rounded-[12px] bg-background shadow-[var(--shadow-soft)]"
-                          transition={{
-                            type: "spring",
-                            stiffness: 380,
-                            damping: 30,
-                          }}
+                          transition={{ type: "spring", stiffness: 380, damping: 30 }}
                         />
                       ) : null}
-                      <span className="relative z-10">{item}</span>
+                      <span className="relative z-10 inline-flex items-center gap-1.5">
+                        <Icon className="h-4 w-4" />
+                        {tab.label}
+                      </span>
                     </button>
                   );
                 })}
               </div>
+            </MotionSection>
 
-              <div className="grid gap-3 sm:grid-cols-2">
-                {providers.map((item, index) => {
-                  const active = provider?.id === item.id;
-                  const Icon = item.category === "TV" ? Tv : Zap;
-                  return (
-                    <motion.button
-                      key={item.id}
-                      type="button"
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.04 }}
-                      whileHover={{ y: -2 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => setProviderId(item.id)}
-                      className={cn(
-                        "rounded-[18px] border px-4 py-4 text-left transition-colors",
-                        active
-                          ? "border-primary bg-oryno-orange-muted shadow-[var(--shadow-soft)]"
-                          : "border-border bg-background hover:bg-muted/50",
-                      )}
-                    >
-                      <div className="flex items-start gap-3">
-                        <span
-                          className="flex h-11 w-11 items-center justify-center rounded-2xl text-white"
-                          style={{
-                            background: item.accent ?? "var(--oryno-orange)",
-                          }}
-                        >
-                          <Icon className="h-5 w-5" strokeWidth={1.75} />
-                        </span>
-                        <div>
-                          <p className="text-sm font-semibold text-foreground">
-                            {item.name}
-                          </p>
-                          <p className="mt-0.5 text-xs text-muted-foreground">
-                            {item.description}
-                          </p>
-                        </div>
-                      </div>
-                    </motion.button>
-                  );
-                })}
-              </div>
+            <MotionSection
+              delay={0.04}
+              className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6"
+            >
+              <h2 className="mb-3 text-base font-semibold">
+                {category === "tv" ? "TV providers" : "Electricity discos"}
+              </h2>
+              <VtpassServicePicker
+                services={services}
+                value={serviceID}
+                onChange={setServiceID}
+                loading={loadingServices}
+                columns="grid-cols-2 sm:grid-cols-3 lg:grid-cols-4"
+              />
             </MotionSection>
 
             <MotionSection
               delay={0.06}
-              className="rounded-[28px] border border-border bg-background p-5 shadow-[var(--shadow-soft)] sm:p-6"
+              className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6"
             >
-              <label className="block">
-                <span className="text-sm font-semibold text-foreground">
-                  {isTv ? "Smartcard / IUC Number" : "Meter Number"}
-                </span>
-                <div className="mt-2 flex h-14 items-center gap-3 rounded-[16px] border border-border bg-muted/40 px-4 transition focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/15">
-                  <Hash
-                    className="h-5 w-5 shrink-0 text-muted-foreground"
-                    strokeWidth={1.75}
-                  />
-                  <input
-                    value={meterOrSmartcard}
-                    onChange={(e) => setMeterOrSmartcard(e.target.value)}
-                    placeholder={isTv ? "e.g. 7012345678" : "e.g. 4578129034"}
-                    required
-                    className="w-full bg-transparent text-base font-medium text-foreground outline-none placeholder:text-muted-foreground"
-                  />
-                </div>
+              <label className="mb-2 block text-sm font-medium">
+                {category === "tv" ? "Smartcard number" : "Meter number"}
               </label>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <input
+                  value={customerRef}
+                  onChange={(e) => {
+                    setCustomerRef(e.target.value);
+                    setCustomerName(null);
+                  }}
+                  placeholder={
+                    category === "tv" ? "Smartcard / IUC" : "Meter number"
+                  }
+                  className="h-12 w-full rounded-[14px] border border-border bg-background px-4 text-sm outline-none focus:border-primary"
+                />
+                <button
+                  type="button"
+                  onClick={verifyCustomer}
+                  disabled={verifying || customerRef.trim().length < 6}
+                  className="btn-secondary inline-flex h-12 shrink-0 items-center justify-center gap-2 px-4 disabled:opacity-50"
+                >
+                  <Search className="h-4 w-4" />
+                  {verifying ? "Checking…" : "Verify"}
+                </button>
+              </div>
+              {customerName ? (
+                <p className="mt-2 text-sm font-medium text-[var(--oryno-success)]">
+                  {customerName}
+                </p>
+              ) : null}
 
-              <label className="mt-5 block">
-                <span className="text-sm font-semibold text-foreground">
-                  Amount
-                </span>
-                <div className="mt-2 flex h-16 items-center rounded-[18px] border-2 border-primary/80 bg-muted/30 px-4">
-                  <span className="mr-2 text-xl font-semibold text-muted-foreground">
-                    {currencySymbol}
-                  </span>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={amountNumber.toLocaleString("en-NG")}
-                    onChange={(e) =>
-                      setAmount(e.target.value.replace(/[^\d]/g, "") || "0")
-                    }
-                    className="w-full bg-transparent text-3xl font-bold tracking-tight text-foreground outline-none"
-                  />
-                </div>
+              <label className="mt-4 mb-2 block text-sm font-medium">
+                Phone (for receipt)
               </label>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="0803 000 0000"
+                className="h-12 w-full rounded-[14px] border border-border bg-background px-4 text-sm outline-none focus:border-primary"
+              />
+            </MotionSection>
 
-              <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {amountPresets.map((preset) => {
-                  const active = amount === preset;
-                  return (
-                    <motion.button
-                      key={preset}
+            <MotionSection
+              delay={0.08}
+              className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6"
+            >
+              <h2 className="mb-3 text-base font-semibold">
+                {category === "tv" ? "Bouquets / plans" : "Meter type"}
+              </h2>
+              <div className="grid max-h-[320px] gap-2 overflow-y-auto">
+                {loadingPlans ? (
+                  Array.from({ length: 3 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="h-14 animate-pulse rounded-[16px] bg-muted"
+                    />
+                  ))
+                ) : (
+                  variations.map((v) => (
+                    <button
+                      key={v.variationCode}
                       type="button"
-                      whileHover={{ y: -2 }}
-                      whileTap={{ scale: 0.96 }}
-                      onClick={() => setAmount(preset)}
+                      onClick={() => setVariationCode(v.variationCode)}
                       className={cn(
-                        "rounded-[14px] px-2 py-2.5 text-sm font-semibold transition-colors",
-                        active
-                          ? "bg-primary text-white shadow-[var(--shadow-orange)]"
-                          : "bg-muted text-foreground hover:bg-oryno-orange-muted",
+                        "flex items-center justify-between rounded-[16px] border px-4 py-3 text-left",
+                        variationCode === v.variationCode
+                          ? "border-primary bg-oryno-orange-muted"
+                          : "border-border",
                       )}
                     >
-                      {formatMoney(Number(preset))}
-                    </motion.button>
-                  );
-                })}
+                      <span className="text-sm font-semibold">{v.name}</span>
+                      {v.fixedPrice && v.amount > 0 ? (
+                        <span className="text-sm font-bold text-primary">
+                          {money(v.amount)}
+                        </span>
+                      ) : null}
+                    </button>
+                  ))
+                )}
               </div>
+
+              {(category === "electricity" ||
+                (selectedVariation && !selectedVariation.fixedPrice)) && (
+                <div className="mt-4">
+                  <label className="mb-2 block text-sm font-medium">Amount</label>
+                  <input
+                    type="number"
+                    min={100}
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    className="h-12 w-full rounded-[14px] border border-border bg-background px-4 text-sm outline-none focus:border-primary"
+                  />
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {amountPresets.map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setAmount(p)}
+                        className={cn(
+                          "rounded-full px-3 py-1.5 text-xs font-semibold",
+                          amount === p
+                            ? "bg-primary text-white"
+                            : "bg-muted",
+                        )}
+                      >
+                        ₦{p}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </MotionSection>
 
             <MotionSection
               delay={0.1}
-              className="rounded-[28px] border border-border bg-background p-5 shadow-[var(--shadow-soft)] sm:p-6"
+              className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6"
             >
-              <h2 className="text-base font-semibold text-foreground">
-                Order summary
-              </h2>
-              <div className="mt-4 space-y-3 text-sm">
-                <SummaryRow label="Provider" value={provider?.name ?? "—"} />
-                <SummaryRow label="Category" value={provider?.category ?? "—"} />
-                <SummaryRow
-                  label={isTv ? "Smartcard" : "Meter"}
-                  value={meterOrSmartcard || "—"}
+              <h2 className="text-base font-semibold">Order summary</h2>
+              <div className="mt-3 space-y-2 text-sm">
+                <Row label="Provider" value={selectedService?.name ?? "—"} />
+                <Row
+                  label={category === "tv" ? "Smartcard" : "Meter"}
+                  value={customerRef || "—"}
                 />
-                <SummaryRow
-                  label="Amount"
-                  value={formatMoney(amountNumber)}
-                  accent
-                />
-                <div className="flex items-center justify-between border-t border-border pt-3">
-                  <span className="inline-flex items-center gap-2 font-semibold text-foreground">
-                    <Wallet className="h-4 w-4 text-primary" />
-                    Wallet balance
-                  </span>
-                  <span className="font-semibold text-foreground">
-                    {formatMoney(walletBalance)}
-                  </span>
+                <Row label="Plan" value={selectedVariation?.name ?? "—"} />
+                <Row label="Amount" value={money(amountNumber)} accent />
+                <div className="flex items-center gap-2 border-t border-border pt-3 font-semibold">
+                  <Wallet className="h-4 w-4 text-primary" />
+                  Pay from wallet
                 </div>
               </div>
             </MotionSection>
 
-            <MotionSection delay={0.14}>
-              <motion.button
-                type="submit"
-                disabled={!canSubmit || submitting}
-                whileHover={canSubmit ? { y: -2 } : undefined}
-                whileTap={canSubmit ? { scale: 0.985 } : undefined}
-                className="btn-primary h-12 w-full text-base disabled:opacity-50 sm:max-w-md"
-              >
-                {submitting
-                  ? "Processing…"
-                  : `Pay Bill · ${formatMoney(amountNumber)}`}
-              </motion.button>
-            </MotionSection>
+            {error ? (
+              <p className="rounded-[14px] bg-red-50 px-4 py-3 text-sm text-red-600">
+                {error}
+              </p>
+            ) : null}
+
+            <motion.button
+              type="submit"
+              disabled={!canSubmit}
+              whileTap={canSubmit ? { scale: 0.985 } : undefined}
+              className="btn-primary h-12 w-full text-base disabled:opacity-50 sm:max-w-md"
+            >
+              {submitting
+                ? "Processing…"
+                : `Pay bill · ${money(amountNumber)}`}
+            </motion.button>
           </form>
         )}
       </AnimatePresence>
@@ -337,7 +490,7 @@ export default function BillsPage() {
   );
 }
 
-function SummaryRow({
+function Row({
   label,
   value,
   accent,
@@ -347,11 +500,11 @@ function SummaryRow({
   accent?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3">
+    <div className="flex items-start justify-between gap-3">
       <span className="text-muted-foreground">{label}</span>
       <span
         className={cn(
-          "text-right font-semibold",
+          "max-w-[60%] text-right font-semibold break-words",
           accent ? "text-primary" : "text-foreground",
         )}
       >

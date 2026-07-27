@@ -48,9 +48,9 @@ export const servicesDirectory: ServiceDirectoryItem[] = [
     label: "Airtime",
     shortDescription: "Top up any network instantly",
     longDescription:
-      "Buy MTN, Airtel, Glo, and 9mobile airtime for yourself or saved beneficiaries in seconds.",
+      "Buy local airtime in Nigeria (MTN, Airtel, Glo, 9mobile) or international top-ups for your country via VTpass.",
     category: "Telecom",
-    tags: ["MTN", "Airtel", "Glo", "9mobile"],
+    tags: ["MTN", "Airtel", "Glo", "9mobile", "International"],
     eta: "Instant",
     accent: "#FF6A00",
     popular: true,
@@ -63,26 +63,27 @@ export const servicesDirectory: ServiceDirectoryItem[] = [
     label: "Data Bundles",
     shortDescription: "Daily, weekly & monthly plans",
     longDescription:
-      "Browse network data plans with clear validity and pricing — pick a bundle and deliver instantly.",
+      "Live VTpass plans for MTN, Airtel, Glo, 9mobile, Smile, Spectranet and SME — or international data for your country.",
     category: "Telecom",
-    tags: ["Daily", "Weekly", "Monthly"],
+    tags: ["MTN", "Airtel", "Glo", "Smile", "SME"],
     eta: "Instant",
     accent: "#FF8C42",
     popular: true,
     icon: Wifi,
-    stats: "Best value plans",
+    stats: "All VTpass plans",
   },
   {
     id: "bills",
     href: "/services/bills",
     label: "Bill Payments",
-    shortDescription: "Power, TV & utilities",
+    shortDescription: "TV & electricity",
     longDescription: `Pay ${billProviders
+      .filter((p) => p.category === "TV")
       .slice(0, 3)
       .map((p) => p.name)
-      .join(", ")} and more with wallet balance.`,
+      .join(", ")} plus all electricity discos with wallet balance via VTpass.`,
     category: "Utilities",
-    tags: billProviders.slice(0, 4).map((p) => p.name),
+    tags: ["DStv", "GOtv", "IKEDC", "EKEDC"],
     eta: "1–3 mins",
     accent: "#E85D00",
     popular: true,

@@ -1,60 +1,295 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   CheckCircle2,
-  ContactRound,
   Gift,
+  Globe2,
   Smartphone,
   Wallet,
 } from "lucide-react";
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
-import { NetworkPicker } from "@/components/app/network-picker";
 import { PageHeader } from "@/components/app/page-header";
 import {
-  airtimePresets,
-  estimateAirtimeCashback,
-  formatNaira,
-  NetworkId,
-  networks,
-} from "@/lib/telecom";
+  VtpassServicePicker,
+  type VtpassServiceOption,
+} from "@/components/app/vtpass-service-picker";
+import { ServiceLogo } from "@/components/app/service-logo";
+import { useCountry } from "@/components/providers/country-provider";
+import { airtimePresets, estimateAirtimeCashback } from "@/lib/telecom";
+import { formatCountryMoney } from "@/lib/country";
 import { cn } from "@/lib/utils";
 
+type Variation = {
+  variationCode: string;
+  name: string;
+  amount: number;
+  fixedPrice: boolean;
+};
+
+type IntlCountry = {
+  code: string;
+  flag: string;
+  name: string;
+  currency: string;
+  prefix: string;
+};
+
+type IntlOperator = {
+  operator_id: string;
+  name: string;
+  operator_image?: string;
+};
+
 export default function AirtimePage() {
-  const [network, setNetwork] = useState<NetworkId>("mtn");
-  const [phone, setPhone] = useState("0803 111 2222");
+  const { country } = useCountry();
+  const isNigeria = (country?.code || "NG") === "NG";
+
+  const [services, setServices] = useState<VtpassServiceOption[]>([]);
+  const [loadingServices, setLoadingServices] = useState(true);
+  const [serviceID, setServiceID] = useState("");
+  const [phone, setPhone] = useState("");
   const [amount, setAmount] = useState("500");
   const [saveBeneficiary, setSaveBeneficiary] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [walletLabel, setWalletLabel] = useState<string | null>(null);
+  const [receiptAmount, setReceiptAmount] = useState("");
 
-  const amountNumber = Number(amount) || 0;
-  const cashback = estimateAirtimeCashback(amountNumber);
-  const selectedNetwork = networks.find((n) => n.id === network)!;
-  const walletBalance = 1245600;
+  // International
+  const [intlCountries, setIntlCountries] = useState<IntlCountry[]>([]);
+  const [countryIso, setCountryIso] = useState<string>(country?.code || "GH");
+  const [operators, setOperators] = useState<IntlOperator[]>([]);
+  const [operatorId, setOperatorId] = useState("");
+  const [variations, setVariations] = useState<Variation[]>([]);
+  const [variationCode, setVariationCode] = useState("");
+  const [loadingIntl, setLoadingIntl] = useState(false);
 
-  const canSubmit = useMemo(
-    () => phone.replace(/\D/g, "").length >= 10 && amountNumber >= 50,
-    [phone, amountNumber],
+  const selectedService = services.find((s) => s.serviceID === serviceID);
+  const selectedVariation = variations.find(
+    (v) => v.variationCode === variationCode,
   );
+  const selectedOperator = operators.find((o) => o.operator_id === operatorId);
 
-  function onSubmit(e: FormEvent) {
+  const amountNumber = isNigeria
+    ? Number(amount) || 0
+    : selectedVariation?.amount || 0;
+  const cashback = estimateAirtimeCashback(amountNumber);
+
+  const canSubmit = useMemo(() => {
+    const digits = phone.replace(/\D/g, "").length >= 10;
+    if (!digits || submitting) return false;
+    if (isNigeria) return Boolean(serviceID) && amountNumber >= 50;
+    return Boolean(operatorId && variationCode && amountNumber > 0);
+  }, [
+    phone,
+    submitting,
+    isNigeria,
+    serviceID,
+    amountNumber,
+    operatorId,
+    variationCode,
+  ]);
+
+  useEffect(() => {
+    if (!isNigeria) return;
+    let cancelled = false;
+    (async () => {
+      setLoadingServices(true);
+      try {
+        const res = await fetch("/api/vtpass/services?identifier=airtime");
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to load networks");
+        if (cancelled) return;
+        setServices(data.services ?? []);
+        if (data.services?.[0]?.serviceID) {
+          setServiceID(data.services[0].serviceID);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : "Failed to load networks");
+        }
+      } finally {
+        if (!cancelled) setLoadingServices(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isNigeria]);
+
+  useEffect(() => {
+    if (isNigeria) return;
+    let cancelled = false;
+    (async () => {
+      setLoadingIntl(true);
+      try {
+        const res = await fetch("/api/vtpass/international/countries");
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to load countries");
+        if (cancelled) return;
+        const list: IntlCountry[] = data.countries ?? [];
+        setIntlCountries(list);
+        const preferred =
+          list.find((c) => c.code === country?.code)?.code ||
+          list.find((c) => c.code !== "NG")?.code ||
+          list[0]?.code ||
+          "GH";
+        setCountryIso(preferred);
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : "Failed to load countries");
+        }
+      } finally {
+        if (!cancelled) setLoadingIntl(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isNigeria, country?.code]);
+
+  useEffect(() => {
+    if (isNigeria || !countryIso) return;
+    let cancelled = false;
+    (async () => {
+      setLoadingIntl(true);
+      setOperators([]);
+      setOperatorId("");
+      setVariations([]);
+      setVariationCode("");
+      try {
+        const typesRes = await fetch(
+          `/api/vtpass/international/product-types?code=${countryIso}`,
+        );
+        const typesData = await typesRes.json();
+        if (!typesRes.ok) throw new Error(typesData.error);
+        const topUp =
+          (typesData.productTypes as { product_type_id: number; name: string }[])?.find(
+            (t) => /top\s*up|airtime/i.test(t.name),
+          ) || typesData.productTypes?.[0];
+        if (!topUp) return;
+
+        const opRes = await fetch(
+          `/api/vtpass/international/operators?code=${countryIso}&product_type_id=${topUp.product_type_id}`,
+        );
+        const opData = await opRes.json();
+        if (!opRes.ok) throw new Error(opData.error);
+        if (cancelled) return;
+        setOperators(opData.operators ?? []);
+        if (opData.operators?.[0]?.operator_id) {
+          setOperatorId(opData.operators[0].operator_id);
+        }
+        setProductTypeId(topUp.product_type_id);
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : "Failed to load operators");
+        }
+      } finally {
+        if (!cancelled) setLoadingIntl(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isNigeria, countryIso]);
+
+  const [productTypeId, setProductTypeId] = useState<number>(1);
+
+  useEffect(() => {
+    if (isNigeria || !countryIso || !operatorId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const typesRes = await fetch(
+          `/api/vtpass/international/product-types?code=${countryIso}`,
+        );
+        const typesData = await typesRes.json();
+        const topUp =
+          (typesData.productTypes as { product_type_id: number; name: string }[])?.find(
+            (t) => /top\s*up|airtime/i.test(t.name),
+          ) || typesData.productTypes?.[0];
+        const pt = topUp?.product_type_id ?? 1;
+        setProductTypeId(pt);
+
+        const res = await fetch(
+          `/api/vtpass/variations?serviceID=foreign-airtime&operator_id=${operatorId}&product_type_id=${pt}`,
+        );
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to load packages");
+        if (cancelled) return;
+        setVariations(data.variations ?? []);
+        if (data.variations?.[0]?.variationCode) {
+          setVariationCode(data.variations[0].variationCode);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : "Failed to load packages");
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isNigeria, countryIso, operatorId]);
+
+  async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!canSubmit || submitting) return;
+    if (!canSubmit) return;
     setSubmitting(true);
-    window.setTimeout(() => {
-      setSubmitting(false);
+    setError(null);
+    try {
+      const res = await fetch("/api/vtpass/purchase/airtime", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          isNigeria
+            ? {
+                mode: "local",
+                serviceID,
+                phone,
+                amount: amountNumber,
+                saveBeneficiary,
+              }
+            : {
+                mode: "international",
+                phone,
+                amount: amountNumber,
+                operatorId,
+                countryIso,
+                productTypeId,
+                variationCode,
+                saveBeneficiary,
+              },
+        ),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Purchase failed");
+      setReceiptAmount(data.amountFormatted);
+      setWalletLabel(data.wallet?.balanceFormatted ?? null);
       setSuccess(true);
-    }, 900);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Purchase failed");
+    } finally {
+      setSubmitting(false);
+    }
   }
+
+  const money = (n: number) =>
+    formatCountryMoney(n, country?.code || "NG");
 
   return (
     <AppShell hideNav>
       <PageHeader
         title="Buy Airtime"
-        subtitle="Top up any line instantly with cashback"
+        subtitle={
+          isNigeria
+            ? "MTN, Airtel, Glo & 9mobile via VTpass"
+            : "International airtime for your country"
+        }
         backHref="/dashboard"
       />
 
@@ -64,202 +299,270 @@ export default function AirtimePage() {
             <motion.div
               initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="rounded-[28px] border border-border bg-background p-8 text-center shadow-[var(--shadow-soft)]"
+              className="rounded-2xl border border-border bg-background p-5 text-center shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-8"
             >
-              <motion.span
-                initial={{ scale: 0.6, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ type: "spring", stiffness: 320, damping: 18 }}
-                className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-oryno-orange-muted text-primary"
-              >
-                <CheckCircle2 className="h-8 w-8" strokeWidth={1.75} />
-              </motion.span>
-              <h2 className="mt-5 text-2xl font-bold text-foreground">
+              <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-oryno-orange-muted text-[var(--oryno-success)]">
+                <CheckCircle2 className="h-7 w-7" strokeWidth={1.75} />
+              </span>
+              <h2 className="mt-4 text-xl font-bold text-foreground sm:text-2xl">
                 Airtime sent
               </h2>
               <p className="mt-2 text-sm text-muted-foreground">
-                {formatNaira(amountNumber)} {selectedNetwork.name} airtime was
-                sent to {phone}.
+                {receiptAmount || money(amountNumber)} sent to {phone}
+                {isNigeria && selectedService
+                  ? ` · ${selectedService.name}`
+                  : selectedOperator
+                    ? ` · ${selectedOperator.name}`
+                    : ""}
               </p>
-              <p className="mt-3 text-sm font-semibold text-primary">
-                Cashback earned: {formatNaira(cashback)}
-              </p>
-              <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:justify-center">
-                <motion.button
+              {isNigeria ? (
+                <p className="mt-3 text-sm font-semibold text-primary">
+                  Cashback: {money(cashback)}
+                </p>
+              ) : null}
+              {walletLabel ? (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Wallet balance {walletLabel}
+                </p>
+              ) : null}
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
+                <button
                   type="button"
-                  whileHover={{ y: -2 }}
-                  whileTap={{ scale: 0.98 }}
                   onClick={() => setSuccess(false)}
-                  className="btn-primary h-12 px-6"
+                  className="btn-primary h-12 w-full px-6 sm:w-auto"
                 >
                   Buy again
-                </motion.button>
-                <motion.a
+                </button>
+                <a
                   href="/dashboard"
-                  whileHover={{ y: -2 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="btn-secondary inline-flex h-12 items-center justify-center px-6"
+                  className="btn-secondary inline-flex h-12 w-full items-center justify-center px-6 sm:w-auto"
                 >
                   Back to Home
-                </motion.a>
+                </a>
               </div>
             </motion.div>
           </MotionSection>
         ) : (
-          <form key="form" onSubmit={onSubmit} className="space-y-5">
-            <MotionSection className="rounded-[28px] border border-border bg-background p-5 shadow-[var(--shadow-soft)] sm:p-6">
-              <div className="mb-4 flex items-center gap-3">
-                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-oryno-orange-muted text-primary">
-                  <Smartphone className="h-5 w-5" strokeWidth={1.75} />
-                </span>
-                <div>
-                  <h2 className="text-base font-semibold text-foreground">
-                    Select Network
-                  </h2>
-                  <p className="text-sm text-muted-foreground">
-                    Choose where to send airtime
-                  </p>
+          <form key="form" onSubmit={onSubmit} className="space-y-4 sm:space-y-5">
+            {!isNigeria ? (
+              <MotionSection className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6">
+                <div className="mb-4 flex items-center gap-3">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-oryno-orange-muted text-primary">
+                    <Globe2 className="h-5 w-5" />
+                  </span>
+                  <div>
+                    <h2 className="text-base font-semibold">International airtime</h2>
+                    <p className="text-xs text-muted-foreground">
+                      Based on your country · VTpass foreign-airtime
+                    </p>
+                  </div>
                 </div>
-              </div>
-              <NetworkPicker value={network} onChange={setNetwork} />
-            </MotionSection>
+
+                <label className="mb-2 block text-sm font-medium">Country</label>
+                <select
+                  value={countryIso}
+                  onChange={(e) => setCountryIso(e.target.value)}
+                  className="mb-4 h-12 w-full rounded-[14px] border border-border bg-background px-3 text-sm"
+                >
+                  {intlCountries.map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.name} (+{c.prefix})
+                    </option>
+                  ))}
+                </select>
+
+                <label className="mb-2 block text-sm font-medium">Operator</label>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {loadingIntl
+                    ? Array.from({ length: 2 }).map((_, i) => (
+                        <div
+                          key={i}
+                          className="h-16 animate-pulse rounded-[16px] bg-muted"
+                        />
+                      ))
+                    : operators.map((op) => (
+                        <button
+                          key={op.operator_id}
+                          type="button"
+                          onClick={() => setOperatorId(op.operator_id)}
+                          className={cn(
+                            "flex items-center gap-3 rounded-[16px] border px-3 py-3 text-left",
+                            operatorId === op.operator_id
+                              ? "border-primary bg-oryno-orange-muted"
+                              : "border-border",
+                          )}
+                        >
+                          <ServiceLogo
+                            src={op.operator_image}
+                            alt={op.name}
+                          />
+                          <span className="text-sm font-semibold">{op.name}</span>
+                        </button>
+                      ))}
+                </div>
+              </MotionSection>
+            ) : (
+              <MotionSection className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6">
+                <div className="mb-4 flex items-center gap-3">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-oryno-orange-muted text-primary">
+                    <Smartphone className="h-5 w-5" />
+                  </span>
+                  <div>
+                    <h2 className="text-base font-semibold">Select network</h2>
+                    <p className="text-xs text-muted-foreground">
+                      Logos from VTpass · Airtime VTU
+                    </p>
+                  </div>
+                </div>
+                <VtpassServicePicker
+                  services={services}
+                  value={serviceID}
+                  onChange={setServiceID}
+                  loading={loadingServices}
+                />
+              </MotionSection>
+            )}
 
             <MotionSection
-              delay={0.06}
-              className="rounded-[28px] border border-border bg-background p-5 shadow-[var(--shadow-soft)] sm:p-6"
+              delay={0.05}
+              className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6"
             >
-              <label className="block">
-                <span className="text-sm font-semibold text-foreground">
-                  Phone Number
-                </span>
-                <div className="mt-2 flex h-14 items-center gap-3 rounded-[16px] border border-border bg-muted/40 px-4 transition focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/15">
-                  <ContactRound
-                    className="h-5 w-5 shrink-0 text-muted-foreground"
-                    strokeWidth={1.75}
-                  />
-                  <input
-                    type="tel"
-                    inputMode="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="e.g. 0803 111 2222"
-                    required
-                    className="w-full bg-transparent text-base font-medium text-foreground outline-none placeholder:text-muted-foreground"
-                  />
-                </div>
-              </label>
-
-              <label className="mt-4 flex cursor-pointer items-center gap-3 text-sm text-muted-foreground">
+              <label className="mb-2 block text-sm font-medium">Phone number</label>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder={isNigeria ? "0803 000 0000" : "Recipient number"}
+                className="h-12 w-full rounded-[14px] border border-border bg-background px-4 text-sm outline-none focus:border-primary"
+              />
+              <label className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
                 <input
                   type="checkbox"
                   checked={saveBeneficiary}
                   onChange={(e) => setSaveBeneficiary(e.target.checked)}
-                  className="h-4 w-4 rounded border-border text-primary accent-[var(--oryno-orange)]"
+                  className="rounded border-border"
                 />
-                Save as beneficiary for next top-up
+                Save as beneficiary
               </label>
             </MotionSection>
 
-            <MotionSection
-              delay={0.1}
-              className="rounded-[28px] border border-border bg-background p-5 shadow-[var(--shadow-soft)] sm:p-6"
-            >
-              <label className="block">
-                <span className="text-sm font-semibold text-foreground">
-                  Amount
-                </span>
-                <div className="mt-2 flex h-16 items-center rounded-[18px] border-2 border-primary/80 bg-muted/30 px-4">
-                  <span className="mr-2 text-xl font-semibold text-muted-foreground">
+            {isNigeria ? (
+              <MotionSection
+                delay={0.08}
+                className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6"
+              >
+                <label className="mb-2 block text-sm font-medium">Amount</label>
+                <div className="relative">
+                  <span className="absolute top-1/2 left-4 -translate-y-1/2 text-sm font-semibold text-muted-foreground">
                     ₦
                   </span>
                   <input
-                    type="text"
-                    inputMode="numeric"
-                    value={amountNumber.toLocaleString("en-NG")}
-                    onChange={(e) =>
-                      setAmount(e.target.value.replace(/[^\d]/g, "") || "0")
-                    }
-                    className="w-full bg-transparent text-3xl font-bold tracking-tight text-foreground outline-none"
+                    type="number"
+                    min={50}
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    className="h-12 w-full rounded-[14px] border border-border bg-background pr-4 pl-9 text-sm outline-none focus:border-primary"
                   />
                 </div>
-              </label>
-
-              <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-6">
-                {airtimePresets.map((preset, index) => {
-                  const active = amount === preset;
-                  return (
-                    <motion.button
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {airtimePresets.map((preset) => (
+                    <button
                       key={preset}
                       type="button"
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.12 + index * 0.03 }}
-                      whileHover={{ y: -2 }}
-                      whileTap={{ scale: 0.96 }}
                       onClick={() => setAmount(preset)}
                       className={cn(
-                        "rounded-[14px] px-2 py-2.5 text-sm font-semibold transition-colors",
-                        active
-                          ? "bg-primary text-white shadow-[var(--shadow-orange)]"
-                          : "bg-muted text-foreground hover:bg-oryno-orange-muted",
+                        "rounded-full px-3.5 py-2 text-sm font-semibold",
+                        amount === preset
+                          ? "bg-primary text-white"
+                          : "bg-muted text-foreground",
                       )}
                     >
-                      ₦{Number(preset).toLocaleString()}
-                    </motion.button>
-                  );
-                })}
-              </div>
-
-              <div className="mt-5 flex items-start gap-3 rounded-[16px] bg-oryno-orange-muted px-4 py-3">
-                <Gift className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                <p className="text-sm font-medium text-primary">
-                  You will earn {formatNaira(cashback)} cashback on this
-                  transaction.
+                      ₦{preset}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-3 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Gift className="h-3.5 w-3.5 text-primary" />
+                  Est. cashback {money(cashback)}
                 </p>
-              </div>
-            </MotionSection>
+              </MotionSection>
+            ) : (
+              <MotionSection
+                delay={0.08}
+                className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6"
+              >
+                <h2 className="mb-3 text-base font-semibold">Top-up packages</h2>
+                <div className="grid gap-2">
+                  {variations.map((v) => (
+                    <button
+                      key={v.variationCode}
+                      type="button"
+                      onClick={() => setVariationCode(v.variationCode)}
+                      className={cn(
+                        "flex items-center justify-between rounded-[16px] border px-4 py-3 text-left",
+                        variationCode === v.variationCode
+                          ? "border-primary bg-oryno-orange-muted"
+                          : "border-border",
+                      )}
+                    >
+                      <span className="text-sm font-semibold">{v.name}</span>
+                      <span className="text-sm font-bold text-primary">
+                        {money(v.amount)}
+                      </span>
+                    </button>
+                  ))}
+                  {!variations.length ? (
+                    <p className="py-4 text-center text-sm text-muted-foreground">
+                      {loadingIntl
+                        ? "Loading packages…"
+                        : "No packages for this operator"}
+                    </p>
+                  ) : null}
+                </div>
+              </MotionSection>
+            )}
 
             <MotionSection
-              delay={0.14}
-              className="rounded-[28px] border border-border bg-background p-5 shadow-[var(--shadow-soft)] sm:p-6"
+              delay={0.1}
+              className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6"
             >
-              <h2 className="text-base font-semibold text-foreground">
-                Order summary
-              </h2>
-              <div className="mt-4 space-y-3 text-sm">
-                <SummaryRow label="Network" value={selectedNetwork.name} />
-                <SummaryRow label="Phone" value={phone || "—"} />
-                <SummaryRow label="Amount" value={formatNaira(amountNumber)} />
-                <SummaryRow
-                  label="Cashback"
-                  value={formatNaira(cashback)}
-                  accent
+              <h2 className="text-base font-semibold">Order summary</h2>
+              <div className="mt-3 space-y-2 text-sm">
+                <Row
+                  label="Network"
+                  value={
+                    isNigeria
+                      ? selectedService?.name ?? "—"
+                      : selectedOperator?.name ?? "—"
+                  }
                 />
+                <Row label="Phone" value={phone || "—"} />
+                <Row label="Amount" value={money(amountNumber)} accent />
                 <div className="flex items-center justify-between border-t border-border pt-3">
-                  <span className="inline-flex items-center gap-2 font-semibold text-foreground">
+                  <span className="inline-flex items-center gap-2 font-semibold">
                     <Wallet className="h-4 w-4 text-primary" />
-                    Wallet balance
-                  </span>
-                  <span className="font-semibold text-foreground">
-                    {formatNaira(walletBalance)}
+                    Pay from wallet
                   </span>
                 </div>
               </div>
             </MotionSection>
 
-            <MotionSection delay={0.18}>
-              <motion.button
-                type="submit"
-                disabled={!canSubmit || submitting}
-                whileHover={canSubmit ? { y: -2 } : undefined}
-                whileTap={canSubmit ? { scale: 0.985 } : undefined}
-                className="btn-primary h-12 w-full text-base disabled:opacity-50 sm:max-w-md"
-              >
-                {submitting
-                  ? "Processing…"
-                  : `Buy Airtime · ${formatNaira(amountNumber)}`}
-              </motion.button>
-            </MotionSection>
+            {error ? (
+              <p className="rounded-[14px] bg-red-50 px-4 py-3 text-sm text-red-600">
+                {error}
+              </p>
+            ) : null}
+
+            <motion.button
+              type="submit"
+              disabled={!canSubmit}
+              whileTap={canSubmit ? { scale: 0.985 } : undefined}
+              className="btn-primary h-12 w-full text-base disabled:opacity-50 sm:max-w-md"
+            >
+              {submitting
+                ? "Processing…"
+                : `Buy airtime · ${money(amountNumber)}`}
+            </motion.button>
           </form>
         )}
       </AnimatePresence>
@@ -267,7 +570,7 @@ export default function AirtimePage() {
   );
 }
 
-function SummaryRow({
+function Row({
   label,
   value,
   accent,
@@ -277,11 +580,11 @@ function SummaryRow({
   accent?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3">
+    <div className="flex items-start justify-between gap-3">
       <span className="text-muted-foreground">{label}</span>
       <span
         className={cn(
-          "font-semibold",
+          "max-w-[60%] text-right font-semibold break-words",
           accent ? "text-primary" : "text-foreground",
         )}
       >

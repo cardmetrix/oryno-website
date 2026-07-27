@@ -47,6 +47,16 @@ const nextConfig = {
         hostname: 'img.clerk.com',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'sandbox.vtpass.com',
+        pathname: '/resources/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'vtpass.com',
+        pathname: '/resources/**',
+      },
     ],
   },
 }
