@@ -247,6 +247,14 @@ export function UsdWalletCard({
             </span>
           </div>
 
+          {liveFx ? (
+            <p className="mt-4 text-[11px] text-white/55">
+              Mid {liveFx.midRate.toFixed(2)} {localCurrency}/USD · Buy{" "}
+              {liveFx.buyRate.toFixed(2)} · Sell {liveFx.sellRate.toFixed(2)} ·
+              +{liveFx.commissionPercent}% fee · {liveFx.provider}
+            </p>
+          ) : null}
+
           <div className="relative mt-5 grid grid-cols-2 gap-2.5">
             <button
               type="button"
