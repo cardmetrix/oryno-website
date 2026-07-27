@@ -54,7 +54,7 @@ const nextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'vtpass.com',
+        hostname: 'www.vtpass.com',
         pathname: '/resources/**',
       },
     ],

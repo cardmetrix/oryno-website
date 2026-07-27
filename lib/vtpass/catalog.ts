@@ -1,6 +1,8 @@
 import type { VtpassService, VtpassVariation } from "./types";
 
 const IMG = "https://sandbox.vtpass.com/resources/products/200X200";
+/** Live CDN — some product logos exist only here (sandbox 404s). */
+const IMG_LIVE = "https://vtpass.com/resources/products/200X200";
 
 /** Fallback catalogs when VTpass keys are missing (logos still from VTpass CDN). */
 export const FALLBACK_AIRTIME_SERVICES: VtpassService[] = [
@@ -63,12 +65,14 @@ export const FALLBACK_DATA_SERVICES: VtpassService[] = [
   {
     serviceID: "glo-sme-data",
     name: "GLO Data (SME)",
-    image: `${IMG}/GLO-Data-(SME).jpg`,
+    // Live CDN — sandbox returns 404 for this asset
+    image: `${IMG_LIVE}/GLO-Data-(SME).jpg`,
   },
   {
     serviceID: "spectranet",
     name: "Spectranet Internet Data",
-    image: `${IMG}/Spectranet.jpg`,
+    // Live CDN — sandbox returns 404 for this asset
+    image: `${IMG_LIVE}/Spectranet.jpg`,
   },
 ];
 
@@ -477,6 +481,8 @@ const SERVICE_IMAGE_OVERRIDES: Record<string, string> = {
   "glo-data": `${IMG}/GLO-Data.jpg`,
   "etisalat-data": `${IMG}/9mobile-Data.jpg`,
   "smile-direct": `${IMG}/Smile-Payment.jpg`,
+  "glo-sme-data": `${IMG_LIVE}/GLO-Data-(SME).jpg`,
+  spectranet: `${IMG_LIVE}/Spectranet.jpg`,
   dstv: `${IMG}/Pay-DSTV-Subscription.jpg`,
   gotv: `${IMG}/Gotv-Payment.jpg`,
   startimes: `${IMG}/Startimes-Subscription.jpg`,
@@ -522,6 +528,17 @@ export function resolveServiceImage(
   url = url
     .replace(/-Airtime-VTU\.jpg$/i, "-Airtime.jpg")
     .replace(/-VTU\.jpg$/i, ".jpg");
+
+  // Some assets (GLO SME, Spectranet, …) are only on the live CDN
+  if (
+    /GLO-Data-\(SME\)|Spectranet/i.test(url) &&
+    url.includes("sandbox.vtpass.com")
+  ) {
+    url = url.replace(
+      "https://sandbox.vtpass.com",
+      "https://vtpass.com",
+    );
+  }
 
   return url;
 }
