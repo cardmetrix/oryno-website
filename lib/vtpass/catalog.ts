@@ -95,6 +95,7 @@ export const FALLBACK_TV_SERVICES: VtpassService[] = [
   {
     serviceID: "showmax",
     name: "Showmax",
+    // API returns ShowMax.jpg (404 on sandbox); Showmax.jpg works
     image: `${IMG}/Showmax.jpg`,
   },
 ];
@@ -103,62 +104,62 @@ export const FALLBACK_ELECTRICITY_SERVICES: VtpassService[] = [
   {
     serviceID: "ikeja-electric",
     name: "Ikeja Electric Payment - IKEDC",
-    image: `${IMG}/Ikeja-Electric-Payment---IKEDC.jpg`,
+    image: `${IMG}/Ikeja-Electric-Payment-PHCN.jpg`,
   },
   {
     serviceID: "eko-electric",
     name: "Eko Electric Payment - EKEDC",
-    image: `${IMG}/Eko-Electric-Payment---EKEDC.jpg`,
+    image: `${IMG}/Eko-Electric-Payment-PHCN.jpg`,
   },
   {
     serviceID: "abuja-electric",
     name: "Abuja Electricity Distribution Company - AEDC",
-    image: `${IMG}/AEDC.jpg`,
+    image: `${IMG}/Abuja-Electric.jpg`,
   },
   {
     serviceID: "kano-electric",
     name: "KEDCO - Kano Electric",
-    image: `${IMG}/KEDCO---Kano-Electric.jpg`,
+    image: `${IMG}/Kano-Electric.jpg`,
   },
   {
     serviceID: "portharcourt-electric",
     name: "PHED - Port Harcourt Electric",
-    image: `${IMG}/PHED---Port-Harcourt-Electric.jpg`,
+    image: `${IMG}/Port-Harcourt-Electric.jpg`,
   },
   {
     serviceID: "jos-electric",
     name: "Jos Electric - JED",
-    image: `${IMG}/Jos-Electric---JED.jpg`,
+    image: `${IMG}/Jos-Electric-JED.jpg`,
   },
   {
     serviceID: "kaduna-electric",
     name: "Kaduna Electric - KAEDCO",
-    image: `${IMG}/Kaduna-Electric---KAEDCO.jpg`,
+    image: `${IMG}/Kaduna-Electric-KAEDCO.jpg`,
   },
   {
     serviceID: "enugu-electric",
     name: "Enugu Electric - EEDC",
-    image: `${IMG}/Enugu-Electric---EEDC.jpg`,
+    image: `${IMG}/Enugu-Electric-EEDC.jpg`,
   },
   {
     serviceID: "ibadan-electric",
     name: "IBEDC - Ibadan Electricity",
-    image: `${IMG}/IBEDC.jpg`,
+    image: `${IMG}/Ibadan-Electric.jpg`,
   },
   {
     serviceID: "benin-electric",
     name: "Benin Electricity - BEDC",
-    image: `${IMG}/BEDC.jpg`,
+    image: `${IMG_LIVE}/Benin-Electricity-BEDC.jpg`,
   },
   {
     serviceID: "aba-electric",
-    name: "Aba Electric Payment - APLE",
-    image: `${IMG}/Aba-Electric.jpg`,
+    name: "Aba Electric Payment - ABEDC",
+    image: `${IMG_LIVE}/Aba-Electric-Payment-ABEDC.jpg`,
   },
   {
     serviceID: "yola-electric",
     name: "Yola Electric Disco Payment - YEDC",
-    image: `${IMG}/YEDC.jpg`,
+    image: `${IMG_LIVE}/Yola-Electric-Payment-IKEDC.jpg`,
   },
 ];
 
@@ -486,6 +487,7 @@ const SERVICE_IMAGE_OVERRIDES: Record<string, string> = {
   dstv: `${IMG}/Pay-DSTV-Subscription.jpg`,
   gotv: `${IMG}/Gotv-Payment.jpg`,
   startimes: `${IMG}/Startimes-Subscription.jpg`,
+  showmax: `${IMG}/Showmax.jpg`,
   "ikeja-electric": `${IMG}/Ikeja-Electric-Payment-PHCN.jpg`,
   "eko-electric": `${IMG}/Eko-Electric-Payment-PHCN.jpg`,
   "abuja-electric": `${IMG}/Abuja-Electric.jpg`,
@@ -494,6 +496,10 @@ const SERVICE_IMAGE_OVERRIDES: Record<string, string> = {
   "jos-electric": `${IMG}/Jos-Electric-JED.jpg`,
   "kaduna-electric": `${IMG}/Kaduna-Electric-KAEDCO.jpg`,
   "enugu-electric": `${IMG}/Enugu-Electric-EEDC.jpg`,
+  "ibadan-electric": `${IMG}/Ibadan-Electric.jpg`,
+  "benin-electric": `${IMG_LIVE}/Benin-Electricity-BEDC.jpg`,
+  "aba-electric": `${IMG_LIVE}/Aba-Electric-Payment-ABEDC.jpg`,
+  "yola-electric": `${IMG_LIVE}/Yola-Electric-Payment-IKEDC.jpg`,
 };
 
 /** Strip product words so UI shows only the network / brand name. */
@@ -527,17 +533,18 @@ export function resolveServiceImage(
   // VTpass often returns Airtime-VTU.jpg which 404s — fall back to Airtime.jpg
   url = url
     .replace(/-Airtime-VTU\.jpg$/i, "-Airtime.jpg")
-    .replace(/-VTU\.jpg$/i, ".jpg");
+    .replace(/-VTU\.jpg$/i, ".jpg")
+    // ShowMax.jpg 404s on sandbox; Showmax.jpg works
+    .replace(/\/ShowMax\.jpg$/i, "/Showmax.jpg");
 
-  // Some assets (GLO SME, Spectranet, …) are only on the live CDN
+  // Some assets only exist on the live product CDN
   if (
-    /GLO-Data-\(SME\)|Spectranet/i.test(url) &&
+    /GLO-Data-\(SME\)|Spectranet|ShowMax|IBEDC-Ibadan|Benin-Electricity-BEDC|Aba-Electric-Payment-ABEDC|Yola-Electric-Payment/i.test(
+      url,
+    ) &&
     url.includes("sandbox.vtpass.com")
   ) {
-    url = url.replace(
-      "https://sandbox.vtpass.com",
-      "https://vtpass.com",
-    );
+    url = url.replace("https://sandbox.vtpass.com", "https://vtpass.com");
   }
 
   return url;
