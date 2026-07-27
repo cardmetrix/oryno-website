@@ -41,6 +41,7 @@ export default function VirtualNumbersPage() {
   const [loadingServices, setLoadingServices] = useState(true);
   const [loadingOffers, setLoadingOffers] = useState(false);
   const [query, setQuery] = useState("");
+  const [serviceQuery, setServiceQuery] = useState("");
   const [selected, setSelected] = useState<HeroOffer | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,13 +53,23 @@ export default function VirtualNumbersPage() {
   const [polling, setPolling] = useState(false);
   const [receipt, setReceipt] = useState("");
 
+  const filteredServices = useMemo(() => {
+    const q = serviceQuery.trim().toLowerCase();
+    if (!q) return services;
+    return services.filter(
+      (s) =>
+        s.name.toLowerCase().includes(q) || s.code.toLowerCase().includes(q),
+    );
+  }, [services, serviceQuery]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return offers;
     return offers.filter(
       (o) =>
         o.countryName.toLowerCase().includes(q) ||
-        (o.iso || "").toLowerCase().includes(q),
+        (o.iso || "").toLowerCase().includes(q) ||
+        o.serviceName.toLowerCase().includes(q),
     );
   }, [offers, query]);
 
@@ -93,6 +104,7 @@ export default function VirtualNumbersPage() {
       setLoadingOffers(true);
       setSelected(null);
       setError(null);
+      setQuery("");
       try {
         const res = await fetch(
           `/api/herosms/prices?service=${encodeURIComponent(service)}`,
@@ -259,15 +271,26 @@ export default function VirtualNumbersPage() {
           >
             <MotionSection className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6">
               <div className="mb-4 flex items-center gap-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-oryno-orange-muted text-primary">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-oryno-orange-muted text-primary">
                   <Phone className="h-5 w-5" />
                 </span>
-                <div>
+                <div className="min-w-0">
                   <h2 className="text-base font-semibold">Select service</h2>
                   <p className="text-xs text-muted-foreground">
                     WhatsApp, Telegram, Google, Instagram & more
                   </p>
                 </div>
+              </div>
+
+              <div className="relative mb-3">
+                <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  value={serviceQuery}
+                  onChange={(e) => setServiceQuery(e.target.value)}
+                  placeholder="Search services (e.g. WhatsApp, Telegram)"
+                  className="h-11 w-full rounded-[14px] border border-border bg-background pr-3 pl-9 text-sm outline-none focus:border-primary"
+                  autoComplete="off"
+                />
               </div>
 
               <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -278,21 +301,27 @@ export default function VirtualNumbersPage() {
                         className="h-9 w-24 shrink-0 animate-pulse rounded-full bg-muted"
                       />
                     ))
-                  : services.map((s) => (
-                      <button
-                        key={s.code}
-                        type="button"
-                        onClick={() => setService(s.code)}
-                        className={cn(
-                          "shrink-0 rounded-full px-3.5 py-2 text-sm font-semibold",
-                          service === s.code
-                            ? "bg-primary text-white"
-                            : "bg-muted text-foreground",
-                        )}
-                      >
-                        {s.name}
-                      </button>
-                    ))}
+                  : filteredServices.length
+                    ? filteredServices.map((s) => (
+                        <button
+                          key={s.code}
+                          type="button"
+                          onClick={() => setService(s.code)}
+                          className={cn(
+                            "shrink-0 rounded-full px-3.5 py-2 text-sm font-semibold",
+                            service === s.code
+                              ? "bg-primary text-white"
+                              : "bg-muted text-foreground",
+                          )}
+                        >
+                          {s.name}
+                        </button>
+                      ))
+                    : (
+                        <p className="py-2 text-sm text-muted-foreground">
+                          No services match “{serviceQuery.trim()}”
+                        </p>
+                      )}
               </div>
             </MotionSection>
 
@@ -300,17 +329,22 @@ export default function VirtualNumbersPage() {
               delay={0.05}
               className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6"
             >
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <h2 className="text-base font-semibold">Countries</h2>
-                <div className="relative w-full sm:w-56">
-                  <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <input
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Search country"
-                    className="h-10 w-full rounded-[12px] border border-border bg-background pr-3 pl-9 text-sm outline-none focus:border-primary"
-                  />
-                </div>
+              <h2 className="mb-1 text-base font-semibold">Countries</h2>
+              <p className="mb-3 text-xs text-muted-foreground">
+                {loadingOffers
+                  ? "Loading prices…"
+                  : `${filtered.length} of ${offers.length} countries`}
+              </p>
+
+              <div className="relative mb-3">
+                <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search country (e.g. USA, Nigeria, GB)"
+                  className="h-11 w-full rounded-[14px] border border-border bg-background pr-3 pl-9 text-sm outline-none focus:border-primary"
+                  autoComplete="off"
+                />
               </div>
 
               <div className="grid max-h-[420px] gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
@@ -365,7 +399,9 @@ export default function VirtualNumbersPage() {
                   })
                 ) : (
                   <p className="col-span-full py-8 text-center text-sm text-muted-foreground">
-                    No countries available for this service
+                    {query.trim()
+                      ? `No countries match “${query.trim()}”`
+                      : "No countries available for this service"}
                   </p>
                 )}
               </div>
