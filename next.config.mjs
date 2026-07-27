@@ -57,6 +57,11 @@ const nextConfig = {
         hostname: 'www.vtpass.com',
         pathname: '/resources/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'flagcdn.com',
+        pathname: '/**',
+      },
     ],
   },
 }

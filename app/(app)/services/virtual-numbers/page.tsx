@@ -1,349 +1,420 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   CheckCircle2,
-  Clock3,
-  MessageSquareText,
+  Copy,
   Phone,
-  ShoppingBag,
+  RefreshCw,
+  Search,
   Wallet,
 } from "lucide-react";
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
-import {
-  activeCountryConfig,
-  formatMoney,
-  VirtualNumberOffer,
-} from "@/lib/services-catalog";
+import { useCountry } from "@/components/providers/country-provider";
+import { formatCountryMoney } from "@/lib/country";
 import { cn } from "@/lib/utils";
 
-const modes = ["All", "Buy", "Rent"] as const;
+type HeroService = { code: string; name: string };
+type HeroOffer = {
+  countryId: number;
+  countryName: string;
+  iso: string | null;
+  flagUrl: string | null;
+  flagEmoji: string;
+  service: string;
+  serviceName: string;
+  priceUsd: number;
+  priceLocal: number;
+  currency: string;
+  count: number;
+};
 
 export default function VirtualNumbersPage() {
-  const { virtualNumbers } = activeCountryConfig;
-  const [mode, setMode] = useState<(typeof modes)[number]>("All");
-  const [country, setCountry] = useState("All");
-  const [offerId, setOfferId] = useState(virtualNumbers[0]?.id ?? "");
+  const { country } = useCountry();
+  const [services, setServices] = useState<HeroService[]>([]);
+  const [service, setService] = useState("wa");
+  const [offers, setOffers] = useState<HeroOffer[]>([]);
+  const [loadingServices, setLoadingServices] = useState(true);
+  const [loadingOffers, setLoadingOffers] = useState(false);
+  const [query, setQuery] = useState("");
+  const [selected, setSelected] = useState<HeroOffer | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
   const [success, setSuccess] = useState(false);
-  const walletBalance = 1245600;
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [activationId, setActivationId] = useState("");
+  const [smsCode, setSmsCode] = useState<string | null>(null);
+  const [polling, setPolling] = useState(false);
+  const [receipt, setReceipt] = useState("");
 
-  const countries = useMemo(() => {
-    const unique = Array.from(
-      new Map(
-        virtualNumbers.map((n) => [
-          n.countryCode,
-          { code: n.countryCode, name: n.countryName, flag: n.flag },
-        ]),
-      ).values(),
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return offers;
+    return offers.filter(
+      (o) =>
+        o.countryName.toLowerCase().includes(q) ||
+        (o.iso || "").toLowerCase().includes(q),
     );
-    return unique;
-  }, [virtualNumbers]);
+  }, [offers, query]);
 
-  const offers = useMemo(() => {
-    return virtualNumbers.filter((offer) => {
-      const modeOk = mode === "All" || offer.type === mode;
-      const countryOk = country === "All" || offer.countryCode === country;
-      return modeOk && countryOk;
-    });
-  }, [virtualNumbers, mode, country]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoadingServices(true);
+      try {
+        const res = await fetch("/api/herosms/services");
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        if (cancelled) return;
+        setServices(data.services ?? []);
+        if (data.services?.[0]?.code) setService(data.services[0].code);
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : "Failed to load services");
+        }
+      } finally {
+        if (!cancelled) setLoadingServices(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-  const selected: VirtualNumberOffer | null =
-    offers.find((o) => o.id === offerId) ?? offers[0] ?? null;
+  useEffect(() => {
+    if (!service) return;
+    let cancelled = false;
+    (async () => {
+      setLoadingOffers(true);
+      setSelected(null);
+      setError(null);
+      try {
+        const res = await fetch(
+          `/api/herosms/prices?service=${encodeURIComponent(service)}`,
+        );
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        if (cancelled) return;
+        const list: HeroOffer[] = data.offers ?? [];
+        setOffers(list);
+        if (list[0]) setSelected(list[0]);
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : "Failed to load prices");
+          setOffers([]);
+        }
+      } finally {
+        if (!cancelled) setLoadingOffers(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [service]);
 
-  const canSubmit = Boolean(selected);
+  // Poll SMS after purchase
+  useEffect(() => {
+    if (!success || !activationId || smsCode) return;
+    let cancelled = false;
+    let tries = 0;
 
-  function onModeChange(next: (typeof modes)[number]) {
-    setMode(next);
-    const nextOffers = virtualNumbers.filter((offer) => {
-      const modeOk = next === "All" || offer.type === next;
-      const countryOk = country === "All" || offer.countryCode === country;
-      return modeOk && countryOk;
-    });
-    if (nextOffers[0]) setOfferId(nextOffers[0].id);
-  }
+    async function tick() {
+      if (cancelled || tries > 40) return;
+      tries += 1;
+      setPolling(true);
+      try {
+        const res = await fetch(
+          `/api/herosms/status/number/${encodeURIComponent(activationId)}`,
+        );
+        const data = await res.json();
+        if (data.code) {
+          setSmsCode(data.code);
+          setPolling(false);
+          return;
+        }
+      } catch {
+        // keep polling
+      }
+      setPolling(false);
+      window.setTimeout(tick, 5000);
+    }
 
-  function onCountryChange(code: string) {
-    setCountry(code);
-    const nextOffers = virtualNumbers.filter((offer) => {
-      const modeOk = mode === "All" || offer.type === mode;
-      const countryOk = code === "All" || offer.countryCode === code;
-      return modeOk && countryOk;
-    });
-    if (nextOffers[0]) setOfferId(nextOffers[0].id);
-  }
+    tick();
+    return () => {
+      cancelled = true;
+    };
+  }, [success, activationId, smsCode]);
 
-  function onSubmit(e: FormEvent) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!canSubmit || submitting || !selected) return;
+    if (!selected || submitting) return;
     setSubmitting(true);
-    window.setTimeout(() => {
-      setSubmitting(false);
+    setError(null);
+    try {
+      const res = await fetch("/api/herosms/purchase/number", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          heroCountryId: selected.countryId,
+          countryName: selected.countryName,
+          iso: selected.iso,
+          service: selected.service,
+          serviceName: selected.serviceName,
+          priceUsd: selected.priceUsd,
+          priceLocal: selected.priceLocal,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Purchase failed");
+      setPhoneNumber(data.phoneNumber);
+      setActivationId(data.activationId);
+      setReceipt(data.amountFormatted);
+      setSmsCode(null);
       setSuccess(true);
-    }, 900);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Purchase failed");
+    } finally {
+      setSubmitting(false);
+    }
   }
+
+  const money = (n: number) =>
+    formatCountryMoney(n, country?.code || "NG");
 
   return (
     <AppShell hideNav>
       <PageHeader
         title="Virtual Numbers"
-        subtitle="Buy permanently or rent for SMS verification"
+        subtitle="SMS verification numbers · HeroSMS"
         backHref="/services"
       />
 
       <AnimatePresence mode="wait">
-        {success && selected ? (
+        {success ? (
           <MotionSection key="success">
             <motion.div
               initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="rounded-[28px] border border-border bg-background p-8 text-center shadow-[var(--shadow-soft)]"
+              className="rounded-2xl border border-border bg-background p-5 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-8"
             >
-              <motion.span
-                initial={{ scale: 0.6, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ type: "spring", stiffness: 320, damping: 18 }}
-                className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-oryno-orange-muted text-[var(--oryno-success)]"
-              >
-                <CheckCircle2 className="h-8 w-8" strokeWidth={1.75} />
-              </motion.span>
-              <h2 className="mt-5 text-2xl font-bold text-foreground">
-                Number reserved
-              </h2>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {selected.flag} {selected.countryName} · {selected.type} ·{" "}
-                {selected.duration}. SMS inbox is ready in your numbers list.
-              </p>
-              <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:justify-center">
-                <motion.button
+              <div className="text-center">
+                <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-oryno-orange-muted text-[var(--oryno-success)]">
+                  <CheckCircle2 className="h-7 w-7" />
+                </span>
+                <h2 className="mt-4 text-xl font-bold sm:text-2xl">
+                  Number ready
+                </h2>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Use this number for verification · {receipt}
+                </p>
+              </div>
+
+              <div className="mt-6 space-y-3">
+                <CopyRow label="Phone number" value={phoneNumber} />
+                <CopyRow
+                  label="SMS code"
+                  value={smsCode || (polling ? "Waiting for SMS…" : "—")}
+                  mono={!smsCode}
+                />
+                {polling && !smsCode ? (
+                  <p className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                    Polling HeroSMS for the OTP…
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
+                <button
                   type="button"
-                  whileHover={{ y: -2 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => setSuccess(false)}
-                  className="btn-primary h-12 px-6"
+                  onClick={() => {
+                    setSuccess(false);
+                    setPhoneNumber("");
+                    setActivationId("");
+                    setSmsCode(null);
+                  }}
+                  className="btn-primary h-12 w-full px-6 sm:w-auto"
                 >
                   Get another number
-                </motion.button>
-                <motion.a
+                </button>
+                <a
                   href="/dashboard"
-                  whileHover={{ y: -2 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="btn-secondary inline-flex h-12 items-center justify-center px-6"
+                  className="btn-secondary inline-flex h-12 w-full items-center justify-center px-6 sm:w-auto"
                 >
                   Back to Home
-                </motion.a>
+                </a>
               </div>
             </motion.div>
           </MotionSection>
         ) : (
-          <form key="form" onSubmit={onSubmit} className="space-y-5">
-            <MotionSection className="rounded-[28px] border border-border bg-background p-5 shadow-[var(--shadow-soft)] sm:p-6">
+          <form
+            key="form"
+            onSubmit={onSubmit}
+            className="space-y-4 sm:space-y-5"
+          >
+            <MotionSection className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6">
               <div className="mb-4 flex items-center gap-3">
-                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-oryno-orange-muted text-primary">
-                  <Phone className="h-5 w-5" strokeWidth={1.75} />
+                <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-oryno-orange-muted text-primary">
+                  <Phone className="h-5 w-5" />
                 </span>
                 <div>
-                  <h2 className="text-base font-semibold text-foreground">
-                    Buy or rent
-                  </h2>
-                  <p className="text-sm text-muted-foreground">
-                    Permanent lines or short SMS rentals
+                  <h2 className="text-base font-semibold">Select service</h2>
+                  <p className="text-xs text-muted-foreground">
+                    WhatsApp, Telegram, Google, Instagram & more
                   </p>
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-2 rounded-[16px] bg-muted/70 p-1.5">
-                {modes.map((item) => {
-                  const active = mode === item;
-                  return (
-                    <button
-                      key={item}
-                      type="button"
-                      onClick={() => onModeChange(item)}
-                      className={cn(
-                        "relative rounded-[12px] px-2 py-2.5 text-sm font-semibold transition-colors",
-                        active
-                          ? "text-primary"
-                          : "text-muted-foreground hover:text-foreground",
-                      )}
-                    >
-                      {active ? (
-                        <motion.span
-                          layoutId="vn-mode"
-                          className="absolute inset-0 rounded-[12px] bg-background shadow-[var(--shadow-soft)]"
-                          transition={{
-                            type: "spring",
-                            stiffness: 380,
-                            damping: 30,
-                          }}
-                        />
-                      ) : null}
-                      <span className="relative z-10 inline-flex items-center justify-center gap-1.5">
-                        {item === "Buy" ? (
-                          <ShoppingBag className="h-3.5 w-3.5" />
-                        ) : null}
-                        {item === "Rent" ? (
-                          <Clock3 className="h-3.5 w-3.5" />
-                        ) : null}
-                        {item}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
-                <FilterChip
-                  active={country === "All"}
-                  onClick={() => onCountryChange("All")}
-                  label="All countries"
-                />
-                {countries.map((c) => (
-                  <FilterChip
-                    key={c.code}
-                    active={country === c.code}
-                    onClick={() => onCountryChange(c.code)}
-                    label={`${c.flag} ${c.name}`}
-                  />
-                ))}
-              </div>
-            </MotionSection>
-
-            <MotionSection
-              delay={0.06}
-              className="rounded-[28px] border border-border bg-background p-5 shadow-[var(--shadow-soft)] sm:p-6"
-            >
-              <h2 className="mb-4 text-base font-semibold text-foreground">
-                Available numbers
-              </h2>
-              <div className="grid gap-3">
-                <AnimatePresence mode="popLayout">
-                  {offers.map((offer, index) => {
-                    const active = selected?.id === offer.id;
-                    return (
-                      <motion.button
-                        key={offer.id}
+              <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {loadingServices
+                  ? Array.from({ length: 6 }).map((_, i) => (
+                      <div
+                        key={i}
+                        className="h-9 w-24 shrink-0 animate-pulse rounded-full bg-muted"
+                      />
+                    ))
+                  : services.map((s) => (
+                      <button
+                        key={s.code}
                         type="button"
-                        layout
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -6 }}
-                        transition={{ delay: index * 0.03, duration: 0.28 }}
-                        whileHover={{ y: -2 }}
-                        whileTap={{ scale: 0.985 }}
-                        onClick={() => setOfferId(offer.id)}
+                        onClick={() => setService(s.code)}
                         className={cn(
-                          "rounded-[20px] border px-4 py-4 text-left transition-colors",
-                          active
-                            ? "border-primary bg-oryno-orange-muted shadow-[var(--shadow-soft)]"
-                            : "border-border bg-background hover:bg-muted/50",
+                          "shrink-0 rounded-full px-3.5 py-2 text-sm font-semibold",
+                          service === s.code
+                            ? "bg-primary text-white"
+                            : "bg-muted text-foreground",
                         )}
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex items-start gap-3">
-                            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-muted text-xl">
-                              {offer.flag}
-                            </span>
-                            <div>
-                              <p className="text-sm font-semibold text-foreground">
-                                {offer.countryName}
-                              </p>
-                              <p className="mt-0.5 text-xs text-muted-foreground">
-                                {offer.category} · {offer.duration}
-                              </p>
-                              <div className="mt-2 flex flex-wrap gap-1.5">
-                                <span
-                                  className={cn(
-                                    "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase",
-                                    offer.type === "Buy"
-                                      ? "bg-primary text-white"
-                                      : "bg-muted text-foreground",
-                                  )}
-                                >
-                                  {offer.type}
-                                </span>
-                                {offer.smsCapable ? (
-                                  <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                                    <MessageSquareText className="h-3 w-3" />
-                                    SMS
-                                  </span>
-                                ) : null}
-                              </div>
-                            </div>
-                          </div>
-                          <p className="text-base font-bold text-primary">
-                            {formatMoney(offer.price)}
-                          </p>
-                        </div>
-                      </motion.button>
-                    );
-                  })}
-                </AnimatePresence>
-
-                {offers.length === 0 ? (
-                  <p className="rounded-[16px] bg-muted/60 px-4 py-6 text-center text-sm text-muted-foreground">
-                    No numbers match this filter.
-                  </p>
-                ) : null}
+                        {s.name}
+                      </button>
+                    ))}
               </div>
             </MotionSection>
 
             <MotionSection
-              delay={0.1}
-              className="rounded-[28px] border border-border bg-background p-5 shadow-[var(--shadow-soft)] sm:p-6"
+              delay={0.05}
+              className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6"
             >
-              <h2 className="text-base font-semibold text-foreground">
-                Order summary
-              </h2>
-              <div className="mt-4 space-y-3 text-sm">
-                <SummaryRow
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-base font-semibold">Countries</h2>
+                <div className="relative w-full sm:w-56">
+                  <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Search country"
+                    className="h-10 w-full rounded-[12px] border border-border bg-background pr-3 pl-9 text-sm outline-none focus:border-primary"
+                  />
+                </div>
+              </div>
+
+              <div className="grid max-h-[420px] gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
+                {loadingOffers ? (
+                  Array.from({ length: 8 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="h-16 animate-pulse rounded-[16px] bg-muted"
+                    />
+                  ))
+                ) : filtered.length ? (
+                  filtered.map((offer) => {
+                    const active =
+                      selected?.countryId === offer.countryId &&
+                      selected?.service === offer.service;
+                    return (
+                      <button
+                        key={`${offer.countryId}-${offer.service}`}
+                        type="button"
+                        onClick={() => setSelected(offer)}
+                        className={cn(
+                          "flex items-center gap-3 rounded-[16px] border px-3 py-3 text-left",
+                          active
+                            ? "border-primary bg-oryno-orange-muted"
+                            : "border-border hover:bg-muted/50",
+                        )}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        {offer.flagUrl ? (
+                          <img
+                            src={offer.flagUrl}
+                            alt={offer.countryName}
+                            className="h-8 w-10 shrink-0 rounded object-cover shadow-sm"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <span className="text-2xl">{offer.flagEmoji}</span>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold">
+                            {offer.countryName}
+                          </p>
+                          <p className="text-[11px] text-muted-foreground">
+                            {offer.count} available · SMS
+                          </p>
+                        </div>
+                        <p className="shrink-0 text-sm font-bold text-primary">
+                          {money(offer.priceLocal)}
+                        </p>
+                      </button>
+                    );
+                  })
+                ) : (
+                  <p className="col-span-full py-8 text-center text-sm text-muted-foreground">
+                    No countries available for this service
+                  </p>
+                )}
+              </div>
+            </MotionSection>
+
+            <MotionSection
+              delay={0.08}
+              className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6"
+            >
+              <h2 className="text-base font-semibold">Order summary</h2>
+              <div className="mt-3 space-y-2 text-sm">
+                <Row label="Service" value={selected?.serviceName ?? "—"} />
+                <Row
                   label="Country"
                   value={
                     selected
-                      ? `${selected.flag} ${selected.countryName}`
+                      ? `${selected.flagEmoji} ${selected.countryName}`
                       : "—"
                   }
                 />
-                <SummaryRow label="Type" value={selected?.type ?? "—"} />
-                <SummaryRow
-                  label="Duration"
-                  value={selected?.duration ?? "—"}
-                />
-                <SummaryRow
+                <Row
                   label="Amount"
-                  value={selected ? formatMoney(selected.price) : formatMoney(0)}
+                  value={selected ? money(selected.priceLocal) : money(0)}
                   accent
                 />
-                <div className="flex items-center justify-between border-t border-border pt-3">
-                  <span className="inline-flex items-center gap-2 font-semibold text-foreground">
-                    <Wallet className="h-4 w-4 text-primary" />
-                    Wallet balance
-                  </span>
-                  <span className="font-semibold text-foreground">
-                    {formatMoney(walletBalance)}
-                  </span>
+                <div className="flex items-center gap-2 border-t border-border pt-3 font-semibold">
+                  <Wallet className="h-4 w-4 text-primary" />
+                  Pay from wallet · HeroSMS
                 </div>
               </div>
             </MotionSection>
 
-            <MotionSection delay={0.14}>
-              <motion.button
-                type="submit"
-                disabled={!canSubmit || submitting}
-                whileHover={canSubmit ? { y: -2 } : undefined}
-                whileTap={canSubmit ? { scale: 0.985 } : undefined}
-                className="btn-primary h-12 w-full text-base disabled:opacity-50 sm:max-w-md"
-              >
-                {submitting
-                  ? "Processing…"
-                  : selected
-                    ? `${selected.type} number · ${formatMoney(selected.price)}`
-                    : "Continue"}
-              </motion.button>
-            </MotionSection>
+            {error ? (
+              <p className="rounded-[14px] bg-red-50 px-4 py-3 text-sm text-red-600">
+                {error}
+              </p>
+            ) : null}
+
+            <motion.button
+              type="submit"
+              disabled={!selected || submitting}
+              whileTap={selected ? { scale: 0.985 } : undefined}
+              className="btn-primary h-12 w-full text-base disabled:opacity-50 sm:max-w-md"
+            >
+              {submitting
+                ? "Getting number…"
+                : selected
+                  ? `Get number · ${money(selected.priceLocal)}`
+                  : "Select a country"}
+            </motion.button>
           </form>
         )}
       </AnimatePresence>
@@ -351,32 +422,7 @@ export default function VirtualNumbersPage() {
   );
 }
 
-function FilterChip({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "shrink-0 rounded-full px-3.5 py-2 text-sm font-semibold transition-colors",
-        active
-          ? "bg-primary text-white shadow-[var(--shadow-orange)]"
-          : "bg-muted text-foreground hover:bg-oryno-orange-muted",
-      )}
-    >
-      {label}
-    </button>
-  );
-}
-
-function SummaryRow({
+function Row({
   label,
   value,
   accent,
@@ -386,16 +432,52 @@ function SummaryRow({
   accent?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3">
+    <div className="flex items-start justify-between gap-3">
       <span className="text-muted-foreground">{label}</span>
       <span
         className={cn(
-          "text-right font-semibold",
+          "max-w-[60%] text-right font-semibold break-words",
           accent ? "text-primary" : "text-foreground",
         )}
       >
         {value}
       </span>
+    </div>
+  );
+}
+
+function CopyRow({
+  label,
+  value,
+  mono,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-[16px] border border-border bg-muted/40 px-4 py-3">
+      <div className="min-w-0">
+        <p className="text-[11px] text-muted-foreground">{label}</p>
+        <p
+          className={cn(
+            "truncate text-sm font-bold",
+            mono && "text-muted-foreground",
+          )}
+        >
+          {value}
+        </p>
+      </div>
+      {value && value !== "—" && !value.includes("Waiting") ? (
+        <button
+          type="button"
+          onClick={() => navigator.clipboard.writeText(value)}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] border border-border bg-background"
+          aria-label="Copy"
+        >
+          <Copy className="h-4 w-4" />
+        </button>
+      ) : null}
     </div>
   );
 }
