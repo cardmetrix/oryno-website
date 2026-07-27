@@ -35,5 +35,7 @@ export const serviceNav = [
 
 export function isNavActive(pathname: string, href: string) {
   if (href === "/dashboard") return pathname === "/dashboard";
+  // "All Services" should only highlight on the directory itself
+  if (href === "/services") return pathname === "/services";
   return pathname === href || pathname.startsWith(`${href}/`);
 }

@@ -5,7 +5,6 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   ArrowRight,
-  Mail,
   MoreHorizontal,
   Phone,
   Smartphone,
@@ -28,7 +27,6 @@ const quickActions = [
   { href: "/services/gift-cards", label: "Gift Cards", icon: GiftCardIcon },
   { href: "/services/social", label: "Boosting", icon: TrendingUp },
   { href: "/services/virtual-numbers", label: "Numbers", icon: Phone },
-  { href: "/services/emails", label: "Emails", icon: Mail },
   { href: "/services/airtime", label: "Airtime", icon: Smartphone },
   { href: "/services/data", label: "Data", icon: Wifi },
   { href: "/services", label: "More", icon: MoreHorizontal },
