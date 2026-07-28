@@ -7,6 +7,7 @@ import {
   wallets,
 } from "@/lib/db/schema";
 import { quoteLocalUsd, roundMoney } from "@/lib/fx/rates";
+import { resolveCountryCode } from "@/lib/country";
 import {
   currencyForCountry,
   ensurePrimaryWallet,
@@ -204,7 +205,7 @@ export async function purchaseJapBoost(input: {
       : local;
 
   const pkg = await ensureSocialPackage({
-    countryCode: input.countryCode || "NG",
+    countryCode: resolveCountryCode(input.countryCode),
     platform: input.platform,
     name: input.serviceName,
     metric: input.metric,

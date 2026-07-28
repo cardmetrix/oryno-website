@@ -11,6 +11,7 @@ import {
   wallets,
 } from "@/lib/db/schema";
 import { estimateAirtimeCashback } from "@/lib/telecom";
+import { resolveCountryCode } from "@/lib/country";
 import {
   currencyForCountry,
   ensurePrimaryWallet,
@@ -372,13 +373,17 @@ export async function purchaseAirtime(input: {
 }) {
   const phone = normalizePhone(input.phone);
   if (phone.length < 10) throw new Error("Enter a valid phone number");
+  if (!Number.isFinite(input.amount) || input.amount <= 0) {
+    throw new Error("Enter a valid amount");
+  }
   if (input.amount < 50 && input.mode !== "international") {
     throw new Error("Minimum airtime amount is ₦50");
   }
 
   const cashback = estimateAirtimeCashback(input.amount);
+  const market = resolveCountryCode(input.countryCode);
   const network = await ensureTelecomNetwork(
-    (input.countryCode || "NG").toUpperCase().slice(0, 2),
+    market,
     input.mode === "international"
       ? `foreign-${input.operatorId ?? "airtime"}`
       : input.serviceID,

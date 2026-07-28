@@ -1,16 +1,18 @@
 /**
- * Provider API often returns Chinese (or mixed) error strings.
+ * Provider API often returns Chinese (or mixed) error strings / SMS-Activate codes.
  * Map known messages to clear English for the UI — never expose provider brand.
  */
 const HERO_ERROR_EN: Record<string, string> = {
-  您的请求包含无效数据: "Your request contains invalid data",
-  请求包含无效数据: "Your request contains invalid data",
+  您的请求包含无效数据:
+    "Your request contains invalid data. Try another domain or site.",
+  请求包含无效数据:
+    "Your request contains invalid data. Try another domain or site.",
   无效的请求: "Invalid request",
-  未授权: "Unauthorized — check your email service configuration",
+  未授权: "Service temporarily unavailable. Please try again later.",
   没有权限: "Permission denied",
-  余额不足: "Service temporarily unavailable — try again later",
-  没有可用的邮箱: "No emails available for this domain",
-  没有可用邮箱: "No emails available for this domain",
+  余额不足: "Service temporarily unavailable. Please try again later.",
+  没有可用的邮箱: "No emails available for this domain. Try another one.",
+  没有可用邮箱: "No emails available for this domain. Try another one.",
   邮箱不存在: "Email activation not found",
   激活不存在: "Activation not found",
   服务不存在: "Service not found",
@@ -20,6 +22,20 @@ const HERO_ERROR_EN: Record<string, string> = {
   站点无效: "Invalid site",
   请求过于频繁: "Too many requests — try again shortly",
   内部服务器错误: "Something went wrong — try again",
+  NO_NUMBERS:
+    "No numbers available for this country and service. Try another country.",
+  NO_BALANCE: "Service temporarily unavailable. Please try again later.",
+  BAD_KEY: "Service temporarily unavailable. Please try again later.",
+  BAD_SERVICE: "This service isn’t available right now. Try another one.",
+  BAD_ACTION: "Something went wrong. Please try again.",
+  BAD_STATUS: "Couldn’t update number status. Please try again.",
+  ERROR_SQL: "Something went wrong. Please try again.",
+  NO_ACTIVATION: "Activation not found",
+  WRONG_ACTIVATION_ID: "Activation not found",
+  WRONG_MAX_PRICE: "Price changed — refresh and try again.",
+  WRONG_SERVICE: "This service isn’t available right now.",
+  CHANNELS_LIMIT:
+    "Too many active numbers. Finish or cancel one, then try again.",
 };
 
 export function herosmsErrorToEnglish(raw: unknown): string {
@@ -28,14 +44,28 @@ export function herosmsErrorToEnglish(raw: unknown): string {
     .replace(/\s+/g, " ");
   if (!text) return "Something went wrong. Please try again.";
 
+  const upper = text.toUpperCase();
+  if (HERO_ERROR_EN[upper]) return HERO_ERROR_EN[upper];
   if (HERO_ERROR_EN[text]) return HERO_ERROR_EN[text];
 
-  for (const [zh, en] of Object.entries(HERO_ERROR_EN)) {
-    if (text.includes(zh)) return en;
+  for (const [key, en] of Object.entries(HERO_ERROR_EN)) {
+    if (text.includes(key) || upper.includes(key.toUpperCase())) return en;
   }
 
-  // Strip accidental provider branding from upstream messages
   return text
     .replace(/HeroSMS/gi, "ORYNO")
-    .replace(/hero-sms/gi, "oryno");
+    .replace(/hero-sms/gi, "oryno")
+    .replace(/VTpass/gi, "ORYNO")
+    .replace(/JustAnotherPanel/gi, "ORYNO");
+}
+
+/** Normalize signup site for email rentals (host only, lowercase). */
+export function normalizeEmailSite(site: string) {
+  return site
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .replace(/^www\./, "")
+    .replace(/\/.*$/, "")
+    .replace(/[?#].*$/, "");
 }

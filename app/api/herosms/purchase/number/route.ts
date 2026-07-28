@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
 import { createNotification } from "@/lib/notifications-service";
 import { formatMoney } from "@/lib/transactions";
-import { purchaseVirtualNumber } from "@/lib/herosms";
+import { purchaseVirtualNumber, herosmsErrorToEnglish } from "@/lib/herosms";
 
 export const runtime = "nodejs";
 
@@ -25,9 +25,9 @@ export async function POST(req: Request) {
 
     if (
       body.heroCountryId == null ||
-      !body.countryName ||
-      !body.service ||
-      !body.priceUsd
+      !Number.isFinite(Number(body.heroCountryId)) ||
+      !body.countryName?.trim() ||
+      !body.service?.trim()
     ) {
       return NextResponse.json(
         { error: "Select a country and service" },
@@ -35,15 +35,23 @@ export async function POST(req: Request) {
       );
     }
 
+    const priceUsd = Number(body.priceUsd);
+    if (!Number.isFinite(priceUsd) || priceUsd <= 0) {
+      return NextResponse.json(
+        { error: "Invalid price — refresh and try again" },
+        { status: 400 },
+      );
+    }
+
     const result = await purchaseVirtualNumber({
       userId: user.id,
       countryCode: user.countryCode,
-      heroCountryId: body.heroCountryId,
+      heroCountryId: Number(body.heroCountryId),
       countryName: body.countryName,
       iso: body.iso,
       service: body.service,
       serviceName: body.serviceName || body.service,
-      priceUsd: Number(body.priceUsd),
+      priceUsd,
       priceLocal: Number(body.priceLocal) || 0,
     });
 
@@ -80,8 +88,9 @@ export async function POST(req: Request) {
     console.error("[herosms-purchase-number]", error);
     return NextResponse.json(
       {
-        error:
+        error: herosmsErrorToEnglish(
           error instanceof Error ? error.message : "Failed to buy number",
+        ),
       },
       { status: 400 },
     );

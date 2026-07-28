@@ -29,8 +29,8 @@ export function isVtpassSandbox() {
   const flag = (process.env.VTPASS_SANDBOX || "").toLowerCase();
   if (flag === "true" || flag === "1") return true;
   if (flag === "false" || flag === "0") return false;
-  // Default to sandbox when using keys that look like sandbox / no explicit live
-  return true;
+  // Prefer live when unset — production must opt into sandbox explicitly
+  return false;
 }
 
 export function vtpassBaseUrl() {

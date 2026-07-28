@@ -23,6 +23,7 @@ import {
   setHerosmsStatus,
 } from "./client";
 import { countryFlagEmoji } from "./countries";
+import { herosmsErrorToEnglish, normalizeEmailSite } from "./errors";
 
 async function debitWallet(input: {
   userId: string;
@@ -189,7 +190,7 @@ export async function purchaseVirtualNumber(input: {
     input.priceLocal > 0 ? input.priceLocal : local;
 
   const offer = await ensureOffer({
-    countryCode: (input.iso || "XX").slice(0, 2).toUpperCase(),
+    countryCode: (input.iso || input.countryCode || "NG").slice(0, 2).toUpperCase(),
     countryName: input.countryName,
     iso: input.iso,
     service: input.service,
@@ -197,6 +198,10 @@ export async function purchaseVirtualNumber(input: {
     price: chargeAmount,
     currency,
   });
+
+  if (!offer?.id) {
+    throw new Error("Unable to prepare this number offer. Please try again.");
+  }
 
   const prepared = await debitWallet({
     userId: input.userId,
@@ -279,14 +284,16 @@ export async function purchaseVirtualNumber(input: {
       simulated,
     };
   } catch (error) {
-    const reason = error instanceof Error ? error.message : "Purchase failed";
+    const reason = herosmsErrorToEnglish(
+      error instanceof Error ? error.message : "Purchase failed",
+    );
     await refundDebit({
       walletId: prepared.wallet.id,
       transactionId: prepared.transaction.id,
       amount: prepared.amount,
       reason,
     });
-    throw error instanceof Error ? error : new Error(reason);
+    throw new Error(reason);
   }
 }
 
@@ -306,17 +313,23 @@ export async function purchaseEmailActivation(input: {
   const chargeAmount =
     input.priceLocal && input.priceLocal > 0 ? input.priceLocal : local;
 
+  const site = normalizeEmailSite(input.site);
+  const domain = input.domain.trim().toLowerCase().replace(/^@/, "");
+  if (!site || !domain) {
+    throw new Error("Site and domain are required");
+  }
+
   const prepared = await debitWallet({
     userId: input.userId,
     countryCode: input.countryCode,
     amount: chargeAmount,
     category: "other",
     title: "Temporary email",
-    subtitle: `${input.domain} · ${input.site}`,
+    subtitle: `${domain} · ${site}`,
     metadata: {
       kind: "email_rental",
-      site: input.site,
-      domain: input.domain,
+      site,
+      domain,
       priceUsd: input.priceUsd,
     },
   });
@@ -330,11 +343,11 @@ export async function purchaseEmailActivation(input: {
       simulated = true;
       emailId = `demo_email_${Date.now()}`;
       const localPart = `oryno${String(Date.now()).slice(-6)}`;
-      email = `${localPart}@${input.domain}`;
+      email = `${localPart}@${domain}`;
     } else {
       const bought = await purchaseHerosmsEmail({
-        site: input.site,
-        domain: input.domain,
+        site,
+        domain,
         service: input.service,
       });
       emailId = bought.emailId;
@@ -353,8 +366,8 @@ export async function purchaseEmailActivation(input: {
           kind: "email_rental",
           emailId,
           email,
-          site: input.site,
-          domain: input.domain,
+          site,
+          domain,
           simulated,
         },
       })
@@ -363,8 +376,8 @@ export async function purchaseEmailActivation(input: {
     return {
       emailId,
       email,
-      site: input.site,
-      domain: input.domain,
+      site,
+      domain,
       transactionId: prepared.transaction.id,
       wallet: toWalletSummary(prepared.wallet),
       amount: chargeAmount,
@@ -372,14 +385,16 @@ export async function purchaseEmailActivation(input: {
       simulated,
     };
   } catch (error) {
-    const reason = error instanceof Error ? error.message : "Purchase failed";
+    const reason = herosmsErrorToEnglish(
+      error instanceof Error ? error.message : "Purchase failed",
+    );
     await refundDebit({
       walletId: prepared.wallet.id,
       transactionId: prepared.transaction.id,
       amount: prepared.amount,
       reason,
     });
-    throw error instanceof Error ? error : new Error(reason);
+    throw new Error(reason);
   }
 }
 

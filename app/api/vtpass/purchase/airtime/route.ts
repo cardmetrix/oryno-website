@@ -29,6 +29,12 @@ export async function POST(req: Request) {
     if (!body.phone) {
       return NextResponse.json({ error: "Phone is required" }, { status: 400 });
     }
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return NextResponse.json(
+        { error: "Enter a valid amount" },
+        { status: 400 },
+      );
+    }
 
     const mode = body.mode ?? "local";
     if (mode === "local" && !body.serviceID) {
@@ -106,10 +112,13 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     console.error("[vtpass-airtime]", error);
+    const raw =
+      error instanceof Error ? error.message : "Airtime purchase failed";
     return NextResponse.json(
       {
-        error:
-          error instanceof Error ? error.message : "Airtime purchase failed",
+        error: raw
+          .replace(/VTpass/gi, "ORYNO")
+          .replace(/vtpass/gi, "ORYNO"),
       },
       { status: 400 },
     );

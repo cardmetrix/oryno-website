@@ -1,5 +1,5 @@
 import { mapHeroCountry, type HeroCountry, type HeroService } from "./catalog";
-import { herosmsErrorToEnglish } from "./errors";
+import { herosmsErrorToEnglish, normalizeEmailSite } from "./errors";
 
 const DEFAULT_BASE = "https://hero-sms.com/stubs/handler_api.php";
 const EMAIL_BASE = "https://hero-sms.com/api/v1";
@@ -142,21 +142,51 @@ export async function getHerosmsNumber(input: {
     service: input.service,
     country: input.country,
   };
-  if (input.maxPrice != null) params.maxPrice = input.maxPrice;
+  if (input.maxPrice != null && Number.isFinite(input.maxPrice)) {
+    params.maxPrice = input.maxPrice;
+  }
   if (input.operator) params.operator = input.operator;
 
-  const { text } = await heroGet("getNumber", params);
-  // ACCESS_NUMBER:id:phone
-  if (text.startsWith("ACCESS_NUMBER:")) {
-    const [, activationId, phoneNumber] = text.split(":");
-    return {
-      activationId,
-      phoneNumber: phoneNumber?.startsWith("+")
-        ? phoneNumber
-        : `+${phoneNumber}`,
-    };
+  const tryOnce = async (p: Record<string, string | number>) => {
+    const { text } = await heroGet("getNumber", p);
+    if (text.startsWith("ACCESS_NUMBER:")) {
+      const parts = text.split(":");
+      const activationId = parts[1];
+      const phoneNumber = parts.slice(2).join(":");
+      return {
+        activationId,
+        phoneNumber: phoneNumber?.startsWith("+")
+          ? phoneNumber
+          : `+${phoneNumber}`,
+      };
+    }
+    const json = tryParseJson(text) as {
+      activationId?: string | number;
+      phone?: string | number;
+      number?: string | number;
+      error?: string;
+    } | null;
+    if (json?.activationId != null && (json.phone || json.number)) {
+      const phone = String(json.phone || json.number);
+      return {
+        activationId: String(json.activationId),
+        phoneNumber: phone.startsWith("+") ? phone : `+${phone}`,
+      };
+    }
+    throw new Error(json?.error || text || "Failed to get number");
+  };
+
+  try {
+    return await tryOnce(params);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    // Retry without maxPrice when the provider rejects the ceiling
+    if (/WRONG_MAX_PRICE/i.test(msg) && params.maxPrice != null) {
+      const { maxPrice: _drop, ...rest } = params;
+      return tryOnce(rest);
+    }
+    throw new Error(herosmsErrorToEnglish(msg));
   }
-  throw new Error(text || "Failed to get number");
 }
 
 export async function getHerosmsStatus(activationId: string) {
@@ -252,17 +282,40 @@ export async function getHerosmsEmailDomains() {
   return data;
 }
 
+const SITE_SERVICE_CODES: Record<string, string> = {
+  "telegram.com": "tg",
+  "google.com": "go",
+  "gmail.com": "go",
+  "instagram.com": "ig",
+  "facebook.com": "fb",
+  "discord.com": "ds",
+  "openai.com": "ot",
+  "whatsapp.com": "wa",
+  "tiktok.com": "lf",
+  "twitter.com": "tw",
+  "x.com": "tw",
+};
+
 export async function purchaseHerosmsEmail(input: {
   site: string;
   domain: string;
   service?: string;
 }) {
+  const site = normalizeEmailSite(input.site);
+  const domain = input.domain.trim().toLowerCase().replace(/^@/, "");
+  if (!site || !domain) {
+    throw new Error("Site and domain are required");
+  }
+
+  const service =
+    input.service?.trim() || SITE_SERVICE_CODES[site] || undefined;
+
   const json = await emailFetch("/emails", {
     method: "POST",
     body: JSON.stringify({
-      site: input.site,
-      domain: input.domain,
-      ...(input.service ? { service: input.service } : {}),
+      site,
+      domain,
+      ...(service ? { service } : {}),
     }),
   });
   const data = json?.data as
@@ -287,8 +340,8 @@ export async function purchaseHerosmsEmail(input: {
   return {
     emailId: String(row.id ?? ""),
     email: row.email,
-    site: row.site || input.site,
-    domain: row.domain || input.domain,
+    site: row.site || site,
+    domain: row.domain || domain,
     costUsd: Number(row.cost) || 0,
   };
 }
