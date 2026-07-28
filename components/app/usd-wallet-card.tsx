@@ -8,6 +8,7 @@ import {
   CreditCard,
   DollarSign,
   Loader2,
+  Plus,
   ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -268,8 +269,8 @@ export function UsdWalletCard({
                   : "bg-white text-black",
               )}
             >
-              <CreditCard className="h-4 w-4" strokeWidth={2.25} />
-              Fund USD
+        <Plus className="h-4 w-4 text-black" strokeWidth={2.5} />
+              Fund 
             </button>
             <button
               type="button"

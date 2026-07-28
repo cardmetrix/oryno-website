@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, Suspense, useCallback, useEffect, useState } from "react";
+import { FormEvent, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
@@ -75,6 +75,9 @@ function WalletPageContent() {
   const [accountNumber, setAccountNumber] = useState("");
   const [flash, setFlash] = useState<string | null>(null);
   const [bankError, setBankError] = useState<string | null>(null);
+  /** Mobile wallet pager: only one currency card is in view at a time */
+  const [walletView, setWalletView] = useState<"local" | "usd">("local");
+  const walletPagerRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async (opts?: { soft?: boolean }) => {
     if (!opts?.soft) setLoading(true);
@@ -285,98 +288,129 @@ function WalletPageContent() {
         <>
           <div className="-mx-4 sm:-mx-6 md:mx-0">
             <div
+              ref={walletPagerRef}
+              onScroll={(e) => {
+                const el = e.currentTarget;
+                // Desktop grid doesn't page — ignore
+                if (window.matchMedia("(min-width: 768px)").matches) return;
+                const idx = Math.round(el.scrollLeft / Math.max(el.clientWidth, 1));
+                setWalletView(idx >= 1 ? "usd" : "local");
+              }}
               className={cn(
-                "flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 [-ms-overflow-style:none] [scrollbar-width:none] sm:px-6 [&::-webkit-scrollbar]:hidden",
-                "md:grid md:grid-cols-2 md:gap-4 md:overflow-visible md:px-0 md:pb-0",
+                "flex snap-x snap-mandatory overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+                "md:grid md:grid-cols-2 md:gap-4 md:overflow-visible",
               )}
               style={{ WebkitOverflowScrolling: "touch" }}
             >
-              <MotionSection className="w-[min(88vw,22.5rem)] shrink-0 snap-center overflow-hidden rounded-[28px] border border-border bg-background shadow-[var(--shadow-soft)] sm:w-[min(80vw,26rem)] md:w-full md:min-w-0 md:shrink">
-                <div className="relative overflow-hidden bg-gradient-to-br from-[#ff8124] via-oryno-orange to-[#e85d00] px-5 py-5 text-white sm:px-6 sm:py-6">
-                  <div
-                    aria-hidden="true"
-                    className="pointer-events-none absolute -top-12 -right-10 h-40 w-40 rounded-full bg-white/15 blur-2xl"
-                  />
-                  <motion.div
-                    aria-hidden="true"
-                    animate={{ x: ["-30%", "130%"] }}
-                    transition={{
-                      duration: 4.8,
-                      repeat: Infinity,
-                      ease: "easeInOut",
-                      repeatDelay: 2,
-                    }}
-                    className="pointer-events-none absolute inset-y-0 w-1/3 skew-x-[-18deg] bg-gradient-to-r from-transparent via-white/25 to-transparent"
-                  />
+              {/* Local wallet — full-bleed slide on mobile */}
+              <MotionSection
+                className={cn(
+                  "w-full shrink-0 snap-start snap-always px-4 sm:px-6",
+                  "md:w-auto md:min-w-0 md:shrink md:snap-none md:px-0",
+                )}
+              >
+                <div className="overflow-hidden rounded-[28px] border border-border bg-background shadow-[var(--shadow-soft)]">
+                  <div className="relative overflow-hidden bg-gradient-to-br from-[#ff8124] via-oryno-orange to-[#e85d00] px-5 py-5 text-white sm:px-6 sm:py-6">
+                    <div
+                      aria-hidden="true"
+                      className="pointer-events-none absolute -top-12 -right-10 h-40 w-40 rounded-full bg-white/15 blur-2xl"
+                    />
+                    <motion.div
+                      aria-hidden="true"
+                      animate={{ x: ["-30%", "130%"] }}
+                      transition={{
+                        duration: 4.8,
+                        repeat: Infinity,
+                        ease: "easeInOut",
+                        repeatDelay: 2,
+                      }}
+                      className="pointer-events-none absolute inset-y-0 w-1/3 skew-x-[-18deg] bg-gradient-to-r from-transparent via-white/25 to-transparent"
+                    />
 
-                  <div className="relative flex items-start justify-between gap-3">
-                    <div>
-                      <p className="inline-flex items-center gap-1.5 text-[11px] font-bold tracking-[0.16em] text-white/80 uppercase">
-                        <Sparkles className="h-3.5 w-3.5 text-[#ffd29a]" />
-                        Primary · {currency}
-                      </p>
-                      <AnimatePresence mode="wait">
-                        <motion.p
-                          key={hidden ? "h" : data.primary.balanceFormatted}
-                          initial={{ opacity: 0, y: 8, filter: "blur(4px)" }}
-                          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                          exit={{ opacity: 0, y: -6 }}
-                          className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl"
+                    <div className="relative flex items-start justify-between gap-3">
+                      <div>
+                        <p className="inline-flex items-center gap-1.5 text-[11px] font-bold tracking-[0.16em] text-white/80 uppercase">
+                          <Sparkles className="h-3.5 w-3.5 text-[#ffd29a]" />
+                          Primary · {currency}
+                        </p>
+                        <AnimatePresence mode="wait">
+                          <motion.p
+                            key={hidden ? "h" : data.primary.balanceFormatted}
+                            initial={{ opacity: 0, y: 8, filter: "blur(4px)" }}
+                            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                            exit={{ opacity: 0, y: -6 }}
+                            className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl"
+                          >
+                            {hidden ? "••••••••" : data.primary.balanceFormatted}
+                          </motion.p>
+                        </AnimatePresence>
+                        <p className="mt-1.5 text-sm text-white/85">
+                          {data.user.fullName} · {data.user.countryCode} wallet
+                        </p>
+                      </div>
+
+                      <div className="flex flex-col items-end gap-2">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-black/20 px-2.5 py-1 text-[11px] font-bold text-[#ffd29a] ring-1 ring-white/20">
+                          <ShieldCheck className="h-3.5 w-3.5" />
+                          {data.primary.status === "healthy"
+                            ? "Protected"
+                            : data.primary.status}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setHidden((v) => !v)}
+                          className="flex h-9 w-9 items-center justify-center rounded-full bg-black/20 ring-1 ring-white/20"
+                          aria-label={hidden ? "Show balance" : "Hide balance"}
                         >
-                          {hidden ? "••••••••" : data.primary.balanceFormatted}
-                        </motion.p>
-                      </AnimatePresence>
-                      <p className="mt-1.5 text-sm text-white/85">
-                        {data.user.fullName} · {data.user.countryCode} wallet
-                      </p>
+                          {hidden ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </button>
+                      </div>
                     </div>
 
-                    <div className="flex flex-col items-end gap-2">
-                      <span className="inline-flex items-center gap-1 rounded-full bg-black/20 px-2.5 py-1 text-[11px] font-bold text-[#ffd29a] ring-1 ring-white/20">
-                        <ShieldCheck className="h-3.5 w-3.5" />
-                        {data.primary.status === "healthy"
-                          ? "Protected"
-                          : data.primary.status}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setHidden((v) => !v)}
-                        className="flex h-9 w-9 items-center justify-center rounded-full bg-black/20 ring-1 ring-white/20"
-                        aria-label={hidden ? "Show balance" : "Hide balance"}
+                    <div className="relative mt-5 grid grid-cols-2 gap-2.5">
+                      <motion.div
+                        whileHover={{ y: -2 }}
+                        whileTap={{ scale: 0.98 }}
                       >
-                        {hidden ? (
-                          <EyeOff className="h-4 w-4" />
-                        ) : (
-                          <Eye className="h-4 w-4" />
-                        )}
-                      </button>
+                        <Link
+                          href="/fund"
+                          className="flex h-[50px] items-center justify-center gap-2 rounded-[16px] bg-white font-bold text-black shadow-[0_10px_24px_rgba(0,0,0,0.12)]"
+                        >
+                          <Plus
+                            className="h-4 w-4 text-black"
+                            strokeWidth={2.5}
+                          />
+                          <span className="text-black">Fund</span>
+                        </Link>
+                      </motion.div>
+                      <motion.div
+                        whileHover={{ y: -2 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        <Link
+                          href="/withdraw"
+                          className="flex h-[50px] items-center justify-center gap-2 rounded-[16px] bg-black/25 font-bold text-white ring-1 ring-white/25 backdrop-blur-md"
+                        >
+                          <ArrowUpRight className="h-4 w-4" />
+                          Withdraw
+                        </Link>
+                      </motion.div>
                     </div>
-                  </div>
-
-                  <div className="relative mt-5 grid grid-cols-2 gap-2.5">
-                    <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }}>
-                      <Link
-                        href="/fund"
-                        className="flex h-[50px] items-center justify-center gap-2 rounded-[16px] bg-white font-bold text-black shadow-[0_10px_24px_rgba(0,0,0,0.12)]"
-                      >
-                        <Plus className="h-4 w-4 text-black" strokeWidth={2.5} />
-                        <span className="text-black">Fund</span>
-                      </Link>
-                    </motion.div>
-                    <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }}>
-                      <Link
-                        href="/withdraw"
-                        className="flex h-[50px] items-center justify-center gap-2 rounded-[16px] bg-black/25 font-bold text-white ring-1 ring-white/25 backdrop-blur-md"
-                      >
-                        <ArrowUpRight className="h-4 w-4" />
-                        Withdraw
-                      </Link>
-                    </motion.div>
                   </div>
                 </div>
               </MotionSection>
 
-              <div className="w-[min(88vw,22.5rem)] shrink-0 snap-center sm:w-[min(80vw,26rem)] md:w-full md:min-w-0 md:shrink">
+              {/* USD wallet — full-bleed slide on mobile */}
+              <div
+                className={cn(
+                  "w-full shrink-0 snap-start snap-always px-4 sm:px-6",
+                  "md:w-auto md:min-w-0 md:shrink md:snap-none md:px-0",
+                )}
+              >
                 <UsdWalletCard
                   usd={data.usd}
                   localCurrency={currency}
@@ -388,11 +422,59 @@ function WalletPageContent() {
                 />
               </div>
             </div>
-            <p className="mt-1 px-4 text-center text-[11px] text-muted-foreground sm:px-6 md:hidden">
-              Swipe for USD wallet
-            </p>
+
+            {/* Mobile pager hints */}
+            <div className="mt-2 flex flex-col items-center gap-2 px-4 md:hidden">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  aria-label="Show local wallet"
+                  onClick={() => {
+                    setWalletView("local");
+                    walletPagerRef.current?.scrollTo({
+                      left: 0,
+                      behavior: "smooth",
+                    });
+                  }}
+                  className={cn(
+                    "h-2 rounded-full transition-all",
+                    walletView === "local"
+                      ? "w-6 bg-primary"
+                      : "w-2 bg-muted-foreground/35",
+                  )}
+                />
+                <button
+                  type="button"
+                  aria-label="Show USD wallet"
+                  onClick={() => {
+                    setWalletView("usd");
+                    const el = walletPagerRef.current;
+                    if (el) {
+                      el.scrollTo({ left: el.clientWidth, behavior: "smooth" });
+                    }
+                  }}
+                  className={cn(
+                    "h-2 rounded-full transition-all",
+                    walletView === "usd"
+                      ? "w-6 bg-primary"
+                      : "w-2 bg-muted-foreground/35",
+                  )}
+                />
+              </div>
+              <p className="text-center text-[11px] text-muted-foreground">
+                {walletView === "local"
+                  ? "Swipe for USD wallet"
+                  : "Swipe for local wallet"}
+              </p>
+            </div>
           </div>
 
+          {/* Local-only sections — hidden on mobile while USD wallet is in view */}
+          <div
+            className={cn(
+              walletView === "usd" && "hidden md:contents",
+            )}
+          >
           <MotionSection delay={0.06} className="mt-4 grid grid-cols-3 gap-3">
             {[
               {
@@ -672,6 +754,7 @@ function WalletPageContent() {
               ))}
             </ol>
           </MotionSection>
+          </div>
 
           <MotionSection
             delay={0.14}
