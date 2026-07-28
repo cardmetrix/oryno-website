@@ -213,7 +213,7 @@ export default function BillsPage() {
         />
         <MotionSection className="rounded-2xl border border-border bg-background p-6 text-center shadow-[var(--shadow-soft)]">
           <Zap className="mx-auto h-10 w-10 text-primary" />
-          <h2 className="mt-4 text-lg font-bold">Nigeria bills via VTpass</h2>
+          <h2 className="mt-4 text-lg font-bold">Bill payments for Nigeria</h2>
           <p className="mt-2 text-sm text-muted-foreground">
             DSTV, GOtv, Startimes, Showmax and all electricity discos are
             available when your account country is Nigeria. Switch country in
@@ -232,7 +232,7 @@ export default function BillsPage() {
     <AppShell hideNav>
       <PageHeader
         title="Bill Payments"
-        subtitle="TV subscriptions & electricity · VTpass"
+        subtitle="TV subscriptions & electricity"
         backHref="/services"
       />
 

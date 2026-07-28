@@ -161,7 +161,7 @@ export default function EmailRentPage() {
     <AppShell hideNav>
       <PageHeader
         title="Rent Email"
-        subtitle="Temporary inboxes for OTP & sign-ups · HeroSMS"
+        subtitle="Temporary inboxes for OTP & sign-ups"
         backHref="/services"
       />
 
@@ -199,7 +199,7 @@ export default function EmailRentPage() {
                 {polling && !code ? (
                   <p className="inline-flex items-center gap-2 text-xs text-muted-foreground">
                     <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                    Checking HeroSMS inbox…
+                    Checking inbox for codes…
                   </p>
                 ) : null}
               </div>
@@ -324,7 +324,7 @@ export default function EmailRentPage() {
                 />
                 <div className="flex items-center gap-2 border-t border-border pt-3 font-semibold">
                   <Wallet className="h-4 w-4 text-primary" />
-                  Pay from wallet · HeroSMS
+                  Pay from wallet
                 </div>
               </div>
             </MotionSection>

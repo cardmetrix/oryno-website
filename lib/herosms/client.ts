@@ -192,29 +192,34 @@ async function emailFetch(
   init?: RequestInit,
 ) {
   const key = herosmsApiKey();
-  if (!key) throw new Error("HEROSMS_API_KEY is not configured");
+  if (!key) throw new Error("Email service is not configured");
 
-  // Email API docs use: Authorization: YOUR_SECRET_TOKEN (raw key)
-  const res = await fetch(`${herosmsEmailBaseUrl()}${path}`, {
-    ...init,
-    headers: {
-      Accept: "application/json",
-      Authorization: key,
-      ...(init?.body ? { "Content-Type": "application/json" } : {}),
-      ...(init?.headers ?? {}),
-    },
-    cache: "no-store",
-  });
+  // HeroSMS email REST accepts Authorization: ApiKey <token> (and some accounts use raw token).
+  const authStyles = [`ApiKey ${key}`, key] as const;
+  let lastError = "Failed to reach email service";
 
-  const json = (await res.json().catch(() => null)) as {
-    data?: unknown;
-    meta?: unknown;
-    title?: string;
-    details?: string | Record<string, unknown>;
-    message?: string;
-  } | null;
+  for (const authorization of authStyles) {
+    const res = await fetch(`${herosmsEmailBaseUrl()}${path}`, {
+      ...init,
+      headers: {
+        Accept: "application/json",
+        Authorization: authorization,
+        ...(init?.body ? { "Content-Type": "application/json" } : {}),
+        ...(init?.headers ?? {}),
+      },
+      cache: "no-store",
+    });
 
-  if (!res.ok) {
+    const json = (await res.json().catch(() => null)) as {
+      data?: unknown;
+      meta?: unknown;
+      title?: string;
+      details?: string | Record<string, unknown>;
+      message?: string;
+    } | null;
+
+    if (res.ok) return json;
+
     const details =
       typeof json?.details === "string"
         ? json.details
@@ -222,10 +227,19 @@ async function emailFetch(
           ? JSON.stringify(json.details)
           : null;
     const raw =
-      details || json?.message || json?.title || `HeroSMS email error (${res.status})`;
-    throw new Error(herosmsErrorToEnglish(raw));
+      details ||
+      json?.message ||
+      json?.title ||
+      `Email service error (${res.status})`;
+    lastError = herosmsErrorToEnglish(raw);
+
+    // Retry next auth style on auth / validation failures only
+    if (res.status !== 401 && res.status !== 403 && res.status !== 400) {
+      break;
+    }
   }
-  return json;
+
+  throw new Error(lastError);
 }
 
 export async function getHerosmsEmailDomains() {
@@ -269,7 +283,7 @@ export async function purchaseHerosmsEmail(input: {
       }>;
 
   const row = Array.isArray(data) ? data[0] : data;
-  if (!row?.email) throw new Error("No email returned from HeroSMS");
+  if (!row?.email) throw new Error("No email returned from the email service");
   return {
     emailId: String(row.id ?? ""),
     email: row.email,

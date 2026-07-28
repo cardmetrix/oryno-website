@@ -76,7 +76,7 @@ async function japPost(params: Record<string, string | number>) {
   try {
     json = JSON.parse(text);
   } catch {
-    throw new Error(text || `JAP error (${res.status})`);
+    throw new Error(text || `Boost service error (${res.status})`);
   }
 
   if (
@@ -89,7 +89,7 @@ async function japPost(params: Record<string, string | number>) {
   }
 
   if (!res.ok) {
-    throw new Error(`JAP error (${res.status})`);
+    throw new Error(`Boost service error (${res.status})`);
   }
 
   return json;
@@ -108,7 +108,7 @@ export async function getJapBalance() {
 
 export async function getJapServices(): Promise<JapService[]> {
   const json = await japPost({ action: "services" });
-  if (!Array.isArray(json)) throw new Error("Failed to load JAP services");
+  if (!Array.isArray(json)) throw new Error("Failed to load boost services");
 
   return json
     .map((row) => {
@@ -140,7 +140,7 @@ export async function addJapOrder(input: {
     quantity: input.quantity,
   })) as { order?: number | string };
 
-  if (json.order == null) throw new Error("No order id returned from JAP");
+  if (json.order == null) throw new Error("No order id returned");
   return { orderId: String(json.order) };
 }
 

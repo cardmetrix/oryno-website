@@ -202,7 +202,7 @@ export default function VirtualNumbersPage() {
     <AppShell hideNav>
       <PageHeader
         title="Virtual Numbers"
-        subtitle="SMS verification numbers · HeroSMS"
+        subtitle="SMS verification numbers"
         backHref="/services"
       />
 
@@ -236,7 +236,7 @@ export default function VirtualNumbersPage() {
                 {polling && !smsCode ? (
                   <p className="inline-flex items-center gap-2 text-xs text-muted-foreground">
                     <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                    Polling HeroSMS for the OTP…
+                    Waiting for the OTP…
                   </p>
                 ) : null}
               </div>
@@ -429,7 +429,7 @@ export default function VirtualNumbersPage() {
                 />
                 <div className="flex items-center gap-2 border-t border-border pt-3 font-semibold">
                   <Wallet className="h-4 w-4 text-primary" />
-                  Pay from wallet · HeroSMS
+                  Pay from wallet
                 </div>
               </div>
             </MotionSection>

@@ -83,8 +83,8 @@ export async function POST(req: Request) {
       wallet: result.wallet,
       amountFormatted,
       message: result.simulated
-        ? "Demo boost placed — add JAP_API_KEY for live orders"
-        : "Boost ordered via JustAnotherPanel",
+        ? "Demo boost placed — add your API key for live orders"
+        : "Boost ordered successfully",
     });
   } catch (error) {
     console.error("[jap-purchase]", error);

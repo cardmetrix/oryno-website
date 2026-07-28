@@ -166,7 +166,7 @@ async function ensureSocialPackage(input: {
       metric: input.metric.slice(0, 40),
       quantity: qtyLabel.slice(0, 40),
       price: input.price.toFixed(2),
-      delivery: "Provider ETA",
+      delivery: "Starts after order",
       popular: false,
       active: true,
     })
@@ -251,7 +251,7 @@ export async function purchaseJapBoost(input: {
         profileUrl: link.slice(0, 2000),
         amount: chargeAmount.toFixed(2),
         status: "processing",
-        deliveryEta: "Provider ETA",
+        deliveryEta: "Starts after order",
         transactionId: debit.transaction.id,
         providerRef: orderId.slice(0, 120),
       })

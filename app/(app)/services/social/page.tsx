@@ -58,7 +58,6 @@ export default function SocialBoostPage() {
   const [profileUrl, setProfileUrl] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [demo, setDemo] = useState(false);
 
   const [success, setSuccess] = useState(false);
   const [orderId, setOrderId] = useState("");
@@ -78,7 +77,6 @@ export default function SocialBoostPage() {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Failed to load services");
         if (cancelled) return;
-        setDemo(Boolean(data.demo));
         setPlatforms(data.platforms ?? ["All"]);
         const list: JapServiceRow[] = data.services ?? [];
         setServices(list);
@@ -218,11 +216,7 @@ export default function SocialBoostPage() {
     <AppShell hideNav>
       <PageHeader
         title="Social Boosting"
-        subtitle={
-          demo
-            ? "Grow followers, likes, views · Demo mode"
-            : "Grow followers, likes, views · JustAnotherPanel"
-        }
+        subtitle="Grow followers, likes, views"
         backHref="/services"
       />
 
@@ -296,7 +290,7 @@ export default function SocialBoostPage() {
                     Choose platform
                   </h2>
                   <p className="text-sm text-muted-foreground">
-                    Live services from JustAnotherPanel
+                    Live boost packages for your country
                   </p>
                 </div>
               </div>
@@ -515,7 +509,7 @@ export default function SocialBoostPage() {
                 <div className="flex items-center justify-between border-t border-border pt-3">
                   <span className="inline-flex items-center gap-2 font-semibold text-foreground">
                     <Wallet className="h-4 w-4 text-primary" />
-                    Pay from wallet · JAP
+                      Pay from wallet
                   </span>
                 </div>
               </div>

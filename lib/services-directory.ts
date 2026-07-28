@@ -47,7 +47,7 @@ export const servicesDirectory: ServiceDirectoryItem[] = [
     label: "Airtime",
     shortDescription: "Top up any network instantly",
     longDescription:
-      "Buy local airtime in Nigeria (MTN, Airtel, Glo, 9mobile) or international top-ups for your country via VTpass.",
+      "Buy local airtime in Nigeria (MTN, Airtel, Glo, 9mobile) or international top-ups for your country.",
     category: "Telecom",
     tags: ["MTN", "Airtel", "Glo", "9mobile", "International"],
     eta: "Instant",
@@ -62,14 +62,14 @@ export const servicesDirectory: ServiceDirectoryItem[] = [
     label: "Data Bundles",
     shortDescription: "Daily, weekly & monthly plans",
     longDescription:
-      "Live VTpass plans for MTN, Airtel, Glo, 9mobile, Smile, Spectranet and SME — or international data for your country.",
+      "Live plans for MTN, Airtel, Glo, 9mobile, Smile, Spectranet and SME — or international data for your country.",
     category: "Telecom",
     tags: ["MTN", "Airtel", "Glo", "Smile", "SME"],
     eta: "Instant",
     accent: "#FF8C42",
     popular: true,
     icon: Wifi,
-    stats: "All VTpass plans",
+    stats: "All networks",
   },
   {
     id: "bills",
@@ -80,7 +80,7 @@ export const servicesDirectory: ServiceDirectoryItem[] = [
       .filter((p) => p.category === "TV")
       .slice(0, 3)
       .map((p) => p.name)
-      .join(", ")} plus all electricity discos with wallet balance via VTpass.`,
+      .join(", ")} plus all electricity discos with wallet balance.`,
     category: "Utilities",
     tags: ["DStv", "GOtv", "IKEDC", "EKEDC"],
     eta: "1–3 mins",
@@ -95,14 +95,14 @@ export const servicesDirectory: ServiceDirectoryItem[] = [
     label: "Social Boost",
     shortDescription: "Followers, likes & views",
     longDescription:
-      "Grow Instagram, TikTok, YouTube and more via JustAnotherPanel — live services, wallet checkout, and order tracking.",
+      "Grow Instagram, TikTok, YouTube and more — live packages, wallet checkout, and order tracking.",
     category: "Lifestyle",
-    tags: ["Instagram", "TikTok", "YouTube", "JAP"],
-    eta: "Provider ETA",
+    tags: ["Instagram", "TikTok", "YouTube"],
+    eta: "Starts soon after order",
     accent: "#C44D00",
     popular: true,
     icon: TrendingUp,
-    stats: `Live JAP catalog`,
+    stats: "Live catalog",
   },
   {
     id: "virtual-numbers",
@@ -124,9 +124,9 @@ export const servicesDirectory: ServiceDirectoryItem[] = [
     label: "Rent Email",
     shortDescription: "Temporary inboxes for OTP",
     longDescription:
-      "Rent HeroSMS temporary emails for sign-ups and verification — pick a duration and grab codes from your inbox.",
+      "Rent temporary emails for sign-ups and verification — pick a domain and grab codes from your inbox.",
     category: "Lifestyle",
-    tags: ["Rent", "OTP", "HeroSMS"],
+    tags: ["Rent", "OTP", "Inbox"],
     eta: "Instant inbox",
     accent: "#7A2E00",
     popular: true,

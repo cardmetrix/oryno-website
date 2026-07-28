@@ -18,12 +18,28 @@ export async function GET() {
     }
 
     const currency = currencyForCountry(user.countryCode);
-    const domains = isHerosmsDemoMode()
-      ? FALLBACK_EMAIL_DOMAINS
-      : await getHerosmsEmailDomains();
+
+    let domains = FALLBACK_EMAIL_DOMAINS;
+    let demo = isHerosmsDemoMode();
+
+    if (!demo) {
+      try {
+        const live = await getHerosmsEmailDomains();
+        if (live.length) {
+          domains = live;
+        } else {
+          demo = true;
+        }
+      } catch (error) {
+        // Never fail the page — serve fallback domains so rent email stays usable.
+        console.error("[herosms-email-domains] live failed, using fallback", error);
+        demo = true;
+        domains = FALLBACK_EMAIL_DOMAINS;
+      }
+    }
 
     const list = [];
-    for (const d of domains.length ? domains : FALLBACK_EMAIL_DOMAINS) {
+    for (const d of domains) {
       const costUsd = Number(d.cost) || 0.1;
       const { local } = await usdToLocalPrice(costUsd, user.countryCode);
       list.push({
@@ -37,7 +53,7 @@ export async function GET() {
 
     return NextResponse.json({
       ok: true,
-      demo: isHerosmsDemoMode(),
+      demo,
       domains: list,
     });
   } catch (error) {

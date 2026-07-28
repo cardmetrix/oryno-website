@@ -41,11 +41,11 @@ export const SERVICE_INSTRUCTIONS: Record<
   bills: {
     subtitle: "Follow these steps to pay TV or electricity bills",
     steps: [
-      "Bill payments currently run on VTpass for Nigeria accounts.",
+      "Bill payments are available for Nigeria accounts.",
       "Choose TV or electricity, then pick your provider (e.g. DStv, IKEDC).",
       "Enter your smartcard / meter number and verify the customer name.",
       "Select a package or amount, then pay from your wallet.",
-      "Keep the receipt from History in case the provider needs a reference.",
+      "Keep the receipt from History in case you need a reference.",
     ],
   },
   social: {
@@ -53,7 +53,7 @@ export const SERVICE_INSTRUCTIONS: Record<
     steps: [
       "Fund your wallet — boosts are paid from your ORYNO balance.",
       "Choose a platform (Instagram, TikTok, YouTube, and more).",
-      "Search and pick a JustAnotherPanel service, then set quantity (within min–max).",
+      "Search and pick a service, then set quantity (within min–max).",
       "Paste your public profile or post link exactly as shown on the app.",
       "Confirm and pay — track status on the success screen; keep the account public while processing.",
     ],
@@ -65,7 +65,7 @@ export const SERVICE_INSTRUCTIONS: Record<
       "Select the service you need the number for (Telegram, WhatsApp, etc.).",
       "Pick a country with stock available (flags show each market).",
       "Pay from your wallet to reserve the number, then copy it into the app.",
-      "Stay on the page — the SMS code appears here when HeroSMS receives it.",
+      "Stay on the page — the SMS code appears here when it arrives.",
     ],
   },
   emails: {
