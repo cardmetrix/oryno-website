@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useCallback, useEffect, useRef, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -62,84 +62,89 @@ export default function TransactionReceiptPage({
     };
   }, [id]);
 
-  const shareText = useCallback(() => {
-    if (!tx) return "";
-    return [
-      "ORYNO Transaction Receipt",
-      `${tx.title} · ${tx.amount}`,
-      `Status: ${tx.status}`,
-      `Ref: ${tx.reference}`,
-      `Date: ${tx.createdAtFormatted}`,
-      tx.subtitle ? `Details: ${tx.subtitle}` : null,
-    ]
-      .filter(Boolean)
-      .join("\n");
-  }, [tx]);
+  async function buildReceiptImage() {
+    if (!tx) throw new Error("No transaction");
+    const canvas = await renderReceiptCanvas(tx);
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/png"),
+    );
+    if (!blob) throw new Error("Could not create image");
+    const filename = `oryno-receipt-${tx.reference}.png`;
+    const file = new File([blob], filename, { type: "image/png" });
+    return { blob, file, filename };
+  }
 
   async function onShare() {
     if (!tx) return;
     setSharing(true);
     try {
-      const text = shareText();
-      if (navigator.share) {
+      const { blob, file, filename } = await buildReceiptImage();
+
+      // Prefer native image share (WhatsApp, Messages, etc.)
+      if (
+        typeof navigator.share === "function" &&
+        typeof navigator.canShare === "function" &&
+        navigator.canShare({ files: [file] })
+      ) {
         await navigator.share({
+          files: [file],
           title: "ORYNO Receipt",
-          text,
+          text: `${tx.title} · ${tx.amount}`,
         });
-      } else {
-        await navigator.clipboard.writeText(text);
-        toast.success("Receipt copied", {
-          description: "Share text is on your clipboard.",
-        });
+        return;
       }
+
+      if (typeof navigator.share === "function") {
+        // Some browsers support share but not files — try file share anyway
+        try {
+          await navigator.share({
+            files: [file],
+            title: "ORYNO Receipt",
+            text: `${tx.title} · ${tx.amount}`,
+          });
+          return;
+        } catch (err) {
+          if (err instanceof Error && err.name === "AbortError") return;
+          // fall through to download
+        }
+      }
+
+      // Fallback: download the image so the user can share it manually
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast.success("Receipt image ready", {
+        description: "Image saved — share it from your gallery.",
+      });
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") return;
-      try {
-        await navigator.clipboard.writeText(shareText());
-        toast.success("Receipt copied");
-      } catch {
-        toast.error("Couldn’t share receipt");
-      }
+      toast.error("Couldn’t share receipt image");
     } finally {
       setSharing(false);
     }
   }
 
   async function onDownload() {
-    if (!tx || !receiptRef.current) return;
+    if (!tx) return;
     setDownloading(true);
     try {
-      const canvas = await renderReceiptCanvas(tx);
-      const blob = await new Promise<Blob | null>((resolve) =>
-        canvas.toBlob(resolve, "image/png"),
-      );
-      if (!blob) throw new Error("Could not create image");
-
+      const { blob, filename } = await buildReceiptImage();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `oryno-receipt-${tx.reference}.png`;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
       toast.success("Receipt downloaded");
     } catch {
-      // Fallback: download a simple text receipt
-      try {
-        const blob = new Blob([shareText()], { type: "text/plain" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `oryno-receipt-${tx.reference}.txt`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(url);
-        toast.success("Receipt downloaded");
-      } catch {
-        toast.error("Couldn’t download receipt");
-      }
+      toast.error("Couldn’t download receipt");
     } finally {
       setDownloading(false);
     }

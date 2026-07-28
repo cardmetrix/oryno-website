@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  ArrowRight,
   Mail,
   Phone,
   Search,
@@ -190,7 +189,7 @@ export default function ServicesPage() {
                   key={`${category}-${query}`}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
+                  className="grid grid-cols-3 gap-3 sm:grid-cols-4 sm:gap-4 lg:grid-cols-5"
                 >
                   {visible.map((item, index) => (
                     <ServiceCard key={item.id} item={item} index={index} />
@@ -218,80 +217,48 @@ function ServiceCard({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 14 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: Math.min(index * 0.04, 0.28), duration: 0.35 }}
-      whileHover={{ y: -4 }}
+      initial={{ opacity: 0, y: 16, scale: 0.94 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{
+        delay: Math.min(index * 0.045, 0.35),
+        duration: 0.4,
+        ease: [0.22, 1, 0.36, 1],
+      }}
+      whileHover={{ y: -4, scale: 1.02 }}
+      whileTap={{ scale: 0.97 }}
       className="h-full"
     >
       <Link
         href={item.href}
-        className="group relative flex h-full flex-col overflow-hidden rounded-[28px] border border-border bg-background p-4 shadow-[var(--shadow-soft)] transition hover:border-primary/25 hover:shadow-[0_18px_40px_rgba(255,106,0,0.12)] sm:p-5"
+        className="group relative flex h-full flex-col items-center justify-center gap-3 overflow-hidden rounded-[22px] border border-border bg-background px-3 py-5 text-center shadow-[var(--shadow-soft)] transition hover:border-primary/30 hover:shadow-[0_14px_32px_rgba(255,106,0,0.14)] sm:rounded-[24px] sm:px-4 sm:py-6"
       >
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute -top-12 -right-10 h-32 w-32 rounded-full opacity-30 blur-2xl transition group-hover:opacity-50"
-          style={{ background: item.accent }}
+          className="pointer-events-none absolute inset-0 opacity-0 transition duration-300 group-hover:opacity-100"
+          style={{
+            background: `radial-gradient(circle at 50% 0%, ${item.accent}22, transparent 65%)`,
+          }}
         />
 
-        <div className="relative flex items-start justify-between gap-3">
-          <span
-            className="flex h-14 w-14 items-center justify-center rounded-2xl text-white shadow-[0_10px_24px_rgba(0,0,0,0.18)] ring-1 ring-white/20"
-            style={{
-              background: `linear-gradient(145deg, ${item.accent}, #e85d00)`,
-            }}
-          >
-            <Icon className="h-6 w-6" strokeWidth={1.75} />
-          </span>
-
-          <div className="flex flex-col items-end gap-1.5">
-            {item.soon ? (
-              <span className="rounded-full bg-oryno-orange-muted px-2.5 py-1 text-[10px] font-bold text-primary">
-                Soon
-              </span>
-            ) : item.popular ? (
-              <span className="rounded-full bg-oryno-charcoal px-2.5 py-1 text-[10px] font-bold text-white">
-                Popular
-              </span>
-            ) : null}
-            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-              {item.eta}
+        <motion.span
+          className="relative flex h-14 w-14 items-center justify-center rounded-2xl text-white shadow-[0_10px_22px_rgba(0,0,0,0.16)] ring-1 ring-white/20 sm:h-16 sm:w-16"
+          style={{
+            background: `linear-gradient(145deg, ${item.accent}, #e85d00)`,
+          }}
+          whileHover={{ rotate: [-2, 2, 0] }}
+          transition={{ duration: 0.45 }}
+        >
+          <Icon className="h-6 w-6 sm:h-7 sm:w-7" strokeWidth={1.75} />
+          {item.soon ? (
+            <span className="absolute -top-1.5 -right-1.5 rounded-full bg-oryno-charcoal px-1.5 py-0.5 text-[8px] font-bold tracking-wide text-white uppercase">
+              Soon
             </span>
-          </div>
-        </div>
+          ) : null}
+        </motion.span>
 
-        <div className="relative mt-4 flex-1">
-          <p className="text-base font-bold tracking-tight text-foreground">
-            {item.label}
-          </p>
-          <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-            {item.shortDescription}
-          </p>
-          <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-muted-foreground/90">
-            {item.longDescription}
-          </p>
-        </div>
-
-        <div className="relative mt-4 flex flex-wrap gap-1.5">
-          {item.tags.slice(0, 3).map((tag) => (
-            <span
-              key={tag}
-              className="rounded-full bg-muted px-2 py-1 text-[10px] font-semibold text-muted-foreground"
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
-
-        <div className="relative mt-4 flex items-center justify-between border-t border-border/80 pt-3">
-          <span className="text-xs font-semibold text-foreground">
-            {item.stats ?? item.category}
-          </span>
-          <span className="inline-flex items-center gap-1 text-xs font-bold text-primary transition group-hover:gap-1.5">
-            Open
-            <ArrowRight className="h-3.5 w-3.5" />
-          </span>
-        </div>
+        <p className="relative text-[13px] leading-tight font-bold tracking-tight text-foreground sm:text-sm">
+          {item.label}
+        </p>
       </Link>
     </motion.div>
   );
