@@ -14,6 +14,7 @@ import {
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
+import { ErrorAlertModal } from "@/components/app/error-alert-modal";
 import { ServiceInstructions } from "@/components/app/service-instructions";
 import { useCountry } from "@/components/providers/country-provider";
 import { formatCountryMoney } from "@/lib/country";
@@ -517,12 +518,6 @@ export default function SocialBoostPage() {
 
             <ServiceInstructions service="social" delay={0.14} />
 
-            {error ? (
-              <p className="rounded-[14px] bg-red-50 px-4 py-3 text-sm text-red-600">
-                {error}
-              </p>
-            ) : null}
-
             <MotionSection delay={0.18}>
               <motion.button
                 type="submit"
@@ -541,6 +536,12 @@ export default function SocialBoostPage() {
           </form>
         )}
       </AnimatePresence>
+
+      <ErrorAlertModal
+        error={error}
+        onClose={() => setError(null)}
+        page="Social Boost"
+      />
     </AppShell>
   );
 }

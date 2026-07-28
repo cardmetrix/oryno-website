@@ -6,6 +6,7 @@ import { CheckCircle2, Gift, Smartphone, Wallet } from "lucide-react";
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
+import { ErrorAlertModal } from "@/components/app/error-alert-modal";
 import { ServiceInstructions } from "@/components/app/service-instructions";
 import {
   VtpassServicePicker,
@@ -432,12 +433,6 @@ export default function AirtimePage() {
 
             <ServiceInstructions service="airtime" delay={0.12} />
 
-            {error ? (
-              <p className="rounded-[14px] bg-red-50 px-4 py-3 text-sm text-red-600">
-                {error}
-              </p>
-            ) : null}
-
             <motion.button
               type="submit"
               disabled={!canSubmit}
@@ -451,6 +446,12 @@ export default function AirtimePage() {
           </form>
         )}
       </AnimatePresence>
+
+      <ErrorAlertModal
+        error={error}
+        onClose={() => setError(null)}
+        page="Buy Airtime"
+      />
     </AppShell>
   );
 }

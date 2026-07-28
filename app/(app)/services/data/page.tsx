@@ -6,6 +6,7 @@ import { CheckCircle2, Wallet, Wifi } from "lucide-react";
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
+import { ErrorAlertModal } from "@/components/app/error-alert-modal";
 import { ServiceInstructions } from "@/components/app/service-instructions";
 import {
   VtpassServicePicker,
@@ -383,12 +384,6 @@ export default function DataPage() {
 
             <ServiceInstructions service="data" delay={0.12} />
 
-            {error ? (
-              <p className="rounded-[14px] bg-red-50 px-4 py-3 text-sm text-red-600">
-                {error}
-              </p>
-            ) : null}
-
             <motion.button
               type="submit"
               disabled={!canSubmit}
@@ -404,6 +399,12 @@ export default function DataPage() {
           </form>
         )}
       </AnimatePresence>
+
+      <ErrorAlertModal
+        error={error}
+        onClose={() => setError(null)}
+        page="Buy Data"
+      />
     </AppShell>
   );
 }

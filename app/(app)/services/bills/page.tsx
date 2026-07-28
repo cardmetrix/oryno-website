@@ -12,6 +12,7 @@ import {
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
+import { ErrorAlertModal } from "@/components/app/error-alert-modal";
 import { ServiceInstructions } from "@/components/app/service-instructions";
 import {
   VtpassServicePicker,
@@ -44,7 +45,6 @@ export default function BillsPage() {
   const [loadingPlans, setLoadingPlans] = useState(false);
   const [variationCode, setVariationCode] = useState("");
   const [customerRef, setCustomerRef] = useState("");
-  const [phone, setPhone] = useState("");
   const [amount, setAmount] = useState("2000");
   const [verifying, setVerifying] = useState(false);
   const [customerName, setCustomerName] = useState<string | null>(null);
@@ -184,7 +184,6 @@ export default function BillsPage() {
           serviceName: selectedService.name,
           category,
           customerRef: customerRef.trim(),
-          phone,
           amount: amountNumber,
           variationCode,
         }),
@@ -366,16 +365,7 @@ export default function BillsPage() {
                 </p>
               ) : null}
 
-              <label className="mt-4 mb-2 block text-sm font-medium">
-                Phone (for receipt)
-              </label>
-              <input
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="0803 000 0000"
-                className="h-12 w-full rounded-[14px] border border-border bg-background px-4 text-sm outline-none focus:border-primary"
-              />
+           
             </MotionSection>
 
             <MotionSection
@@ -471,12 +461,6 @@ export default function BillsPage() {
 
             <ServiceInstructions service="bills" delay={0.12} />
 
-            {error ? (
-              <p className="rounded-[14px] bg-red-50 px-4 py-3 text-sm text-red-600">
-                {error}
-              </p>
-            ) : null}
-
             <motion.button
               type="submit"
               disabled={!canSubmit}
@@ -490,6 +474,12 @@ export default function BillsPage() {
           </form>
         )}
       </AnimatePresence>
+
+      <ErrorAlertModal
+        error={error}
+        onClose={() => setError(null)}
+        page="Bill Payments"
+      />
     </AppShell>
   );
 }

@@ -13,6 +13,7 @@ import {
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
+import { ErrorAlertModal } from "@/components/app/error-alert-modal";
 import { ServiceInstructions } from "@/components/app/service-instructions";
 import { useCountry } from "@/components/providers/country-provider";
 import { formatCountryMoney } from "@/lib/country";
@@ -335,12 +336,6 @@ export default function EmailRentPage() {
               className="mb-20 sm:mb-0"
             />
 
-            {error ? (
-              <p className="rounded-[14px] bg-red-50 px-4 py-3 text-sm text-red-600">
-                {error}
-              </p>
-            ) : null}
-
             <div className="hidden sm:block">
               <motion.button
                 type="submit"
@@ -372,6 +367,12 @@ export default function EmailRentPage() {
           </form>
         )}
       </AnimatePresence>
+
+      <ErrorAlertModal
+        error={error}
+        onClose={() => setError(null)}
+        page="Rent Email"
+      />
     </AppShell>
   );
 }
