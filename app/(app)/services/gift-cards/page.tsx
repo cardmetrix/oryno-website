@@ -25,6 +25,7 @@ import { ErrorAlertModal } from "@/components/app/error-alert-modal";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
 import { ServiceInstructions } from "@/components/app/service-instructions";
+import { giftCardImageFallbacks } from "@/lib/sogo/catalog";
 import { cn } from "@/lib/utils";
 
 type Brand = {
@@ -68,10 +69,52 @@ const SUB_TYPES = [
 ];
 
 function brandImageSrc(brand: Pick<Brand, "slug" | "image">) {
-  if (brand.image?.endsWith(".png") || brand.image?.endsWith(".svg")) {
-    return brand.image;
-  }
-  return `/gift-cards/${brand.slug}.svg`;
+  if (brand.image && /^https?:\/\//i.test(brand.image)) return brand.image;
+  if (brand.image?.startsWith("/")) return brand.image;
+  return giftCardImageFallbacks(brand.slug)[0];
+}
+
+function BrandLogo({
+  brand,
+  className,
+  size = 44,
+}: {
+  brand: Pick<Brand, "slug" | "image" | "name">;
+  className?: string;
+  size?: number;
+}) {
+  const chain = [
+    brandImageSrc(brand),
+    ...giftCardImageFallbacks(brand.slug).filter(
+      (u) => u !== brandImageSrc(brand),
+    ),
+  ];
+  const [idx, setIdx] = useState(0);
+  const src = chain[Math.min(idx, chain.length - 1)];
+  const remote = /^https?:\/\//i.test(src);
+
+  return (
+    <div
+      className={cn(
+        "relative shrink-0 overflow-hidden rounded-2xl bg-white ring-1 ring-border",
+        className,
+      )}
+      style={{ width: size, height: size }}
+    >
+      <Image
+        key={src}
+        src={src}
+        alt={brand.name}
+        fill
+        sizes={`${size}px`}
+        className="object-contain p-1.5"
+        unoptimized={remote || src.endsWith(".svg")}
+        onError={() => {
+          setIdx((i) => (i + 1 < chain.length ? i + 1 : i));
+        }}
+      />
+    </div>
+  );
 }
 
 /** Deterministic 24h-style change for UI (until provider exposes history). */
@@ -383,16 +426,8 @@ export default function GiftCardsPage() {
             </button>
 
             <MotionSection className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6">
-              <div className="flex items-center gap-3">
-                <div className="relative h-14 w-14 overflow-hidden rounded-2xl bg-muted ring-1 ring-border">
-                  <Image
-                    src={brandImageSrc(selected)}
-                    alt=""
-                    fill
-                    className="object-cover"
-                    unoptimized={brandImageSrc(selected).endsWith(".svg")}
-                  />
-                </div>
+                <div className="flex items-center gap-3">
+                <BrandLogo brand={selected} size={56} />
                 <div className="min-w-0 flex-1">
                   <h2 className="truncate text-base font-semibold text-foreground">
                     Sell {selected.name}
@@ -687,18 +722,7 @@ export default function GiftCardsPage() {
                           onClick={() => setSelected(brand)}
                           className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition sm:px-5"
                         >
-                          <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-2xl bg-muted ring-1 ring-border">
-                            <Image
-                              src={brandImageSrc(brand)}
-                              alt=""
-                              fill
-                              sizes="44px"
-                              className="object-cover"
-                              unoptimized={brandImageSrc(brand).endsWith(
-                                ".svg",
-                              )}
-                            />
-                          </div>
+                          <BrandLogo brand={brand} size={44} />
 
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-semibold text-foreground">

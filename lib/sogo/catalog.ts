@@ -1,7 +1,46 @@
 import type { GiftCardBrandView, SogoCatalogBrand } from "./types";
 
-/** Local gift-card art under /public/gift-cards */
-const PNG_BRANDS = new Set([
+/** Domains used for open logo APIs (Clearbit / DuckDuckGo / Google). */
+export const BRAND_LOGO_DOMAINS: Record<string, string> = {
+  amazon: "amazon.com",
+  apple: "apple.com",
+  itunes: "apple.com",
+  "google-play": "play.google.com",
+  googleplay: "google.com",
+  steam: "steampowered.com",
+  playstation: "playstation.com",
+  xbox: "xbox.com",
+  roblox: "roblox.com",
+  "razer-gold": "razer.com",
+  razergold: "razer.com",
+  netflix: "netflix.com",
+  spotify: "spotify.com",
+  sephora: "sephora.com",
+  nike: "nike.com",
+  walmart: "walmart.com",
+  target: "target.com",
+  "best-buy": "bestbuy.com",
+  bestbuy: "bestbuy.com",
+  ebay: "ebay.com",
+  gamestop: "gamestop.com",
+  "foot-locker": "footlocker.com",
+  footlocker: "footlocker.com",
+  nordstrom: "nordstrom.com",
+  macys: "macys.com",
+  lululemon: "lululemon.com",
+  offgamers: "offgamers.com",
+  visa: "visa.com",
+  amex: "americanexpress.com",
+  vanilla: "vanillagift.com",
+  "green-dot": "greendot.com",
+  greendot: "greendot.com",
+  netspend: "netspend.com",
+  "dicks-sporting": "dickssportinggoods.com",
+  dickssportinggoods: "dickssportinggoods.com",
+};
+
+/** Local fallback art under /public/gift-cards */
+const LOCAL_PNG = new Set([
   "amazon",
   "apple",
   "google-play",
@@ -12,10 +51,62 @@ const PNG_BRANDS = new Set([
   "spotify",
 ]);
 
-export function giftCardImagePath(slug: string) {
+export function brandDomain(slug: string) {
   const key = slug.toLowerCase();
-  if (PNG_BRANDS.has(key)) return `/gift-cards/${key}.png`;
-  return `/gift-cards/${key}.svg`;
+  if (BRAND_LOGO_DOMAINS[key]) return BRAND_LOGO_DOMAINS[key];
+  return `${key.replace(/[^a-z0-9-]/g, "")}.com`;
+}
+
+/**
+ * Prefer provider OpenAPI image fields, then open logo APIs, then local art.
+ * Open APIs: Clearbit Logo API (public).
+ */
+export function giftCardImagePath(slug: string, providerImage?: string | null) {
+  if (providerImage && /^https?:\/\//i.test(providerImage)) {
+    return providerImage;
+  }
+  const domain = brandDomain(slug);
+  return `https://logo.clearbit.com/${domain}?size=128`;
+}
+
+export function giftCardImageFallbacks(slug: string) {
+  const domain = brandDomain(slug);
+  const local = LOCAL_PNG.has(slug.toLowerCase())
+    ? `/gift-cards/${slug.toLowerCase()}.png`
+    : `/gift-cards/${slug.toLowerCase()}.svg`;
+  return [
+    `https://logo.clearbit.com/${domain}?size=128`,
+    `https://icons.duckduckgo.com/ip3/${domain}.ico`,
+    `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`,
+    local,
+  ];
+}
+
+/** Pick image URL from raw OpenAPI / provider catalog objects. */
+export function pickProviderImage(
+  raw: Record<string, unknown> | null | undefined,
+) {
+  if (!raw) return null;
+  const keys = [
+    "image",
+    "image_url",
+    "imageUrl",
+    "logo",
+    "logo_url",
+    "logoUrl",
+    "icon",
+    "icon_url",
+    "iconUrl",
+    "thumbnail",
+    "thumbnail_url",
+  ];
+  for (const key of keys) {
+    const v = raw[key];
+    if (typeof v === "string" && /^https?:\/\//i.test(v.trim())) {
+      return v.trim();
+    }
+  }
+  return null;
 }
 
 const CATEGORY_BY_SLUG: Record<string, string> = {
@@ -68,45 +159,6 @@ export function categoryForSlug(slug: string, name?: string) {
     return "Fashion";
   return "Shopping";
 }
-
-/** Domains used to fetch brand logos when generating local art */
-export const BRAND_LOGO_DOMAINS: Record<string, string> = {
-  amazon: "amazon.com",
-  apple: "apple.com",
-  itunes: "apple.com",
-  "google-play": "play.google.com",
-  googleplay: "google.com",
-  steam: "steampowered.com",
-  playstation: "playstation.com",
-  xbox: "xbox.com",
-  roblox: "roblox.com",
-  "razer-gold": "razer.com",
-  razergold: "razer.com",
-  netflix: "netflix.com",
-  spotify: "spotify.com",
-  sephora: "sephora.com",
-  nike: "nike.com",
-  walmart: "walmart.com",
-  target: "target.com",
-  "best-buy": "bestbuy.com",
-  bestbuy: "bestbuy.com",
-  ebay: "ebay.com",
-  gamestop: "gamestop.com",
-  "foot-locker": "footlocker.com",
-  footlocker: "footlocker.com",
-  nordstrom: "nordstrom.com",
-  macys: "macys.com",
-  lululemon: "lululemon.com",
-  offgamers: "offgamers.com",
-  visa: "visa.com",
-  amex: "americanexpress.com",
-  vanilla: "vanillagift.com",
-  "green-dot": "greendot.com",
-  greendot: "greendot.com",
-  netspend: "netspend.com",
-  "dicks-sporting": "dickssportinggoods.com",
-  dickssportinggoods: "dickssportinggoods.com",
-};
 
 /**
  * Static fallback catalogue when SOGO_SECRET_KEY is missing (demo mode)
@@ -339,7 +391,7 @@ export const FALLBACK_GIFT_CARD_CATALOG: SogoCatalogBrand[] = [
   },
 ];
 
-/** Demo NGN rates per $1 face value (ecode). Physical slightly lower. */
+/** Demo NGN rates per $1 face value (ecode). */
 export const FALLBACK_DEMO_RATES_NGN: Record<string, number> = {
   amazon: 1634,
   apple: 1580,
@@ -371,13 +423,37 @@ export const FALLBACK_DEMO_RATES_NGN: Record<string, number> = {
   "dicks-sporting": 1400,
 };
 
+export function normalizeCatalogBrand(
+  raw: SogoCatalogBrand | Record<string, unknown>,
+): SogoCatalogBrand {
+  const row = raw as Record<string, unknown>;
+  const slug = String(row.slug || "").toLowerCase();
+  const providerImage = pickProviderImage(row);
+  return {
+    slug,
+    name: String(row.name || slug),
+    currencies: Array.isArray(row.currencies)
+      ? (row.currencies as string[])
+      : ["USD"],
+    denominations: Array.isArray(row.denominations)
+      ? (row.denominations as number[])
+      : [10, 25, 50, 100],
+    card_types: Array.isArray(row.card_types)
+      ? (row.card_types as SogoCatalogBrand["card_types"])
+      : ["ecode"],
+    requires_pin: Boolean(row.requires_pin),
+    is_active: row.is_active !== false,
+    image: providerImage,
+  };
+}
+
 export function toBrandView(brand: SogoCatalogBrand): GiftCardBrandView {
   const slug = brand.slug.toLowerCase();
   return {
     slug,
     name: brand.name,
     category: categoryForSlug(slug, brand.name),
-    image: brand.image || giftCardImagePath(slug),
+    image: giftCardImagePath(slug, brand.image),
     currencies: brand.currencies?.length ? brand.currencies : ["USD"],
     denominations: brand.denominations?.length
       ? brand.denominations

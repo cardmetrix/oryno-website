@@ -1,6 +1,7 @@
 import {
   FALLBACK_DEMO_RATES_NGN,
   FALLBACK_GIFT_CARD_CATALOG,
+  normalizeCatalogBrand,
   toBrandView,
 } from "./catalog";
 import { sogoErrorToEnglish } from "./errors";
@@ -129,7 +130,9 @@ export async function fetchSogoSellCatalog(): Promise<GiftCardBrandView[]> {
     );
     const rows = Array.isArray(json?.data) ? json.data : [];
     if (!rows.length) return FALLBACK_GIFT_CARD_CATALOG.map(toBrandView);
-    return rows.map(toBrandView).filter((b) => b.active);
+    return rows
+      .map((row) => toBrandView(normalizeCatalogBrand(row)))
+      .filter((b) => b.active);
   } catch (error) {
     console.error("[sogo-catalog]", error);
     return FALLBACK_GIFT_CARD_CATALOG.map(toBrandView);
