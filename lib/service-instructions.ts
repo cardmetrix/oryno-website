@@ -79,12 +79,12 @@ export const SERVICE_INSTRUCTIONS: Record<
     ],
   },
   "gift-cards": {
-    subtitle: "How to sell a gift card on ORYNO",
+    subtitle: "How to buy or sell gift cards on ORYNO",
     steps: [
-      "Pick a brand and choose e-code or physical card.",
-      "Enter the face value, country, and currency of your card.",
-      "Paste the code or upload clear photos, then confirm the Naira payout.",
-      "When the trade is approved, your wallet is credited automatically.",
+      "Use the Sell or Buy tab at the top — Sell is the default.",
+      "Sell: pick a brand, enter the code or upload photos, and get Naira credit.",
+      "Buy: pick a product and amount, pay from your wallet, and receive the code.",
+      "Every trade appears in History with a receipt you can revisit anytime.",
     ],
   },
   catalog: {

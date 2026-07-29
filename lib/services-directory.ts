@@ -137,9 +137,9 @@ export const servicesDirectory: ServiceDirectoryItem[] = [
     id: "gift-cards",
     href: "/services/gift-cards",
     label: "Gift Cards",
-    shortDescription: "Sell gift cards for Naira",
+    shortDescription: "Buy & sell gift cards",
     longDescription:
-      "Trade Amazon, Apple, Steam, Xbox and 50+ brands for live Naira rates credited to your wallet.",
+      "Sell cards for Naira via live rates, or buy digital codes with your wallet.",
     category: "Lifestyle",
     tags: ["Amazon", "Apple", "Steam"],
     eta: "Live rates",
