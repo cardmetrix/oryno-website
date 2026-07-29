@@ -51,10 +51,26 @@ const LOCAL_PNG = new Set([
   "spotify",
 ]);
 
+/** Brands whose Clearbit/open-API logos are missing or unreliable — prefer local art. */
+const LOCAL_FIRST = new Set([
+  "foot-locker",
+  "vanilla",
+  "netspend",
+  "dicks-sporting",
+  "dickssportinggoods",
+]);
+
 export function brandDomain(slug: string) {
   const key = slug.toLowerCase();
   if (BRAND_LOGO_DOMAINS[key]) return BRAND_LOGO_DOMAINS[key];
   return `${key.replace(/[^a-z0-9-]/g, "")}.com`;
+}
+
+function localGiftCardArt(slug: string) {
+  const key = slug.toLowerCase();
+  return LOCAL_PNG.has(key)
+    ? `/gift-cards/${key}.png`
+    : `/gift-cards/${key}.svg`;
 }
 
 /**
@@ -65,21 +81,25 @@ export function giftCardImagePath(slug: string, providerImage?: string | null) {
   if (providerImage && /^https?:\/\//i.test(providerImage)) {
     return providerImage;
   }
+  const key = slug.toLowerCase();
+  if (LOCAL_FIRST.has(key)) return localGiftCardArt(key);
   const domain = brandDomain(slug);
   return `https://logo.clearbit.com/${domain}?size=128`;
 }
 
 export function giftCardImageFallbacks(slug: string) {
   const domain = brandDomain(slug);
-  const local = LOCAL_PNG.has(slug.toLowerCase())
-    ? `/gift-cards/${slug.toLowerCase()}.png`
-    : `/gift-cards/${slug.toLowerCase()}.svg`;
-  return [
+  const key = slug.toLowerCase();
+  const local = localGiftCardArt(key);
+  const remote = [
     `https://logo.clearbit.com/${domain}?size=128`,
     `https://icons.duckduckgo.com/ip3/${domain}.ico`,
     `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`,
-    local,
   ];
+  if (LOCAL_FIRST.has(key)) {
+    return [local, ...remote];
+  }
+  return [...remote, local];
 }
 
 /** Pick image URL from raw OpenAPI / provider catalog objects. */

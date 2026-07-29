@@ -60,6 +60,8 @@ export type BuyProductView = {
   brandName: string;
   countryCode: string;
   image: string;
+  /** OpenAPI / open-logo fallback chain for the UI */
+  imageFallbacks?: string[];
   denominationType: "FIXED" | "RANGE" | string;
   recipientCurrency: string;
   denominations: number[];

@@ -1,4 +1,75 @@
 import type { BuyProductView, ReloadlyProduct } from "./types";
+import { brandDomain, giftCardImagePath } from "@/lib/sogo/catalog";
+
+/** Map common Reloadly brand names → domains for open logo APIs */
+const BUY_BRAND_DOMAINS: Record<string, string> = {
+  amazon: "amazon.com",
+  apple: "apple.com",
+  itunes: "apple.com",
+  "google play": "google.com",
+  googleplay: "google.com",
+  steam: "steampowered.com",
+  netflix: "netflix.com",
+  spotify: "spotify.com",
+  xbox: "xbox.com",
+  playstation: "playstation.com",
+  roblox: "roblox.com",
+  nike: "nike.com",
+  sephora: "sephora.com",
+  walmart: "walmart.com",
+  target: "target.com",
+  ebay: "ebay.com",
+  visa: "visa.com",
+  "american express": "americanexpress.com",
+  amex: "americanexpress.com",
+  "foot locker": "footlocker.com",
+  vanilla: "vanillagift.com",
+  netspend: "netspend.com",
+  "dick's sporting": "dickssportinggoods.com",
+  "dicks sporting": "dickssportinggoods.com",
+};
+
+export function buyBrandDomain(brandName: string) {
+  const key = brandName.toLowerCase().trim();
+  if (BUY_BRAND_DOMAINS[key]) return BUY_BRAND_DOMAINS[key];
+  for (const [name, domain] of Object.entries(BUY_BRAND_DOMAINS)) {
+    if (key.includes(name)) return domain;
+  }
+  return brandDomain(
+    key.replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "gift",
+  );
+}
+
+/** Prefer Reloadly logoUrls, else open logo API (Clearbit / Google). */
+export function buyProductImage(
+  product: Pick<ReloadlyProduct, "logoUrls" | "brand" | "productName">,
+) {
+  const providerLogo = product.logoUrls?.find((u) => /^https?:\/\//i.test(u));
+  if (providerLogo) return providerLogo;
+
+  const brandName = product.brand?.brandName || product.productName || "gift";
+  const domain = buyBrandDomain(brandName);
+  return `https://logo.clearbit.com/${domain}?size=128`;
+}
+
+export function buyProductImageFallbacks(
+  product: Pick<ReloadlyProduct, "logoUrls" | "brand" | "productName">,
+) {
+  const brandName = product.brand?.brandName || product.productName || "gift";
+  const domain = buyBrandDomain(brandName);
+  const slug = brandName
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+  const provider = product.logoUrls?.filter((u) => /^https?:\/\//i.test(u)) ?? [];
+  return [
+    ...provider,
+    `https://logo.clearbit.com/${domain}?size=128`,
+    `https://icons.duckduckgo.com/ip3/${domain}.ico`,
+    `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`,
+    giftCardImagePath(slug),
+  ];
+}
 
 export const DEMO_RELOADLY_PRODUCTS: ReloadlyProduct[] = [
   {
@@ -149,19 +220,14 @@ export function toBuyProductView(p: ReloadlyProduct): BuyProductView {
   const dens =
     p.fixedRecipientDenominations?.filter((n) => Number.isFinite(n)) ?? [];
   const brandName = p.brand?.brandName || p.productName;
-  const image =
-    p.logoUrls?.[0] ||
-    `https://logo.clearbit.com/${brandName
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "")
-      .slice(0, 24)}.com?size=128`;
 
   return {
     productId: p.productId,
     name: p.productName,
     brandName,
     countryCode: (p.country?.isoName || "US").toUpperCase(),
-    image,
+    image: buyProductImage(p),
+    imageFallbacks: buyProductImageFallbacks(p),
     denominationType: p.denominationType || "FIXED",
     recipientCurrency: p.recipientCurrencyCode || "USD",
     denominations: dens.length ? dens : [10, 25, 50, 100],

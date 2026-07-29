@@ -51,6 +51,7 @@ type BuyProduct = {
   brandName: string;
   countryCode: string;
   image: string;
+  imageFallbacks?: string[];
   denominationType: string;
   recipientCurrency: string;
   denominations: number[];
@@ -104,20 +105,23 @@ function BrandLogo({
   brand,
   className,
   size = 44,
+  fallbacks,
 }: {
   brand: { slug?: string; image: string; name: string };
   className?: string;
   size?: number;
+  fallbacks?: string[];
 }) {
   const primary = brandImageSrc(brand);
-  const chain = brand.slug
-    ? [
-        primary,
-        ...giftCardImageFallbacks(brand.slug).filter((u) => u !== primary),
-      ]
-    : [primary, `/gift-cards/amazon.svg`];
+  const chain = [
+    primary,
+    ...(fallbacks || []),
+    ...(brand.slug
+      ? giftCardImageFallbacks(brand.slug).filter((u) => u !== primary)
+      : []),
+  ].filter((u, i, arr) => u && arr.indexOf(u) === i);
   const [idx, setIdx] = useState(0);
-  const src = chain[Math.min(idx, chain.length - 1)];
+  const src = chain[Math.min(idx, Math.max(chain.length - 1, 0))] || primary;
   const remote = /^https?:\/\//i.test(src);
 
   return (
@@ -1063,6 +1067,7 @@ export default function GiftCardsPage() {
                         image: selectedBuy.image,
                         name: selectedBuy.brandName,
                       }}
+                      fallbacks={selectedBuy.imageFallbacks}
                       size={56}
                     />
                     <div className="min-w-0 flex-1">
@@ -1239,6 +1244,7 @@ export default function GiftCardsPage() {
                                   image: product.image,
                                   name: product.brandName,
                                 }}
+                                fallbacks={product.imageFallbacks}
                               />
                               <div className="min-w-0 flex-1">
                                 <p className="truncate text-sm font-semibold">
