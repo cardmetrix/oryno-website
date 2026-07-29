@@ -227,7 +227,6 @@ export default function TransactionReceiptPage({
                 <DetailRow label="Type" value={credit ? "Credit" : "Debit"} />
                 <DetailRow label="Date" value={tx.createdAtFormatted} />
                 <DetailRow label="Reference" value={tx.reference} mono />
-              
                 <DetailRow label="Currency" value={tx.currency ?? "NGN"} />
               </div>
 

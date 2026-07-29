@@ -61,7 +61,7 @@ export default function AdminSettingsPage() {
           <Field label="Default payout SLA" value="5–30 minutes" />
           <Field label="Support email" value="support@oryno.com" />
           <Field label="Default currency display" value="User local currency" />
-          <Field label="Gift cards module" value="Coming soon (disabled)" />
+          <Field label="Gift cards module" value="Live (Sogo sell)" />
         </div>
         <motion.button
           type="button"

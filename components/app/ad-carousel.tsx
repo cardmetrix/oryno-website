@@ -11,7 +11,7 @@ const ads = [
     id: "gift",
     href: "/services/gift-cards",
     title: "Gift Cards",
-    subtitle: "Buy & sell coming soon",
+    subtitle: "Sell for live Naira rates",
     image: "/brand/auth-panel.jpg",
     overlay: "from-oryno-charcoal/85 via-oryno-charcoal/40 to-transparent",
   },

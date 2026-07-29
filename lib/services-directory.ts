@@ -137,16 +137,16 @@ export const servicesDirectory: ServiceDirectoryItem[] = [
     id: "gift-cards",
     href: "/services/gift-cards",
     label: "Gift Cards",
-    shortDescription: "Buy & sell — coming soon",
+    shortDescription: "Sell gift cards for Naira",
     longDescription:
-      "Trade popular gift cards at transparent rates. Join the waitlist while we finish launch.",
-    category: "Coming soon",
-    tags: ["Apple", "Amazon", "Steam"],
-    eta: "Soon",
+      "Trade Amazon, Apple, Steam, Xbox and 50+ brands for live Naira rates credited to your wallet.",
+    category: "Lifestyle",
+    tags: ["Amazon", "Apple", "Steam"],
+    eta: "Live rates",
     accent: "#FF6A00",
-    soon: true,
+    soon: false,
     icon: GiftCardIcon,
-    stats: `${currencySymbol} rates live soon`,
+    stats: "50+ brands",
   },
 ];
 

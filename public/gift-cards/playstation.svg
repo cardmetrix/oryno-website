@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="480" viewBox="0 0 360 480">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#003087"/>
+      <stop offset="55%" stop-color="#003087"/>
+      <stop offset="100%" stop-color="#0B1220"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.22)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+    </linearGradient>
+  </defs>
+  <rect width="360" height="480" rx="28" fill="url(#bg)"/>
+  <rect width="360" height="180" rx="28" fill="url(#shine)"/>
+  <rect x="22" y="22" width="316" height="436" rx="22" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="1.5"/>
+  <text x="36" y="64" fill="rgba(255,255,255,0.75)" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="700" letter-spacing="3">GIFT CARD</text>
+  <g transform="translate(180 175)"><g transform="scale(3.2) translate(-12 -12)"><path d="M8.984 2.596v17.547l3.915 1.261V6.688c0-.69.304-1.151.794-.991.636.18.76.814.76 1.505v5.875c2.441 1.193 4.362-.002 4.362-3.152 0-3.237-1.126-4.675-4.438-5.827-1.307-.448-3.728-1.186-5.39-1.502zm4.656 16.241l6.296-2.275c.715-.258.826-.625.246-.818-.586-.192-1.637-.139-2.357.123l-4.205 1.5V14.98l.24-.085s1.201-.42 2.913-.615c1.696-.18 3.785.03 5.437.661 1.848.601 2.04 1.472 1.576 2.072-.465.6-1.622 1.036-1.622 1.036l-8.544 3.107V18.86zM1.807 18.6c-1.9-.545-2.214-1.668-1.352-2.32.801-.586 2.16-1.052 2.16-1.052l5.615-2.013v2.313L4.205 17c-.705.271-.825.632-.239.826.586.195 1.637.15 2.343-.12L8.247 17v2.074c-.12.03-.256.044-.39.073-1.939.331-3.996.196-6.038-.479z" fill="#ffffff"/></g></g>
+  <text x="180" y="300" text-anchor="middle" fill="#fff" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700">PlayStation</text>
+  <text x="180" y="328" text-anchor="middle" fill="rgba(255,255,255,0.72)" font-family="Arial, Helvetica, sans-serif" font-size="13">Redeem for Naira on ORYNO</text>
+  <rect x="48" y="372" width="264" height="48" rx="14" fill="rgba(255,255,255,0.14)"/>
+  <text x="180" y="402" text-anchor="middle" fill="#fff" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="600">Live sell rates</text>
+</svg>

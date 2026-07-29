@@ -8,8 +8,8 @@ import { ArrowRight } from "lucide-react";
 const promos = [
   {
     emoji: "🎁",
-    title: "Buy & Sell Gift Cards",
-    subtitle: "Amazon, Apple, Steam and more — launching soon",
+    title: "Sell Gift Cards",
+    subtitle: "Amazon, Apple, Steam and 50+ brands for live Naira rates",
     href: "/services/gift-cards",
     tone: "from-oryno-orange to-oryno-orange-soft",
   },

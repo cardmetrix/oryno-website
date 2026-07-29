@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="480" viewBox="0 0 360 480">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#CC0000"/>
+      <stop offset="55%" stop-color="#CC0000"/>
+      <stop offset="100%" stop-color="#0B1220"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.22)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+    </linearGradient>
+  </defs>
+  <rect width="360" height="480" rx="28" fill="url(#bg)"/>
+  <rect width="360" height="180" rx="28" fill="url(#shine)"/>
+  <rect x="22" y="22" width="316" height="436" rx="22" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="1.5"/>
+  <text x="36" y="64" fill="rgba(255,255,255,0.75)" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="700" letter-spacing="3">GIFT CARD</text>
+  <g transform="translate(180 175)"><g transform="scale(3.2) translate(-12 -12)"><path d="M12.0005 0C18.627 0 24 5.373 24 12.0005 24 18.627 18.627 24 11.9995 24 5.373 24 0 18.627 0 11.9995 0 5.373 5.373 0 12.0005 0zm0 19.826a7.8265 7.8265 0 10-.001-15.652C7.7133 4.2246 4.2653 7.7136 4.2653 12c0 4.2864 3.448 7.7754 7.7342 7.826h.001zm0-3.9853a3.8402 3.8402 0 110-7.6803c2.1204.0006 3.839 1.7197 3.839 3.8401s-1.7186 3.8396-3.839 3.8402z" fill="#ffffff"/></g></g>
+  <text x="180" y="300" text-anchor="middle" fill="#fff" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700">Target</text>
+  <text x="180" y="328" text-anchor="middle" fill="rgba(255,255,255,0.72)" font-family="Arial, Helvetica, sans-serif" font-size="13">Redeem for Naira on ORYNO</text>
+  <rect x="48" y="372" width="264" height="48" rx="14" fill="rgba(255,255,255,0.14)"/>
+  <text x="180" y="402" text-anchor="middle" fill="#fff" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="600">Live sell rates</text>
+</svg>

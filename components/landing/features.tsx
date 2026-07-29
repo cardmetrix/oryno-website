@@ -57,7 +57,7 @@ const features: {
   {
     icon: GiftCardIcon,
     title: "Gift Cards",
-    description: "Buy and sell gift cards — launching soon inside ORYNO.",
+    description: "Sell gift cards for live Naira rates credited to your wallet.",
     soon: true,
   },
   {

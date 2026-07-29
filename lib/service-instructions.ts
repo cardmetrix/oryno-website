@@ -79,12 +79,12 @@ export const SERVICE_INSTRUCTIONS: Record<
     ],
   },
   "gift-cards": {
-    subtitle: "What to expect when gift cards launch",
+    subtitle: "How to sell a gift card on ORYNO",
     steps: [
-      "Browse the brands that will be available at launch.",
-      "Tap Notify me to get an alert when buy & sell goes live.",
-      "After launch, you’ll fund your wallet and trade at live rates.",
-      "Until then, use Airtime, Data, Numbers, or Emails from All Services.",
+      "Pick a brand and choose e-code or physical card.",
+      "Enter the face value, country, and currency of your card.",
+      "Paste the code or upload clear photos, then confirm the Naira payout.",
+      "When the trade is approved, your wallet is credited automatically.",
     ],
   },
   catalog: {
