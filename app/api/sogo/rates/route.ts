@@ -46,6 +46,7 @@ export async function GET(req: Request) {
         quote,
         payoutShare: sogoSellPayoutShare(),
         demo: isSogoDemoMode(),
+        source: isSogoDemoMode() ? "demo" : "provider",
       });
     }
 
@@ -75,6 +76,7 @@ export async function GET(req: Request) {
       simplified,
       payoutShare: sogoSellPayoutShare(),
       demo: isSogoDemoMode(),
+      source: isSogoDemoMode() ? "demo" : "provider",
     });
   } catch (error) {
     console.error("[sogo-rates]", error);

@@ -116,10 +116,11 @@ export async function quoteGiftCardSell(input: {
   const providerPayout =
     Math.round(input.cardAmount * ratePerUnit * 100) / 100;
   const share = sogoSellPayoutShare();
+  // userPayout follows provider payout exactly when share === 1
   const userPayout = Math.round(providerPayout * share * 100) / 100;
 
   return {
-    ratePerUnit,
+    ratePerUnit, // exact NGN-per-unit from provider (or demo mirror)
     providerPayout,
     userPayout,
     currency: "NGN" as const,
@@ -249,9 +250,16 @@ export async function sellGiftCard(input: {
       idempotencyKey,
     });
 
-    const providerPayout = Number(data.payout_amount?.raw ?? quote.providerPayout);
-    const userPayout =
-      Math.round(providerPayout * sogoSellPayoutShare() * 100) / 100;
+    // Lock to the provider's payout_amount — that is the live trade rate.
+    const providerPayout = Number(
+      data.payout_amount?.raw ?? quote.providerPayout,
+    );
+    const share = sogoSellPayoutShare();
+    const userPayout = Math.round(providerPayout * share * 100) / 100;
+    const lockedRatePerUnit =
+      input.cardAmount > 0
+        ? Math.round((providerPayout / input.cardAmount) * 10000) / 10000
+        : quote.ratePerUnit;
 
     await db
       .update(giftCardOrders)
@@ -289,7 +297,7 @@ export async function sellGiftCard(input: {
           codeHint: redactCode(input.additionalInfo),
           providerPayout,
           userPayout,
-          ratePerUnit: quote.ratePerUnit,
+          ratePerUnit: lockedRatePerUnit,
           idempotencyKey,
           demo: simulated,
           sogoStatus: data.status,
@@ -471,6 +479,7 @@ export async function handleSogoWebhookEvent(event: SogoWebhookEvent) {
   const name = event.event;
 
   if (name === "transaction.completed" || event.data.status === "completed") {
+    // Prefer the provider's settled payout — never invent a different rate.
     const providerPayout = Number(
       typeof event.data.payout_amount === "object"
         ? event.data.payout_amount?.raw
@@ -479,8 +488,8 @@ export async function handleSogoWebhookEvent(event: SogoWebhookEvent) {
             event.data.amount ??
             txRow.amount,
     );
-    const userPayout =
-      Math.round(providerPayout * sogoSellPayoutShare() * 100) / 100;
+    const share = sogoSellPayoutShare();
+    const userPayout = Math.round(providerPayout * share * 100) / 100;
 
     const result = await settleGiftCardSellSuccess({
       orderId,

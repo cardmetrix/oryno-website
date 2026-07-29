@@ -52,6 +52,7 @@ type Quote = {
   providerPayout: number;
   userPayout: number;
   currency: string;
+  demo?: boolean;
 };
 
 const CARD_COUNTRIES = [
@@ -627,8 +628,11 @@ export default function GiftCardsPage() {
                 </div>
                 {quote ? (
                   <p className="mt-1 text-[11px] text-muted-foreground">
-                    ≈ ₦{quote.ratePerUnit.toLocaleString("en-NG")} per{" "}
-                    {cardCurrency} 1
+                    Provider rate ₦{quote.ratePerUnit.toLocaleString("en-NG")}{" "}
+                    per {cardCurrency} 1
+                    {quote.providerPayout !== quote.userPayout
+                      ? ` · payout ₦${quote.providerPayout.toLocaleString("en-NG", { minimumFractionDigits: 2 })}`
+                      : ""}
                   </p>
                 ) : null}
 

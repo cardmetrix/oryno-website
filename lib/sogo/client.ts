@@ -61,12 +61,13 @@ export function isSogoDemoMode() {
 }
 
 /**
- * Share of Sogo payout credited to the user (rest is ORYNO margin).
- * Default 0.97 = user gets 97%.
+ * Share of provider payout credited to the user.
+ * Default 1 = pass through the exact provider rate (no ORYNO haircut).
+ * Set e.g. 0.97 only if you intentionally keep a margin.
  */
 export function sogoSellPayoutShare() {
-  const raw = Number(process.env.SOGO_SELL_PAYOUT_SHARE || "0.97");
-  if (!Number.isFinite(raw) || raw <= 0 || raw > 1) return 0.97;
+  const raw = Number(process.env.SOGO_SELL_PAYOUT_SHARE ?? "1");
+  if (!Number.isFinite(raw) || raw <= 0 || raw > 1) return 1;
   return raw;
 }
 
