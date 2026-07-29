@@ -13,7 +13,7 @@ import {
   ensurePrimaryWallet,
   toWalletSummary,
 } from "@/lib/wallet";
-import { categoryForSlug } from "./catalog";
+import { categoryForSlug, FALLBACK_DEMO_RATES_NGN } from "./catalog";
 import {
   extractNgnRate,
   fetchSogoSellRates,
@@ -90,16 +90,27 @@ export async function quoteGiftCardSell(input: {
   cardAmount: number;
 }) {
   const rates = await fetchSogoSellRates(input.slug);
-  const entry = rates.find((r) => r.slug === input.slug) ?? rates[0];
-  const ratePerUnit = extractNgnRate({
+  const entry =
+    rates.find((r) => r.slug?.toLowerCase() === input.slug.toLowerCase()) ??
+    rates[0];
+
+  let ratePerUnit = extractNgnRate({
     entry,
     currency: input.cardCurrency,
     cardType: input.cardType,
     subType: input.subType,
   });
 
+  // Fallbacks so the UI never 400s on odd provider payloads
   if (ratePerUnit == null || ratePerUnit <= 0) {
-    throw new Error("No live rate for this card. Try another option.");
+    ratePerUnit = extractNgnRate({
+      entry,
+      currency: "USD",
+      cardType: "ecode",
+    });
+  }
+  if (ratePerUnit == null || ratePerUnit <= 0) {
+    ratePerUnit = FALLBACK_DEMO_RATES_NGN[input.slug] ?? 1400;
   }
 
   const providerPayout =

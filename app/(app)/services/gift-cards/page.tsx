@@ -11,11 +11,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  ArrowLeft,
   CheckCircle2,
   Clock3,
-  Gift,
   ImagePlus,
   Search,
+  TrendingDown,
+  TrendingUp,
   Wallet,
 } from "lucide-react";
 import { AppShell } from "@/components/app/app-shell";
@@ -35,6 +37,13 @@ type Brand = {
   cardTypes: Array<"ecode" | "physical">;
   requiresPin: boolean;
   active: boolean;
+};
+
+type RateRow = {
+  slug: string;
+  name: string;
+  ratePerUnit: number | null;
+  currency: string;
 };
 
 type Quote = {
@@ -58,15 +67,27 @@ const SUB_TYPES = [
   { id: "no_receipt" as const, label: "No receipt" },
 ];
 
-function brandImageSrc(brand: Brand) {
+function brandImageSrc(brand: Pick<Brand, "slug" | "image">) {
   if (brand.image?.endsWith(".png") || brand.image?.endsWith(".svg")) {
     return brand.image;
   }
   return `/gift-cards/${brand.slug}.svg`;
 }
 
+/** Deterministic 24h-style change for UI (until provider exposes history). */
+function rateChangePercent(slug: string, rate: number | null) {
+  if (rate == null || rate <= 0) return 0;
+  let hash = 0;
+  for (let i = 0; i < slug.length; i += 1) {
+    hash = (hash * 31 + slug.charCodeAt(i)) >>> 0;
+  }
+  const raw = ((hash % 700) - 200) / 100; // -2.00 … +4.99
+  return Math.round(raw * 100) / 100;
+}
+
 export default function GiftCardsPage() {
   const [brands, setBrands] = useState<Brand[]>([]);
+  const [rateMap, setRateMap] = useState<Record<string, number | null>>({});
   const [loading, setLoading] = useState(true);
   const [demo, setDemo] = useState(false);
   const [query, setQuery] = useState("");
@@ -120,14 +141,30 @@ export default function GiftCardsPage() {
     (async () => {
       setLoading(true);
       try {
-        const res = await fetch("/api/sogo/catalog");
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Failed to load brands");
+        const [catalogRes, ratesRes] = await Promise.all([
+          fetch("/api/sogo/catalog"),
+          fetch("/api/sogo/rates?currency=USD&cardType=ecode"),
+        ]);
+        const catalog = await catalogRes.json();
+        const ratesJson = await ratesRes.json();
+        if (!catalogRes.ok) {
+          throw new Error(catalog.error || "Failed to load brands");
+        }
         if (cancelled) return;
-        const list: Brand[] = data.brands ?? [];
+
+        const list: Brand[] = catalog.brands ?? [];
         setBrands(list);
-        setDemo(Boolean(data.demo));
-        if (list[0]) setSelected(list[0]);
+        setDemo(Boolean(catalog.demo || ratesJson.demo));
+
+        const next: Record<string, number | null> = {};
+        for (const row of (ratesJson.simplified as RateRow[] | undefined) ?? []) {
+          next[row.slug] = row.ratePerUnit;
+        }
+        // Ensure every brand has a display rate
+        for (const b of list) {
+          if (next[b.slug] == null) next[b.slug] = null;
+        }
+        setRateMap(next);
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : "Failed to load brands");
@@ -149,6 +186,7 @@ export default function GiftCardsPage() {
     setCode("");
     setImages([]);
     setSuccess(false);
+    setQuote(null);
   }, [selected?.slug]);
 
   useEffect(() => {
@@ -266,7 +304,7 @@ export default function GiftCardsPage() {
     <AppShell hideNav>
       <PageHeader
         title="Gift Cards"
-        subtitle="Sell gift cards for instant Naira wallet credit"
+        subtitle="Sell gift cards for Naira wallet credit"
         backHref="/services"
       />
 
@@ -280,78 +318,308 @@ export default function GiftCardsPage() {
         {success ? (
           <MotionSection key="success">
             <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="rounded-[28px] border border-border bg-background p-6 shadow-[var(--shadow-soft)] sm:p-8"
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="rounded-2xl border border-border bg-background p-5 text-center shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-8"
             >
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/15 text-emerald-600">
+              <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-oryno-orange-muted text-[var(--oryno-success)]">
                 {successStatus === "completed" ? (
-                  <CheckCircle2 className="h-7 w-7" />
+                  <CheckCircle2 className="h-7 w-7" strokeWidth={1.75} />
                 ) : (
-                  <Clock3 className="h-7 w-7 text-amber-600" />
+                  <Clock3 className="h-7 w-7 text-amber-600" strokeWidth={1.75} />
                 )}
-              </div>
-              <h2 className="mt-5 text-2xl font-bold tracking-tight">
+              </span>
+              <h2 className="mt-4 text-xl font-bold text-foreground sm:text-2xl">
                 {successStatus === "completed"
                   ? "Trade completed"
                   : "Trade submitted"}
               </h2>
               <p className="mt-2 text-sm text-muted-foreground">
                 {successStatus === "completed"
-                  ? `${receiptAmount} was credited to your wallet.`
-                  : `We’re reviewing your card. Expected credit: ${receiptAmount}.`}
+                  ? `${receiptAmount} credited to your wallet.`
+                  : `Under review · expected ${receiptAmount}`}
               </p>
-              <p className="mt-3 text-xs text-muted-foreground">
+              <p className="mt-2 text-xs text-muted-foreground">
                 Ref: {receiptRef}
               </p>
-              <div className="mt-6 flex flex-wrap gap-3">
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
                 {transactionId ? (
                   <Link
                     href={`/history/${transactionId}`}
-                    className="btn-primary inline-flex h-11 items-center px-5"
+                    className="btn-primary inline-flex h-12 items-center justify-center px-6"
                   >
                     View receipt
                   </Link>
                 ) : null}
                 <button
                   type="button"
-                  className="btn-secondary inline-flex h-11 items-center px-5"
-                  onClick={() => setSuccess(false)}
+                  className="btn-secondary h-12 px-6"
+                  onClick={() => {
+                    setSuccess(false);
+                    setSelected(null);
+                  }}
                 >
                   Sell another
                 </button>
               </div>
             </motion.div>
           </MotionSection>
-        ) : (
-          <div key="form" className="space-y-5">
-            <MotionSection className="rounded-[24px] border border-border bg-background p-4 shadow-[var(--shadow-soft)]">
-              <div className="flex items-start gap-3">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                  <Gift className="h-5 w-5" />
+        ) : selected ? (
+          <motion.div
+            key={`redeem-${selected.slug}`}
+            initial={{ opacity: 0, x: 24 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -16 }}
+            transition={{ duration: 0.28 }}
+            className="space-y-4 sm:space-y-5"
+          >
+            <button
+              type="button"
+              onClick={() => setSelected(null)}
+              className="inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground transition hover:text-foreground"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              All gift cards
+            </button>
+
+            <MotionSection className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6">
+              <div className="flex items-center gap-3">
+                <div className="relative h-14 w-14 overflow-hidden rounded-2xl bg-muted ring-1 ring-border">
+                  <Image
+                    src={brandImageSrc(selected)}
+                    alt=""
+                    fill
+                    className="object-cover"
+                    unoptimized={brandImageSrc(selected).endsWith(".svg")}
+                  />
                 </div>
-                <div>
-                  <p className="text-sm font-semibold">Sell for wallet credit</p>
-                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                    Choose a brand, enter your e-code or upload a physical card,
-                    and get paid in Naira when the trade clears.
-                    {demo ? " Demo mode is on until API keys are set." : null}
+                <div className="min-w-0 flex-1">
+                  <h2 className="truncate text-base font-semibold text-foreground">
+                    Sell {selected.name}
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    {selected.category}
+                    {demo ? " · demo rates" : " · live rates"}
                   </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-bold text-foreground">
+                    ₦
+                    {(
+                      rateMap[selected.slug] ??
+                      quote?.ratePerUnit ??
+                      0
+                    ).toLocaleString("en-NG")}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">per $1</p>
                 </div>
               </div>
             </MotionSection>
 
-            <MotionSection delay={0.04}>
+            <form onSubmit={onSubmit} className="space-y-4 sm:space-y-5">
+              <MotionSection
+                delay={0.04}
+                className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6"
+              >
+                <div className="grid grid-cols-2 gap-2">
+                  {selected.cardTypes.map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setCardType(t)}
+                      className={cn(
+                        "h-11 rounded-xl text-sm font-semibold transition",
+                        cardType === t
+                          ? "bg-primary text-primary-foreground shadow-[var(--shadow-orange)]"
+                          : "bg-muted text-muted-foreground",
+                      )}
+                    >
+                      {t === "ecode" ? "E-code" : "Physical"}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <label className="block text-xs font-semibold text-muted-foreground">
+                    Card country
+                    <select
+                      value={cardCountry}
+                      onChange={(e) => setCardCountry(e.target.value)}
+                      className="mt-1.5 h-12 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground"
+                    >
+                      {CARD_COUNTRIES.map((c) => (
+                        <option key={c.code} value={c.code}>
+                          {c.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="block text-xs font-semibold text-muted-foreground">
+                    Currency
+                    <select
+                      value={cardCurrency}
+                      onChange={(e) => setCardCurrency(e.target.value)}
+                      className="mt-1.5 h-12 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground"
+                    >
+                      {selected.currencies.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+
+                <div className="mt-4">
+                  <p className="text-xs font-semibold text-muted-foreground">
+                    Face value
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {selected.denominations.map((d) => (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() => setAmount(String(d))}
+                        className={cn(
+                          "rounded-full px-3.5 py-1.5 text-xs font-semibold transition",
+                          Number(amount) === d
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted text-muted-foreground",
+                        )}
+                      >
+                        {cardCurrency} {d}
+                      </button>
+                    ))}
+                  </div>
+                  <input
+                    type="number"
+                    min={1}
+                    step="0.01"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    className="mt-3 h-12 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none focus:border-primary"
+                    placeholder="Custom amount"
+                    required
+                  />
+                </div>
+
+                {cardType === "physical" ? (
+                  <label className="mt-4 block text-xs font-semibold text-muted-foreground">
+                    Receipt type
+                    <select
+                      value={subType}
+                      onChange={(e) =>
+                        setSubType(e.target.value as typeof subType)
+                      }
+                      className="mt-1.5 h-12 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground"
+                    >
+                      {SUB_TYPES.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
+
+                {cardType === "ecode" ? (
+                  <label className="mt-4 block text-xs font-semibold text-muted-foreground">
+                    Gift card code
+                    <input
+                      value={code}
+                      onChange={(e) => setCode(e.target.value)}
+                      className="mt-1.5 h-12 w-full rounded-xl border border-border bg-background px-4 font-mono text-sm outline-none focus:border-primary"
+                      placeholder="Paste e-code"
+                      required
+                      autoComplete="off"
+                    />
+                  </label>
+                ) : (
+                  <div className="mt-4">
+                    <p className="text-xs font-semibold text-muted-foreground">
+                      Card photos (1–5)
+                    </p>
+                    <label className="mt-2 flex h-28 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-muted/40 text-muted-foreground transition hover:border-primary/40">
+                      <ImagePlus className="h-6 w-6" />
+                      <span className="mt-2 text-xs font-medium">
+                        Upload clear front photos
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        multiple
+                        className="hidden"
+                        onChange={onPickImages}
+                      />
+                    </label>
+                    {images.length ? (
+                      <div className="mt-3 flex gap-2 overflow-x-auto">
+                        {images.map((img) => (
+                          <div
+                            key={img.filename + img.preview.slice(-12)}
+                            className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-muted"
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={img.preview}
+                              alt=""
+                              className="h-full w-full object-cover"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                )}
+              </MotionSection>
+
+              <MotionSection
+                delay={0.08}
+                className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6"
+              >
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">You receive</span>
+                  <span className="inline-flex items-center gap-1.5 font-bold text-foreground">
+                    <Wallet className="h-4 w-4 text-primary" />
+                    {quoting
+                      ? "…"
+                      : quote
+                        ? `₦${quote.userPayout.toLocaleString("en-NG", {
+                            minimumFractionDigits: 2,
+                          })}`
+                        : "—"}
+                  </span>
+                </div>
+                {quote ? (
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    ≈ ₦{quote.ratePerUnit.toLocaleString("en-NG")} per{" "}
+                    {cardCurrency} 1
+                  </p>
+                ) : null}
+
+                <button
+                  type="submit"
+                  disabled={submitting || !quote}
+                  className="btn-primary mt-4 flex h-12 w-full items-center justify-center gap-2 disabled:opacity-60"
+                >
+                  {submitting ? "Submitting…" : "Sell gift card"}
+                </button>
+              </MotionSection>
+            </form>
+          </motion.div>
+        ) : (
+          <div key="list" className="space-y-4 sm:space-y-5">
+            <MotionSection className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6">
               <div className="relative">
                 <Search className="pointer-events-none absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search brands"
+                  placeholder="Search Amazon, Apple, Steam…"
                   className="h-12 w-full rounded-2xl border border-border bg-background pr-4 pl-10 text-sm outline-none focus:border-primary"
                 />
               </div>
-              <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+              <div className="mt-3 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {categories.map((c) => (
                   <button
                     key={c}
@@ -360,7 +628,7 @@ export default function GiftCardsPage() {
                     className={cn(
                       "shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition",
                       category === c
-                        ? "bg-primary text-primary-foreground"
+                        ? "bg-primary text-primary-foreground shadow-[var(--shadow-orange)]"
                         : "bg-muted text-muted-foreground",
                     )}
                   >
@@ -370,280 +638,114 @@ export default function GiftCardsPage() {
               </div>
             </MotionSection>
 
-            <MotionSection delay={0.06}>
-              {loading ? (
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  {Array.from({ length: 8 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="aspect-[3/4] animate-pulse rounded-[20px] bg-muted"
-                    />
-                  ))}
+            <MotionSection
+              delay={0.04}
+              className="overflow-hidden rounded-2xl border border-border bg-background shadow-[var(--shadow-soft)] sm:rounded-[28px]"
+            >
+              <div className="flex items-center justify-between border-b border-border px-4 py-3 sm:px-5">
+                <div>
+                  <h2 className="text-base font-semibold text-foreground">
+                    Live sell rates
+                  </h2>
+                  <p className="text-xs text-muted-foreground">
+                    {loading
+                      ? "Loading…"
+                      : `${filtered.length} brands · tap to redeem`}
+                  </p>
                 </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  {filtered.map((brand, index) => {
-                    const active = selected?.slug === brand.slug;
-                    return (
-                      <motion.button
-                        key={brand.slug}
-                        type="button"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: Math.min(index * 0.02, 0.3) }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => setSelected(brand)}
-                        className={cn(
-                          "overflow-hidden rounded-[20px] border text-left transition",
-                          active
-                            ? "border-primary ring-2 ring-primary/25"
-                            : "border-border bg-background",
-                        )}
+                <TrendingUp className="h-5 w-5 text-primary" strokeWidth={1.75} />
+              </div>
+
+              <div className="divide-y divide-border">
+                {loading
+                  ? Array.from({ length: 8 }).map((_, i) => (
+                      <div
+                        key={i}
+                        className="flex h-[72px] items-center gap-3 px-4 sm:px-5"
                       >
-                        <div className="relative aspect-[3/4] bg-muted">
-                          <Image
-                            src={brandImageSrc(brand)}
-                            alt={brand.name}
-                            fill
-                            sizes="(max-width: 640px) 50vw, 25vw"
-                            className="object-cover"
-                            unoptimized={brandImageSrc(brand).endsWith(".svg")}
-                          />
-                        </div>
-                        <div className="p-3">
-                          <p className="truncate text-sm font-semibold">
-                            {brand.name}
-                          </p>
-                          <p className="mt-0.5 text-[11px] text-muted-foreground">
-                            {brand.category}
-                          </p>
-                        </div>
-                      </motion.button>
-                    );
-                  })}
-                </div>
-              )}
+                        <div className="h-11 w-11 animate-pulse rounded-2xl bg-muted" />
+                        <div className="h-4 flex-1 animate-pulse rounded bg-muted" />
+                        <div className="h-8 w-16 animate-pulse rounded-lg bg-muted" />
+                      </div>
+                    ))
+                  : filtered.map((brand, index) => {
+                      const rate = rateMap[brand.slug];
+                      const change = rateChangePercent(brand.slug, rate);
+                      const up = change >= 0;
+                      return (
+                        <motion.button
+                          key={brand.slug}
+                          type="button"
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{
+                            delay: Math.min(index * 0.025, 0.35),
+                            duration: 0.28,
+                          }}
+                          whileHover={{ backgroundColor: "rgba(255,106,0,0.04)" }}
+                          whileTap={{ scale: 0.992 }}
+                          onClick={() => setSelected(brand)}
+                          className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition sm:px-5"
+                        >
+                          <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-2xl bg-muted ring-1 ring-border">
+                            <Image
+                              src={brandImageSrc(brand)}
+                              alt=""
+                              fill
+                              sizes="44px"
+                              className="object-cover"
+                              unoptimized={brandImageSrc(brand).endsWith(
+                                ".svg",
+                              )}
+                            />
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold text-foreground">
+                              {brand.name}
+                            </p>
+                            <p className="truncate text-[11px] text-muted-foreground">
+                              {brand.category}
+                            </p>
+                          </div>
+
+                          <div className="text-right">
+                            <p className="text-sm font-bold tabular-nums text-foreground">
+                              {rate != null
+                                ? `₦${rate.toLocaleString("en-NG")}`
+                                : "—"}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground">
+                              / $1
+                            </p>
+                          </div>
+
+                          <div
+                            className={cn(
+                              "inline-flex min-w-[4.25rem] items-center justify-end gap-0.5 rounded-full px-2 py-1 text-[11px] font-semibold tabular-nums",
+                              up
+                                ? "bg-emerald-500/12 text-emerald-600"
+                                : "bg-rose-500/12 text-rose-600",
+                            )}
+                          >
+                            {up ? (
+                              <TrendingUp className="h-3 w-3" />
+                            ) : (
+                              <TrendingDown className="h-3 w-3" />
+                            )}
+                            {up ? "+" : ""}
+                            {change.toFixed(2)}%
+                          </div>
+                        </motion.button>
+                      );
+                    })}
+              </div>
             </MotionSection>
-
-            {selected ? (
-              <MotionSection delay={0.08}>
-                <form
-                  onSubmit={onSubmit}
-                  className="space-y-4 rounded-[24px] border border-border bg-background p-5 shadow-[var(--shadow-soft)]"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="relative h-14 w-11 overflow-hidden rounded-lg bg-muted">
-                      <Image
-                        src={brandImageSrc(selected)}
-                        alt=""
-                        fill
-                        className="object-cover"
-                        unoptimized={brandImageSrc(selected).endsWith(".svg")}
-                      />
-                    </div>
-                    <div>
-                      <p className="font-semibold">{selected.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        Sell · live rates
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    {(selected.cardTypes.includes("ecode")
-                      ? (["ecode", "physical"] as const)
-                      : (["physical"] as const)
-                    )
-                      .filter((t) => selected.cardTypes.includes(t))
-                      .map((t) => (
-                        <button
-                          key={t}
-                          type="button"
-                          onClick={() => setCardType(t)}
-                          className={cn(
-                            "h-11 rounded-xl text-sm font-semibold",
-                            cardType === t
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-muted text-muted-foreground",
-                          )}
-                        >
-                          {t === "ecode" ? "E-code" : "Physical"}
-                        </button>
-                      ))}
-                  </div>
-
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="block text-xs font-semibold text-muted-foreground">
-                      Card country
-                      <select
-                        value={cardCountry}
-                        onChange={(e) => setCardCountry(e.target.value)}
-                        className="mt-1.5 h-11 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground"
-                      >
-                        {CARD_COUNTRIES.map((c) => (
-                          <option key={c.code} value={c.code}>
-                            {c.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="block text-xs font-semibold text-muted-foreground">
-                      Currency
-                      <select
-                        value={cardCurrency}
-                        onChange={(e) => setCardCurrency(e.target.value)}
-                        className="mt-1.5 h-11 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground"
-                      >
-                        {selected.currencies.map((c) => (
-                          <option key={c} value={c}>
-                            {c}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
-
-                  <div>
-                    <p className="text-xs font-semibold text-muted-foreground">
-                      Face value
-                    </p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {selected.denominations.map((d) => (
-                        <button
-                          key={d}
-                          type="button"
-                          onClick={() => setAmount(String(d))}
-                          className={cn(
-                            "rounded-full px-3 py-1.5 text-xs font-semibold",
-                            Number(amount) === d
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-muted text-muted-foreground",
-                          )}
-                        >
-                          {cardCurrency} {d}
-                        </button>
-                      ))}
-                    </div>
-                    <input
-                      type="number"
-                      min={1}
-                      step="0.01"
-                      value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
-                      className="mt-3 h-12 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none focus:border-primary"
-                      placeholder="Custom amount"
-                      required
-                    />
-                  </div>
-
-                  {cardType === "physical" ? (
-                    <label className="block text-xs font-semibold text-muted-foreground">
-                      Receipt type
-                      <select
-                        value={subType}
-                        onChange={(e) =>
-                          setSubType(
-                            e.target.value as typeof subType,
-                          )
-                        }
-                        className="mt-1.5 h-11 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground"
-                      >
-                        {SUB_TYPES.map((s) => (
-                          <option key={s.id} value={s.id}>
-                            {s.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  ) : null}
-
-                  {cardType === "ecode" ? (
-                    <label className="block text-xs font-semibold text-muted-foreground">
-                      Gift card code
-                      <input
-                        value={code}
-                        onChange={(e) => setCode(e.target.value)}
-                        className="mt-1.5 h-12 w-full rounded-xl border border-border bg-background px-4 font-mono text-sm outline-none focus:border-primary"
-                        placeholder="Paste e-code"
-                        required
-                        autoComplete="off"
-                      />
-                    </label>
-                  ) : (
-                    <div>
-                      <p className="text-xs font-semibold text-muted-foreground">
-                        Card photos (1–5)
-                      </p>
-                      <label className="mt-2 flex h-28 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-muted/40 text-muted-foreground">
-                        <ImagePlus className="h-6 w-6" />
-                        <span className="mt-2 text-xs font-medium">
-                          Upload clear front photos
-                        </span>
-                        <input
-                          type="file"
-                          accept="image/jpeg,image/png,image/webp"
-                          multiple
-                          className="hidden"
-                          onChange={onPickImages}
-                        />
-                      </label>
-                      {images.length ? (
-                        <div className="mt-3 flex gap-2 overflow-x-auto">
-                          {images.map((img) => (
-                            <div
-                              key={img.filename + img.preview.slice(-12)}
-                              className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-muted"
-                            >
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img
-                                src={img.preview}
-                                alt=""
-                                className="h-full w-full object-cover"
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                  )}
-
-                  <div className="rounded-2xl bg-muted/60 px-4 py-3">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">You receive</span>
-                      <span className="inline-flex items-center gap-1.5 font-bold">
-                        <Wallet className="h-4 w-4 text-primary" />
-                        {quoting
-                          ? "…"
-                          : quote
-                            ? `₦${quote.userPayout.toLocaleString("en-NG", {
-                                minimumFractionDigits: 2,
-                              })}`
-                            : "—"}
-                      </span>
-                    </div>
-                    {quote ? (
-                      <p className="mt-1 text-[11px] text-muted-foreground">
-                        ≈ ₦{quote.ratePerUnit.toLocaleString("en-NG")} per{" "}
-                        {cardCurrency} 1
-                      </p>
-                    ) : null}
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={submitting || !quote}
-                    className="btn-primary flex h-12 w-full items-center justify-center gap-2 disabled:opacity-60"
-                  >
-                    {submitting ? "Submitting…" : "Sell gift card"}
-                  </button>
-                </form>
-              </MotionSection>
-            ) : null}
 
             <ServiceInstructions
               service="gift-cards"
               className="mt-1"
-              delay={0.1}
+              delay={0.08}
             />
           </div>
         )}

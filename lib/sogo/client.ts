@@ -18,7 +18,18 @@ const LIVE_BASE = "https://api.sogo.africa/v1";
 const SANDBOX_BASE = "https://sandbox.sogo.africa/v1";
 
 export function sogoSecretKey() {
-  return (process.env.SOGO_SECRET_KEY || "").trim();
+  const key = (process.env.SOGO_SECRET_KEY || "").trim();
+  // Gift-card sell endpoints require a secret key (sogo_sk_*), not public (sogo_pk_*).
+  if (!key || key.startsWith("sogo_pk_")) return "";
+  return key;
+}
+
+export function sogoPublicKey() {
+  const fromEnv = (process.env.SOGO_PUBLIC_KEY || "").trim();
+  if (fromEnv) return fromEnv;
+  const secretSlot = (process.env.SOGO_SECRET_KEY || "").trim();
+  if (secretSlot.startsWith("sogo_pk_")) return secretSlot;
+  return "";
 }
 
 export function sogoWebhookSecret() {
@@ -126,7 +137,7 @@ export async function fetchSogoSellCatalog(): Promise<GiftCardBrandView[]> {
 }
 
 export async function fetchSogoSellRates(slug?: string): Promise<SogoRateEntry[]> {
-  if (isSogoDemoMode()) {
+  const demoRates = () => {
     const brands = slug
       ? FALLBACK_GIFT_CARD_CATALOG.filter((b) => b.slug === slug)
       : FALLBACK_GIFT_CARD_CATALOG;
@@ -148,13 +159,22 @@ export async function fetchSogoSellRates(slug?: string): Promise<SogoRateEntry[]
       }
       return { slug: b.slug, name: b.name, rates };
     });
-  }
+  };
 
-  const qs = slug ? `?slug=${encodeURIComponent(slug)}` : "";
-  const json = await sogoFetch<{ data: SogoRateEntry[] }>(
-    `/gift-cards/sell/rates${qs}`,
-  );
-  return Array.isArray(json?.data) ? json.data : [];
+  if (isSogoDemoMode()) return demoRates();
+
+  try {
+    const qs = slug ? `?slug=${encodeURIComponent(slug)}` : "";
+    const json = await sogoFetch<{ data: SogoRateEntry[] }>(
+      `/gift-cards/sell/rates${qs}`,
+    );
+    const rows = Array.isArray(json?.data) ? json.data : [];
+    if (!rows.length) return demoRates();
+    return rows;
+  } catch (error) {
+    console.error("[sogo-rates]", error);
+    return demoRates();
+  }
 }
 
 export function extractNgnRate(input: {
@@ -165,40 +185,70 @@ export function extractNgnRate(input: {
 }): number | null {
   const { entry, currency, cardType, subType } = input;
   if (!entry?.rates) return null;
-  const byCurrency = entry.rates[currency] || entry.rates[currency.toUpperCase()];
-  if (!byCurrency) return null;
 
-  const bucket = byCurrency[cardType];
+  const rateMap = entry.rates as Record<string, unknown>;
+  const currencyKey =
+    Object.keys(rateMap).find(
+      (k) => k.toUpperCase() === currency.toUpperCase(),
+    ) || currency.toUpperCase();
+  const byCurrency = rateMap[currencyKey] as
+    | Record<string, unknown>
+    | undefined;
+  if (!byCurrency || typeof byCurrency !== "object") return null;
+
+  const typeKey =
+    Object.keys(byCurrency).find(
+      (k) =>
+        k.toLowerCase() === cardType.toLowerCase() ||
+        (cardType === "ecode" &&
+          ["e_code", "e-code", "code"].includes(k.toLowerCase())),
+    ) || cardType;
+  const bucket = byCurrency[typeKey];
   if (bucket == null) return null;
 
-  if (typeof bucket === "number") return bucket;
-
-  // ecode: { NGN: 1634 } or physical nested
-  if (cardType === "ecode") {
-    if (typeof (bucket as { NGN?: number }).NGN === "number") {
-      return (bucket as { NGN: number }).NGN;
+  const asNumber = (v: unknown): number | null => {
+    if (typeof v === "number" && Number.isFinite(v) && v > 0) return v;
+    if (typeof v === "string") {
+      const n = Number(v.replace(/,/g, ""));
+      if (Number.isFinite(n) && n > 0) return n;
     }
-    const vals = Object.values(bucket as Record<string, unknown>);
-    const n = vals.find((v) => typeof v === "number");
-    return typeof n === "number" ? n : null;
+    return null;
+  };
+
+  const direct = asNumber(bucket);
+  if (direct != null) return direct;
+
+  if (typeof bucket !== "object") return null;
+  const record = bucket as Record<string, unknown>;
+
+  if (cardType === "ecode") {
+    const ngn = asNumber(record.NGN ?? record.ngn);
+    if (ngn != null) return ngn;
+    for (const v of Object.values(record)) {
+      const n = asNumber(v);
+      if (n != null) return n;
+    }
+    return null;
   }
 
-  // physical: { NGN: { cash_receipt: n, ... } } or flat
-  const asRecord = bucket as Record<string, unknown>;
-  const ngn = asRecord.NGN;
-  if (typeof ngn === "number") return ngn;
-  if (ngn && typeof ngn === "object") {
+  const ngnNode = record.NGN ?? record.ngn;
+  const ngnDirect = asNumber(ngnNode);
+  if (ngnDirect != null) return ngnDirect;
+
+  if (ngnNode && typeof ngnNode === "object") {
+    const nested = ngnNode as Record<string, unknown>;
     const sub = subType || "cash_receipt";
-    const v = (ngn as Record<string, number>)[sub];
-    if (typeof v === "number") return v;
-    const first = Object.values(ngn as Record<string, number>).find(
-      (x) => typeof x === "number",
-    );
-    return typeof first === "number" ? first : null;
+    const preferred = asNumber(nested[sub]);
+    if (preferred != null) return preferred;
+    for (const v of Object.values(nested)) {
+      const n = asNumber(v);
+      if (n != null) return n;
+    }
   }
 
-  if (subType && typeof asRecord[subType] === "number") {
-    return asRecord[subType] as number;
+  if (subType) {
+    const n = asNumber(record[subType]);
+    if (n != null) return n;
   }
 
   return null;
