@@ -37,6 +37,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { giftCardImageFallbacks } from "@/lib/sogo/catalog";
 import { cn } from "@/lib/utils";
 
@@ -223,6 +231,7 @@ export default function GiftCardsPage() {
   const [buyCards, setBuyCards] = useState<
     { cardNumber: string | null; pinCode: string | null }[]
   >([]);
+  const isMobile = useIsMobile();
 
   const sellCategories = useMemo(() => {
     const set = new Set(sellBrands.map((b) => b.category));
@@ -1372,142 +1381,182 @@ export default function GiftCardsPage() {
         />
       ) : null}
 
-      <Dialog open={changeSellOpen} onOpenChange={setChangeSellOpen}>
-        <DialogContent className="max-h-[85vh] overflow-hidden rounded-[24px] p-0 sm:max-w-md">
-          <DialogHeader className="border-b border-border px-5 py-4 text-left">
-            <DialogTitle>Change gift card</DialogTitle>
-            <DialogDescription>
-              Pick another brand to sell without leaving this form.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="border-b border-border px-4 py-3">
-            <div className="relative">
-              <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <input
-                value={changeSellQuery}
-                onChange={(e) => setChangeSellQuery(e.target.value)}
-                placeholder="Search brands…"
-                className="h-11 w-full rounded-xl border border-border bg-background pr-3 pl-9 text-sm outline-none focus:border-primary"
-                autoFocus
-              />
-            </div>
+      <ChangeCardSheet
+        open={changeSellOpen}
+        onOpenChange={setChangeSellOpen}
+        isMobile={isMobile}
+        title="Change gift card"
+        description="Pick another brand to sell without leaving this form."
+        search={
+          <div className="relative">
+            <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={changeSellQuery}
+              onChange={(e) => setChangeSellQuery(e.target.value)}
+              placeholder="Search brands…"
+              className="h-11 w-full rounded-xl border border-border bg-background pr-3 pl-9 text-sm outline-none focus:border-primary"
+              autoFocus
+            />
           </div>
-          <div className="max-h-[50vh] overflow-y-auto">
-            {changeSellOptions.length ? (
-              changeSellOptions.map((brand) => {
-                const active = selectedSell?.slug === brand.slug;
-                const rate = rateMap[brand.slug];
-                return (
-                  <button
-                    key={brand.slug}
-                    type="button"
-                    onClick={() => {
-                      setSelectedSell(brand);
-                      setImages([]);
-                      setCode("");
-                      setChangeSellOpen(false);
-                    }}
-                    className={cn(
-                      "flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-muted/50",
-                      active && "bg-oryno-orange-muted",
-                    )}
-                  >
-                    <BrandLogo
-                      brand={{
-                        slug: brand.slug,
-                        image: brand.image,
-                        name: brand.name,
-                      }}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold">
-                        {brand.name}
-                      </p>
-                      <p className="truncate text-[11px] text-muted-foreground">
-                        {brand.category}
-                      </p>
-                    </div>
-                    <p className="shrink-0 text-sm font-bold tabular-nums">
-                      {rate != null ? `₦${rate.toLocaleString("en-NG")}` : "—"}
-                    </p>
-                  </button>
-                );
-              })
-            ) : (
-              <p className="px-4 py-8 text-center text-sm text-muted-foreground">
-                No brands match your search
-              </p>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+        }
+      >
+        {changeSellOptions.length ? (
+          changeSellOptions.map((brand) => {
+            const active = selectedSell?.slug === brand.slug;
+            const rate = rateMap[brand.slug];
+            return (
+              <button
+                key={brand.slug}
+                type="button"
+                onClick={() => {
+                  setSelectedSell(brand);
+                  setImages([]);
+                  setCode("");
+                  setChangeSellOpen(false);
+                }}
+                className={cn(
+                  "flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-muted/50",
+                  active && "bg-oryno-orange-muted",
+                )}
+              >
+                <BrandLogo
+                  brand={{
+                    slug: brand.slug,
+                    image: brand.image,
+                    name: brand.name,
+                  }}
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold">{brand.name}</p>
+                  <p className="truncate text-[11px] text-muted-foreground">
+                    {brand.category}
+                  </p>
+                </div>
+                <p className="shrink-0 text-sm font-bold tabular-nums">
+                  {rate != null ? `₦${rate.toLocaleString("en-NG")}` : "—"}
+                </p>
+              </button>
+            );
+          })
+        ) : (
+          <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+            No brands match your search
+          </p>
+        )}
+      </ChangeCardSheet>
 
-      <Dialog open={changeBuyOpen} onOpenChange={setChangeBuyOpen}>
-        <DialogContent className="max-h-[85vh] overflow-hidden rounded-[24px] p-0 sm:max-w-md">
-          <DialogHeader className="border-b border-border px-5 py-4 text-left">
-            <DialogTitle>Change gift card</DialogTitle>
-            <DialogDescription>
-              Pick another product to buy without leaving this form.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="border-b border-border px-4 py-3">
-            <div className="relative">
-              <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <input
-                value={changeBuyQuery}
-                onChange={(e) => setChangeBuyQuery(e.target.value)}
-                placeholder="Search products…"
-                className="h-11 w-full rounded-xl border border-border bg-background pr-3 pl-9 text-sm outline-none focus:border-primary"
-                autoFocus
-              />
-            </div>
+      <ChangeCardSheet
+        open={changeBuyOpen}
+        onOpenChange={setChangeBuyOpen}
+        isMobile={isMobile}
+        title="Change gift card"
+        description="Pick another product to buy without leaving this form."
+        search={
+          <div className="relative">
+            <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={changeBuyQuery}
+              onChange={(e) => setChangeBuyQuery(e.target.value)}
+              placeholder="Search products…"
+              className="h-11 w-full rounded-xl border border-border bg-background pr-3 pl-9 text-sm outline-none focus:border-primary"
+              autoFocus
+            />
           </div>
-          <div className="max-h-[50vh] overflow-y-auto">
-            {changeBuyOptions.length ? (
-              changeBuyOptions.map((product) => {
-                const active = selectedBuy?.productId === product.productId;
-                return (
-                  <button
-                    key={product.productId}
-                    type="button"
-                    onClick={() => {
-                      setSelectedBuy(product);
-                      setChangeBuyOpen(false);
-                    }}
-                    className={cn(
-                      "flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-muted/50",
-                      active && "bg-oryno-orange-muted",
-                    )}
-                  >
-                    <BrandLogo
-                      brand={{
-                        image: product.image,
-                        name: product.brandName,
-                      }}
-                      fallbacks={product.imageFallbacks}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold">
-                        {product.brandName}
-                      </p>
-                      <p className="truncate text-[11px] text-muted-foreground">
-                        {product.name}
-                      </p>
-                    </div>
-                    <p className="shrink-0 text-[10px] font-medium text-muted-foreground">
-                      {product.countryCode}
-                    </p>
-                  </button>
-                );
-              })
-            ) : (
-              <p className="px-4 py-8 text-center text-sm text-muted-foreground">
-                No products match your search
-              </p>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+        }
+      >
+        {changeBuyOptions.length ? (
+          changeBuyOptions.map((product) => {
+            const active = selectedBuy?.productId === product.productId;
+            return (
+              <button
+                key={product.productId}
+                type="button"
+                onClick={() => {
+                  setSelectedBuy(product);
+                  setChangeBuyOpen(false);
+                }}
+                className={cn(
+                  "flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-muted/50",
+                  active && "bg-oryno-orange-muted",
+                )}
+              >
+                <BrandLogo
+                  brand={{
+                    image: product.image,
+                    name: product.brandName,
+                  }}
+                  fallbacks={product.imageFallbacks}
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold">
+                    {product.brandName}
+                  </p>
+                  <p className="truncate text-[11px] text-muted-foreground">
+                    {product.name}
+                  </p>
+                </div>
+                <p className="shrink-0 text-[10px] font-medium text-muted-foreground">
+                  {product.countryCode}
+                </p>
+              </button>
+            );
+          })
+        ) : (
+          <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+            No products match your search
+          </p>
+        )}
+      </ChangeCardSheet>
     </AppShell>
+  );
+}
+
+function ChangeCardSheet({
+  open,
+  onOpenChange,
+  isMobile,
+  title,
+  description,
+  search,
+  children,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  isMobile: boolean;
+  title: string;
+  description: string;
+  search: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  if (isMobile) {
+    return (
+      <Drawer open={open} onOpenChange={onOpenChange}>
+        <DrawerContent className="flex max-h-[88vh] flex-col rounded-t-[28px] border-border pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <DrawerHeader className="gap-1 border-b border-border px-5 pb-3 pt-2 text-left">
+            <DrawerTitle>{title}</DrawerTitle>
+            <DrawerDescription>{description}</DrawerDescription>
+          </DrawerHeader>
+          <div className="shrink-0 border-b border-border px-4 py-3">
+            {search}
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+            {children}
+          </div>
+        </DrawerContent>
+      </Drawer>
+    );
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[85vh] overflow-hidden rounded-[24px] p-0 sm:max-w-md">
+        <DialogHeader className="border-b border-border px-5 py-4 text-left">
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
+        </DialogHeader>
+        <div className="border-b border-border px-4 py-3">{search}</div>
+        <div className="max-h-[50vh] overflow-y-auto">{children}</div>
+      </DialogContent>
+    </Dialog>
   );
 }

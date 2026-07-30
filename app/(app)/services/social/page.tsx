@@ -47,6 +47,20 @@ function priceFor(service: JapServiceRow, quantity: number) {
   return (service.priceLocalPerThousand * quantity) / 1000;
 }
 
+/** Preset quantities within a package min/max — user must pick one. */
+function quantityOptions(min: number, max: number) {
+  const presets = [
+    50, 100, 250, 500, 750, 1000, 1500, 2000, 2500, 5000, 7500, 10000, 15000,
+    20000, 25000, 50000, 75000, 100000, 250000, 500000, 1000000,
+  ];
+  const opts = presets.filter((n) => n >= min && n <= max);
+  if (!opts.includes(min)) opts.unshift(min);
+  if (max !== min && max <= 1_000_000 && !opts.includes(max) && opts.length < 14) {
+    opts.push(max);
+  }
+  return Array.from(new Set(opts)).sort((a, b) => a - b);
+}
+
 const selectClassName = cn(authInputClassName, "appearance-none pr-10");
 
 export default function SocialBoostPage() {
@@ -57,7 +71,7 @@ export default function SocialBoostPage() {
   const [services, setServices] = useState<JapServiceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [quantity, setQuantity] = useState(1000);
+  const [quantity, setQuantity] = useState<number | null>(null);
   const [profileUrl, setProfileUrl] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -105,11 +119,7 @@ export default function SocialBoostPage() {
               s.platform === firstPlatform && s.metric === firstMetric,
           ) ?? list[0] ?? null;
         setSelectedId(firstPkg?.service ?? null);
-        if (firstPkg) {
-          setQuantity(
-            clampQty(firstPkg.sampleQuantity, firstPkg.min, firstPkg.max),
-          );
-        }
+        setQuantity(null);
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : "Failed to load services");
@@ -147,10 +157,16 @@ export default function SocialBoostPage() {
     packagesForType[0] ??
     null;
 
-  const amount = selected ? priceFor(selected, quantity) : 0;
+  const qtyOptions = useMemo(
+    () => (selected ? quantityOptions(selected.min, selected.max) : []),
+    [selected],
+  );
+
+  const amount =
+    selected && quantity != null ? priceFor(selected, quantity) : 0;
 
   const canSubmit = useMemo(() => {
-    if (!selected || submitting) return false;
+    if (!selected || submitting || quantity == null) return false;
     if (quantity < selected.min || quantity > selected.max) return false;
     const link = profileUrl.trim();
     return link.length > 4 && /^(https?:\/\/|@|t\.me\/)/i.test(link);
@@ -162,7 +178,11 @@ export default function SocialBoostPage() {
   useEffect(() => {
     if (!selected) return;
     setSelectedId(selected.service);
-    setQuantity((q) => clampQty(q, selected.min, selected.max));
+    setQuantity((q) => {
+      if (q == null) return null;
+      if (q < selected.min || q > selected.max) return null;
+      return q;
+    });
   }, [selected]);
 
   // Keep metric valid when platform changes (instant, no network).
@@ -226,9 +246,7 @@ export default function SocialBoostPage() {
       (s) => s.platform === next && s.metric === nextMetric,
     );
     setSelectedId(match?.service ?? null);
-    if (match) {
-      setQuantity(clampQty(match.sampleQuantity, match.min, match.max));
-    }
+    setQuantity(null);
   }
 
   function onMetricChange(next: string) {
@@ -238,22 +256,30 @@ export default function SocialBoostPage() {
         (!platform || s.platform === platform) && s.metric === next,
     );
     setSelectedId(match?.service ?? null);
-    if (match) {
-      setQuantity(clampQty(match.sampleQuantity, match.min, match.max));
-    }
+    setQuantity(null);
   }
 
   function onPackageChange(serviceId: number) {
-    const match = packagesForType.find((s) => s.service === serviceId);
     setSelectedId(serviceId);
-    if (match) {
-      setQuantity(clampQty(match.sampleQuantity, match.min, match.max));
+    setQuantity(null);
+  }
+
+  function onQuantityChange(value: string) {
+    if (!value) {
+      setQuantity(null);
+      return;
     }
+    const n = Number(value);
+    if (!selected || !Number.isFinite(n)) {
+      setQuantity(null);
+      return;
+    }
+    setQuantity(clampQty(n, selected.min, selected.max));
   }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!canSubmit || !selected) return;
+    if (!canSubmit || !selected || quantity == null) return;
     setSubmitting(true);
     setError(null);
     try {
@@ -312,8 +338,9 @@ export default function SocialBoostPage() {
                 Boost ordered
               </h2>
               <p className="mt-2 text-sm text-muted-foreground">
-                {quantity.toLocaleString()} {selected.metric.toLowerCase()} for{" "}
-                {selected.platform} · {receipt}
+                {(quantity ?? 0).toLocaleString()}{" "}
+                {selected.metric.toLowerCase()} for {selected.platform} ·{" "}
+                {receipt}
               </p>
               {statusLabel ? (
                 <p className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-primary">
@@ -334,6 +361,7 @@ export default function SocialBoostPage() {
                   onClick={() => {
                     setSuccess(false);
                     setStatusLabel(null);
+                    setQuantity(null);
                   }}
                   className="btn-primary h-12 px-6"
                 >
@@ -440,7 +468,41 @@ export default function SocialBoostPage() {
                   </div>
                 </AuthField>
 
-                {selected ? (
+                <AuthField label="Quantity">
+                  <div className="relative">
+                    <select
+                      value={quantity ?? ""}
+                      onChange={(e) => onQuantityChange(e.target.value)}
+                      disabled={!selected || !qtyOptions.length}
+                      className={selectClassName}
+                      required
+                    >
+                      <option value="">
+                        {!selected
+                          ? "Select a package first"
+                          : "Select quantity"}
+                      </option>
+                      {qtyOptions.map((n) => (
+                        <option key={n} value={n}>
+                          {n.toLocaleString()}{" "}
+                          {selected?.metric?.toLowerCase() || "units"}
+                          {selected
+                            ? ` · ${money(priceFor(selected, n))}`
+                            : ""}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute top-1/2 right-3.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  </div>
+                  {selected ? (
+                    <p className="mt-1.5 text-xs text-muted-foreground">
+                      Allowed range {selected.min.toLocaleString()}–
+                      {selected.max.toLocaleString()}
+                    </p>
+                  ) : null}
+                </AuthField>
+
+                {selected && quantity != null ? (
                   <div className="rounded-2xl border border-border bg-muted/40 px-4 py-3.5">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -448,15 +510,15 @@ export default function SocialBoostPage() {
                           {selected.name}
                         </p>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          Min {selected.min.toLocaleString()} · Max{" "}
-                          {selected.max.toLocaleString()}
+                          {quantity.toLocaleString()}{" "}
+                          {selected.metric.toLowerCase()}
                           {selected.refill ? " · Refill available" : ""}
                         </p>
                       </div>
                       <p className="shrink-0 text-right text-sm font-bold text-foreground">
-                        {money(selected.samplePriceLocal)}
+                        {money(amount)}
                         <span className="block text-[10px] font-medium text-muted-foreground">
-                          / {selected.sampleQuantity.toLocaleString()}
+                          total
                         </span>
                       </p>
                     </div>
@@ -487,34 +549,6 @@ export default function SocialBoostPage() {
                   />
                 </div>
               </label>
-
-              {selected ? (
-                <label className="mt-4 block">
-                  <span className="text-sm font-semibold text-foreground">
-                    Quantity
-                  </span>
-                  <input
-                    type="number"
-                    min={selected.min}
-                    max={selected.max}
-                    value={quantity}
-                    onChange={(e) =>
-                      setQuantity(
-                        clampQty(
-                          Number(e.target.value),
-                          selected.min,
-                          selected.max,
-                        ),
-                      )
-                    }
-                    className="mt-2 h-12 w-full rounded-[14px] border border-border bg-background px-4 text-base font-semibold outline-none focus:border-primary"
-                  />
-                  <p className="mt-1.5 text-xs text-muted-foreground">
-                    Allowed range {selected.min.toLocaleString()}–
-                    {selected.max.toLocaleString()}
-                  </p>
-                </label>
-              ) : null}
             </MotionSection>
 
             <MotionSection
@@ -540,15 +574,17 @@ export default function SocialBoostPage() {
                 <SummaryRow
                   label="Quantity"
                   value={
-                    selected
+                    selected && quantity != null
                       ? `${quantity.toLocaleString()} ${selected.metric}`
-                      : "—"
+                      : "Select quantity"
                   }
                 />
                 <SummaryRow label="Target" value={profileUrl || "—"} />
                 <SummaryRow
                   label="Amount"
-                  value={money(amount)}
+                  value={
+                    selected && quantity != null ? money(amount) : "—"
+                  }
                   accent
                 />
                 <div className="flex items-center justify-between border-t border-border pt-3">
@@ -572,9 +608,9 @@ export default function SocialBoostPage() {
               >
                 {submitting
                   ? "Processing…"
-                  : selected
+                  : selected && quantity != null
                     ? `Boost now · ${money(amount)}`
-                    : "Boost now"}
+                    : "Select quantity to continue"}
               </motion.button>
             </MotionSection>
           </form>
