@@ -18,6 +18,7 @@ export type JapPlatform = (typeof JAP_PLATFORMS)[number];
 export type JapCatalogService = JapService & {
   platform: Exclude<JapPlatform, "All">;
   metric: string;
+  quality: string;
   /** USD cost for `quantity` units (rate is typically per 1000) */
   priceUsdFor: (quantity: number) => number;
 };
@@ -161,6 +162,23 @@ export function detectMetric(name: string): string {
   return "Boost";
 }
 
+/** Quality tier inferred from JAP package titles / types. */
+export function detectQuality(name: string, type?: string): string {
+  const n = `${name} ${type || ""}`.toLowerCase();
+  if (/\b(premium|vip|elite|ultra)\b/.test(n)) return "Premium";
+  if (/\b(hq|high[\s-]?quality|real|organic|active|no[\s-]?drop)\b/.test(n)) {
+    return "High Quality";
+  }
+  if (/\b(instant|fast|speed|express)\b/.test(n)) return "Instant";
+  if (/\b(cheap|economy|budget|low[\s-]?drop|least)\b/.test(n)) {
+    return "Economy";
+  }
+  if (type && type.trim() && !/^default$/i.test(type.trim())) {
+    return type.trim();
+  }
+  return "Standard";
+}
+
 /** JAP rate is USD cost per 1000 units for Default services. */
 export function japUsdCost(ratePerThousand: number, quantity: number) {
   if (!Number.isFinite(ratePerThousand) || !Number.isFinite(quantity)) return 0;
@@ -170,10 +188,12 @@ export function japUsdCost(ratePerThousand: number, quantity: number) {
 export function enrichJapService(raw: JapService): JapCatalogService {
   const platform = detectPlatform(raw.category, raw.name);
   const metric = detectMetric(raw.name);
+  const quality = detectQuality(raw.name, raw.type);
   return {
     ...raw,
     platform,
     metric,
+    quality,
     priceUsdFor: (quantity: number) => japUsdCost(raw.rate, quantity),
   };
 }

@@ -16,13 +16,13 @@ export const runtime = "nodejs";
 
 /** Cap packages per platform+metric so the full catalog stays small & fast. */
 function diversifyJapCatalog<
-  T extends { platform: string; metric: string; rate: number },
->(list: T[], perGroup = 12) {
+  T extends { platform: string; metric: string; quality?: string; rate: number },
+>(list: T[], perGroup = 8) {
   const sorted = [...list].sort((a, b) => a.rate - b.rate);
   const counts = new Map<string, number>();
   const out: T[] = [];
   for (const item of sorted) {
-    const key = `${item.platform}::${item.metric}`;
+    const key = `${item.platform}::${item.metric}::${item.quality || "Standard"}`;
     const n = counts.get(key) ?? 0;
     if (n >= perGroup) continue;
     counts.set(key, n + 1);
@@ -75,6 +75,7 @@ export async function GET(req: Request) {
         category: s.category,
         platform: s.platform,
         metric: s.metric,
+        quality: s.quality,
         rate: s.rate,
         min: s.min,
         max: s.max,

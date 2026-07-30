@@ -36,6 +36,7 @@ type JapServiceRow = {
   category: string;
   platform: string;
   metric: string;
+  quality: string;
   rate: number;
   min: number;
   max: number;
@@ -82,6 +83,7 @@ export default function SocialBoostPage() {
   const [platforms, setPlatforms] = useState<string[]>([]);
   const [platform, setPlatform] = useState("");
   const [metric, setMetric] = useState("");
+  const [quality, setQuality] = useState("");
   const [services, setServices] = useState<JapServiceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -111,7 +113,12 @@ export default function SocialBoostPage() {
         const nextPlatforms: string[] = (data.platforms ?? []).filter(
           (p: string) => p && p !== "All",
         );
-        const list: JapServiceRow[] = data.services ?? [];
+        const list: JapServiceRow[] = (data.services ?? []).map(
+          (s: JapServiceRow) => ({
+            ...s,
+            quality: s.quality || "Standard",
+          }),
+        );
         setPlatforms(nextPlatforms);
         setServices(list);
 
@@ -127,11 +134,28 @@ export default function SocialBoostPage() {
           "";
         setMetric(firstMetric);
 
-        const firstPkg =
+        const firstQuality =
           list.find(
             (s) =>
               s.platform === firstPlatform && s.metric === firstMetric,
-          ) ?? list[0] ?? null;
+          )?.quality ||
+          list[0]?.quality ||
+          "Standard";
+        setQuality(firstQuality);
+
+        const firstPkg =
+          list.find(
+            (s) =>
+              s.platform === firstPlatform &&
+              s.metric === firstMetric &&
+              s.quality === firstQuality,
+          ) ??
+          list.find(
+            (s) =>
+              s.platform === firstPlatform && s.metric === firstMetric,
+          ) ??
+          list[0] ??
+          null;
         setSelectedId(firstPkg?.service ?? null);
         setQuantityText("");
       } catch (e) {
@@ -158,13 +182,41 @@ export default function SocialBoostPage() {
     return Array.from(set);
   }, [services, platform]);
 
+  const qualities = useMemo(() => {
+    const order = [
+      "Premium",
+      "High Quality",
+      "Instant",
+      "Standard",
+      "Economy",
+    ];
+    const set = new Set(
+      services
+        .filter(
+          (s) =>
+            (!platform || s.platform === platform) &&
+            (!metric || s.metric === metric),
+        )
+        .map((s) => s.quality || "Standard"),
+    );
+    return Array.from(set).sort((a, b) => {
+      const ai = order.indexOf(a);
+      const bi = order.indexOf(b);
+      if (ai === -1 && bi === -1) return a.localeCompare(b);
+      if (ai === -1) return 1;
+      if (bi === -1) return -1;
+      return ai - bi;
+    });
+  }, [services, platform, metric]);
+
   const packagesForType = useMemo(() => {
     return services.filter(
       (s) =>
         (!platform || s.platform === platform) &&
-        (!metric || s.metric === metric),
+        (!metric || s.metric === metric) &&
+        (!quality || (s.quality || "Standard") === quality),
     );
-  }, [services, platform, metric]);
+  }, [services, platform, metric, quality]);
 
   const selected =
     packagesForType.find((s) => s.service === selectedId) ??
@@ -232,13 +284,20 @@ export default function SocialBoostPage() {
     });
   }, [selected]);
 
-  // Keep metric valid when platform changes (instant, no network).
+  // Keep metric / quality valid when upstream filters change.
   useEffect(() => {
     if (!platform || !metrics.length) return;
     if (!metrics.includes(metric)) {
       setMetric(metrics[0]);
     }
   }, [platform, metrics, metric]);
+
+  useEffect(() => {
+    if (!qualities.length) return;
+    if (!qualities.includes(quality)) {
+      setQuality(qualities[0]);
+    }
+  }, [qualities, quality]);
 
   useEffect(() => {
     if (!success || !orderId || orderId.startsWith("demo_")) return;
@@ -289,8 +348,22 @@ export default function SocialBoostPage() {
     );
     const nextMetric = nextMetrics[0] || "";
     setMetric(nextMetric);
+    const nextQualities = Array.from(
+      new Set(
+        services
+          .filter(
+            (s) => s.platform === next && s.metric === nextMetric,
+          )
+          .map((s) => s.quality || "Standard"),
+      ),
+    );
+    const nextQuality = nextQualities[0] || "";
+    setQuality(nextQuality);
     const match = services.find(
-      (s) => s.platform === next && s.metric === nextMetric,
+      (s) =>
+        s.platform === next &&
+        s.metric === nextMetric &&
+        (s.quality || "Standard") === nextQuality,
     );
     setSelectedId(match?.service ?? null);
     setQuantityText("");
@@ -298,9 +371,35 @@ export default function SocialBoostPage() {
 
   function onMetricChange(next: string) {
     setMetric(next);
+    const nextQualities = Array.from(
+      new Set(
+        services
+          .filter(
+            (s) =>
+              (!platform || s.platform === platform) && s.metric === next,
+          )
+          .map((s) => s.quality || "Standard"),
+      ),
+    );
+    const nextQuality = nextQualities[0] || "";
+    setQuality(nextQuality);
     const match = services.find(
       (s) =>
-        (!platform || s.platform === platform) && s.metric === next,
+        (!platform || s.platform === platform) &&
+        s.metric === next &&
+        (s.quality || "Standard") === nextQuality,
+    );
+    setSelectedId(match?.service ?? null);
+    setQuantityText("");
+  }
+
+  function onQualityChange(next: string) {
+    setQuality(next);
+    const match = services.find(
+      (s) =>
+        (!platform || s.platform === platform) &&
+        (!metric || s.metric === metric) &&
+        (s.quality || "Standard") === next,
     );
     setSelectedId(match?.service ?? null);
     setQuantityText("");
@@ -458,7 +557,7 @@ export default function SocialBoostPage() {
                     Choose boost
                   </h2>
                   <p className="text-sm text-muted-foreground">
-                    Pick a platform, then the type of boost
+                    Platform, type, quality, then package
                   </p>
                 </div>
               </div>
@@ -492,6 +591,23 @@ export default function SocialBoostPage() {
                   sheetTitle="Type of service"
                   sheetDescription="Followers, likes, views, and more"
                   onChange={onMetricChange}
+                />
+
+                <BoostField
+                  label="Quality type"
+                  isMobile={isMobile}
+                  value={quality}
+                  placeholder={
+                    !metric ? "Select a type first" : "Select quality"
+                  }
+                  options={qualities.map((item) => ({
+                    value: item,
+                    label: item,
+                  }))}
+                  disabled={!qualities.length}
+                  sheetTitle="Quality type"
+                  sheetDescription="Premium, high quality, economy, and more"
+                  onChange={onQualityChange}
                 />
 
                 <BoostField
@@ -627,6 +743,10 @@ export default function SocialBoostPage() {
                 <SummaryRow
                   label="Type"
                   value={selected?.metric ?? "—"}
+                />
+                <SummaryRow
+                  label="Quality"
+                  value={selected?.quality || quality || "—"}
                 />
                 <SummaryRow
                   label="Package"
