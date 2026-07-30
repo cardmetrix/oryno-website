@@ -16,8 +16,10 @@ import {
   Clock3,
   Copy,
   ImagePlus,
+  RefreshCw,
   Search,
   ShoppingBag,
+  Trash2,
   TrendingDown,
   TrendingUp,
   Wallet,
@@ -28,8 +30,18 @@ import { ErrorAlertModal } from "@/components/app/error-alert-modal";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
 import { ServiceInstructions } from "@/components/app/service-instructions";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { giftCardImageFallbacks } from "@/lib/sogo/catalog";
 import { cn } from "@/lib/utils";
+
+const MAX_CARD_IMAGE_BYTES = 2_500_000;
+const MAX_CARD_IMAGES = 5;
 
 type Mode = "sell" | "buy";
 
@@ -188,6 +200,8 @@ export default function GiftCardsPage() {
   const [sellReceiptAmount, setSellReceiptAmount] = useState("");
   const [sellReceiptRef, setSellReceiptRef] = useState("");
   const [sellTxId, setSellTxId] = useState("");
+  const [changeSellOpen, setChangeSellOpen] = useState(false);
+  const [changeSellQuery, setChangeSellQuery] = useState("");
 
   // ── Buy state ───────────────────────────────────────────────
   const [buyProducts, setBuyProducts] = useState<BuyProduct[]>([]);
@@ -198,6 +212,8 @@ export default function GiftCardsPage() {
   const [selectedBuy, setSelectedBuy] = useState<BuyProduct | null>(null);
   const [buyAmount, setBuyAmount] = useState("25");
   const [buyEmail, setBuyEmail] = useState("");
+  const [changeBuyOpen, setChangeBuyOpen] = useState(false);
+  const [changeBuyQuery, setChangeBuyQuery] = useState("");
   const [buyQuote, setBuyQuote] = useState<BuyQuote | null>(null);
   const [buyQuoting, setBuyQuoting] = useState(false);
   const [buySubmitting, setBuySubmitting] = useState(false);
@@ -235,6 +251,27 @@ export default function GiftCardsPage() {
         p.brandName.toLowerCase().includes(q),
     );
   }, [buyProducts, buyQuery]);
+
+  const changeSellOptions = useMemo(() => {
+    const q = changeSellQuery.trim().toLowerCase();
+    if (!q) return sellBrands;
+    return sellBrands.filter(
+      (b) =>
+        b.name.toLowerCase().includes(q) ||
+        b.slug.includes(q) ||
+        b.category.toLowerCase().includes(q),
+    );
+  }, [sellBrands, changeSellQuery]);
+
+  const changeBuyOptions = useMemo(() => {
+    const q = changeBuyQuery.trim().toLowerCase();
+    if (!q) return buyProducts;
+    return buyProducts.filter(
+      (p) =>
+        p.name.toLowerCase().includes(q) ||
+        p.brandName.toLowerCase().includes(q),
+    );
+  }, [buyProducts, changeBuyQuery]);
 
   // Load sell catalog
   useEffect(() => {
@@ -394,13 +431,22 @@ export default function GiftCardsPage() {
   }, [selectedBuy, buyAmount, buyCountry]);
 
   async function onPickImages(e: ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files || []).slice(0, 5);
-    const next: typeof images = [];
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+
+    const next = [...images];
     for (const file of files) {
-      if (!file.type.startsWith("image/")) continue;
-      if (file.size > 2_500_000) {
+      if (!file.type.startsWith("image/")) {
+        setError("Please choose an image file (any image format).");
+        continue;
+      }
+      if (file.size > MAX_CARD_IMAGE_BYTES) {
         setError("Each image must be under 2.5MB");
         continue;
+      }
+      if (next.length >= MAX_CARD_IMAGES) {
+        setError(`You can upload up to ${MAX_CARD_IMAGES} images`);
+        break;
       }
       const dataUrl = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
@@ -409,14 +455,18 @@ export default function GiftCardsPage() {
         reader.readAsDataURL(file);
       });
       next.push({
-        filename: file.name,
-        mime: file.type,
+        filename: file.name || `card-${Date.now()}-${next.length}.img`,
+        mime: file.type || "image/jpeg",
         base64: dataUrl.split(",")[1] || "",
         preview: dataUrl,
       });
     }
     setImages(next);
     e.target.value = "";
+  }
+
+  function removeImage(index: number) {
+    setImages((prev) => prev.filter((_, i) => i !== index));
   }
 
   async function onSellSubmit(e: FormEvent) {
@@ -624,16 +674,32 @@ export default function GiftCardsPage() {
                         {sellDemo ? " · demo rates" : " · live rates"}
                       </p>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm font-bold">
-                        ₦
-                        {(
-                          rateMap[selectedSell.slug] ??
-                          sellQuote?.ratePerUnit ??
-                          0
-                        ).toLocaleString("en-NG")}
-                      </p>
-                      <p className="text-[11px] text-muted-foreground">per $1</p>
+                    <div className="flex items-center gap-2">
+                      <div className="text-right">
+                        <p className="text-sm font-bold">
+                          ₦
+                          {(
+                            rateMap[selectedSell.slug] ??
+                            sellQuote?.ratePerUnit ??
+                            0
+                          ).toLocaleString("en-NG")}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          per $1
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setChangeSellQuery("");
+                          setChangeSellOpen(true);
+                        }}
+                        className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-muted/50 text-muted-foreground transition hover:border-primary/40 hover:bg-oryno-orange-muted hover:text-primary"
+                        aria-label="Change gift card"
+                        title="Change gift card"
+                      >
+                        <RefreshCw className="h-4 w-4" strokeWidth={1.75} />
+                      </button>
                     </div>
                   </div>
                 </MotionSection>
@@ -758,34 +824,47 @@ export default function GiftCardsPage() {
                     ) : (
                       <div className="mt-4">
                         <p className="text-xs font-semibold text-muted-foreground">
-                          Card photos (1–5)
+                          Card photos (1–{MAX_CARD_IMAGES}) · max 2.5MB each
                         </p>
-                        <label className="mt-2 flex h-28 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-muted/40 text-muted-foreground">
+                        <label className="mt-2 flex h-28 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-muted/40 text-muted-foreground transition hover:border-primary/40 hover:bg-oryno-orange-muted/30">
                           <ImagePlus className="h-6 w-6" />
                           <span className="mt-2 text-xs font-medium">
-                            Upload clear front photos
+                            {images.length
+                              ? "Add another photo"
+                              : "Upload clear card photos"}
+                          </span>
+                          <span className="mt-1 text-[10px] text-muted-foreground">
+                            Any image format · under 2.5MB
                           </span>
                           <input
                             type="file"
-                            accept="image/jpeg,image/png,image/webp"
+                            accept="image/*"
                             multiple
                             className="hidden"
                             onChange={onPickImages}
                           />
                         </label>
                         {images.length ? (
-                          <div className="mt-3 flex gap-2 overflow-x-auto">
-                            {images.map((img) => (
+                          <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+                            {images.map((img, index) => (
                               <div
-                                key={img.filename + img.preview.slice(-8)}
-                                className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-muted"
+                                key={`${img.filename}-${index}-${img.preview.slice(-12)}`}
+                                className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-muted ring-1 ring-border"
                               >
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img
                                   src={img.preview}
-                                  alt=""
+                                  alt={`Card photo ${index + 1}`}
                                   className="h-full w-full object-cover"
                                 />
+                                <button
+                                  type="button"
+                                  onClick={() => removeImage(index)}
+                                  className="absolute right-1 top-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-white transition hover:bg-black"
+                                  aria-label={`Remove photo ${index + 1}`}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </button>
                               </div>
                             ))}
                           </div>
@@ -1079,6 +1158,18 @@ export default function GiftCardsPage() {
                         {buyDemo ? " · demo" : ""}
                       </p>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setChangeBuyQuery("");
+                        setChangeBuyOpen(true);
+                      }}
+                      className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-muted/50 text-muted-foreground transition hover:border-primary/40 hover:bg-oryno-orange-muted hover:text-primary"
+                      aria-label="Change gift card"
+                      title="Change gift card"
+                    >
+                      <RefreshCw className="h-4 w-4" strokeWidth={1.75} />
+                    </button>
                   </div>
                   {selectedBuy.redeemHint ? (
                     <p className="mt-3 text-xs text-muted-foreground">
@@ -1280,6 +1371,143 @@ export default function GiftCardsPage() {
           delay={0.1}
         />
       ) : null}
+
+      <Dialog open={changeSellOpen} onOpenChange={setChangeSellOpen}>
+        <DialogContent className="max-h-[85vh] overflow-hidden rounded-[24px] p-0 sm:max-w-md">
+          <DialogHeader className="border-b border-border px-5 py-4 text-left">
+            <DialogTitle>Change gift card</DialogTitle>
+            <DialogDescription>
+              Pick another brand to sell without leaving this form.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="border-b border-border px-4 py-3">
+            <div className="relative">
+              <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                value={changeSellQuery}
+                onChange={(e) => setChangeSellQuery(e.target.value)}
+                placeholder="Search brands…"
+                className="h-11 w-full rounded-xl border border-border bg-background pr-3 pl-9 text-sm outline-none focus:border-primary"
+                autoFocus
+              />
+            </div>
+          </div>
+          <div className="max-h-[50vh] overflow-y-auto">
+            {changeSellOptions.length ? (
+              changeSellOptions.map((brand) => {
+                const active = selectedSell?.slug === brand.slug;
+                const rate = rateMap[brand.slug];
+                return (
+                  <button
+                    key={brand.slug}
+                    type="button"
+                    onClick={() => {
+                      setSelectedSell(brand);
+                      setImages([]);
+                      setCode("");
+                      setChangeSellOpen(false);
+                    }}
+                    className={cn(
+                      "flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-muted/50",
+                      active && "bg-oryno-orange-muted",
+                    )}
+                  >
+                    <BrandLogo
+                      brand={{
+                        slug: brand.slug,
+                        image: brand.image,
+                        name: brand.name,
+                      }}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold">
+                        {brand.name}
+                      </p>
+                      <p className="truncate text-[11px] text-muted-foreground">
+                        {brand.category}
+                      </p>
+                    </div>
+                    <p className="shrink-0 text-sm font-bold tabular-nums">
+                      {rate != null ? `₦${rate.toLocaleString("en-NG")}` : "—"}
+                    </p>
+                  </button>
+                );
+              })
+            ) : (
+              <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+                No brands match your search
+              </p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={changeBuyOpen} onOpenChange={setChangeBuyOpen}>
+        <DialogContent className="max-h-[85vh] overflow-hidden rounded-[24px] p-0 sm:max-w-md">
+          <DialogHeader className="border-b border-border px-5 py-4 text-left">
+            <DialogTitle>Change gift card</DialogTitle>
+            <DialogDescription>
+              Pick another product to buy without leaving this form.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="border-b border-border px-4 py-3">
+            <div className="relative">
+              <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                value={changeBuyQuery}
+                onChange={(e) => setChangeBuyQuery(e.target.value)}
+                placeholder="Search products…"
+                className="h-11 w-full rounded-xl border border-border bg-background pr-3 pl-9 text-sm outline-none focus:border-primary"
+                autoFocus
+              />
+            </div>
+          </div>
+          <div className="max-h-[50vh] overflow-y-auto">
+            {changeBuyOptions.length ? (
+              changeBuyOptions.map((product) => {
+                const active = selectedBuy?.productId === product.productId;
+                return (
+                  <button
+                    key={product.productId}
+                    type="button"
+                    onClick={() => {
+                      setSelectedBuy(product);
+                      setChangeBuyOpen(false);
+                    }}
+                    className={cn(
+                      "flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-muted/50",
+                      active && "bg-oryno-orange-muted",
+                    )}
+                  >
+                    <BrandLogo
+                      brand={{
+                        image: product.image,
+                        name: product.brandName,
+                      }}
+                      fallbacks={product.imageFallbacks}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold">
+                        {product.brandName}
+                      </p>
+                      <p className="truncate text-[11px] text-muted-foreground">
+                        {product.name}
+                      </p>
+                    </div>
+                    <p className="shrink-0 text-[10px] font-medium text-muted-foreground">
+                      {product.countryCode}
+                    </p>
+                  </button>
+                );
+              })
+            ) : (
+              <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+                No products match your search
+              </p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </AppShell>
   );
 }
