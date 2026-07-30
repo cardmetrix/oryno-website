@@ -4,6 +4,7 @@ import { desc, eq } from "drizzle-orm";
 import { ensureAppUser } from "@/lib/auth/current-user";
 import { db } from "@/lib/db";
 import { kycSubmissions, users } from "@/lib/db/schema";
+import { createNotification } from "@/lib/notifications-service";
 
 export const runtime = "nodejs";
 
@@ -37,6 +38,8 @@ export async function GET() {
             selfieUrl: latest.selfieUrl,
             status: latest.status,
             rejectionReason: latest.rejectionReason,
+            submittedAt: latest.updatedAt?.toISOString?.() ?? latest.createdAt?.toISOString?.() ?? null,
+            createdAt: latest.createdAt?.toISOString?.() ?? null,
           }
         : null,
     });
@@ -124,6 +127,22 @@ export async function POST(req: Request) {
         .update(users)
         .set({ kycStatus: "pending", updatedAt: new Date() })
         .where(eq(users.id, dbUser.id));
+
+      try {
+        await createNotification({
+          userId: dbUser.id,
+          title: "KYC under review",
+          body: "Your identity documents were received. We’ll notify you when verification is complete — usually within a few hours.",
+          type: "kyc",
+          metadata: {
+            href: "/settings/kyc",
+            kycStatus: "pending",
+            submissionId: submission.id,
+          },
+        });
+      } catch (notifyError) {
+        console.error("[kyc-submit-notify]", notifyError);
+      }
     }
 
     return NextResponse.json({
@@ -139,6 +158,11 @@ export async function POST(req: Request) {
         selfieUrl: submission.selfieUrl,
         status: submission.status,
         rejectionReason: submission.rejectionReason,
+        submittedAt:
+          submission.updatedAt?.toISOString?.() ??
+          submission.createdAt?.toISOString?.() ??
+          null,
+        createdAt: submission.createdAt?.toISOString?.() ?? null,
       },
     });
   } catch (error) {

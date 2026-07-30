@@ -1,6 +1,7 @@
 import {
   ArrowDownLeft,
   ArrowUpRight,
+  BadgeCheck,
   Bell,
   CheckCircle2,
   Gift,
@@ -47,6 +48,11 @@ export function notificationVisual(
     case "promo":
       return {
         icon: Gift,
+        color: "text-primary bg-oryno-orange-muted",
+      };
+    case "kyc":
+      return {
+        icon: BadgeCheck,
         color: "text-primary bg-oryno-orange-muted",
       };
     case "security":

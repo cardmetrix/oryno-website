@@ -7,7 +7,8 @@ export type NotificationType =
   | "promo"
   | "security"
   | "transfer"
-  | "service";
+  | "service"
+  | "kyc";
 
 export type AppNotificationDto = {
   id: string;

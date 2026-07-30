@@ -7,9 +7,11 @@ import {
   BadgeCheck,
   Camera,
   CheckCircle2,
+  Clock3,
   FileImage,
   Loader2,
   ShieldAlert,
+  ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/app-shell";
@@ -30,9 +32,42 @@ type Submission = {
   selfieUrl: string | null;
   status: string;
   rejectionReason: string | null;
+  submittedAt?: string | null;
+  createdAt?: string | null;
 };
 
 const ID_TYPES = ["NIN Slip", "National ID", "Passport", "Driver License"];
+
+const REVIEW_STEPS = [
+  {
+    key: "submitted",
+    label: "Documents submitted",
+    detail: "ID and selfie received securely",
+  },
+  {
+    key: "review",
+    label: "Under review",
+    detail: "Our team is verifying your identity",
+  },
+  {
+    key: "done",
+    label: "Verification complete",
+    detail: "You’ll get a notification when approved",
+  },
+] as const;
+
+function formatSubmittedAt(iso?: string | null) {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleString("en-NG", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
 
 export default function KycPage() {
   const [loading, setLoading] = useState(true);
@@ -49,8 +84,7 @@ export default function KycPage() {
   >(null);
 
   const step = useMemo(() => {
-    if (kycStatus === "verified") return 4;
-    if (kycStatus === "pending") return 4;
+    if (kycStatus === "verified" || kycStatus === "pending") return 4;
     if (selfieUrl) return 3;
     if (idFrontUrl && idNumber) return 2;
     return 1;
@@ -139,6 +173,9 @@ export default function KycPage() {
   }
 
   const locked = kycStatus === "verified" || kycStatus === "pending";
+  const submittedLabel = formatSubmittedAt(
+    submission?.submittedAt || submission?.createdAt,
+  );
 
   return (
     <AppShell>
@@ -148,7 +185,7 @@ export default function KycPage() {
           kycStatus === "verified"
             ? "Your identity is verified"
             : kycStatus === "pending"
-              ? "Under review"
+              ? "Pending verification"
               : `Step ${Math.min(step, 3)} of 3`
         }
         backHref="/settings"
@@ -157,9 +194,14 @@ export default function KycPage() {
       {loading ? (
         <MotionSection className="space-y-4 rounded-[28px] border border-border bg-background p-5 shadow-[var(--shadow-soft)]">
           <Skeleton className="h-2 w-full rounded-full" />
-          <Skeleton className="h-20 w-full rounded-[18px]" />
+          <Skeleton className="h-40 w-full rounded-[22px]" />
           <Skeleton className="h-11 w-full rounded-[14px]" />
         </MotionSection>
+      ) : kycStatus === "pending" ? (
+        <PendingVerificationView
+          submission={submission}
+          submittedLabel={submittedLabel}
+        />
       ) : (
         <>
           <MotionSection className="rounded-[28px] border border-border bg-background p-5 shadow-[var(--shadow-soft)]">
@@ -170,9 +212,7 @@ export default function KycPage() {
                   width:
                     kycStatus === "verified"
                       ? "100%"
-                      : kycStatus === "pending"
-                        ? "90%"
-                        : `${(step / 3) * 100}%`,
+                      : `${(Math.min(step, 3) / 3) * 100}%`,
                 }}
                 className="h-full rounded-full bg-gradient-to-r from-[#ff8124] via-oryno-orange to-[#e85d00]"
               />
@@ -184,13 +224,6 @@ export default function KycPage() {
                 title="Verified"
                 body="You have full access to ORYNO limits and payouts."
                 tone="success"
-              />
-            ) : kycStatus === "pending" ? (
-              <StatusCard
-                icon={CheckCircle2}
-                title="Pending review"
-                body="We’re reviewing your documents. This usually takes a few hours."
-                tone="pending"
               />
             ) : kycStatus === "rejected" ? (
               <StatusCard
@@ -209,7 +242,7 @@ export default function KycPage() {
             )}
           </MotionSection>
 
-          {!locked || kycStatus === "rejected" ? (
+          {!locked ? (
             <MotionSection
               delay={0.06}
               className="mt-4 space-y-4 rounded-[28px] border border-border bg-background p-5 shadow-[var(--shadow-soft)]"
@@ -281,6 +314,202 @@ export default function KycPage() {
         </>
       )}
     </AppShell>
+  );
+}
+
+function PendingVerificationView({
+  submission,
+  submittedLabel,
+}: {
+  submission: Submission | null;
+  submittedLabel: string | null;
+}) {
+  const docs = [
+    { label: "ID front", url: submission?.idFrontUrl },
+    { label: "ID back", url: submission?.idBackUrl },
+    { label: "Selfie", url: submission?.selfieUrl },
+  ].filter((d) => d.url);
+
+  return (
+    <div className="space-y-4">
+      <MotionSection className="overflow-hidden rounded-[28px] border border-border bg-background shadow-[var(--shadow-soft)]">
+        <div className="relative overflow-hidden bg-gradient-to-br from-[#ff8124] via-oryno-orange to-[#c94a00] px-5 pb-8 pt-7 text-white">
+          <motion.div
+            aria-hidden
+            className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/15"
+            animate={{ scale: [1, 1.12, 1], opacity: [0.35, 0.55, 0.35] }}
+            transition={{ duration: 4.5, repeat: Infinity, ease: "easeInOut" }}
+          />
+          <motion.div
+            aria-hidden
+            className="pointer-events-none absolute -bottom-16 left-8 h-36 w-36 rounded-full bg-black/10"
+            animate={{ scale: [1, 1.08, 1] }}
+            transition={{ duration: 5.5, repeat: Infinity, ease: "easeInOut" }}
+          />
+
+          <div className="relative flex flex-col items-center text-center">
+            <div className="relative mb-4">
+              <motion.span
+                className="absolute inset-0 rounded-full bg-white/25"
+                animate={{ scale: [1, 1.45, 1], opacity: [0.55, 0, 0.55] }}
+                transition={{ duration: 2.2, repeat: Infinity, ease: "easeOut" }}
+              />
+              <span className="relative flex h-16 w-16 items-center justify-center rounded-full bg-white/20 ring-1 ring-white/35 backdrop-blur-sm">
+                <ShieldCheck className="h-8 w-8" strokeWidth={1.75} />
+              </span>
+            </div>
+
+            <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-white/80">
+              Pending verification
+            </p>
+            <h2 className="mt-2 text-2xl font-bold tracking-tight">
+              We’re reviewing your KYC
+            </h2>
+            <p className="mt-2 max-w-sm text-sm text-white/85">
+              Your documents are in the review queue. You’ll get an in-app
+              notification as soon as a decision is made.
+            </p>
+
+            <div className="mt-5 inline-flex items-center gap-2 rounded-full bg-black/15 px-3.5 py-2 text-xs font-semibold ring-1 ring-white/20 backdrop-blur-sm">
+              <Clock3 className="h-3.5 w-3.5" />
+              Usually takes a few hours
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-5 p-5">
+          <div className="grid grid-cols-2 gap-2.5">
+            <div className="rounded-2xl border border-border bg-muted/40 px-3.5 py-3">
+              <p className="text-[11px] font-medium text-muted-foreground">
+                Submitted
+              </p>
+              <p className="mt-1 text-sm font-semibold text-foreground">
+                {submittedLabel || "Just now"}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-border bg-muted/40 px-3.5 py-3">
+              <p className="text-[11px] font-medium text-muted-foreground">
+                ID type
+              </p>
+              <p className="mt-1 truncate text-sm font-semibold text-foreground">
+                {submission?.idType || "—"}
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              Review progress
+            </p>
+            <ol className="space-y-0">
+              {REVIEW_STEPS.map((item, index) => {
+                const done = index === 0;
+                const active = index === 1;
+                const upcoming = index === 2;
+                return (
+                  <li key={item.key} className="flex gap-3">
+                    <div className="flex flex-col items-center">
+                      <span
+                        className={cn(
+                          "flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold",
+                          done && "bg-[var(--oryno-success)] text-white",
+                          active &&
+                            "bg-oryno-orange-muted text-primary ring-2 ring-primary/25",
+                          upcoming && "bg-muted text-muted-foreground",
+                        )}
+                      >
+                        {done ? (
+                          <CheckCircle2 className="h-4 w-4" />
+                        ) : active ? (
+                          <motion.span
+                            className="h-2.5 w-2.5 rounded-full bg-primary"
+                            animate={{ scale: [1, 1.35, 1], opacity: [1, 0.65, 1] }}
+                            transition={{
+                              duration: 1.4,
+                              repeat: Infinity,
+                              ease: "easeInOut",
+                            }}
+                          />
+                        ) : (
+                          index + 1
+                        )}
+                      </span>
+                      {index < REVIEW_STEPS.length - 1 ? (
+                        <span
+                          className={cn(
+                            "my-1 w-0.5 flex-1 min-h-6 rounded-full",
+                            done ? "bg-[var(--oryno-success)]" : "bg-border",
+                          )}
+                        />
+                      ) : null}
+                    </div>
+                    <div className={cn("pb-5", index === REVIEW_STEPS.length - 1 && "pb-0")}>
+                      <p
+                        className={cn(
+                          "text-sm font-semibold",
+                          upcoming ? "text-muted-foreground" : "text-foreground",
+                        )}
+                      >
+                        {item.label}
+                      </p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {item.detail}
+                      </p>
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+
+          {docs.length ? (
+            <div>
+              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                Submitted documents
+              </p>
+              <div className="grid grid-cols-3 gap-2.5">
+                {docs.map((doc) => (
+                  <div
+                    key={doc.label}
+                    className="overflow-hidden rounded-2xl border border-border bg-muted/30"
+                  >
+                    <div className="relative aspect-square">
+                      <Image
+                        src={doc.url!}
+                        alt={doc.label}
+                        fill
+                        className="object-cover"
+                        sizes="120px"
+                      />
+                    </div>
+                    <p className="truncate px-2 py-1.5 text-center text-[11px] font-medium text-muted-foreground">
+                      {doc.label}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          <div className="rounded-2xl border border-dashed border-primary/25 bg-oryno-orange-muted/50 px-4 py-3.5">
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-background text-primary">
+                <Clock3 className="h-4 w-4" />
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-foreground">
+                  We’ll notify you
+                </p>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  Check Notifications for the verification result. No need to
+                  resubmit while review is in progress.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </MotionSection>
+    </div>
   );
 }
 

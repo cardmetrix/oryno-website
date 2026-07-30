@@ -8,24 +8,15 @@ import { PageHeader } from "./page-header";
 
 
 type DashboardHeaderProps = {
-  name?: string;
   subtitle?: string;
 };
 
 export function DashboardHeader({
-  name,
   subtitle = "Welcome back to ORYNO",
 }: DashboardHeaderProps) {
   const { user } = useUser();
   const { country } = useCountry();
-  const displayName =
-    name ||
-    user?.fullName ||
-    user?.firstName ||
-    (typeof user?.unsafeMetadata?.fullName === "string"
-      ? user.unsafeMetadata.fullName
-      : null) ||
-    "there";
+  const displayName = user?.username || "there";
 
   return (
     <PageHeader
