@@ -68,15 +68,14 @@ export default function SocialBoostPage() {
   const [statusLabel, setStatusLabel] = useState<string | null>(null);
   const [polling, setPolling] = useState(false);
 
+  // Load the full catalog once — platform/type/package filter client-side.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
       setError(null);
       try {
-        const params = new URLSearchParams();
-        if (platform) params.set("platform", platform);
-        const res = await fetch(`/api/jap/services?${params.toString()}`);
+        const res = await fetch("/api/jap/services");
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Failed to load services");
         if (cancelled) return;
@@ -84,32 +83,31 @@ export default function SocialBoostPage() {
         const nextPlatforms: string[] = (data.platforms ?? []).filter(
           (p: string) => p && p !== "All",
         );
-        setPlatforms(nextPlatforms);
-
-        if (!platform && nextPlatforms[0]) {
-          setPlatform(nextPlatforms[0]);
-          return;
-        }
-
         const list: JapServiceRow[] = data.services ?? [];
+        setPlatforms(nextPlatforms);
         setServices(list);
 
-        const metrics = Array.from(
-          new Set(list.map((s) => s.metric).filter(Boolean)),
-        );
-        const nextMetric =
-          metric && metrics.includes(metric) ? metric : metrics[0] || "";
-        setMetric(nextMetric);
+        const firstPlatform =
+          nextPlatforms.find((p) => list.some((s) => s.platform === p)) ||
+          nextPlatforms[0] ||
+          "";
+        setPlatform(firstPlatform);
 
-        const filtered = nextMetric
-          ? list.filter((s) => s.metric === nextMetric)
-          : list;
-        const nextSelected =
-          filtered.find((s) => s.service === selectedId) ?? filtered[0] ?? null;
-        setSelectedId(nextSelected?.service ?? null);
-        if (nextSelected) {
-          setQuantity((q) =>
-            clampQty(q || nextSelected.sampleQuantity, nextSelected.min, nextSelected.max),
+        const firstMetric =
+          list.find((s) => s.platform === firstPlatform)?.metric ||
+          list[0]?.metric ||
+          "";
+        setMetric(firstMetric);
+
+        const firstPkg =
+          list.find(
+            (s) =>
+              s.platform === firstPlatform && s.metric === firstMetric,
+          ) ?? list[0] ?? null;
+        setSelectedId(firstPkg?.service ?? null);
+        if (firstPkg) {
+          setQuantity(
+            clampQty(firstPkg.sampleQuantity, firstPkg.min, firstPkg.max),
           );
         }
       } catch (e) {
@@ -124,8 +122,7 @@ export default function SocialBoostPage() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload on platform only
-  }, [platform]);
+  }, []);
 
   const metrics = useMemo(() => {
     const set = new Set(
@@ -164,8 +161,17 @@ export default function SocialBoostPage() {
 
   useEffect(() => {
     if (!selected) return;
+    setSelectedId(selected.service);
     setQuantity((q) => clampQty(q, selected.min, selected.max));
   }, [selected]);
+
+  // Keep metric valid when platform changes (instant, no network).
+  useEffect(() => {
+    if (!platform || !metrics.length) return;
+    if (!metrics.includes(metric)) {
+      setMetric(metrics[0]);
+    }
+  }, [platform, metrics, metric]);
 
   useEffect(() => {
     if (!success || !orderId || orderId.startsWith("demo_")) return;
@@ -206,16 +212,30 @@ export default function SocialBoostPage() {
 
   function onPlatformChange(next: string) {
     setPlatform(next);
-    setMetric("");
-    setSelectedId(null);
+    const nextMetrics = Array.from(
+      new Set(
+        services
+          .filter((s) => s.platform === next)
+          .map((s) => s.metric)
+          .filter(Boolean),
+      ),
+    );
+    const nextMetric = nextMetrics[0] || "";
+    setMetric(nextMetric);
+    const match = services.find(
+      (s) => s.platform === next && s.metric === nextMetric,
+    );
+    setSelectedId(match?.service ?? null);
+    if (match) {
+      setQuantity(clampQty(match.sampleQuantity, match.min, match.max));
+    }
   }
 
   function onMetricChange(next: string) {
     setMetric(next);
     const match = services.find(
       (s) =>
-        (!platform || s.platform === platform) &&
-        s.metric === next,
+        (!platform || s.platform === platform) && s.metric === next,
     );
     setSelectedId(match?.service ?? null);
     if (match) {
@@ -353,11 +373,13 @@ export default function SocialBoostPage() {
                     <select
                       value={platform}
                       onChange={(e) => onPlatformChange(e.target.value)}
-                      disabled={loading && !platforms.length}
+                      disabled={!platforms.length}
                       className={selectClassName}
                     >
                       {!platform ? (
-                        <option value="">Select platform</option>
+                        <option value="">
+                          {loading ? "Loading…" : "Select platform"}
+                        </option>
                       ) : null}
                       {platforms.map((item) => (
                         <option key={item} value={item}>
@@ -374,7 +396,7 @@ export default function SocialBoostPage() {
                     <select
                       value={metric}
                       onChange={(e) => onMetricChange(e.target.value)}
-                      disabled={loading || !metrics.length}
+                      disabled={!metrics.length}
                       className={selectClassName}
                     >
                       {!metric ? (
@@ -399,7 +421,7 @@ export default function SocialBoostPage() {
                       onChange={(e) =>
                         onPackageChange(Number(e.target.value))
                       }
-                      disabled={loading || !packagesForType.length}
+                      disabled={!packagesForType.length}
                       className={selectClassName}
                     >
                       {!selected ? (

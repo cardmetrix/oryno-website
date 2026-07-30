@@ -30,6 +30,9 @@ export function japMarkup() {
   return Number.isFinite(raw) && raw >= 1 ? raw : 1.30;
 }
 
+const JAP_SERVICES_TTL_MS = 10 * 60 * 1000;
+let japServicesCache: { at: number; data: JapService[] } | null = null;
+
 export type JapService = {
   service: number;
   name: string;
@@ -107,10 +110,18 @@ export async function getJapBalance() {
 }
 
 export async function getJapServices(): Promise<JapService[]> {
+  const now = Date.now();
+  if (
+    japServicesCache &&
+    now - japServicesCache.at < JAP_SERVICES_TTL_MS
+  ) {
+    return japServicesCache.data;
+  }
+
   const json = await japPost({ action: "services" });
   if (!Array.isArray(json)) throw new Error("Failed to load boost services");
 
-  return json
+  const data = json
     .map((row) => {
       const r = row as Record<string, unknown>;
       return {
@@ -126,6 +137,9 @@ export async function getJapServices(): Promise<JapService[]> {
       } satisfies JapService;
     })
     .filter((s) => Number.isFinite(s.service) && s.service > 0 && s.name);
+
+  japServicesCache = { at: now, data };
+  return data;
 }
 
 export async function addJapOrder(input: {

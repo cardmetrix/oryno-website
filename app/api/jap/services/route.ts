@@ -14,6 +14,23 @@ import {
 
 export const runtime = "nodejs";
 
+/** Cap packages per platform+metric so the full catalog stays small & fast. */
+function diversifyJapCatalog<
+  T extends { platform: string; metric: string; rate: number },
+>(list: T[], perGroup = 12) {
+  const sorted = [...list].sort((a, b) => a.rate - b.rate);
+  const counts = new Map<string, number>();
+  const out: T[] = [];
+  for (const item of sorted) {
+    const key = `${item.platform}::${item.metric}`;
+    const n = counts.get(key) ?? 0;
+    if (n >= perGroup) continue;
+    counts.set(key, n + 1);
+    out.push(item);
+  }
+  return out;
+}
+
 export async function GET(req: Request) {
   try {
     const user = await ensureAppUser();
@@ -33,10 +50,15 @@ export async function GET(req: Request) {
     const enriched = raw.map(enrichJapService);
     const filtered = filterJapServices(enriched, { platform, query });
 
+    // Keep enough coverage for client-side platform/type filtering.
+    // Prefer cheapest packages within each platform+metric group.
     const sliced =
-      filtered.length > 250 && platform === "All" && !query.trim()
-        ? filtered.slice(0, 250)
-        : filtered.slice(0, 400);
+      platform === "All" && !query.trim()
+        ? diversifyJapCatalog(filtered, 12)
+        : filtered
+            .slice()
+            .sort((a, b) => a.rate - b.rate)
+            .slice(0, 400);
 
     const quote = await quoteLocalUsd(currency);
     const markup = japMarkup();
