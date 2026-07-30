@@ -1394,7 +1394,7 @@ export default function GiftCardsPage() {
               value={changeSellQuery}
               onChange={(e) => setChangeSellQuery(e.target.value)}
               placeholder="Search brands…"
-              className="h-11 w-full rounded-xl border border-border bg-background pr-3 pl-9 text-sm outline-none focus:border-primary"
+              className="h-11 w-full rounded-xl border border-border bg-background pr-3 pl-9 text-base outline-none focus:border-primary"
               autoFocus
             />
           </div>
@@ -1415,7 +1415,7 @@ export default function GiftCardsPage() {
                   setChangeSellOpen(false);
                 }}
                 className={cn(
-                  "flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-muted/50",
+                  "flex min-h-[64px] w-full items-center gap-3 px-4 py-3.5 text-left transition active:bg-muted/70 hover:bg-muted/50",
                   active && "bg-oryno-orange-muted",
                 )}
               >
@@ -1458,7 +1458,7 @@ export default function GiftCardsPage() {
               value={changeBuyQuery}
               onChange={(e) => setChangeBuyQuery(e.target.value)}
               placeholder="Search products…"
-              className="h-11 w-full rounded-xl border border-border bg-background pr-3 pl-9 text-sm outline-none focus:border-primary"
+              className="h-11 w-full rounded-xl border border-border bg-background pr-3 pl-9 text-base outline-none focus:border-primary"
               autoFocus
             />
           </div>
@@ -1476,7 +1476,7 @@ export default function GiftCardsPage() {
                   setChangeBuyOpen(false);
                 }}
                 className={cn(
-                  "flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-muted/50",
+                  "flex min-h-[64px] w-full items-center gap-3 px-4 py-3.5 text-left transition active:bg-muted/70 hover:bg-muted/50",
                   active && "bg-oryno-orange-muted",
                 )}
               >
@@ -1530,17 +1530,28 @@ function ChangeCardSheet({
 }) {
   if (isMobile) {
     return (
-      <Drawer open={open} onOpenChange={onOpenChange}>
-        <DrawerContent className="flex max-h-[88vh] flex-col rounded-t-[28px] border-border pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-          <DrawerHeader className="gap-1 border-b border-border px-5 pb-3 pt-2 text-left">
-            <DrawerTitle>{title}</DrawerTitle>
-            <DrawerDescription>{description}</DrawerDescription>
+      <Drawer
+        open={open}
+        onOpenChange={onOpenChange}
+        shouldScaleBackground={false}
+        repositionInputs={false}
+        handleOnly
+      >
+        <DrawerContent className="h-[min(88dvh,720px)] max-h-[88dvh] w-full max-w-full rounded-t-[28px] border-border sm:mx-auto sm:max-w-lg">
+          <DrawerHeader className="shrink-0 gap-1 border-b border-border px-4 pb-3 pt-1 text-left sm:px-5">
+            <DrawerTitle className="text-base sm:text-lg">{title}</DrawerTitle>
+            <DrawerDescription className="text-xs sm:text-sm">
+              {description}
+            </DrawerDescription>
           </DrawerHeader>
-          <div className="shrink-0 border-b border-border px-4 py-3">
+          <div className="shrink-0 border-b border-border px-4 py-3 sm:px-5">
             {search}
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-            {children}
+          <div
+            className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]"
+            data-vaul-no-drag=""
+          >
+            <div className="pb-4">{children}</div>
           </div>
         </DrawerContent>
       </Drawer>

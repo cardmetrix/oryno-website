@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  Check,
   CheckCircle2,
   ChevronDown,
   Link2,
@@ -17,6 +18,14 @@ import { ErrorAlertModal } from "@/components/app/error-alert-modal";
 import { ServiceInstructions } from "@/components/app/service-instructions";
 import { AuthField, authInputClassName } from "@/components/auth/auth-field";
 import { useCountry } from "@/components/providers/country-provider";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { formatCountryMoney } from "@/lib/country";
 import { cn } from "@/lib/utils";
 
@@ -38,6 +47,13 @@ type JapServiceRow = {
   samplePriceLocal: number;
 };
 
+type BoostOption = {
+  value: string;
+  label: string;
+  description?: string;
+  trailing?: string;
+};
+
 function clampQty(n: number, min: number, max: number) {
   if (!Number.isFinite(n)) return min;
   return Math.min(max, Math.max(min, Math.round(n)));
@@ -47,31 +63,29 @@ function priceFor(service: JapServiceRow, quantity: number) {
   return (service.priceLocalPerThousand * quantity) / 1000;
 }
 
-/** Preset quantities within a package min/max — user must pick one. */
-function quantityOptions(min: number, max: number) {
-  const presets = [
-    50, 100, 250, 500, 750, 1000, 1500, 2000, 2500, 5000, 7500, 10000, 15000,
-    20000, 25000, 50000, 75000, 100000, 250000, 500000, 1000000,
-  ];
-  const opts = presets.filter((n) => n >= min && n <= max);
-  if (!opts.includes(min)) opts.unshift(min);
-  if (max !== min && max <= 1_000_000 && !opts.includes(max) && opts.length < 14) {
-    opts.push(max);
-  }
-  return Array.from(new Set(opts)).sort((a, b) => a - b);
+/** Global floor: users type any amount from 100 up (within package max). */
+const QUANTITY_FLOOR = 100;
+
+function parseQuantityInput(raw: string): number | null {
+  const cleaned = raw.replace(/[,\s]/g, "").trim();
+  if (!cleaned) return null;
+  const n = Number(cleaned);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return Math.round(n);
 }
 
 const selectClassName = cn(authInputClassName, "appearance-none pr-10");
 
 export default function SocialBoostPage() {
   const { country } = useCountry();
+  const isMobile = useIsMobile();
   const [platforms, setPlatforms] = useState<string[]>([]);
   const [platform, setPlatform] = useState("");
   const [metric, setMetric] = useState("");
   const [services, setServices] = useState<JapServiceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [quantity, setQuantity] = useState<number | null>(null);
+  const [quantityText, setQuantityText] = useState("");
   const [profileUrl, setProfileUrl] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -119,7 +133,7 @@ export default function SocialBoostPage() {
               s.platform === firstPlatform && s.metric === firstMetric,
           ) ?? list[0] ?? null;
         setSelectedId(firstPkg?.service ?? null);
-        setQuantity(null);
+        setQuantityText("");
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : "Failed to load services");
@@ -157,20 +171,50 @@ export default function SocialBoostPage() {
     packagesForType[0] ??
     null;
 
-  const qtyOptions = useMemo(
-    () => (selected ? quantityOptions(selected.min, selected.max) : []),
-    [selected],
-  );
+  const minQuantity = selected
+    ? Math.max(QUANTITY_FLOOR, selected.min)
+    : QUANTITY_FLOOR;
+  const maxQuantity = selected?.max ?? 1_000_000;
+  const quantity = parseQuantityInput(quantityText);
+  const quantityValid =
+    quantity != null &&
+    quantity >= minQuantity &&
+    quantity <= maxQuantity;
 
   const amount =
-    selected && quantity != null ? priceFor(selected, quantity) : 0;
+    selected && quantityValid && quantity != null
+      ? priceFor(selected, quantity)
+      : 0;
+
+  const quantityHint = useMemo(() => {
+    if (!selected) return "Choose a package first";
+    if (!quantityText.trim()) {
+      return `Enter any amount from ${minQuantity.toLocaleString()}–${maxQuantity.toLocaleString()}`;
+    }
+    if (quantity == null) return "Enter a valid whole number";
+    if (quantity < minQuantity) {
+      return `Minimum is ${minQuantity.toLocaleString()}`;
+    }
+    if (quantity > maxQuantity) {
+      return `Maximum is ${maxQuantity.toLocaleString()}`;
+    }
+    return `${quantity.toLocaleString()} ${selected.metric.toLowerCase()} · ${formatCountryMoney(priceFor(selected, quantity), country?.code || "NG")}`;
+  }, [
+    selected,
+    quantityText,
+    quantity,
+    minQuantity,
+    maxQuantity,
+    country?.code,
+  ]);
 
   const canSubmit = useMemo(() => {
-    if (!selected || submitting || quantity == null) return false;
-    if (quantity < selected.min || quantity > selected.max) return false;
+    if (!selected || submitting || !quantityValid || quantity == null) {
+      return false;
+    }
     const link = profileUrl.trim();
     return link.length > 4 && /^(https?:\/\/|@|t\.me\/)/i.test(link);
-  }, [selected, submitting, quantity, profileUrl]);
+  }, [selected, submitting, quantityValid, quantity, profileUrl]);
 
   const money = (n: number) =>
     formatCountryMoney(n, country?.code || "NG");
@@ -178,10 +222,13 @@ export default function SocialBoostPage() {
   useEffect(() => {
     if (!selected) return;
     setSelectedId(selected.service);
-    setQuantity((q) => {
-      if (q == null) return null;
-      if (q < selected.min || q > selected.max) return null;
-      return q;
+    setQuantityText((prev) => {
+      const n = parseQuantityInput(prev);
+      if (n == null) return prev;
+      if (n < Math.max(QUANTITY_FLOOR, selected.min) || n > selected.max) {
+        return "";
+      }
+      return prev;
     });
   }, [selected]);
 
@@ -246,7 +293,7 @@ export default function SocialBoostPage() {
       (s) => s.platform === next && s.metric === nextMetric,
     );
     setSelectedId(match?.service ?? null);
-    setQuantity(null);
+    setQuantityText("");
   }
 
   function onMetricChange(next: string) {
@@ -256,30 +303,41 @@ export default function SocialBoostPage() {
         (!platform || s.platform === platform) && s.metric === next,
     );
     setSelectedId(match?.service ?? null);
-    setQuantity(null);
+    setQuantityText("");
   }
 
   function onPackageChange(serviceId: number) {
     setSelectedId(serviceId);
-    setQuantity(null);
+    setQuantityText("");
   }
 
-  function onQuantityChange(value: string) {
-    if (!value) {
-      setQuantity(null);
+  function onQuantityTextChange(raw: string) {
+    // Allow digits and commas while typing
+    if (raw === "" || /^[\d,.\s]*$/.test(raw)) {
+      setQuantityText(raw);
+    }
+  }
+
+  function nudgeQuantity(delta: number) {
+    if (!selected) return;
+    const current = quantity ?? minQuantity;
+    const next = clampQty(current + delta, minQuantity, maxQuantity);
+    setQuantityText(String(next));
+  }
+
+  function commitQuantity() {
+    if (!selected) return;
+    const n = parseQuantityInput(quantityText);
+    if (n == null) {
+      setQuantityText("");
       return;
     }
-    const n = Number(value);
-    if (!selected || !Number.isFinite(n)) {
-      setQuantity(null);
-      return;
-    }
-    setQuantity(clampQty(n, selected.min, selected.max));
+    setQuantityText(String(clampQty(n, minQuantity, maxQuantity)));
   }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!canSubmit || !selected || quantity == null) return;
+    if (!canSubmit || !selected || quantity == null || !quantityValid) return;
     setSubmitting(true);
     setError(null);
     try {
@@ -310,6 +368,12 @@ export default function SocialBoostPage() {
     }
   }
 
+  const submitLabel = submitting
+    ? "Processing…"
+    : selected && quantityValid && quantity != null
+      ? `Boost now · ${money(amount)}`
+      : "Enter quantity to continue";
+
   return (
     <AppShell hideNav>
       <PageHeader
@@ -324,7 +388,7 @@ export default function SocialBoostPage() {
             <motion.div
               initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="rounded-[28px] border border-border bg-background p-8 text-center shadow-[var(--shadow-soft)]"
+              className="rounded-2xl border border-border bg-background p-5 text-center shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-8"
             >
               <motion.span
                 initial={{ scale: 0.6, opacity: 0 }}
@@ -361,9 +425,9 @@ export default function SocialBoostPage() {
                   onClick={() => {
                     setSuccess(false);
                     setStatusLabel(null);
-                    setQuantity(null);
+                    setQuantityText("");
                   }}
-                  className="btn-primary h-12 px-6"
+                  className="btn-primary h-12 w-full px-6 sm:w-auto"
                 >
                   Boost again
                 </motion.button>
@@ -371,7 +435,7 @@ export default function SocialBoostPage() {
                   href="/dashboard"
                   whileHover={{ y: -2 }}
                   whileTap={{ scale: 0.98 }}
-                  className="btn-secondary inline-flex h-12 items-center justify-center px-6"
+                  className="btn-secondary inline-flex h-12 w-full items-center justify-center px-6 sm:w-auto"
                 >
                   Back to Home
                 </motion.a>
@@ -379,8 +443,12 @@ export default function SocialBoostPage() {
             </motion.div>
           </MotionSection>
         ) : (
-          <form key="form" onSubmit={onSubmit} className="space-y-5">
-            <MotionSection className="rounded-[28px] border border-border bg-background p-5 shadow-[var(--shadow-soft)] sm:p-6">
+          <form
+            key="form"
+            onSubmit={onSubmit}
+            className="space-y-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:space-y-5 sm:pb-0"
+          >
+            <MotionSection className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6">
               <div className="mb-4 flex items-center gap-3">
                 <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-oryno-orange-muted text-primary">
                   <TrendingUp className="h-5 w-5" strokeWidth={1.75} />
@@ -396,117 +464,110 @@ export default function SocialBoostPage() {
               </div>
 
               <div className="space-y-3.5">
-                <AuthField label="Platform">
-                  <div className="relative">
-                    <select
-                      value={platform}
-                      onChange={(e) => onPlatformChange(e.target.value)}
-                      disabled={!platforms.length}
-                      className={selectClassName}
-                    >
-                      {!platform ? (
-                        <option value="">
-                          {loading ? "Loading…" : "Select platform"}
-                        </option>
-                      ) : null}
-                      {platforms.map((item) => (
-                        <option key={item} value={item}>
-                          {item}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="pointer-events-none absolute top-1/2 right-3.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  </div>
-                </AuthField>
+                <BoostField
+                  label="Platform"
+                  isMobile={isMobile}
+                  value={platform}
+                  placeholder={loading ? "Loading…" : "Select platform"}
+                  options={platforms.map((item) => ({
+                    value: item,
+                    label: item,
+                  }))}
+                  disabled={!platforms.length}
+                  sheetTitle="Platform"
+                  sheetDescription="Choose where you want to boost"
+                  onChange={onPlatformChange}
+                />
 
-                <AuthField label="Type of service">
-                  <div className="relative">
-                    <select
-                      value={metric}
-                      onChange={(e) => onMetricChange(e.target.value)}
-                      disabled={!metrics.length}
-                      className={selectClassName}
-                    >
-                      {!metric ? (
-                        <option value="">
-                          {loading ? "Loading…" : "Select type"}
-                        </option>
-                      ) : null}
-                      {metrics.map((item) => (
-                        <option key={item} value={item}>
-                          {item}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="pointer-events-none absolute top-1/2 right-3.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  </div>
-                </AuthField>
+                <BoostField
+                  label="Type of service"
+                  isMobile={isMobile}
+                  value={metric}
+                  placeholder={loading ? "Loading…" : "Select type"}
+                  options={metrics.map((item) => ({
+                    value: item,
+                    label: item,
+                  }))}
+                  disabled={!metrics.length}
+                  sheetTitle="Type of service"
+                  sheetDescription="Followers, likes, views, and more"
+                  onChange={onMetricChange}
+                />
 
-                <AuthField label="Package">
-                  <div className="relative">
-                    <select
-                      value={selected?.service ?? ""}
-                      onChange={(e) =>
-                        onPackageChange(Number(e.target.value))
-                      }
-                      disabled={!packagesForType.length}
-                      className={selectClassName}
-                    >
-                      {!selected ? (
-                        <option value="">
-                          {loading ? "Loading…" : "Select package"}
-                        </option>
-                      ) : null}
-                      {packagesForType.map((item) => (
-                        <option key={item.service} value={item.service}>
-                          {item.name} · {money(item.samplePriceLocal)}/
-                          {item.sampleQuantity.toLocaleString()}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="pointer-events-none absolute top-1/2 right-3.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  </div>
-                </AuthField>
+                <BoostField
+                  label="Package"
+                  isMobile={isMobile}
+                  value={selected ? String(selected.service) : ""}
+                  placeholder={loading ? "Loading…" : "Select package"}
+                  options={packagesForType.map((item) => ({
+                    value: String(item.service),
+                    label: item.name,
+                    trailing: `${money(item.samplePriceLocal)}/${item.sampleQuantity.toLocaleString()}`,
+                  }))}
+                  disabled={!packagesForType.length}
+                  sheetTitle="Package"
+                  sheetDescription="Pick a package for this boost type"
+                  onChange={(next) => onPackageChange(Number(next))}
+                />
 
-                <AuthField label="Quantity">
-                  <div className="relative">
-                    <select
-                      value={quantity ?? ""}
-                      onChange={(e) => onQuantityChange(e.target.value)}
-                      disabled={!selected || !qtyOptions.length}
-                      className={selectClassName}
-                      required
-                    >
-                      <option value="">
-                        {!selected
-                          ? "Select a package first"
-                          : "Select quantity"}
-                      </option>
-                      {qtyOptions.map((n) => (
-                        <option key={n} value={n}>
-                          {n.toLocaleString()}{" "}
-                          {selected?.metric?.toLowerCase() || "units"}
-                          {selected
-                            ? ` · ${money(priceFor(selected, n))}`
-                            : ""}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="pointer-events-none absolute top-1/2 right-3.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  </div>
-                  {selected ? (
-                    <p className="mt-1.5 text-xs text-muted-foreground">
-                      Allowed range {selected.min.toLocaleString()}–
-                      {selected.max.toLocaleString()}
-                    </p>
-                  ) : null}
-                </AuthField>
+                <div>
+                  <AuthField label="Quantity">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={!selected || (quantity ?? 0) <= minQuantity}
+                        onClick={() => nudgeQuantity(-100)}
+                        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] border border-border bg-muted/40 text-lg font-bold text-foreground transition hover:bg-muted disabled:opacity-40"
+                        aria-label="Decrease quantity"
+                      >
+                        −
+                      </button>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9,]*"
+                        value={quantityText}
+                        onChange={(e) => onQuantityTextChange(e.target.value)}
+                        onBlur={commitQuantity}
+                        disabled={!selected}
+                        placeholder={`Min ${minQuantity.toLocaleString()}`}
+                        required
+                        className={cn(
+                          authInputClassName,
+                          "text-center text-lg font-bold tabular-nums tracking-tight disabled:opacity-60",
+                        )}
+                        aria-invalid={
+                          Boolean(quantityText.trim()) && !quantityValid
+                        }
+                      />
+                      <button
+                        type="button"
+                        disabled={!selected || (quantity ?? 0) >= maxQuantity}
+                        onClick={() => nudgeQuantity(100)}
+                        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] border border-border bg-muted/40 text-lg font-bold text-foreground transition hover:bg-muted disabled:opacity-40"
+                        aria-label="Increase quantity"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </AuthField>
+                  <p
+                    className={cn(
+                      "mt-1.5 text-xs",
+                      quantityText.trim() && !quantityValid
+                        ? "font-medium text-destructive"
+                        : "text-muted-foreground",
+                    )}
+                  >
+                    {quantityHint}
+                  </p>
+                </div>
 
-                {selected && quantity != null ? (
+                {selected && quantityValid && quantity != null ? (
                   <div className="rounded-2xl border border-border bg-muted/40 px-4 py-3.5">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-foreground">
+                        <p className="break-words text-sm font-semibold text-foreground">
                           {selected.name}
                         </p>
                         <p className="mt-1 text-xs text-muted-foreground">
@@ -529,13 +590,13 @@ export default function SocialBoostPage() {
 
             <MotionSection
               delay={0.04}
-              className="rounded-[28px] border border-border bg-background p-5 shadow-[var(--shadow-soft)] sm:p-6"
+              className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6"
             >
               <label className="block">
                 <span className="text-sm font-semibold text-foreground">
                   Profile or post link
                 </span>
-                <div className="mt-2 flex h-14 items-center gap-3 rounded-[16px] border border-border bg-muted/40 px-4 transition focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/15">
+                <div className="mt-2 flex h-14 min-w-0 items-center gap-3 rounded-[16px] border border-border bg-muted/40 px-4 transition focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/15">
                   <Link2
                     className="h-5 w-5 shrink-0 text-muted-foreground"
                     strokeWidth={1.75}
@@ -545,7 +606,7 @@ export default function SocialBoostPage() {
                     onChange={(e) => setProfileUrl(e.target.value)}
                     placeholder="https://instagram.com/… or @username"
                     required
-                    className="w-full bg-transparent text-base font-medium text-foreground outline-none placeholder:text-muted-foreground"
+                    className="min-w-0 w-full bg-transparent text-base font-medium text-foreground outline-none placeholder:text-muted-foreground"
                   />
                 </div>
               </label>
@@ -553,7 +614,7 @@ export default function SocialBoostPage() {
 
             <MotionSection
               delay={0.08}
-              className="rounded-[28px] border border-border bg-background p-5 shadow-[var(--shadow-soft)] sm:p-6"
+              className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6"
             >
               <h2 className="text-base font-semibold text-foreground">
                 Order summary
@@ -574,16 +635,18 @@ export default function SocialBoostPage() {
                 <SummaryRow
                   label="Quantity"
                   value={
-                    selected && quantity != null
+                    selected && quantityValid && quantity != null
                       ? `${quantity.toLocaleString()} ${selected.metric}`
-                      : "Select quantity"
+                      : "Enter quantity"
                   }
                 />
                 <SummaryRow label="Target" value={profileUrl || "—"} />
                 <SummaryRow
                   label="Amount"
                   value={
-                    selected && quantity != null ? money(amount) : "—"
+                    selected && quantityValid && quantity != null
+                      ? money(amount)
+                      : "—"
                   }
                   accent
                 />
@@ -596,23 +659,35 @@ export default function SocialBoostPage() {
               </div>
             </MotionSection>
 
-            <ServiceInstructions service="social" delay={0.1} />
+            <ServiceInstructions
+              service="social"
+              delay={0.1}
+              className="mb-20 sm:mb-0"
+            />
 
-            <MotionSection delay={0.14}>
-              <motion.button
+            <div className="hidden sm:block">
+              <MotionSection delay={0.14}>
+                <motion.button
+                  type="submit"
+                  disabled={!canSubmit}
+                  whileHover={canSubmit ? { y: -2 } : undefined}
+                  whileTap={canSubmit ? { scale: 0.985 } : undefined}
+                  className="btn-primary h-12 w-full text-base disabled:opacity-50 sm:max-w-md"
+                >
+                  {submitLabel}
+                </motion.button>
+              </MotionSection>
+            </div>
+
+            <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border/80 bg-[image:var(--header-surface)] px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur-xl sm:hidden">
+              <button
                 type="submit"
                 disabled={!canSubmit}
-                whileHover={canSubmit ? { y: -2 } : undefined}
-                whileTap={canSubmit ? { scale: 0.985 } : undefined}
-                className="btn-primary h-12 w-full text-base disabled:opacity-50 sm:max-w-md"
+                className="btn-primary h-12 w-full text-base disabled:opacity-50"
               >
-                {submitting
-                  ? "Processing…"
-                  : selected && quantity != null
-                    ? `Boost now · ${money(amount)}`
-                    : "Select quantity to continue"}
-              </motion.button>
-            </MotionSection>
+                {submitLabel}
+              </button>
+            </div>
           </form>
         )}
       </AnimatePresence>
@@ -626,6 +701,163 @@ export default function SocialBoostPage() {
   );
 }
 
+function BoostField({
+  label,
+  isMobile,
+  value,
+  placeholder,
+  options,
+  disabled,
+  sheetTitle,
+  sheetDescription,
+  onChange,
+  required,
+}: {
+  label: string;
+  isMobile: boolean;
+  value: string;
+  placeholder: string;
+  options: BoostOption[];
+  disabled?: boolean;
+  sheetTitle: string;
+  sheetDescription: string;
+  onChange: (value: string) => void;
+  required?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = options.find((o) => o.value === value);
+
+  if (isMobile) {
+    return (
+      <div className="flex w-full flex-col gap-2">
+        <span className="text-sm font-medium text-foreground">{label}</span>
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => setOpen(true)}
+          className={cn(
+            selectClassName,
+            "relative flex items-center gap-2 text-left disabled:cursor-not-allowed disabled:opacity-50",
+          )}
+        >
+          <span
+            className={cn(
+              "min-w-0 flex-1 truncate",
+              selected ? "text-foreground" : "text-muted-foreground",
+            )}
+          >
+            {selected?.label ?? placeholder}
+          </span>
+          {selected?.trailing ? (
+            <span className="shrink-0 text-sm font-semibold text-muted-foreground">
+              {selected.trailing}
+            </span>
+          ) : null}
+          <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+        </button>
+
+        <Drawer
+          open={open}
+          onOpenChange={setOpen}
+          shouldScaleBackground={false}
+          repositionInputs={false}
+          handleOnly
+        >
+          <DrawerContent className="h-[min(78dvh,640px)] max-h-[78dvh] w-full max-w-full rounded-t-[28px] border-border sm:mx-auto sm:max-w-lg">
+            <DrawerHeader className="shrink-0 gap-1 border-b border-border px-4 pb-3 pt-1 text-left sm:px-5">
+              <DrawerTitle className="text-base sm:text-lg">
+                {sheetTitle}
+              </DrawerTitle>
+              <DrawerDescription className="text-xs sm:text-sm">
+                {sheetDescription}
+              </DrawerDescription>
+            </DrawerHeader>
+            <div
+              className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]"
+              data-vaul-no-drag=""
+            >
+              <div className="pb-4">
+                {options.length ? (
+                  options.map((option) => {
+                    const active = option.value === value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => {
+                          onChange(option.value);
+                          setOpen(false);
+                        }}
+                        className={cn(
+                          "flex min-h-[56px] w-full items-center gap-3 px-4 py-3.5 text-left transition active:bg-muted/70 hover:bg-muted/50",
+                          active && "bg-oryno-orange-muted",
+                        )}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold text-foreground">
+                            {option.label}
+                          </p>
+                          {option.description ? (
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                              {option.description}
+                            </p>
+                          ) : null}
+                        </div>
+                        {option.trailing ? (
+                          <span className="shrink-0 text-sm font-bold tabular-nums text-foreground">
+                            {option.trailing}
+                          </span>
+                        ) : null}
+                        {active ? (
+                          <Check
+                            className="h-4 w-4 shrink-0 text-primary"
+                            strokeWidth={2.25}
+                          />
+                        ) : (
+                          <span className="h-4 w-4 shrink-0" />
+                        )}
+                      </button>
+                    );
+                  })
+                ) : (
+                  <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+                    {placeholder}
+                  </p>
+                )}
+              </div>
+            </div>
+          </DrawerContent>
+        </Drawer>
+      </div>
+    );
+  }
+
+  return (
+    <AuthField label={label}>
+      <div className="relative">
+        <select
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          disabled={disabled}
+          className={selectClassName}
+          required={required}
+        >
+          {required || !value ? (
+            <option value="">{placeholder}</option>
+          ) : null}
+          {options.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+              {option.trailing ? ` · ${option.trailing}` : ""}
+            </option>
+          ))}
+        </select>
+        <ChevronDown className="pointer-events-none absolute top-1/2 right-3.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      </div>
+    </AuthField>
+  );
+}
+
 function SummaryRow({
   label,
   value,
@@ -636,11 +868,11 @@ function SummaryRow({
   accent?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3">
-      <span className="text-muted-foreground">{label}</span>
+    <div className="flex items-start justify-between gap-3">
+      <span className="shrink-0 text-muted-foreground">{label}</span>
       <span
         className={cn(
-          "max-w-[60%] truncate text-right font-semibold",
+          "max-w-[68%] break-words text-right font-semibold",
           accent ? "text-primary" : "text-foreground",
         )}
       >
