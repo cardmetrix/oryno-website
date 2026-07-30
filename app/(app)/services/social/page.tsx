@@ -4,10 +4,9 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   CheckCircle2,
+  ChevronDown,
   Link2,
   RefreshCw,
-  Search,
-  Sparkles,
   TrendingUp,
   Wallet,
 } from "lucide-react";
@@ -16,6 +15,7 @@ import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
 import { ErrorAlertModal } from "@/components/app/error-alert-modal";
 import { ServiceInstructions } from "@/components/app/service-instructions";
+import { AuthField, authInputClassName } from "@/components/auth/auth-field";
 import { useCountry } from "@/components/providers/country-provider";
 import { formatCountryMoney } from "@/lib/country";
 import { cn } from "@/lib/utils";
@@ -47,13 +47,15 @@ function priceFor(service: JapServiceRow, quantity: number) {
   return (service.priceLocalPerThousand * quantity) / 1000;
 }
 
+const selectClassName = cn(authInputClassName, "appearance-none pr-10");
+
 export default function SocialBoostPage() {
   const { country } = useCountry();
-  const [platforms, setPlatforms] = useState<string[]>(["All"]);
-  const [platform, setPlatform] = useState("All");
+  const [platforms, setPlatforms] = useState<string[]>([]);
+  const [platform, setPlatform] = useState("");
+  const [metric, setMetric] = useState("");
   const [services, setServices] = useState<JapServiceRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [quantity, setQuantity] = useState(1000);
   const [profileUrl, setProfileUrl] = useState("");
@@ -73,24 +75,42 @@ export default function SocialBoostPage() {
       setError(null);
       try {
         const params = new URLSearchParams();
-        if (platform && platform !== "All") params.set("platform", platform);
+        if (platform) params.set("platform", platform);
         const res = await fetch(`/api/jap/services?${params.toString()}`);
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Failed to load services");
         if (cancelled) return;
-        setPlatforms(data.platforms ?? ["All"]);
+
+        const nextPlatforms: string[] = (data.platforms ?? []).filter(
+          (p: string) => p && p !== "All",
+        );
+        setPlatforms(nextPlatforms);
+
+        if (!platform && nextPlatforms[0]) {
+          setPlatform(nextPlatforms[0]);
+          return;
+        }
+
         const list: JapServiceRow[] = data.services ?? [];
         setServices(list);
-        if (list[0]) {
-          setSelectedId((prev) =>
-            list.some((s) => s.service === prev) ? prev : list[0].service,
-          );
-          const next = list.find((s) => s.service === selectedId) ?? list[0];
+
+        const metrics = Array.from(
+          new Set(list.map((s) => s.metric).filter(Boolean)),
+        );
+        const nextMetric =
+          metric && metrics.includes(metric) ? metric : metrics[0] || "";
+        setMetric(nextMetric);
+
+        const filtered = nextMetric
+          ? list.filter((s) => s.metric === nextMetric)
+          : list;
+        const nextSelected =
+          filtered.find((s) => s.service === selectedId) ?? filtered[0] ?? null;
+        setSelectedId(nextSelected?.service ?? null);
+        if (nextSelected) {
           setQuantity((q) =>
-            clampQty(q || next.sampleQuantity, next.min, next.max),
+            clampQty(q || nextSelected.sampleQuantity, nextSelected.min, nextSelected.max),
           );
-        } else {
-          setSelectedId(null);
         }
       } catch (e) {
         if (!cancelled) {
@@ -104,26 +124,30 @@ export default function SocialBoostPage() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- selectedId preference only
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload on platform only
   }, [platform]);
 
-  const visibleServices = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return services;
+  const metrics = useMemo(() => {
+    const set = new Set(
+      services
+        .filter((s) => !platform || s.platform === platform)
+        .map((s) => s.metric)
+        .filter(Boolean),
+    );
+    return Array.from(set);
+  }, [services, platform]);
+
+  const packagesForType = useMemo(() => {
     return services.filter(
       (s) =>
-        s.name.toLowerCase().includes(q) ||
-        s.category.toLowerCase().includes(q) ||
-        s.metric.toLowerCase().includes(q) ||
-        s.platform.toLowerCase().includes(q) ||
-        String(s.service).includes(q),
+        (!platform || s.platform === platform) &&
+        (!metric || s.metric === metric),
     );
-  }, [services, query]);
+  }, [services, platform, metric]);
 
   const selected =
-    visibleServices.find((s) => s.service === selectedId) ??
-    visibleServices[0] ??
-    services.find((s) => s.service === selectedId) ??
+    packagesForType.find((s) => s.service === selectedId) ??
+    packagesForType[0] ??
     null;
 
   const amount = selected ? priceFor(selected, quantity) : 0;
@@ -179,6 +203,33 @@ export default function SocialBoostPage() {
       cancelled = true;
     };
   }, [success, orderId]);
+
+  function onPlatformChange(next: string) {
+    setPlatform(next);
+    setMetric("");
+    setSelectedId(null);
+  }
+
+  function onMetricChange(next: string) {
+    setMetric(next);
+    const match = services.find(
+      (s) =>
+        (!platform || s.platform === platform) &&
+        s.metric === next,
+    );
+    setSelectedId(match?.service ?? null);
+    if (match) {
+      setQuantity(clampQty(match.sampleQuantity, match.min, match.max));
+    }
+  }
+
+  function onPackageChange(serviceId: number) {
+    const match = packagesForType.find((s) => s.service === serviceId);
+    setSelectedId(serviceId);
+    if (match) {
+      setQuantity(clampQty(match.sampleQuantity, match.min, match.max));
+    }
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -288,33 +339,107 @@ export default function SocialBoostPage() {
                 </span>
                 <div>
                   <h2 className="text-base font-semibold text-foreground">
-                    Choose platform
+                    Choose boost
                   </h2>
                   <p className="text-sm text-muted-foreground">
-                    Live boost packages for your country
+                    Pick a platform, then the type of boost
                   </p>
                 </div>
               </div>
 
-              <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {platforms.map((item) => {
-                  const active = platform === item;
-                  return (
-                    <button
-                      key={item}
-                      type="button"
-                      onClick={() => setPlatform(item)}
-                      className={cn(
-                        "relative shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition-colors",
-                        active
-                          ? "bg-primary text-white shadow-[var(--shadow-orange)]"
-                          : "bg-muted text-foreground hover:bg-oryno-orange-muted",
-                      )}
+              <div className="space-y-3.5">
+                <AuthField label="Platform">
+                  <div className="relative">
+                    <select
+                      value={platform}
+                      onChange={(e) => onPlatformChange(e.target.value)}
+                      disabled={loading && !platforms.length}
+                      className={selectClassName}
                     >
-                      {item}
-                    </button>
-                  );
-                })}
+                      {!platform ? (
+                        <option value="">Select platform</option>
+                      ) : null}
+                      {platforms.map((item) => (
+                        <option key={item} value={item}>
+                          {item}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute top-1/2 right-3.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  </div>
+                </AuthField>
+
+                <AuthField label="Type of service">
+                  <div className="relative">
+                    <select
+                      value={metric}
+                      onChange={(e) => onMetricChange(e.target.value)}
+                      disabled={loading || !metrics.length}
+                      className={selectClassName}
+                    >
+                      {!metric ? (
+                        <option value="">
+                          {loading ? "Loading…" : "Select type"}
+                        </option>
+                      ) : null}
+                      {metrics.map((item) => (
+                        <option key={item} value={item}>
+                          {item}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute top-1/2 right-3.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  </div>
+                </AuthField>
+
+                <AuthField label="Package">
+                  <div className="relative">
+                    <select
+                      value={selected?.service ?? ""}
+                      onChange={(e) =>
+                        onPackageChange(Number(e.target.value))
+                      }
+                      disabled={loading || !packagesForType.length}
+                      className={selectClassName}
+                    >
+                      {!selected ? (
+                        <option value="">
+                          {loading ? "Loading…" : "Select package"}
+                        </option>
+                      ) : null}
+                      {packagesForType.map((item) => (
+                        <option key={item.service} value={item.service}>
+                          {item.name} · {money(item.samplePriceLocal)}/
+                          {item.sampleQuantity.toLocaleString()}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute top-1/2 right-3.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  </div>
+                </AuthField>
+
+                {selected ? (
+                  <div className="rounded-2xl border border-border bg-muted/40 px-4 py-3.5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-foreground">
+                          {selected.name}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Min {selected.min.toLocaleString()} · Max{" "}
+                          {selected.max.toLocaleString()}
+                          {selected.refill ? " · Refill available" : ""}
+                        </p>
+                      </div>
+                      <p className="shrink-0 text-right text-sm font-bold text-foreground">
+                        {money(selected.samplePriceLocal)}
+                        <span className="block text-[10px] font-medium text-muted-foreground">
+                          / {selected.sampleQuantity.toLocaleString()}
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </MotionSection>
 
@@ -340,113 +465,6 @@ export default function SocialBoostPage() {
                   />
                 </div>
               </label>
-            </MotionSection>
-
-            <MotionSection
-              delay={0.08}
-              className="rounded-[28px] border border-border bg-background p-5 shadow-[var(--shadow-soft)] sm:p-6"
-            >
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-base font-semibold text-foreground">
-                    Boost services
-                  </h2>
-                  <p className="text-sm text-muted-foreground">
-                    {loading
-                      ? "Loading…"
-                      : `${visibleServices.length} services`}
-                  </p>
-                </div>
-                <Sparkles className="h-5 w-5 text-primary" strokeWidth={1.75} />
-              </div>
-
-              <div className="relative mb-3">
-                <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search followers, likes, views…"
-                  className="h-11 w-full rounded-[14px] border border-border bg-background pr-3 pl-9 text-sm outline-none focus:border-primary"
-                  autoComplete="off"
-                />
-              </div>
-
-              <div className="grid max-h-[360px] gap-3 overflow-y-auto pr-1">
-                {loading ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="h-20 animate-pulse rounded-[20px] bg-muted"
-                    />
-                  ))
-                ) : visibleServices.length ? (
-                  <AnimatePresence mode="popLayout">
-                    {visibleServices.map((item, index) => {
-                      const active = selected?.service === item.service;
-                      return (
-                        <motion.button
-                          key={item.service}
-                          type="button"
-                          layout
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -6 }}
-                          transition={{ delay: Math.min(index * 0.02, 0.2), duration: 0.28 }}
-                          whileHover={{ y: -2 }}
-                          whileTap={{ scale: 0.985 }}
-                          onClick={() => {
-                            setSelectedId(item.service);
-                            setQuantity(
-                              clampQty(
-                                item.sampleQuantity,
-                                item.min,
-                                item.max,
-                              ),
-                            );
-                          }}
-                          className={cn(
-                            "rounded-[20px] border px-4 py-4 text-left transition-colors",
-                            active
-                              ? "border-primary bg-oryno-orange-muted shadow-[var(--shadow-soft)]"
-                              : "border-border bg-background hover:bg-muted/50",
-                          )}
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <p className="text-sm font-semibold text-primary">
-                                  {item.platform}
-                                </p>
-                                <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
-                                  {item.metric}
-                                </span>
-                              </div>
-                              <p className="mt-1 text-sm font-bold tracking-tight text-foreground">
-                                {item.name}
-                              </p>
-                              <p className="mt-0.5 text-xs text-muted-foreground">
-                                Min {item.min.toLocaleString()} · Max{" "}
-                                {item.max.toLocaleString()}
-                                {item.refill ? " · Refill" : ""}
-                              </p>
-                            </div>
-                            <p className="shrink-0 text-sm font-bold text-foreground">
-                              {money(item.samplePriceLocal)}
-                              <span className="block text-[10px] font-medium text-muted-foreground">
-                                / {item.sampleQuantity.toLocaleString()}
-                              </span>
-                            </p>
-                          </div>
-                        </motion.button>
-                      );
-                    })}
-                  </AnimatePresence>
-                ) : (
-                  <p className="py-8 text-center text-sm text-muted-foreground">
-                    No services match your filters
-                  </p>
-                )}
-              </div>
 
               {selected ? (
                 <label className="mt-4 block">
@@ -478,7 +496,7 @@ export default function SocialBoostPage() {
             </MotionSection>
 
             <MotionSection
-              delay={0.12}
+              delay={0.08}
               className="rounded-[28px] border border-border bg-background p-5 shadow-[var(--shadow-soft)] sm:p-6"
             >
               <h2 className="text-base font-semibold text-foreground">
@@ -490,7 +508,11 @@ export default function SocialBoostPage() {
                   value={selected?.platform ?? "—"}
                 />
                 <SummaryRow
-                  label="Service"
+                  label="Type"
+                  value={selected?.metric ?? "—"}
+                />
+                <SummaryRow
+                  label="Package"
                   value={selected?.name ?? "—"}
                 />
                 <SummaryRow
@@ -510,15 +532,15 @@ export default function SocialBoostPage() {
                 <div className="flex items-center justify-between border-t border-border pt-3">
                   <span className="inline-flex items-center gap-2 font-semibold text-foreground">
                     <Wallet className="h-4 w-4 text-primary" />
-                      Pay from wallet
+                    Pay from wallet
                   </span>
                 </div>
               </div>
             </MotionSection>
 
-            <ServiceInstructions service="social" delay={0.14} />
+            <ServiceInstructions service="social" delay={0.1} />
 
-            <MotionSection delay={0.18}>
+            <MotionSection delay={0.14}>
               <motion.button
                 type="submit"
                 disabled={!canSubmit}
