@@ -773,7 +773,7 @@ function GiftCardsPageContent() {
                                 : "bg-muted text-muted-foreground",
                             )}
                           >
-                            {cardCurrency} {d}
+                            {d}
                           </button>
                         ))}
                       </div>
