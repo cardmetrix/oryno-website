@@ -107,17 +107,26 @@ export default function GiftCardsLivePage() {
         fetch("/api/sogo/rates?currency=USD&cardType=ecode"),
       ]);
       const catalog = await catalogRes.json();
-      const ratesJson = await ratesRes.json();
+      const ratesJson = await ratesRes.json().catch(() => ({}));
       if (!catalogRes.ok) throw new Error(catalog.error || "Failed to load");
       setSellBrands(catalog.brands ?? []);
       setSellDemo(Boolean(catalog.demo || ratesJson.demo));
+
+      // API exposes NGN-per-$1 on `simplified` (raw `rates` has nested provider shape).
       const map: Record<string, number | null> = {};
-      for (const row of ratesJson.rates ?? []) {
-        map[row.slug] = row.ratePerUnit ?? null;
+      const rows = Array.isArray(ratesJson.simplified)
+        ? ratesJson.simplified
+        : [];
+      for (const row of rows) {
+        if (row?.slug) {
+          map[row.slug] =
+            typeof row.ratePerUnit === "number" ? row.ratePerUnit : null;
+        }
       }
       setRateMap(map);
     } catch {
       setSellBrands([]);
+      setRateMap({});
     } finally {
       setSellLoading(false);
     }
