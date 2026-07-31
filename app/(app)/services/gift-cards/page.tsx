@@ -3,12 +3,13 @@
 import {
   ChangeEvent,
   FormEvent,
+  Suspense,
   useEffect,
   useMemo,
   useState,
 } from "react";
-import Image from "next/image";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowLeft,
@@ -20,13 +21,12 @@ import {
   Search,
   ShoppingBag,
   Trash2,
-  TrendingDown,
-  TrendingUp,
   Wallet,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/app-shell";
 import { ErrorAlertModal } from "@/components/app/error-alert-modal";
+import { GiftCardBrandLogo } from "@/components/app/gift-card-brand-logo";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
 import { ServiceInstructions } from "@/components/app/service-instructions";
@@ -45,7 +45,6 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { giftCardImageFallbacks } from "@/lib/sogo/catalog";
 import { cn } from "@/lib/utils";
 
 const MAX_CARD_IMAGE_BYTES = 2_500_000;
@@ -102,81 +101,65 @@ const CARD_COUNTRIES = [
   { code: "AU", label: "Australia" },
 ];
 
-const BUY_COUNTRIES = [
-  { code: "US", label: "United States" },
-  { code: "GB", label: "United Kingdom" },
-  { code: "NG", label: "Nigeria" },
-  { code: "CA", label: "Canada" },
-];
-
 const SUB_TYPES = [
   { id: "cash_receipt" as const, label: "Cash receipt" },
   { id: "debit_receipt" as const, label: "Debit receipt" },
   { id: "no_receipt" as const, label: "No receipt" },
 ];
 
-function brandImageSrc(brand: { slug?: string; image: string }) {
-  if (brand.image && /^https?:\/\//i.test(brand.image)) return brand.image;
-  if (brand.image?.startsWith("/")) return brand.image;
-  return giftCardImageFallbacks(brand.slug || "gift")[0];
-}
-
-function BrandLogo({
-  brand,
-  className,
-  size = 44,
-  fallbacks,
-}: {
-  brand: { slug?: string; image: string; name: string };
-  className?: string;
-  size?: number;
-  fallbacks?: string[];
-}) {
-  const primary = brandImageSrc(brand);
-  const chain = [
-    primary,
-    ...(fallbacks || []),
-    ...(brand.slug
-      ? giftCardImageFallbacks(brand.slug).filter((u) => u !== primary)
-      : []),
-  ].filter((u, i, arr) => u && arr.indexOf(u) === i);
-  const [idx, setIdx] = useState(0);
-  const src = chain[Math.min(idx, Math.max(chain.length - 1, 0))] || primary;
-  const remote = /^https?:\/\//i.test(src);
-
+function FormSkeleton() {
   return (
-    <div
-      className={cn(
-        "relative shrink-0 overflow-hidden rounded-2xl bg-white ring-1 ring-border",
-        className,
-      )}
-      style={{ width: size, height: size }}
-    >
-      <Image
-        key={src}
-        src={src}
-        alt={brand.name}
-        fill
-        sizes={`${size}px`}
-        className="object-contain p-1.5"
-        unoptimized={remote || src.endsWith(".svg")}
-        onError={() => setIdx((i) => (i + 1 < chain.length ? i + 1 : i))}
-      />
-    </div>
+    <MotionSection className="space-y-4">
+      <div className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6">
+        <div className="flex items-center gap-3">
+          <div className="h-14 w-14 animate-pulse rounded-2xl bg-muted" />
+          <div className="min-w-0 flex-1 space-y-2">
+            <div className="h-4 w-40 animate-pulse rounded bg-muted" />
+            <div className="h-3 w-24 animate-pulse rounded bg-muted" />
+          </div>
+        </div>
+      </div>
+      <div className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6">
+        <div className="space-y-3">
+          <div className="h-11 animate-pulse rounded-xl bg-muted" />
+          <div className="h-12 animate-pulse rounded-xl bg-muted" />
+          <div className="h-12 animate-pulse rounded-xl bg-muted" />
+        </div>
+      </div>
+    </MotionSection>
   );
 }
 
-function rateChangePercent(slug: string, rate: number | null) {
-  if (rate == null || rate <= 0) return 0;
-  let hash = 0;
-  for (let i = 0; i < slug.length; i += 1) {
-    hash = (hash * 31 + slug.charCodeAt(i)) >>> 0;
-  }
-  return Math.round((((hash % 700) - 200) / 100) * 100) / 100;
+export default function GiftCardsPage() {
+  return (
+    <Suspense
+      fallback={
+        <AppShell hideNav>
+          <PageHeader
+            title="Gift Cards"
+            subtitle="Loading…"
+            backHref="/services/gift-cards/live"
+          />
+          <FormSkeleton />
+        </AppShell>
+      }
+    >
+      <GiftCardsPageContent />
+    </Suspense>
+  );
 }
 
-export default function GiftCardsPage() {
-  const [mode, setMode] = useState<Mode>("sell");
+function GiftCardsPageContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const slugParam = searchParams.get("slug");
+  const productIdParam = searchParams.get("productId");
+  const modeParam = searchParams.get("mode");
+  const countryParam = searchParams.get("country");
+
+  const [mode, setMode] = useState<Mode>(() =>
+    modeParam === "buy" ? "buy" : "sell",
+  );
   const [error, setError] = useState<string | null>(null);
 
   // ── Sell state ──────────────────────────────────────────────
@@ -184,8 +167,6 @@ export default function GiftCardsPage() {
   const [rateMap, setRateMap] = useState<Record<string, number | null>>({});
   const [sellLoading, setSellLoading] = useState(true);
   const [sellDemo, setSellDemo] = useState(false);
-  const [sellQuery, setSellQuery] = useState("");
-  const [sellCategory, setSellCategory] = useState("All");
   const [selectedSell, setSelectedSell] = useState<SellBrand | null>(null);
   const [cardType, setCardType] = useState<"ecode" | "physical">("ecode");
   const [subType, setSubType] = useState<
@@ -215,8 +196,9 @@ export default function GiftCardsPage() {
   const [buyProducts, setBuyProducts] = useState<BuyProduct[]>([]);
   const [buyLoading, setBuyLoading] = useState(false);
   const [buyDemo, setBuyDemo] = useState(false);
-  const [buyQuery, setBuyQuery] = useState("");
-  const [buyCountry, setBuyCountry] = useState("US");
+  const [buyCountry, setBuyCountry] = useState(
+    () => countryParam || "US",
+  );
   const [selectedBuy, setSelectedBuy] = useState<BuyProduct | null>(null);
   const [buyAmount, setBuyAmount] = useState("25");
   const [buyEmail, setBuyEmail] = useState("");
@@ -232,34 +214,6 @@ export default function GiftCardsPage() {
     { cardNumber: string | null; pinCode: string | null }[]
   >([]);
   const isMobile = useIsMobile();
-
-  const sellCategories = useMemo(() => {
-    const set = new Set(sellBrands.map((b) => b.category));
-    return ["All", ...Array.from(set).sort()];
-  }, [sellBrands]);
-
-  const filteredSell = useMemo(() => {
-    const q = sellQuery.trim().toLowerCase();
-    return sellBrands.filter((b) => {
-      if (sellCategory !== "All" && b.category !== sellCategory) return false;
-      if (!q) return true;
-      return (
-        b.name.toLowerCase().includes(q) ||
-        b.slug.includes(q) ||
-        b.category.toLowerCase().includes(q)
-      );
-    });
-  }, [sellBrands, sellQuery, sellCategory]);
-
-  const filteredBuy = useMemo(() => {
-    const q = buyQuery.trim().toLowerCase();
-    if (!q) return buyProducts;
-    return buyProducts.filter(
-      (p) =>
-        p.name.toLowerCase().includes(q) ||
-        p.brandName.toLowerCase().includes(q),
-    );
-  }, [buyProducts, buyQuery]);
 
   const changeSellOptions = useMemo(() => {
     const q = changeSellQuery.trim().toLowerCase();
@@ -322,7 +276,6 @@ export default function GiftCardsPage() {
     let cancelled = false;
     (async () => {
       setBuyLoading(true);
-      setSelectedBuy(null);
       try {
         const res = await fetch(
           `/api/reloadly/products?countryCode=${encodeURIComponent(buyCountry)}`,
@@ -345,6 +298,37 @@ export default function GiftCardsPage() {
       cancelled = true;
     };
   }, [mode, buyCountry]);
+
+  // Select sell brand from URL slug, else first brand
+  useEffect(() => {
+    if (mode !== "sell" || sellLoading || sellBrands.length === 0) return;
+    if (slugParam) {
+      const match = sellBrands.find((b) => b.slug === slugParam);
+      if (match) {
+        setSelectedSell(match);
+        return;
+      }
+    }
+    setSelectedSell((prev) => prev ?? sellBrands[0] ?? null);
+  }, [mode, sellBrands, sellLoading, slugParam]);
+
+  // Select buy product from URL productId, else first product
+  useEffect(() => {
+    if (mode !== "buy" || buyLoading || buyProducts.length === 0) return;
+    if (productIdParam) {
+      const match = buyProducts.find(
+        (p) => String(p.productId) === productIdParam,
+      );
+      setSelectedBuy(match ?? buyProducts[0] ?? null);
+      return;
+    }
+    setSelectedBuy((prev) => {
+      if (prev && buyProducts.some((p) => p.productId === prev.productId)) {
+        return prev;
+      }
+      return buyProducts[0] ?? null;
+    });
+  }, [mode, buyProducts, buyLoading, productIdParam]);
 
   useEffect(() => {
     if (!selectedSell) return;
@@ -555,6 +539,20 @@ export default function GiftCardsPage() {
     toast.success("Copied");
   }
 
+  function switchMode(tab: Mode) {
+    if (tab === mode) return;
+    setMode(tab);
+    setSellSuccess(false);
+    setBuySuccess(false);
+    if (tab === "sell") {
+      setSelectedBuy(null);
+      setSelectedSell(sellBrands[0] ?? null);
+    } else {
+      setSelectedSell(null);
+      setSelectedBuy(buyProducts[0] ?? null);
+    }
+  }
+
   return (
     <AppShell hideNav>
       <PageHeader
@@ -564,7 +562,7 @@ export default function GiftCardsPage() {
             ? "Sell gift cards for Naira wallet credit"
             : "Buy digital gift cards with your wallet"
         }
-        backHref="/services"
+        backHref="/services/gift-cards/live"
       />
 
       <ErrorAlertModal
@@ -579,13 +577,7 @@ export default function GiftCardsPage() {
             <button
               key={tab}
               type="button"
-              onClick={() => {
-                setMode(tab);
-                setSelectedSell(null);
-                setSelectedBuy(null);
-                setSellSuccess(false);
-                setBuySuccess(false);
-              }}
+              onClick={() => switchMode(tab)}
               className={cn(
                 "h-11 rounded-xl text-sm font-semibold capitalize transition",
                 mode === tab
@@ -643,10 +635,7 @@ export default function GiftCardsPage() {
                     <button
                       type="button"
                       className="btn-secondary h-12 px-6"
-                      onClick={() => {
-                        setSellSuccess(false);
-                        setSelectedSell(null);
-                      }}
+                      onClick={() => setSellSuccess(false)}
                     >
                       Sell another
                     </button>
@@ -657,7 +646,7 @@ export default function GiftCardsPage() {
               <div className="space-y-4">
                 <button
                   type="button"
-                  onClick={() => setSelectedSell(null)}
+                  onClick={() => router.push("/services/gift-cards/live")}
                   className="inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground"
                 >
                   <ArrowLeft className="h-4 w-4" />
@@ -666,7 +655,7 @@ export default function GiftCardsPage() {
 
                 <MotionSection className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6">
                   <div className="flex items-center gap-3">
-                    <BrandLogo
+                    <GiftCardBrandLogo
                       brand={{
                         slug: selectedSell.slug,
                         image: selectedSell.image,
@@ -917,126 +906,7 @@ export default function GiftCardsPage() {
                 </form>
               </div>
             ) : (
-              <>
-                <MotionSection className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6">
-                  <div className="relative">
-                    <Search className="pointer-events-none absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <input
-                      value={sellQuery}
-                      onChange={(e) => setSellQuery(e.target.value)}
-                      placeholder="Search Amazon, Apple, Steam…"
-                      className="h-12 w-full rounded-2xl border border-border bg-background pr-4 pl-10 text-sm outline-none focus:border-primary"
-                    />
-                  </div>
-                  <div className="mt-3 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                    {sellCategories.map((c) => (
-                      <button
-                        key={c}
-                        type="button"
-                        onClick={() => setSellCategory(c)}
-                        className={cn(
-                          "shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold",
-                          sellCategory === c
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted text-muted-foreground",
-                        )}
-                      >
-                        {c}
-                      </button>
-                    ))}
-                  </div>
-                </MotionSection>
-
-                <MotionSection
-                  delay={0.04}
-                  className="overflow-hidden rounded-2xl border border-border bg-background shadow-[var(--shadow-soft)] sm:rounded-[28px]"
-                >
-                  <div className="flex items-center justify-between border-b border-border px-4 py-3 sm:px-5">
-                    <div>
-                      <h2 className="text-base font-semibold">Live sell rates</h2>
-                      <p className="text-xs text-muted-foreground">
-                        {sellLoading
-                          ? "Loading…"
-                          : `${filteredSell.length} brands · tap to redeem`}
-                      </p>
-                    </div>
-                    <TrendingUp className="h-5 w-5 text-primary" />
-                  </div>
-                  <div className="divide-y divide-border">
-                    {sellLoading
-                      ? Array.from({ length: 8 }).map((_, i) => (
-                          <div
-                            key={i}
-                            className="flex h-[72px] items-center gap-3 px-4"
-                          >
-                            <div className="h-11 w-11 animate-pulse rounded-2xl bg-muted" />
-                            <div className="h-4 flex-1 animate-pulse rounded bg-muted" />
-                          </div>
-                        ))
-                      : filteredSell.map((brand, index) => {
-                          const rate = rateMap[brand.slug];
-                          const change = rateChangePercent(brand.slug, rate);
-                          const up = change >= 0;
-                          return (
-                            <motion.button
-                              key={brand.slug}
-                              type="button"
-                              initial={{ opacity: 0, y: 8 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              transition={{
-                                delay: Math.min(index * 0.025, 0.35),
-                              }}
-                              whileTap={{ scale: 0.992 }}
-                              onClick={() => setSelectedSell(brand)}
-                              className="flex w-full items-center gap-3 px-4 py-3.5 text-left sm:px-5"
-                            >
-                              <BrandLogo
-                                brand={{
-                                  slug: brand.slug,
-                                  image: brand.image,
-                                  name: brand.name,
-                                }}
-                              />
-                              <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm font-semibold">
-                                  {brand.name}
-                                </p>
-                                <p className="truncate text-[11px] text-muted-foreground">
-                                  {brand.category}
-                                </p>
-                              </div>
-                              <div className="text-right">
-                                <p className="text-sm font-bold tabular-nums">
-                                  {rate != null
-                                    ? `₦${rate.toLocaleString("en-NG")}`
-                                    : "—"}
-                                </p>
-                                <p className="text-[10px] text-muted-foreground">
-                                  / $1
-                                </p>
-                              </div>
-                              <div
-                                className={cn(
-                                  "inline-flex min-w-[4.25rem] items-center justify-end gap-0.5 rounded-full px-2 py-1 text-[11px] font-semibold",
-                                  up
-                                    ? "bg-emerald-500/12 text-emerald-600"
-                                    : "bg-rose-500/12 text-rose-600",
-                                )}
-                              >
-                                {up ? (
-                                  <TrendingUp className="h-3 w-3" />
-                                ) : (
-                                  <TrendingDown className="h-3 w-3" />
-                                )}
-                                {up ? "+" : ""}
-                                {change.toFixed(2)}%
-                              </div>
-                            </motion.button>
-                          );
-                        })}
-                  </div>
-                </MotionSection>
-              </>
+              <FormSkeleton />
             )}
           </motion.div>
         ) : (
@@ -1127,10 +997,7 @@ export default function GiftCardsPage() {
                     <button
                       type="button"
                       className="btn-secondary h-12 px-6"
-                      onClick={() => {
-                        setBuySuccess(false);
-                        setSelectedBuy(null);
-                      }}
+                      onClick={() => setBuySuccess(false)}
                     >
                       Buy another
                     </button>
@@ -1141,7 +1008,7 @@ export default function GiftCardsPage() {
               <div className="space-y-4">
                 <button
                   type="button"
-                  onClick={() => setSelectedBuy(null)}
+                  onClick={() => router.push("/services/gift-cards/live")}
                   className="inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground"
                 >
                   <ArrowLeft className="h-4 w-4" />
@@ -1150,7 +1017,7 @@ export default function GiftCardsPage() {
 
                 <MotionSection className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6">
                   <div className="flex items-center gap-3">
-                    <BrandLogo
+                    <GiftCardBrandLogo
                       brand={{
                         image: selectedBuy.image,
                         name: selectedBuy.brandName,
@@ -1267,113 +1134,13 @@ export default function GiftCardsPage() {
                 </form>
               </div>
             ) : (
-              <>
-                <MotionSection className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6">
-                  <label className="mb-3 block text-xs font-semibold text-muted-foreground">
-                    Card country
-                    <select
-                      value={buyCountry}
-                      onChange={(e) => setBuyCountry(e.target.value)}
-                      className="mt-1.5 h-12 w-full rounded-xl border border-border bg-background px-3 text-sm"
-                    >
-                      {BUY_COUNTRIES.map((c) => (
-                        <option key={c.code} value={c.code}>
-                          {c.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <div className="relative">
-                    <Search className="pointer-events-none absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <input
-                      value={buyQuery}
-                      onChange={(e) => setBuyQuery(e.target.value)}
-                      placeholder="Search brands to buy…"
-                      className="h-12 w-full rounded-2xl border border-border bg-background pr-4 pl-10 text-sm outline-none focus:border-primary"
-                    />
-                  </div>
-                </MotionSection>
-
-                <MotionSection
-                  delay={0.04}
-                  className="overflow-hidden rounded-2xl border border-border bg-background shadow-[var(--shadow-soft)] sm:rounded-[28px]"
-                >
-                  <div className="flex items-center justify-between border-b border-border px-4 py-3 sm:px-5">
-                    <div>
-                      <h2 className="text-base font-semibold">Buy gift cards</h2>
-                      <p className="text-xs text-muted-foreground">
-                        {buyLoading
-                          ? "Loading…"
-                          : `${filteredBuy.length} products · tap to buy`}
-                        {buyDemo ? " · demo catalog" : ""}
-                      </p>
-                    </div>
-                    <ShoppingBag className="h-5 w-5 text-primary" />
-                  </div>
-                  <div className="divide-y divide-border">
-                    {buyLoading
-                      ? Array.from({ length: 6 }).map((_, i) => (
-                          <div
-                            key={i}
-                            className="flex h-[72px] items-center gap-3 px-4"
-                          >
-                            <div className="h-11 w-11 animate-pulse rounded-2xl bg-muted" />
-                            <div className="h-4 flex-1 animate-pulse rounded bg-muted" />
-                          </div>
-                        ))
-                      : filteredBuy.map((product, index) => {
-                          const from =
-                            product.denominations[0] ??
-                            product.minAmount ??
-                            10;
-                          return (
-                            <motion.button
-                              key={product.productId}
-                              type="button"
-                              initial={{ opacity: 0, y: 8 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              transition={{
-                                delay: Math.min(index * 0.025, 0.35),
-                              }}
-                              whileTap={{ scale: 0.992 }}
-                              onClick={() => setSelectedBuy(product)}
-                              className="flex w-full items-center gap-3 px-4 py-3.5 text-left sm:px-5"
-                            >
-                              <BrandLogo
-                                brand={{
-                                  image: product.image,
-                                  name: product.brandName,
-                                }}
-                                fallbacks={product.imageFallbacks}
-                              />
-                              <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm font-semibold">
-                                  {product.brandName}
-                                </p>
-                                <p className="truncate text-[11px] text-muted-foreground">
-                                  {product.name}
-                                </p>
-                              </div>
-                              <div className="text-right">
-                                <p className="text-sm font-bold tabular-nums">
-                                  from {product.recipientCurrency} {from}
-                                </p>
-                                <p className="text-[10px] text-muted-foreground">
-                                  {product.countryCode}
-                                </p>
-                              </div>
-                            </motion.button>
-                          );
-                        })}
-                  </div>
-                </MotionSection>
-              </>
+              <FormSkeleton />
             )}
           </motion.div>
         )}
       </AnimatePresence>
 
-      {!selectedSell && !selectedBuy && !sellSuccess && !buySuccess ? (
+      {(selectedSell || selectedBuy) && !sellSuccess && !buySuccess ? (
         <ServiceInstructions
           service="gift-cards"
           className="mt-5"
@@ -1419,7 +1186,7 @@ export default function GiftCardsPage() {
                   active && "bg-oryno-orange-muted",
                 )}
               >
-                <BrandLogo
+                <GiftCardBrandLogo
                   brand={{
                     slug: brand.slug,
                     image: brand.image,
@@ -1480,7 +1247,7 @@ export default function GiftCardsPage() {
                   active && "bg-oryno-orange-muted",
                 )}
               >
-                <BrandLogo
+                <GiftCardBrandLogo
                   brand={{
                     image: product.image,
                     name: product.brandName,
