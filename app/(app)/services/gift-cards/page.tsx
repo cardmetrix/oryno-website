@@ -94,12 +94,23 @@ type BuyQuote = {
 };
 
 const CARD_COUNTRIES = [
-  { code: "US", label: "United States" },
-  { code: "GB", label: "United Kingdom" },
-  { code: "CA", label: "Canada" },
-  { code: "EU", label: "Europe" },
-  { code: "AU", label: "Australia" },
+  { code: "US", label: "United States", currency: "USD" },
+  { code: "GB", label: "United Kingdom", currency: "GBP" },
+  { code: "CA", label: "Canada", currency: "CAD" },
+  { code: "EU", label: "Europe", currency: "EUR" },
+  { code: "AU", label: "Australia", currency: "AUD" },
 ];
+
+function currencyForCardCountry(
+  countryCode: string,
+  brandCurrencies?: string[],
+) {
+  const mapped =
+    CARD_COUNTRIES.find((c) => c.code === countryCode)?.currency || "USD";
+  if (!brandCurrencies?.length) return mapped;
+  if (brandCurrencies.includes(mapped)) return mapped;
+  return brandCurrencies[0] || mapped;
+}
 
 const SUB_TYPES = [
   { id: "cash_receipt" as const, label: "Cash receipt" },
@@ -332,7 +343,9 @@ function GiftCardsPageContent() {
 
   useEffect(() => {
     if (!selectedSell) return;
-    setCardCurrency(selectedSell.currencies[0] || "USD");
+    setCardCurrency(
+      currencyForCardCountry(cardCountry, selectedSell.currencies),
+    );
     setCardType(selectedSell.cardTypes.includes("ecode") ? "ecode" : "physical");
     setSellAmount(String(selectedSell.denominations[0] || 100));
     setCode("");
@@ -725,12 +738,21 @@ function GiftCardsPageContent() {
                       ))}
                     </div>
 
-                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <div className="mt-4">
                       <label className="block text-xs font-semibold text-muted-foreground">
                         Card country
                         <select
                           value={cardCountry}
-                          onChange={(e) => setCardCountry(e.target.value)}
+                          onChange={(e) => {
+                            const next = e.target.value;
+                            setCardCountry(next);
+                            setCardCurrency(
+                              currencyForCardCountry(
+                                next,
+                                selectedSell.currencies,
+                              ),
+                            );
+                          }}
                           className="mt-1.5 h-12 w-full rounded-xl border border-border bg-background px-3 text-sm"
                         >
                           {CARD_COUNTRIES.map((c) => (
@@ -740,20 +762,9 @@ function GiftCardsPageContent() {
                           ))}
                         </select>
                       </label>
-                      <label className="block text-xs font-semibold text-muted-foreground">
-                        Currency
-                        <select
-                          value={cardCurrency}
-                          onChange={(e) => setCardCurrency(e.target.value)}
-                          className="mt-1.5 h-12 w-full rounded-xl border border-border bg-background px-3 text-sm"
-                        >
-                          {selectedSell.currencies.map((c) => (
-                            <option key={c} value={c}>
-                              {c}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
+                      <p className="mt-1.5 text-[11px] text-muted-foreground">
+                        Currency set to {cardCurrency}
+                      </p>
                     </div>
 
                     <div className="mt-4">
