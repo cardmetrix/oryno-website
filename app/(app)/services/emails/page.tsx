@@ -231,7 +231,7 @@ export default function EmailRentPage() {
           <form
             key="form"
             onSubmit={onSubmit}
-            className="space-y-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:space-y-5 sm:pb-0"
+            className="space-y-4 sm:space-y-5"
           >
             <MotionSection className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6">
               <div className="mb-4 flex items-center gap-3">
@@ -333,7 +333,7 @@ export default function EmailRentPage() {
             <ServiceInstructions
               service="emails"
               delay={0.12}
-              className="mb-20 sm:mb-0"
+              className="mb-2 sm:mb-0"
             />
 
             <div className="hidden sm:block">
@@ -351,7 +351,13 @@ export default function EmailRentPage() {
               </motion.button>
             </div>
 
-            <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border/80 bg-[image:var(--header-surface)] px-4 pt-6 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur-xl sm:hidden">
+            {/* Spacer so sticky CTA never overlaps instructions on mobile */}
+            <div
+              aria-hidden
+              className="h-[calc(5.5rem+env(safe-area-inset-bottom))] sm:hidden"
+            />
+
+            <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border/80 bg-[image:var(--header-surface)] px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur-xl sm:hidden">
               <button
                 type="submit"
                 disabled={!canSubmit}
