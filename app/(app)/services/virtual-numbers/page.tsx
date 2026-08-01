@@ -68,7 +68,6 @@ export default function VirtualNumbersPage() {
   const [loadingServices, setLoadingServices] = useState(true);
   const [loadingOffers, setLoadingOffers] = useState(false);
 
-  const [serviceOpen, setServiceOpen] = useState(false);
   const [countryOpen, setCountryOpen] = useState(false);
   const [serviceQuery, setServiceQuery] = useState("");
   const [countryQuery, setCountryQuery] = useState("");
@@ -83,8 +82,6 @@ export default function VirtualNumbersPage() {
   const [smsCode, setSmsCode] = useState<string | null>(null);
   const [polling, setPolling] = useState(false);
   const [receipt, setReceipt] = useState("");
-
-  const selectedService = services.find((s) => s.code === service);
 
   const filteredServices = useMemo(() => {
     const q = serviceQuery.trim().toLowerCase();
@@ -315,91 +312,52 @@ export default function VirtualNumbersPage() {
                 <div className="min-w-0">
                   <h2 className="text-base font-semibold">Select service</h2>
                   <p className="text-xs text-muted-foreground">
-                    Search and pick WhatsApp, Telegram, Google & more
+                    WhatsApp, Telegram, Google, Instagram & more
                   </p>
                 </div>
               </div>
 
-              {loadingServices ? (
-                <div className="h-12 animate-pulse rounded-[14px] bg-muted" />
-              ) : (
-                <button
-                  type="button"
-                  disabled={!services.length}
-                  onClick={() => {
-                    setServiceQuery("");
-                    setServiceOpen(true);
-                  }}
-                  className="flex h-12 w-full items-center gap-2 rounded-[14px] border border-border bg-background px-3.5 text-left outline-none transition hover:bg-muted/40 focus:border-primary disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <Phone className="h-4 w-4 shrink-0 text-primary" />
-                  <span
-                    className={cn(
-                      "min-w-0 flex-1 truncate text-sm font-semibold",
-                      selectedService
-                        ? "text-foreground"
-                        : "text-muted-foreground",
-                    )}
-                  >
-                    {selectedService?.name || "Select a service"}
-                  </span>
-                  <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
-                </button>
-              )}
+              <div className="relative mb-3">
+                <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  value={serviceQuery}
+                  onChange={(e) => setServiceQuery(e.target.value)}
+                  placeholder="Search services (e.g. WhatsApp, Telegram)"
+                  className="h-11 w-full rounded-[14px] border border-border bg-background pr-3 pl-9 text-sm outline-none focus:border-primary"
+                  autoComplete="off"
+                />
+              </div>
 
-              <SearchPickerSheet
-                open={serviceOpen}
-                onOpenChange={setServiceOpen}
-                isMobile={isMobile}
-                title="Select service"
-                description="Search and choose a platform"
-                searchPlaceholder="Search services…"
-                query={serviceQuery}
-                onQueryChange={setServiceQuery}
-                emptyLabel={
-                  serviceQuery.trim()
-                    ? "No services match your search"
-                    : "No services available"
-                }
-                hasItems={filteredServices.length > 0}
-              >
-                {filteredServices.map((s) => {
-                  const active = s.code === service;
-                  return (
-                    <button
-                      key={s.code}
-                      type="button"
-                      onClick={() => {
-                        setService(s.code);
-                        setServiceOpen(false);
-                        setServiceQuery("");
-                      }}
-                      className={cn(
-                        "flex min-h-[56px] w-full items-center gap-3 px-4 py-3.5 text-left transition active:bg-muted/70 hover:bg-muted/50",
-                        active && "bg-oryno-orange-muted",
-                      )}
-                    >
-                      <Phone className="h-4 w-4 shrink-0 text-primary" />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold">
+              <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {loadingServices
+                  ? Array.from({ length: 6 }).map((_, i) => (
+                      <div
+                        key={i}
+                        className="h-9 w-24 shrink-0 animate-pulse rounded-full bg-muted"
+                      />
+                    ))
+                  : filteredServices.length
+                    ? filteredServices.map((s) => (
+                        <button
+                          key={s.code}
+                          type="button"
+                          onClick={() => setService(s.code)}
+                          className={cn(
+                            "shrink-0 rounded-full px-3.5 py-2 text-sm font-semibold",
+                            service === s.code
+                              ? "bg-primary text-white"
+                              : "bg-muted text-foreground",
+                          )}
+                        >
                           {s.name}
+                        </button>
+                      ))
+                    : (
+                        <p className="py-2 text-sm text-muted-foreground">
+                          No services match “{serviceQuery.trim()}”
                         </p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          {s.code.toUpperCase()}
-                        </p>
-                      </div>
-                      {active ? (
-                        <Check
-                          className="h-4 w-4 shrink-0 text-primary"
-                          strokeWidth={2.25}
-                        />
-                      ) : (
-                        <span className="h-4 w-4 shrink-0" />
                       )}
-                    </button>
-                  );
-                })}
-              </SearchPickerSheet>
+              </div>
             </MotionSection>
 
             <MotionSection
