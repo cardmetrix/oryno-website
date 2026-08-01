@@ -65,27 +65,44 @@ export default function EmailRentPage() {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    const siteForDomains = siteValue.trim().toLowerCase();
+
+    if (!siteForDomains) {
+      setDomains([]);
+      setDomain("");
+      setLoading(false);
+      return;
+    }
+
+    const timer = window.setTimeout(async () => {
       setLoading(true);
+      setDomains([]);
+      setDomain("");
       try {
-        const res = await fetch("/api/herosms/emails/domains");
+        const res = await fetch(
+          `/api/herosms/emails/domains?site=${encodeURIComponent(siteForDomains)}`,
+        );
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error);
+        if (!res.ok) throw new Error(data.error || "Failed to load domains");
         if (cancelled) return;
-        setDomains(data.domains ?? []);
-        if (data.domains?.[0]?.name) setDomain(data.domains[0].name);
+        const list = (data.domains ?? []) as Domain[];
+        setDomains(list);
+        if (list[0]?.name) setDomain(list[0].name);
       } catch (e) {
         if (!cancelled) {
+          setDomains([]);
           setError(e instanceof Error ? e.message : "Failed to load domains");
         }
       } finally {
         if (!cancelled) setLoading(false);
       }
-    })();
+    }, site === "other" ? 400 : 0);
+
     return () => {
       cancelled = true;
+      window.clearTimeout(timer);
     };
-  }, []);
+  }, [siteValue, site]);
 
   useEffect(() => {
     if (!success || !emailId || code) return;
@@ -292,7 +309,9 @@ export default function EmailRentPage() {
                   ))
                 ) : domains.length === 0 ? (
                   <p className="rounded-[16px] border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
-                    No domains available right now. Please try again shortly.
+                    {siteValue
+                      ? `No domains in stock for ${siteValue}. Try another site.`
+                      : "Enter a site to load available domains."}
                   </p>
                 ) : (
                   domains.map((d) => (

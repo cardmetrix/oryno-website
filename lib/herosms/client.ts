@@ -353,10 +353,10 @@ async function emailFetch(path: string, init?: RequestInit) {
   const key = herosmsApiKey();
   if (!key) throw new Error("Email service is not configured");
 
-  // Email REST docs use raw token; some accounts need `ApiKey <token>`.
+  // Working clients use `ApiKey <token>`; some docs show raw token.
   const authStyles = [
-    { label: "raw", value: key },
     { label: "ApiKey", value: `ApiKey ${key}` },
+    { label: "raw", value: key },
   ] as const;
   let lastError = "Failed to reach email service";
 
@@ -397,8 +397,8 @@ async function emailFetch(path: string, init?: RequestInit) {
 
     lastError = formatEmailApiError(json, res.status);
 
-    // Only swap auth style on auth failures — not on validation 400s.
-    if (res.status !== 401 && res.status !== 403) {
+    // HeroSMS often returns 400 for bad auth on email REST — try next style.
+    if (res.status !== 401 && res.status !== 403 && res.status !== 400) {
       break;
     }
   }
@@ -407,14 +407,34 @@ async function emailFetch(path: string, init?: RequestInit) {
   throw new Error(lastError);
 }
 
-export async function getHerosmsEmailDomains() {
-  const json = await emailFetch("/emails/domains");
-  const data = (json?.data ?? []) as {
-    name: string;
-    cost: number;
-    count: number;
-  }[];
-  console.log(LOG_PREFIX, "email domains", { count: data.length });
+/**
+ * HeroSMS requires `site` query param: GET /emails/domains?site=telegram.com
+ */
+export async function getHerosmsEmailDomains(site: string) {
+  const normalized = normalizeEmailSite(site);
+  if (!normalized) throw new Error("Site is required to load domains");
+
+  const qs = new URLSearchParams({ site: normalized });
+  const json = await emailFetch(`/emails/domains?${qs.toString()}`);
+  const raw = (json?.data ?? json) as unknown;
+  const rows = Array.isArray(raw) ? raw : [];
+
+  const data = rows
+    .map((row) => {
+      const r = row as { name?: string; cost?: number; count?: number };
+      return {
+        name: String(r.name || "").trim().toLowerCase(),
+        cost: Number(r.cost) || 0,
+        count: Number(r.count) || 0,
+      };
+    })
+    .filter((d) => d.name && d.count > 0)
+    .sort((a, b) => a.cost - b.cost);
+
+  console.log(LOG_PREFIX, "email domains", {
+    site: normalized,
+    count: data.length,
+  });
   return data;
 }
 
@@ -467,14 +487,13 @@ export async function purchaseHerosmsEmail(input: {
     throw new Error("Site and domain are required");
   }
 
+  // Live clients buy with { site, domain } only.
   const service =
     input.service?.trim() || SITE_SERVICE_CODES[site] || undefined;
-
-  // Docs: POST { site, domain }. Optional service for some accounts.
   const payloads: Record<string, string>[] = [{ site, domain }];
   if (service) payloads.push({ site, domain, service });
 
-  console.log(LOG_PREFIX, "purchase email", { site, domain, service, payloads });
+  console.log(LOG_PREFIX, "purchase email", { site, domain, service });
 
   let lastError = "Failed to rent email";
   for (const body of payloads) {
@@ -483,7 +502,7 @@ export async function purchaseHerosmsEmail(input: {
         method: "POST",
         body: JSON.stringify(body),
       });
-      const result = parsePurchasedEmail(json?.data, { site, domain });
+      const result = parsePurchasedEmail(json?.data ?? json, { site, domain });
       if (!result) {
         lastError = "No email returned from the email service";
         continue;

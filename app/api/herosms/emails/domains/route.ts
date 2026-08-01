@@ -4,17 +4,27 @@ import {
   FALLBACK_EMAIL_DOMAINS,
   getHerosmsEmailDomains,
   isHerosmsDemoMode,
+  normalizeEmailSite,
   usdToLocalPrice,
 } from "@/lib/herosms";
 import { currencyForCountry } from "@/lib/wallet";
 
 export const runtime = "nodejs";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const user = await ensureAppUser();
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const site = normalizeEmailSite(searchParams.get("site") || "");
+    if (!site) {
+      return NextResponse.json(
+        { error: "Select a site to load email domains" },
+        { status: 400 },
+      );
     }
 
     const currency = currencyForCountry(user.countryCode);
@@ -22,24 +32,15 @@ export async function GET() {
     let domains = FALLBACK_EMAIL_DOMAINS;
 
     if (!demo) {
-      console.log("[herosms-email-domains] LIVE fetch");
-      // Live mode: never serve fake fallback domains (purchase would 400).
-      const live = await getHerosmsEmailDomains();
-      domains = live.filter((d) => Boolean(d?.name?.trim()));
+      console.log("[herosms-email-domains] LIVE fetch", { site });
+      const live = await getHerosmsEmailDomains(site);
+      domains = live;
       console.log("[herosms-email-domains] LIVE ok", {
+        site,
         count: domains.length,
       });
-      if (!domains.length) {
-        return NextResponse.json(
-          {
-            error:
-              "No email domains available right now. Try again later.",
-          },
-          { status: 400 },
-        );
-      }
     } else {
-      console.log("[herosms-email-domains] DEMO fallback domains");
+      console.log("[herosms-email-domains] DEMO fallback domains", { site });
     }
 
     const list = [];
@@ -58,6 +59,7 @@ export async function GET() {
     return NextResponse.json({
       ok: true,
       demo,
+      site,
       domains: list,
     });
   } catch (error) {
