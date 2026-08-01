@@ -1,10 +1,19 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import {
+  FormEvent,
+  type ReactNode,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  Check,
   CheckCircle2,
+  ChevronDown,
   Copy,
+  Globe2,
   Phone,
   RefreshCw,
   Search,
@@ -16,6 +25,21 @@ import { PageHeader } from "@/components/app/page-header";
 import { ErrorAlertModal } from "@/components/app/error-alert-modal";
 import { ServiceInstructions } from "@/components/app/service-instructions";
 import { useCountry } from "@/components/providers/country-provider";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { formatCountryMoney } from "@/lib/country";
 import { cn } from "@/lib/utils";
 
@@ -36,14 +60,19 @@ type HeroOffer = {
 
 export default function VirtualNumbersPage() {
   const { country } = useCountry();
+  const isMobile = useIsMobile();
   const [services, setServices] = useState<HeroService[]>([]);
   const [service, setService] = useState("wa");
   const [offers, setOffers] = useState<HeroOffer[]>([]);
   const [liveMode, setLiveMode] = useState(false);
   const [loadingServices, setLoadingServices] = useState(true);
   const [loadingOffers, setLoadingOffers] = useState(false);
-  const [query, setQuery] = useState("");
+
+  const [serviceOpen, setServiceOpen] = useState(false);
+  const [countryOpen, setCountryOpen] = useState(false);
   const [serviceQuery, setServiceQuery] = useState("");
+  const [countryQuery, setCountryQuery] = useState("");
+
   const [selected, setSelected] = useState<HeroOffer | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,6 +84,8 @@ export default function VirtualNumbersPage() {
   const [polling, setPolling] = useState(false);
   const [receipt, setReceipt] = useState("");
 
+  const selectedService = services.find((s) => s.code === service);
+
   const filteredServices = useMemo(() => {
     const q = serviceQuery.trim().toLowerCase();
     if (!q) return services;
@@ -64,16 +95,15 @@ export default function VirtualNumbersPage() {
     );
   }, [services, serviceQuery]);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+  const filteredCountries = useMemo(() => {
+    const q = countryQuery.trim().toLowerCase();
     if (!q) return offers;
     return offers.filter(
       (o) =>
         o.countryName.toLowerCase().includes(q) ||
-        (o.iso || "").toLowerCase().includes(q) ||
-        o.serviceName.toLowerCase().includes(q),
+        (o.iso || "").toLowerCase().includes(q),
     );
-  }, [offers, query]);
+  }, [offers, countryQuery]);
 
   useEffect(() => {
     let cancelled = false;
@@ -106,8 +136,9 @@ export default function VirtualNumbersPage() {
     (async () => {
       setLoadingOffers(true);
       setSelected(null);
+      setCountryQuery("");
+      setCountryOpen(false);
       setError(null);
-      setQuery("");
       try {
         const res = await fetch(
           `/api/herosms/prices?service=${encodeURIComponent(service)}`,
@@ -133,7 +164,6 @@ export default function VirtualNumbersPage() {
     };
   }, [service]);
 
-  // Poll SMS after purchase
   useEffect(() => {
     if (!success || !activationId || smsCode) return;
     let cancelled = false;
@@ -285,134 +315,221 @@ export default function VirtualNumbersPage() {
                 <div className="min-w-0">
                   <h2 className="text-base font-semibold">Select service</h2>
                   <p className="text-xs text-muted-foreground">
-                    WhatsApp, Telegram, Google, Instagram & more
+                    Search and pick WhatsApp, Telegram, Google & more
                   </p>
                 </div>
               </div>
 
-              <div className="relative mb-3">
-                <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <input
-                  value={serviceQuery}
-                  onChange={(e) => setServiceQuery(e.target.value)}
-                  placeholder="Search services (e.g. WhatsApp, Telegram)"
-                  className="h-11 w-full rounded-[14px] border border-border bg-background pr-3 pl-9 text-sm outline-none focus:border-primary"
-                  autoComplete="off"
-                />
-              </div>
+              {loadingServices ? (
+                <div className="h-12 animate-pulse rounded-[14px] bg-muted" />
+              ) : (
+                <button
+                  type="button"
+                  disabled={!services.length}
+                  onClick={() => {
+                    setServiceQuery("");
+                    setServiceOpen(true);
+                  }}
+                  className="flex h-12 w-full items-center gap-2 rounded-[14px] border border-border bg-background px-3.5 text-left outline-none transition hover:bg-muted/40 focus:border-primary disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Phone className="h-4 w-4 shrink-0 text-primary" />
+                  <span
+                    className={cn(
+                      "min-w-0 flex-1 truncate text-sm font-semibold",
+                      selectedService
+                        ? "text-foreground"
+                        : "text-muted-foreground",
+                    )}
+                  >
+                    {selectedService?.name || "Select a service"}
+                  </span>
+                  <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                </button>
+              )}
 
-              <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {loadingServices
-                  ? Array.from({ length: 6 }).map((_, i) => (
-                      <div
-                        key={i}
-                        className="h-9 w-24 shrink-0 animate-pulse rounded-full bg-muted"
-                      />
-                    ))
-                  : filteredServices.length
-                    ? filteredServices.map((s) => (
-                        <button
-                          key={s.code}
-                          type="button"
-                          onClick={() => setService(s.code)}
-                          className={cn(
-                            "shrink-0 rounded-full px-3.5 py-2 text-sm font-semibold",
-                            service === s.code
-                              ? "bg-primary text-white"
-                              : "bg-muted text-foreground",
-                          )}
-                        >
-                          {s.name}
-                        </button>
-                      ))
-                    : (
-                        <p className="py-2 text-sm text-muted-foreground">
-                          No services match “{serviceQuery.trim()}”
-                        </p>
+              <SearchPickerSheet
+                open={serviceOpen}
+                onOpenChange={setServiceOpen}
+                isMobile={isMobile}
+                title="Select service"
+                description="Search and choose a platform"
+                searchPlaceholder="Search services…"
+                query={serviceQuery}
+                onQueryChange={setServiceQuery}
+                emptyLabel={
+                  serviceQuery.trim()
+                    ? "No services match your search"
+                    : "No services available"
+                }
+                hasItems={filteredServices.length > 0}
+              >
+                {filteredServices.map((s) => {
+                  const active = s.code === service;
+                  return (
+                    <button
+                      key={s.code}
+                      type="button"
+                      onClick={() => {
+                        setService(s.code);
+                        setServiceOpen(false);
+                        setServiceQuery("");
+                      }}
+                      className={cn(
+                        "flex min-h-[56px] w-full items-center gap-3 px-4 py-3.5 text-left transition active:bg-muted/70 hover:bg-muted/50",
+                        active && "bg-oryno-orange-muted",
                       )}
-              </div>
+                    >
+                      <Phone className="h-4 w-4 shrink-0 text-primary" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold">
+                          {s.name}
+                        </p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {s.code.toUpperCase()}
+                        </p>
+                      </div>
+                      {active ? (
+                        <Check
+                          className="h-4 w-4 shrink-0 text-primary"
+                          strokeWidth={2.25}
+                        />
+                      ) : (
+                        <span className="h-4 w-4 shrink-0" />
+                      )}
+                    </button>
+                  );
+                })}
+              </SearchPickerSheet>
             </MotionSection>
 
             <MotionSection
               delay={0.05}
               className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6"
             >
-              <h2 className="mb-1 text-base font-semibold">Countries</h2>
+              <h2 className="mb-1 text-base font-semibold">Select country</h2>
               <p className="mb-3 text-xs text-muted-foreground">
                 {loadingOffers
-                  ? "Loading prices…"
-                  : `${filtered.length} of ${offers.length} countries`}
+                  ? "Loading countries…"
+                  : `${offers.length} countries available`}
               </p>
 
-              <div className="relative mb-3">
-                <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search country (e.g. USA, Nigeria, GB)"
-                  className="h-11 w-full rounded-[14px] border border-border bg-background pr-3 pl-9 text-sm outline-none focus:border-primary"
-                  autoComplete="off"
-                />
-              </div>
-
-              <div className="grid max-h-[420px] gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
-                {loadingOffers ? (
-                  Array.from({ length: 8 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="h-16 animate-pulse rounded-[16px] bg-muted"
+              {loadingOffers ? (
+                <div className="h-12 animate-pulse rounded-[14px] bg-muted" />
+              ) : (
+                <button
+                  type="button"
+                  disabled={!offers.length}
+                  onClick={() => {
+                    setCountryQuery("");
+                    setCountryOpen(true);
+                  }}
+                  className="flex h-12 w-full items-center gap-2 rounded-[14px] border border-border bg-background px-3.5 text-left outline-none transition hover:bg-muted/40 focus:border-primary disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {selected?.flagUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={selected.flagUrl}
+                      alt=""
+                      className="h-5 w-7 shrink-0 rounded object-cover"
                     />
-                  ))
-                ) : filtered.length ? (
-                  filtered.map((offer) => {
-                    const active =
-                      selected?.countryId === offer.countryId &&
-                      selected?.service === offer.service;
-                    return (
-                      <button
-                        key={`${offer.countryId}-${offer.service}`}
-                        type="button"
-                        onClick={() => setSelected(offer)}
-                        className={cn(
-                          "flex items-center gap-3 rounded-[16px] border px-3 py-3 text-left",
-                          active
-                            ? "border-primary bg-oryno-orange-muted"
-                            : "border-border hover:bg-muted/50",
-                        )}
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        {offer.flagUrl ? (
-                          <img
-                            src={offer.flagUrl}
-                            alt={offer.countryName}
-                            className="h-8 w-10 shrink-0 rounded object-cover shadow-sm"
-                            loading="lazy"
-                          />
-                        ) : (
-                          <span className="text-2xl">{offer.flagEmoji}</span>
-                        )}
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold">
-                            {offer.countryName}
-                          </p>
-                          <p className="text-[11px] text-muted-foreground">
-                            {offer.count} available · SMS
-                          </p>
-                        </div>
-                        <p className="shrink-0 text-sm font-bold text-primary">
-                          {money(offer.priceLocal)}
+                  ) : (
+                    <Globe2 className="h-4 w-4 shrink-0 text-primary" />
+                  )}
+                  <span
+                    className={cn(
+                      "min-w-0 flex-1 truncate text-sm font-semibold",
+                      selected ? "text-foreground" : "text-muted-foreground",
+                    )}
+                  >
+                    {selected
+                      ? selected.countryName
+                      : offers.length
+                        ? "Select a country"
+                        : "No countries in stock"}
+                  </span>
+                  {selected ? (
+                    <span className="shrink-0 text-sm font-bold text-primary">
+                      {money(selected.priceLocal)}
+                    </span>
+                  ) : null}
+                  <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                </button>
+              )}
+
+              {!loadingOffers && !offers.length ? (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  No countries in stock for this service. Try another service.
+                </p>
+              ) : null}
+
+              <SearchPickerSheet
+                open={countryOpen}
+                onOpenChange={setCountryOpen}
+                isMobile={isMobile}
+                title="Select country"
+                description="Search and choose a country for your number"
+                searchPlaceholder="Search countries…"
+                query={countryQuery}
+                onQueryChange={setCountryQuery}
+                emptyLabel={
+                  countryQuery.trim()
+                    ? "No countries match your search"
+                    : "No countries available for this service"
+                }
+                hasItems={filteredCountries.length > 0}
+              >
+                {filteredCountries.map((offer) => {
+                  const active =
+                    selected?.countryId === offer.countryId &&
+                    selected?.service === offer.service;
+                  return (
+                    <button
+                      key={`${offer.countryId}-${offer.service}`}
+                      type="button"
+                      onClick={() => {
+                        setSelected(offer);
+                        setCountryOpen(false);
+                        setCountryQuery("");
+                      }}
+                      className={cn(
+                        "flex min-h-[56px] w-full items-center gap-3 px-4 py-3.5 text-left transition active:bg-muted/70 hover:bg-muted/50",
+                        active && "bg-oryno-orange-muted",
+                      )}
+                    >
+                      {offer.flagUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={offer.flagUrl}
+                          alt={offer.countryName}
+                          className="h-7 w-9 shrink-0 rounded object-cover shadow-sm"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <span className="text-xl">{offer.flagEmoji}</span>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold">
+                          {offer.countryName}
                         </p>
-                      </button>
-                    );
-                  })
-                ) : (
-                  <p className="col-span-full py-8 text-center text-sm text-muted-foreground">
-                    {query.trim()
-                      ? `No countries match “${query.trim()}”`
-                      : "No countries available for this service"}
-                  </p>
-                )}
-              </div>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {offer.count.toLocaleString()} available · SMS
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-sm font-bold tabular-nums text-primary">
+                        {money(offer.priceLocal)}
+                      </span>
+                      {active ? (
+                        <Check
+                          className="h-4 w-4 shrink-0 text-primary"
+                          strokeWidth={2.25}
+                        />
+                      ) : (
+                        <span className="h-4 w-4 shrink-0" />
+                      )}
+                    </button>
+                  );
+                })}
+              </SearchPickerSheet>
             </MotionSection>
 
             <MotionSection
@@ -444,18 +561,39 @@ export default function VirtualNumbersPage() {
 
             <ServiceInstructions service="virtual-numbers" delay={0.12} />
 
-            <motion.button
-              type="submit"
-              disabled={!selected || submitting}
-              whileTap={selected ? { scale: 0.985 } : undefined}
-              className="btn-primary h-12 w-full text-base disabled:opacity-50 sm:max-w-md"
-            >
-              {submitting
-                ? "Getting number…"
-                : selected
-                  ? `Get number · ${money(selected.priceLocal)}`
-                  : "Select a country"}
-            </motion.button>
+            <div className="hidden pt-2 sm:block">
+              <motion.button
+                type="submit"
+                disabled={!selected || submitting}
+                whileTap={selected ? { scale: 0.985 } : undefined}
+                className="btn-primary h-12 w-full text-base disabled:opacity-50 sm:max-w-md"
+              >
+                {submitting
+                  ? "Getting number…"
+                  : selected
+                    ? `Get number · ${money(selected.priceLocal)}`
+                    : "Select a country"}
+              </motion.button>
+            </div>
+
+            <div
+              aria-hidden
+              className="h-[calc(1.5rem+5.5rem+env(safe-area-inset-bottom))] sm:hidden"
+            />
+
+            <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border/80 bg-[image:var(--header-surface)] px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur-xl sm:hidden">
+              <button
+                type="submit"
+                disabled={!selected || submitting}
+                className="btn-primary h-12 w-full text-base disabled:opacity-50"
+              >
+                {submitting
+                  ? "Getting number…"
+                  : selected
+                    ? `Get number · ${money(selected.priceLocal)}`
+                    : "Select a country"}
+              </button>
+            </div>
           </form>
         )}
       </AnimatePresence>
@@ -466,6 +604,96 @@ export default function VirtualNumbersPage() {
         page="Virtual Numbers"
       />
     </AppShell>
+  );
+}
+
+function SearchPickerSheet({
+  open,
+  onOpenChange,
+  isMobile,
+  title,
+  description,
+  searchPlaceholder,
+  query,
+  onQueryChange,
+  emptyLabel,
+  hasItems,
+  children,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  isMobile: boolean;
+  title: string;
+  description: string;
+  searchPlaceholder: string;
+  query: string;
+  onQueryChange: (query: string) => void;
+  emptyLabel: string;
+  hasItems: boolean;
+  children: ReactNode;
+}) {
+  const search = (
+    <div className="relative">
+      <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      <input
+        value={query}
+        onChange={(e) => onQueryChange(e.target.value)}
+        placeholder={searchPlaceholder}
+        className="h-11 w-full rounded-xl border border-border bg-background pr-3 pl-9 text-base outline-none focus:border-primary"
+        autoFocus
+      />
+    </div>
+  );
+
+  const list = hasItems ? (
+    children
+  ) : (
+    <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+      {emptyLabel}
+    </p>
+  );
+
+  if (isMobile) {
+    return (
+      <Drawer
+        open={open}
+        onOpenChange={onOpenChange}
+        shouldScaleBackground={false}
+        repositionInputs={false}
+        handleOnly
+      >
+        <DrawerContent className="h-[min(78dvh,640px)] max-h-[78dvh] w-full max-w-full rounded-t-[28px] border-border sm:mx-auto sm:max-w-lg">
+          <DrawerHeader className="shrink-0 gap-1 border-b border-border px-4 pb-3 pt-1 text-left sm:px-5">
+            <DrawerTitle className="text-base sm:text-lg">{title}</DrawerTitle>
+            <DrawerDescription className="text-xs sm:text-sm">
+              {description}
+            </DrawerDescription>
+          </DrawerHeader>
+          <div className="shrink-0 border-b border-border px-4 py-3 sm:px-5">
+            {search}
+          </div>
+          <div
+            className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]"
+            data-vaul-no-drag=""
+          >
+            <div className="pb-4">{list}</div>
+          </div>
+        </DrawerContent>
+      </Drawer>
+    );
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[85vh] overflow-hidden rounded-[24px] p-0 sm:max-w-md">
+        <DialogHeader className="border-b border-border px-5 py-4 text-left">
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
+        </DialogHeader>
+        <div className="border-b border-border px-4 py-3">{search}</div>
+        <div className="max-h-[50vh] overflow-y-auto">{list}</div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
