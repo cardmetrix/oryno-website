@@ -22,6 +22,10 @@ const HERO_ERROR_EN: Record<string, string> = {
   站点无效: "Invalid site",
   请求过于频繁: "Too many requests — try again shortly",
   内部服务器错误: "Something went wrong — try again",
+  UNPROCESSABLE_ENTITY:
+    "That site or domain isn’t available. Try another combination.",
+  "Unprocessable Entity":
+    "That site or domain isn’t available. Try another combination.",
   NO_NUMBERS:
     "No numbers available for this country and service. Try another country.",
   NO_BALANCE: "Service temporarily unavailable. Please try again later.",

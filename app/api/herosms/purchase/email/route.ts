@@ -16,7 +16,6 @@ export async function POST(req: Request) {
     const body = (await req.json()) as {
       site?: string;
       domain?: string;
-      service?: string;
       priceUsd?: number;
       priceLocal?: number;
     };
@@ -31,8 +30,8 @@ export async function POST(req: Request) {
     console.log("[herosms-purchase-email] request", {
       site: body.site,
       domain: body.domain,
-      service: body.service,
       priceUsd: body.priceUsd,
+      priceLocal: body.priceLocal,
     });
 
     const result = await purchaseEmailActivation({
@@ -40,7 +39,6 @@ export async function POST(req: Request) {
       countryCode: user.countryCode,
       site: body.site.trim(),
       domain: body.domain.trim(),
-      service: body.service,
       priceUsd: Number(body.priceUsd) || 0.1,
       priceLocal: Number(body.priceLocal) || undefined,
     });

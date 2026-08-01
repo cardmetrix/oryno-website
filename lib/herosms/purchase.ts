@@ -377,11 +377,8 @@ export async function purchaseEmailActivation(input: {
       email = `${localPart}@${domain}`;
       console.log(LOG_PREFIX, "purchase email DEMO", { emailId, email });
     } else {
-      const bought = await purchaseHerosmsEmail({
-        site,
-        domain,
-        service: input.service,
-      });
+      // OpenAPI: POST /emails body is { site, domain } only
+      const bought = await purchaseHerosmsEmail({ site, domain });
       emailId = bought.emailId;
       email = bought.email;
       console.log(LOG_PREFIX, "purchase email LIVE", { emailId, email });

@@ -322,23 +322,34 @@ type EmailApiJson = {
   meta?: unknown;
   title?: string;
   details?: string | Record<string, unknown>;
+  errors?: Record<string, unknown>;
   message?: string;
   error?: string;
 } | null;
+
+function formatFieldErrors(fields: Record<string, unknown>) {
+  return Object.entries(fields)
+    .flatMap(([key, value]) => {
+      if (Array.isArray(value)) {
+        return value.map((item) => `${key}: ${String(item)}`);
+      }
+      if (value == null) return [];
+      return [`${key}: ${String(value)}`];
+    })
+    .join("; ");
+}
 
 function formatEmailApiError(json: EmailApiJson, status: number) {
   if (typeof json?.details === "string" && json.details.trim()) {
     return herosmsErrorToEnglish(json.details);
   }
   if (json?.details && typeof json.details === "object") {
-    const parts = Object.entries(json.details).flatMap(([key, value]) => {
-      if (Array.isArray(value)) {
-        return value.map((item) => `${key}: ${String(item)}`);
-      }
-      if (value == null) return [];
-      return [`${key}: ${String(value)}`];
-    });
-    if (parts.length) return herosmsErrorToEnglish(parts.join("; "));
+    const parts = formatFieldErrors(json.details);
+    if (parts) return herosmsErrorToEnglish(parts);
+  }
+  if (json?.errors && typeof json.errors === "object") {
+    const parts = formatFieldErrors(json.errors);
+    if (parts) return herosmsErrorToEnglish(parts);
   }
   const raw =
     json?.message ||
@@ -348,67 +359,71 @@ function formatEmailApiError(json: EmailApiJson, status: number) {
   return herosmsErrorToEnglish(raw);
 }
 
+/**
+ * HeroSMS OpenAPI: Authorization: ApiKey <token>
+ * Base: https://hero-sms.com/api/v1
+ * POST /emails returns 201; DELETE returns 204.
+ */
 async function emailFetch(path: string, init?: RequestInit) {
   logHerosmsModeOnce();
   const key = herosmsApiKey();
   if (!key) throw new Error("Email service is not configured");
 
-  // Working clients use `ApiKey <token>`; some docs show raw token.
-  const authStyles = [
-    { label: "ApiKey", value: `ApiKey ${key}` },
-    { label: "raw", value: key },
-  ] as const;
-  let lastError = "Failed to reach email service";
+  const method = (init?.method || "GET").toUpperCase();
+  console.log(LOG_PREFIX, "email request", {
+    method,
+    path,
+    body: init?.body ? truncate(String(init.body)) : undefined,
+  });
 
-  for (let i = 0; i < authStyles.length; i++) {
-    const auth = authStyles[i];
-    const method = (init?.method || "GET").toUpperCase();
-    console.log(LOG_PREFIX, "email request", {
-      method,
-      path,
-      authStyle: auth.label,
-      body: init?.body ? truncate(String(init.body)) : undefined,
-    });
+  const started = Date.now();
+  const res = await fetch(`${herosmsEmailBaseUrl()}${path}`, {
+    ...init,
+    method,
+    headers: {
+      Accept: "application/json",
+      Authorization: `ApiKey ${key}`,
+      "User-Agent": "Oryno/1.0",
+      ...(init?.body ? { "Content-Type": "application/json" } : {}),
+      ...(init?.headers ?? {}),
+    },
+    cache: "no-store",
+  });
 
-    const started = Date.now();
-    const res = await fetch(`${herosmsEmailBaseUrl()}${path}`, {
-      ...init,
-      headers: {
-        Accept: "application/json",
-        Authorization: auth.value,
-        ...(init?.body ? { "Content-Type": "application/json" } : {}),
-        ...(init?.headers ?? {}),
-      },
-      cache: "no-store",
-    });
-
-    const json = (await res.json().catch(() => null)) as EmailApiJson;
-
+  // DELETE /emails/{id} → 204 No Content
+  if (res.status === 204) {
     console.log(LOG_PREFIX, "email response", {
       method,
       path,
-      status: res.status,
+      status: 204,
       ms: Date.now() - started,
-      ok: res.ok,
-      body: truncate(JSON.stringify(json ?? {})),
+      ok: true,
     });
-
-    if (res.ok) return json;
-
-    lastError = formatEmailApiError(json, res.status);
-
-    // HeroSMS often returns 400 for bad auth on email REST — try next style.
-    if (res.status !== 401 && res.status !== 403 && res.status !== 400) {
-      break;
-    }
+    return { data: null };
   }
 
-  console.error(LOG_PREFIX, "email error", lastError);
+  const text = await res.text();
+  const json = (text ? tryParseJson(text) : null) as EmailApiJson;
+
+  console.log(LOG_PREFIX, "email response", {
+    method,
+    path,
+    status: res.status,
+    ms: Date.now() - started,
+    ok: res.ok,
+    body: truncate(text || JSON.stringify(json ?? {})),
+  });
+
+  // Docs: purchase returns 201 Created
+  if (res.ok || res.status === 201) return json ?? { data: null };
+
+  const lastError = formatEmailApiError(json, res.status);
+  console.error(LOG_PREFIX, "email error", { status: res.status, lastError });
   throw new Error(lastError);
 }
 
 /**
- * HeroSMS requires `site` query param: GET /emails/domains?site=telegram.com
+ * GET /emails/domains?site=telegram.com
  */
 export async function getHerosmsEmailDomains(site: string) {
   const normalized = normalizeEmailSite(site);
@@ -422,8 +437,12 @@ export async function getHerosmsEmailDomains(site: string) {
   const data = rows
     .map((row) => {
       const r = row as { name?: string; cost?: number; count?: number };
+      const name = String(r.name || "")
+        .trim()
+        .toLowerCase()
+        .replace(/^@/, "");
       return {
-        name: String(r.name || "").trim().toLowerCase(),
+        name,
         cost: Number(r.cost) || 0,
         count: Number(r.count) || 0,
       };
@@ -437,20 +456,6 @@ export async function getHerosmsEmailDomains(site: string) {
   });
   return data;
 }
-
-/** SMS-style service codes that help email routing for known sites. */
-const SITE_SERVICE_CODES: Record<string, string> = {
-  "telegram.com": "tg",
-  "google.com": "go",
-  "gmail.com": "go",
-  "instagram.com": "ig",
-  "facebook.com": "fb",
-  "discord.com": "ds",
-  "whatsapp.com": "wa",
-  "tiktok.com": "lf",
-  "twitter.com": "tw",
-  "x.com": "tw",
-};
 
 function parsePurchasedEmail(
   data: unknown,
@@ -469,63 +474,54 @@ function parsePurchasedEmail(
   if (!row?.email) return null;
   return {
     emailId: String(row.id ?? ""),
-    email: row.email,
+    email: String(row.email),
     site: row.site || fallback.site,
     domain: row.domain || fallback.domain,
     costUsd: Number(row.cost) || 0,
   };
 }
 
+/**
+ * POST /emails — body: { site, domain } only (service is for /emails/batch).
+ * Success: 201 + { data: { id, email, ... } }
+ */
 export async function purchaseHerosmsEmail(input: {
   site: string;
   domain: string;
   service?: string;
 }) {
   const site = normalizeEmailSite(input.site);
-  const domain = input.domain.trim().toLowerCase().replace(/^@/, "");
+  const domain = input.domain
+    .trim()
+    .toLowerCase()
+    .replace(/^@/, "")
+    .replace(/\/.*$/, "");
   if (!site || !domain) {
     throw new Error("Site and domain are required");
   }
 
-  // Live clients buy with { site, domain } only.
-  const service =
-    input.service?.trim() || SITE_SERVICE_CODES[site] || undefined;
-  const payloads: Record<string, string>[] = [{ site, domain }];
-  if (service) payloads.push({ site, domain, service });
+  const body = { site, domain };
+  console.log(LOG_PREFIX, "purchase email LIVE", body);
 
-  console.log(LOG_PREFIX, "purchase email", { site, domain, service });
+  const json = await emailFetch("/emails", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
 
-  let lastError = "Failed to rent email";
-  for (const body of payloads) {
-    try {
-      const json = await emailFetch("/emails", {
-        method: "POST",
-        body: JSON.stringify(body),
-      });
-      const result = parsePurchasedEmail(json?.data ?? json, { site, domain });
-      if (!result) {
-        lastError = "No email returned from the email service";
-        continue;
-      }
-      console.log(LOG_PREFIX, "purchase email ok", { ...result, body });
-      return result;
-    } catch (error) {
-      lastError =
-        error instanceof Error ? error.message : "Failed to rent email";
-      console.warn(LOG_PREFIX, "purchase email attempt failed", {
-        body,
-        error: lastError,
-      });
-    }
+  const result = parsePurchasedEmail(json?.data ?? json, { site, domain });
+  if (!result?.email) {
+    console.error(LOG_PREFIX, "purchase email missing email in response", json);
+    throw new Error("No email returned from the email service");
   }
 
-  throw new Error(lastError);
+  console.log(LOG_PREFIX, "purchase email ok", result);
+  return result;
 }
 
 export async function getHerosmsEmailStatus(emailId: string) {
   console.log(LOG_PREFIX, "email status", { emailId });
   const json = await emailFetch(`/emails/${encodeURIComponent(emailId)}`);
-  const data = json?.data as {
+  const data = (json?.data ?? json) as {
     id?: number;
     site?: string;
     email?: string;
