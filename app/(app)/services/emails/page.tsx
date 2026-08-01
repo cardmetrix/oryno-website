@@ -28,11 +28,11 @@ type Domain = {
 };
 
 const SITES = [
-  { id: "telegram.com", label: "Telegram" },
-  { id: "google.com", label: "Google" },
-  { id: "instagram.com", label: "Instagram" },
-  { id: "facebook.com", label: "Facebook" },
-  { id: "discord.com", label: "Discord" },
+  { id: "telegram.com", label: "Telegram", service: "tg" },
+  { id: "google.com", label: "Google", service: "go" },
+  { id: "instagram.com", label: "Instagram", service: "ig" },
+  { id: "facebook.com", label: "Facebook", service: "fb" },
+  { id: "discord.com", label: "Discord", service: "ds" },
   { id: "openai.com", label: "OpenAI" },
   { id: "other", label: "Other site" },
 ];
@@ -130,18 +130,23 @@ export default function EmailRentPage() {
     setSubmitting(true);
     setError(null);
     try {
+      const service =
+        SITES.find((s) => s.id === site)?.service || undefined;
       const res = await fetch("/api/herosms/purchase/email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           site: siteValue,
           domain: selected.name,
+          service,
           priceUsd: selected.costUsd,
           priceLocal: selected.costLocal,
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Purchase failed");
+      if (!res.ok) {
+        throw new Error(data.error || "Purchase failed");
+      }
       setEmail(data.email);
       setEmailId(data.emailId);
       setReceipt(data.amountFormatted);
@@ -285,6 +290,10 @@ export default function EmailRentPage() {
                       className="h-14 animate-pulse rounded-[16px] bg-muted"
                     />
                   ))
+                ) : domains.length === 0 ? (
+                  <p className="rounded-[16px] border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+                    No domains available right now. Please try again shortly.
+                  </p>
                 ) : (
                   domains.map((d) => (
                     <button

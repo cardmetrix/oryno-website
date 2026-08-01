@@ -18,33 +18,25 @@ export async function GET() {
     }
 
     const currency = currencyForCountry(user.countryCode);
-
+    const demo = isHerosmsDemoMode();
     let domains = FALLBACK_EMAIL_DOMAINS;
-    let demo = isHerosmsDemoMode();
 
     if (!demo) {
       console.log("[herosms-email-domains] LIVE fetch");
-      try {
-        const live = await getHerosmsEmailDomains();
-        if (live.length) {
-          domains = live;
-          console.log("[herosms-email-domains] LIVE ok", {
-            count: live.length,
-          });
-        } else {
-          console.warn(
-            "[herosms-email-domains] LIVE empty — using fallback domains",
-          );
-          demo = true;
-        }
-      } catch (error) {
-        // Never fail the page — serve fallback domains so rent email stays usable.
-        console.error(
-          "[herosms-email-domains] LIVE failed, using fallback",
-          error,
+      // Live mode: never serve fake fallback domains (purchase would 400).
+      const live = await getHerosmsEmailDomains();
+      domains = live.filter((d) => Boolean(d?.name?.trim()));
+      console.log("[herosms-email-domains] LIVE ok", {
+        count: domains.length,
+      });
+      if (!domains.length) {
+        return NextResponse.json(
+          {
+            error:
+              "No email domains available right now. Try again later.",
+          },
+          { status: 400 },
         );
-        demo = true;
-        domains = FALLBACK_EMAIL_DOMAINS;
       }
     } else {
       console.log("[herosms-email-domains] DEMO fallback domains");
