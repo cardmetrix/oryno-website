@@ -330,13 +330,10 @@ export default function EmailRentPage() {
               </div>
             </MotionSection>
 
-            <ServiceInstructions
-              service="emails"
-              delay={0.12}
-              className="mb-2 sm:mb-0"
-            />
+            <ServiceInstructions service="emails" delay={0.12} />
 
-            <div className="hidden sm:block">
+            {/* Desktop: clear gap between instructions and rent button */}
+            <div className="hidden pt-4 sm:block">
               <motion.button
                 type="submit"
                 disabled={!canSubmit}
@@ -351,10 +348,10 @@ export default function EmailRentPage() {
               </motion.button>
             </div>
 
-            {/* Spacer so sticky CTA never overlaps instructions on mobile */}
+            {/* Mobile: space = visual gap + sticky CTA height */}
             <div
               aria-hidden
-              className="h-[calc(5.5rem+env(safe-area-inset-bottom))] sm:hidden"
+              className="h-[calc(1.5rem+5.5rem+env(safe-area-inset-bottom))] sm:hidden"
             />
 
             <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border/80 bg-[image:var(--header-surface)] px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur-xl sm:hidden">
