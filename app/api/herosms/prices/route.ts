@@ -4,6 +4,7 @@ import { currencyForCountry } from "@/lib/wallet";
 import {
   FALLBACK_COUNTRIES,
   getHerosmsPrices,
+  herosmsErrorToEnglish,
   isHerosmsDemoMode,
   POPULAR_SERVICES,
   usdToLocalPrice,
@@ -99,7 +100,8 @@ export async function GET(req: Request) {
         }
       }
 
-      if (cost <= 0 && count <= 0) continue;
+      // Live: only show countries with stock
+      if (cost <= 0 || count <= 0) continue;
 
       const fallback = FALLBACK_COUNTRIES.find((c) => c.id === id);
       const iso = resolveCountryIso(id, fallback?.name) || fallback?.iso || null;
@@ -157,7 +159,9 @@ export async function GET(req: Request) {
     console.error("[herosms-prices] LIVE failed", error);
     return NextResponse.json(
       {
-        error: error instanceof Error ? error.message : "Failed to load prices",
+        error: herosmsErrorToEnglish(
+          error instanceof Error ? error.message : "Failed to load prices",
+        ),
       },
       { status: 400 },
     );

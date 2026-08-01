@@ -13,6 +13,7 @@ import {
   toWalletSummary,
 } from "@/lib/wallet";
 import {
+  assertHerosmsReady,
   cancelHerosmsEmail,
   getHerosmsEmailStatus,
   getHerosmsNumber,
@@ -206,6 +207,20 @@ export async function purchaseVirtualNumber(input: {
     throw new Error("Unable to prepare this number offer. Please try again.");
   }
 
+  console.log(LOG_PREFIX, "purchase number start", {
+    live: isHerosmsLive(),
+    service: input.service,
+    heroCountryId: input.heroCountryId,
+    priceUsd: input.priceUsd,
+    chargeAmount,
+    currency,
+  });
+
+  // Fail before debiting wallet when live provider is down / empty
+  if (!isHerosmsDemoMode()) {
+    await assertHerosmsReady(Math.max(0.01, input.priceUsd * 0.5));
+  }
+
   const prepared = await debitWallet({
     userId: input.userId,
     countryCode: input.countryCode,
@@ -224,15 +239,6 @@ export async function purchaseVirtualNumber(input: {
     let activationId: string;
     let phoneNumber: string;
     let simulated = false;
-
-    console.log(LOG_PREFIX, "purchase number start", {
-      live: isHerosmsLive(),
-      service: input.service,
-      heroCountryId: input.heroCountryId,
-      priceUsd: input.priceUsd,
-      chargeAmount,
-      currency,
-    });
 
     if (isHerosmsDemoMode()) {
       simulated = true;
@@ -340,6 +346,20 @@ export async function purchaseEmailActivation(input: {
     throw new Error("Site and domain are required");
   }
 
+  console.log(LOG_PREFIX, "purchase email start", {
+    live: isHerosmsLive(),
+    site,
+    domain,
+    service: input.service,
+    priceUsd: input.priceUsd,
+    chargeAmount,
+    currency,
+  });
+
+  if (!isHerosmsDemoMode()) {
+    await assertHerosmsReady(Math.max(0.01, input.priceUsd * 0.5));
+  }
+
   const prepared = await debitWallet({
     userId: input.userId,
     countryCode: input.countryCode,
@@ -359,16 +379,6 @@ export async function purchaseEmailActivation(input: {
     let emailId: string;
     let email: string;
     let simulated = false;
-
-    console.log(LOG_PREFIX, "purchase email start", {
-      live: isHerosmsLive(),
-      site,
-      domain,
-      service: input.service,
-      priceUsd: input.priceUsd,
-      chargeAmount,
-      currency,
-    });
 
     if (isHerosmsDemoMode()) {
       simulated = true;

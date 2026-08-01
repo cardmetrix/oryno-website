@@ -39,6 +39,7 @@ export default function VirtualNumbersPage() {
   const [services, setServices] = useState<HeroService[]>([]);
   const [service, setService] = useState("wa");
   const [offers, setOffers] = useState<HeroOffer[]>([]);
+  const [liveMode, setLiveMode] = useState(false);
   const [loadingServices, setLoadingServices] = useState(true);
   const [loadingOffers, setLoadingOffers] = useState(false);
   const [query, setQuery] = useState("");
@@ -84,6 +85,7 @@ export default function VirtualNumbersPage() {
         if (!res.ok) throw new Error(data.error);
         if (cancelled) return;
         setServices(data.services ?? []);
+        setLiveMode(data.demo === false);
         if (data.services?.[0]?.code) setService(data.services[0].code);
       } catch (e) {
         if (!cancelled) {
@@ -115,6 +117,7 @@ export default function VirtualNumbersPage() {
         if (cancelled) return;
         const list: HeroOffer[] = data.offers ?? [];
         setOffers(list);
+        if (typeof data.demo === "boolean") setLiveMode(data.demo === false);
         if (list[0]) setSelected(list[0]);
       } catch (e) {
         if (!cancelled) {
@@ -203,7 +206,11 @@ export default function VirtualNumbersPage() {
     <AppShell hideNav>
       <PageHeader
         title="Virtual Numbers"
-        subtitle="SMS verification numbers"
+        subtitle={
+          liveMode
+            ? "Live SMS verification numbers"
+            : "SMS verification numbers"
+        }
         backHref="/services"
       />
 

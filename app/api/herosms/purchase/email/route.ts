@@ -83,8 +83,18 @@ export async function POST(req: Request) {
     console.error("[herosms-purchase-email]", error);
     const raw =
       error instanceof Error ? error.message : "Failed to rent email";
+    const errorMessage = herosmsErrorToEnglish(raw);
+    const lower = errorMessage.toLowerCase();
+    const code = lower.includes("no balance") || lower.includes("provider account")
+      ? "PROVIDER_BALANCE"
+      : lower.includes("credentials") || lower.includes("not authorized")
+        ? "PROVIDER_AUTH"
+        : lower.includes("insufficient wallet")
+          ? "WALLET_BALANCE"
+          : "PURCHASE_FAILED";
+
     return NextResponse.json(
-      { error: herosmsErrorToEnglish(raw) },
+      { error: errorMessage, code },
       { status: 400 },
     );
   }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
 import {
   getHerosmsServices,
+  herosmsErrorToEnglish,
   isHerosmsDemoMode,
   POPULAR_SERVICES,
 } from "@/lib/herosms";
@@ -21,7 +22,12 @@ export async function GET() {
     let services = demo ? POPULAR_SERVICES : await getHerosmsServices();
 
     if (!services.length) {
-      console.warn("[herosms-services] empty — using popular fallback");
+      if (!demo) {
+        return NextResponse.json(
+          { error: "No services available right now. Try again later." },
+          { status: 400 },
+        );
+      }
       services = POPULAR_SERVICES;
     }
 
@@ -40,11 +46,14 @@ export async function GET() {
       services,
     });
   } catch (error) {
-    console.error("[herosms-services] LIVE failed — demo fallback", error);
-    return NextResponse.json({
-      ok: true,
-      demo: true,
-      services: POPULAR_SERVICES,
-    });
+    console.error("[herosms-services] LIVE failed", error);
+    return NextResponse.json(
+      {
+        error: herosmsErrorToEnglish(
+          error instanceof Error ? error.message : "Failed to load services",
+        ),
+      },
+      { status: 400 },
+    );
   }
 }

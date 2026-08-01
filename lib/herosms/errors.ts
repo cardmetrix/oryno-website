@@ -8,9 +8,11 @@ const HERO_ERROR_EN: Record<string, string> = {
   请求包含无效数据:
     "Your request contains invalid data. Try another domain or site.",
   无效的请求: "Invalid request",
-  未授权: "Service temporarily unavailable. Please try again later.",
-  没有权限: "Permission denied",
-  余额不足: "Service temporarily unavailable. Please try again later.",
+  未授权:
+    "Not authorized for this service. Contact ORYNO support.",
+  没有权限: "Permission denied for this service.",
+  余额不足:
+    "Provider account has no balance. Top up your SMS/email provider wallet, then try again.",
   没有可用的邮箱: "No emails available for this domain. Try another one.",
   没有可用邮箱: "No emails available for this domain. Try another one.",
   邮箱不存在: "Email activation not found",
@@ -26,10 +28,14 @@ const HERO_ERROR_EN: Record<string, string> = {
     "That site or domain isn’t available. Try another combination.",
   "Unprocessable Entity":
     "That site or domain isn’t available. Try another combination.",
+  UNAUTHORIZED: "Not authorized for this service. Contact ORYNO support.",
+  Unauthorized: "Not authorized for this service. Contact ORYNO support.",
   NO_NUMBERS:
     "No numbers available for this country and service. Try another country.",
-  NO_BALANCE: "Service temporarily unavailable. Please try again later.",
-  BAD_KEY: "Service temporarily unavailable. Please try again later.",
+  NO_BALANCE:
+    "Provider account has no balance. Top up your SMS/email provider wallet, then try again.",
+  BAD_KEY:
+    "Service credentials are invalid. Contact ORYNO support.",
   BAD_SERVICE: "This service isn’t available right now. Try another one.",
   BAD_ACTION: "Something went wrong. Please try again.",
   BAD_STATUS: "Couldn’t update number status. Please try again.",
@@ -54,6 +60,11 @@ export function herosmsErrorToEnglish(raw: unknown): string {
 
   for (const [key, en] of Object.entries(HERO_ERROR_EN)) {
     if (text.includes(key) || upper.includes(key.toUpperCase())) return en;
+  }
+
+  // HTTP status leftovers
+  if (/\b401\b/.test(text)) {
+    return "Not authorized for this service. Contact ORYNO support.";
   }
 
   return text

@@ -136,7 +136,32 @@ export async function getHerosmsBalance() {
     console.log(LOG_PREFIX, "balance", { balance: json.balance });
     return json.balance;
   }
-  throw new Error(text || "Failed to get HeroSMS balance");
+  // Surface BAD_KEY / NO_BALANCE etc. clearly
+  throw new Error(herosmsErrorToEnglish(text || "Failed to get balance"));
+}
+
+/**
+ * Verify live API key + balance before charging the user wallet.
+ * Throws mapped English errors (BAD_KEY, NO_BALANCE, …).
+ */
+export async function assertHerosmsReady(minUsd = 0.01) {
+  if (!isHerosmsLive()) {
+    throw new Error("HEROSMS_API_KEY is not configured");
+  }
+  try {
+    const balance = await getHerosmsBalance();
+    console.log(LOG_PREFIX, "preflight balance", { balance, minUsd });
+    if (!Number.isFinite(balance)) {
+      throw new Error("BAD_KEY");
+    }
+    if (balance < minUsd) {
+      throw new Error("NO_BALANCE");
+    }
+    return balance;
+  } catch (error) {
+    const raw = error instanceof Error ? error.message : String(error);
+    throw new Error(herosmsErrorToEnglish(raw));
+  }
 }
 
 export async function getHerosmsCountries(): Promise<HeroCountry[]> {
@@ -208,6 +233,42 @@ export async function getHerosmsPrices(options?: {
   return json as Record<string, unknown>;
 }
 
+function parseNumberResponse(text: string) {
+  if (text.startsWith("ACCESS_NUMBER:")) {
+    const parts = text.split(":");
+    const activationId = parts[1];
+    const phoneNumber = parts.slice(2).join(":");
+    return {
+      activationId,
+      phoneNumber: phoneNumber?.startsWith("+")
+        ? phoneNumber
+        : `+${phoneNumber}`,
+    };
+  }
+
+  const json = tryParseJson(text) as {
+    activationId?: string | number;
+    phoneNumber?: string | number;
+    phone?: string | number;
+    number?: string | number;
+    error?: string;
+  } | null;
+
+  if (json?.activationId != null) {
+    const phone = String(
+      json.phoneNumber || json.phone || json.number || "",
+    ).trim();
+    if (phone) {
+      return {
+        activationId: String(json.activationId),
+        phoneNumber: phone.startsWith("+") ? phone : `+${phone}`,
+      };
+    }
+  }
+
+  throw new Error(json?.error || text || "Failed to get number");
+}
+
 export async function getHerosmsNumber(input: {
   service: string;
   country: number;
@@ -223,51 +284,52 @@ export async function getHerosmsNumber(input: {
   }
   if (input.operator) params.operator = input.operator;
 
-  const tryOnce = async (p: Record<string, string | number>) => {
-    console.log(LOG_PREFIX, "getNumber", p);
-    const { text } = await heroGet("getNumber", p);
-    if (text.startsWith("ACCESS_NUMBER:")) {
-      const parts = text.split(":");
-      const activationId = parts[1];
-      const phoneNumber = parts.slice(2).join(":");
-      const result = {
-        activationId,
-        phoneNumber: phoneNumber?.startsWith("+")
-          ? phoneNumber
-          : `+${phoneNumber}`,
-      };
-      console.log(LOG_PREFIX, "getNumber ok", result);
-      return result;
-    }
-    const json = tryParseJson(text) as {
-      activationId?: string | number;
-      phone?: string | number;
-      number?: string | number;
-      error?: string;
-    } | null;
-    if (json?.activationId != null && (json.phone || json.number)) {
-      const phone = String(json.phone || json.number);
-      const result = {
-        activationId: String(json.activationId),
-        phoneNumber: phone.startsWith("+") ? phone : `+${phone}`,
-      };
-      console.log(LOG_PREFIX, "getNumber ok", result);
-      return result;
-    }
-    throw new Error(json?.error || text || "Failed to get number");
+  const tryAction = async (
+    action: "getNumber" | "getNumberV2",
+    p: Record<string, string | number>,
+  ) => {
+    console.log(LOG_PREFIX, action, p);
+    const { text } = await heroGet(action, p);
+    const result = parseNumberResponse(text);
+    console.log(LOG_PREFIX, `${action} ok`, result);
+    return result;
   };
 
   try {
-    return await tryOnce(params);
+    return await tryAction("getNumber", params);
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error(LOG_PREFIX, "getNumber failed", truncate(msg));
-    // Retry without maxPrice when the provider rejects the ceiling
+
     if (/WRONG_MAX_PRICE/i.test(msg) && params.maxPrice != null) {
       console.log(LOG_PREFIX, "getNumber retry without maxPrice");
       const { maxPrice: _drop, ...rest } = params;
-      return tryOnce(rest);
+      try {
+        return await tryAction("getNumber", rest);
+      } catch (retryError) {
+        const retryMsg =
+          retryError instanceof Error ? retryError.message : String(retryError);
+        console.warn(LOG_PREFIX, "getNumberV2 fallback after maxPrice retry");
+        try {
+          return await tryAction("getNumberV2", rest);
+        } catch {
+          throw new Error(herosmsErrorToEnglish(retryMsg));
+        }
+      }
     }
+
+    // OpenAPI also exposes getNumberV2 — try before surfacing the error
+    if (!/BAD_KEY|NO_BALANCE|BAD_SERVICE/i.test(msg)) {
+      try {
+        console.log(LOG_PREFIX, "getNumberV2 fallback");
+        return await tryAction("getNumberV2", params);
+      } catch (v2Error) {
+        const v2Msg =
+          v2Error instanceof Error ? v2Error.message : String(v2Error);
+        throw new Error(herosmsErrorToEnglish(v2Msg || msg));
+      }
+    }
+
     throw new Error(herosmsErrorToEnglish(msg));
   }
 }

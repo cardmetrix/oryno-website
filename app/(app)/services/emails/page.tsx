@@ -188,6 +188,11 @@ export default function EmailRentPage() {
       });
       const data = await res.json();
       if (!res.ok) {
+        console.error("[rent-email] purchase failed", {
+          status: res.status,
+          code: data.code,
+          error: data.error,
+        });
         throw new Error(data.error || "Purchase failed");
       }
       setEmail(data.email);
