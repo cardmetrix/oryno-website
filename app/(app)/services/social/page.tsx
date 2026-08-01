@@ -551,7 +551,7 @@ export default function SocialBoostPage() {
           <form
             key="form"
             onSubmit={onSubmit}
-            className="space-y-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:space-y-5 sm:pb-0"
+            className="space-y-4 sm:space-y-5"
           >
             <MotionSection className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6">
               <div className="mb-4 flex items-center gap-3">
@@ -785,13 +785,10 @@ export default function SocialBoostPage() {
               </div>
             </MotionSection>
 
-            <ServiceInstructions
-              service="social"
-              delay={0.1}
-              className="mb-20 sm:mb-0"
-            />
+            <ServiceInstructions service="social" delay={0.1} />
 
-            <div className="hidden sm:block">
+            {/* Desktop: clear gap between instructions and submit */}
+            <div className="hidden pt-4 sm:block">
               <MotionSection delay={0.14}>
                 <motion.button
                   type="submit"
@@ -804,6 +801,12 @@ export default function SocialBoostPage() {
                 </motion.button>
               </MotionSection>
             </div>
+
+            {/* Mobile: space = visual gap + sticky CTA height */}
+            <div
+              aria-hidden
+              className="h-[calc(1.5rem+5.5rem+env(safe-area-inset-bottom))] sm:hidden"
+            />
 
             <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border/80 bg-[image:var(--header-surface)] px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur-xl sm:hidden">
               <button
