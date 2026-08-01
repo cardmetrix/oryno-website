@@ -3,11 +3,14 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  Check,
   CheckCircle2,
+  ChevronDown,
   Copy,
   Inbox,
   Mail,
   RefreshCw,
+  Search,
   Wallet,
 } from "lucide-react";
 import { AppShell } from "@/components/app/app-shell";
@@ -16,6 +19,21 @@ import { PageHeader } from "@/components/app/page-header";
 import { ErrorAlertModal } from "@/components/app/error-alert-modal";
 import { ServiceInstructions } from "@/components/app/service-instructions";
 import { useCountry } from "@/components/providers/country-provider";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { formatCountryMoney } from "@/lib/country";
 import { cn } from "@/lib/utils";
 
@@ -39,9 +57,12 @@ const SITES = [
 
 export default function EmailRentPage() {
   const { country } = useCountry();
+  const isMobile = useIsMobile();
   const [domains, setDomains] = useState<Domain[]>([]);
   const [loading, setLoading] = useState(true);
   const [domain, setDomain] = useState("");
+  const [domainOpen, setDomainOpen] = useState(false);
+  const [domainQuery, setDomainQuery] = useState("");
   const [site, setSite] = useState("telegram.com");
   const [customSite, setCustomSite] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -57,6 +78,12 @@ export default function EmailRentPage() {
 
   const selected = domains.find((d) => d.name === domain);
   const siteValue = site === "other" ? customSite.trim() : site;
+
+  const filteredDomains = useMemo(() => {
+    const q = domainQuery.trim().toLowerCase().replace(/^@/, "");
+    if (!q) return domains;
+    return domains.filter((d) => d.name.toLowerCase().includes(q));
+  }, [domains, domainQuery]);
 
   const canSubmit = useMemo(
     () => Boolean(domain && siteValue && selected && !submitting),
@@ -78,6 +105,8 @@ export default function EmailRentPage() {
       setLoading(true);
       setDomains([]);
       setDomain("");
+      setDomainOpen(false);
+      setDomainQuery("");
       try {
         const res = await fetch(
           `/api/herosms/emails/domains?site=${encodeURIComponent(siteForDomains)}`,
@@ -298,44 +327,70 @@ export default function EmailRentPage() {
               delay={0.05}
               className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6"
             >
-              <h2 className="mb-3 text-base font-semibold">Email domain</h2>
-              <div className="grid gap-2">
-                {loading ? (
-                  Array.from({ length: 4 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="h-14 animate-pulse rounded-[16px] bg-muted"
-                    />
-                  ))
-                ) : domains.length === 0 ? (
-                  <p className="rounded-[16px] border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
-                    {siteValue
-                      ? `No domains in stock for ${siteValue}. Try another site.`
-                      : "Enter a site to load available domains."}
-                  </p>
-                ) : (
-                  domains.map((d) => (
-                    <button
-                      key={d.name}
-                      type="button"
-                      onClick={() => setDomain(d.name)}
-                      className={cn(
-                        "flex items-center justify-between rounded-[16px] border px-4 py-3 text-left",
-                        domain === d.name
-                          ? "border-primary bg-oryno-orange-muted"
-                          : "border-border hover:bg-muted/50",
-                      )}
-                    >
-                      <span className="inline-flex items-center gap-2 text-sm font-semibold">
-                        <Inbox className="h-4 w-4 text-primary" />@{d.name}
-                      </span>
-                      <span className="text-sm font-bold text-primary">
-                        {money(d.costLocal)}
-                      </span>
-                    </button>
-                  ))
-                )}
-              </div>
+              <h2 className="mb-1 text-base font-semibold">Email domain</h2>
+              <p className="mb-3 text-xs text-muted-foreground">
+                Search and pick a domain for {siteValue || "your site"}
+              </p>
+
+              {loading ? (
+                <div className="h-12 animate-pulse rounded-[14px] bg-muted" />
+              ) : (
+                <button
+                  type="button"
+                  disabled={!domains.length}
+                  onClick={() => {
+                    setDomainQuery("");
+                    setDomainOpen(true);
+                  }}
+                  className={cn(
+                    "flex h-12 w-full items-center gap-2 rounded-[14px] border border-border bg-background px-3.5 text-left outline-none transition hover:bg-muted/40 focus:border-primary disabled:cursor-not-allowed disabled:opacity-50",
+                  )}
+                >
+                  <Inbox className="h-4 w-4 shrink-0 text-primary" />
+                  <span
+                    className={cn(
+                      "min-w-0 flex-1 truncate text-sm font-semibold",
+                      selected ? "text-foreground" : "text-muted-foreground",
+                    )}
+                  >
+                    {selected
+                      ? `@${selected.name}`
+                      : domains.length
+                        ? "Select a domain"
+                        : siteValue
+                          ? "No domains in stock"
+                          : "Enter a site first"}
+                  </span>
+                  {selected ? (
+                    <span className="shrink-0 text-sm font-bold text-primary">
+                      {money(selected.costLocal)}
+                    </span>
+                  ) : null}
+                  <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                </button>
+              )}
+
+              {!loading && !domains.length && siteValue ? (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  No domains in stock for {siteValue}. Try another site.
+                </p>
+              ) : null}
+
+              <DomainPickerSheet
+                open={domainOpen}
+                onOpenChange={setDomainOpen}
+                isMobile={isMobile}
+                query={domainQuery}
+                onQueryChange={setDomainQuery}
+                options={filteredDomains}
+                value={domain}
+                formatPrice={money}
+                onSelect={(name) => {
+                  setDomain(name);
+                  setDomainOpen(false);
+                  setDomainQuery("");
+                }}
+              />
             </MotionSection>
 
             <MotionSection
@@ -405,6 +460,131 @@ export default function EmailRentPage() {
         page="Rent Email"
       />
     </AppShell>
+  );
+}
+
+function DomainPickerSheet({
+  open,
+  onOpenChange,
+  isMobile,
+  query,
+  onQueryChange,
+  options,
+  value,
+  formatPrice,
+  onSelect,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  isMobile: boolean;
+  query: string;
+  onQueryChange: (query: string) => void;
+  options: Domain[];
+  value: string;
+  formatPrice: (n: number) => string;
+  onSelect: (name: string) => void;
+}) {
+  const search = (
+    <div className="relative">
+      <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      <input
+        value={query}
+        onChange={(e) => onQueryChange(e.target.value)}
+        placeholder="Search domains…"
+        className="h-11 w-full rounded-xl border border-border bg-background pr-3 pl-9 text-base outline-none focus:border-primary"
+        autoFocus
+      />
+    </div>
+  );
+
+  const list = options.length ? (
+    options.map((d) => {
+      const active = d.name === value;
+      return (
+        <button
+          key={d.name}
+          type="button"
+          onClick={() => onSelect(d.name)}
+          className={cn(
+            "flex min-h-[56px] w-full items-center gap-3 px-4 py-3.5 text-left transition active:bg-muted/70 hover:bg-muted/50",
+            active && "bg-oryno-orange-muted",
+          )}
+        >
+          <Inbox className="h-4 w-4 shrink-0 text-primary" />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-foreground">
+              @{d.name}
+            </p>
+            {d.count > 0 ? (
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {d.count.toLocaleString()} in stock
+              </p>
+            ) : null}
+          </div>
+          <span className="shrink-0 text-sm font-bold tabular-nums text-primary">
+            {formatPrice(d.costLocal)}
+          </span>
+          {active ? (
+            <Check className="h-4 w-4 shrink-0 text-primary" strokeWidth={2.25} />
+          ) : (
+            <span className="h-4 w-4 shrink-0" />
+          )}
+        </button>
+      );
+    })
+  ) : (
+    <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+      {query.trim()
+        ? "No domains match your search"
+        : "No domains available for this site"}
+    </p>
+  );
+
+  if (isMobile) {
+    return (
+      <Drawer
+        open={open}
+        onOpenChange={onOpenChange}
+        shouldScaleBackground={false}
+        repositionInputs={false}
+        handleOnly
+      >
+        <DrawerContent className="h-[min(78dvh,640px)] max-h-[78dvh] w-full max-w-full rounded-t-[28px] border-border sm:mx-auto sm:max-w-lg">
+          <DrawerHeader className="shrink-0 gap-1 border-b border-border px-4 pb-3 pt-1 text-left sm:px-5">
+            <DrawerTitle className="text-base sm:text-lg">
+              Select domain
+            </DrawerTitle>
+            <DrawerDescription className="text-xs sm:text-sm">
+              Search and choose an email domain
+            </DrawerDescription>
+          </DrawerHeader>
+          <div className="shrink-0 border-b border-border px-4 py-3 sm:px-5">
+            {search}
+          </div>
+          <div
+            className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]"
+            data-vaul-no-drag=""
+          >
+            <div className="pb-4">{list}</div>
+          </div>
+        </DrawerContent>
+      </Drawer>
+    );
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[85vh] overflow-hidden rounded-[24px] p-0 sm:max-w-md">
+        <DialogHeader className="border-b border-border px-5 py-4 text-left">
+          <DialogTitle>Select domain</DialogTitle>
+          <DialogDescription>
+            Search and choose an email domain
+          </DialogDescription>
+        </DialogHeader>
+        <div className="border-b border-border px-4 py-3">{search}</div>
+        <div className="max-h-[50vh] overflow-y-auto">{list}</div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
