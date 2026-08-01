@@ -15,11 +15,15 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    let countries = isHerosmsDemoMode()
-      ? FALLBACK_COUNTRIES
-      : await getHerosmsCountries();
+    const demo = isHerosmsDemoMode();
+    console.log("[herosms-countries]", demo ? "DEMO" : "LIVE");
 
-    if (!countries.length) countries = FALLBACK_COUNTRIES;
+    let countries = demo ? FALLBACK_COUNTRIES : await getHerosmsCountries();
+
+    if (!countries.length) {
+      console.warn("[herosms-countries] empty — using fallback");
+      countries = FALLBACK_COUNTRIES;
+    }
 
     // Prefer countries that have flags; keep all but sort flagged first
     countries = [...countries].sort((a, b) => {
@@ -31,11 +35,11 @@ export async function GET() {
 
     return NextResponse.json({
       ok: true,
-      demo: isHerosmsDemoMode(),
+      demo,
       countries,
     });
   } catch (error) {
-    console.error("[herosms-countries]", error);
+    console.error("[herosms-countries] LIVE failed — demo fallback", error);
     return NextResponse.json({
       ok: true,
       demo: true,

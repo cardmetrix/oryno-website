@@ -28,6 +28,13 @@ export async function POST(req: Request) {
       );
     }
 
+    console.log("[herosms-purchase-email] request", {
+      site: body.site,
+      domain: body.domain,
+      service: body.service,
+      priceUsd: body.priceUsd,
+    });
+
     const result = await purchaseEmailActivation({
       userId: user.id,
       countryCode: user.countryCode,
@@ -36,6 +43,12 @@ export async function POST(req: Request) {
       service: body.service,
       priceUsd: Number(body.priceUsd) || 0.1,
       priceLocal: Number(body.priceLocal) || undefined,
+    });
+
+    console.log("[herosms-purchase-email] ok", {
+      simulated: result.simulated,
+      emailId: result.emailId,
+      email: result.email,
     });
 
     const amountFormatted = formatMoney(result.amount, result.currency);

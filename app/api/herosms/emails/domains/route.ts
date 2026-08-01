@@ -23,19 +23,31 @@ export async function GET() {
     let demo = isHerosmsDemoMode();
 
     if (!demo) {
+      console.log("[herosms-email-domains] LIVE fetch");
       try {
         const live = await getHerosmsEmailDomains();
         if (live.length) {
           domains = live;
+          console.log("[herosms-email-domains] LIVE ok", {
+            count: live.length,
+          });
         } else {
+          console.warn(
+            "[herosms-email-domains] LIVE empty — using fallback domains",
+          );
           demo = true;
         }
       } catch (error) {
         // Never fail the page — serve fallback domains so rent email stays usable.
-        console.error("[herosms-email-domains] live failed, using fallback", error);
+        console.error(
+          "[herosms-email-domains] LIVE failed, using fallback",
+          error,
+        );
         demo = true;
         domains = FALLBACK_EMAIL_DOMAINS;
       }
+    } else {
+      console.log("[herosms-email-domains] DEMO fallback domains");
     }
 
     const list = [];

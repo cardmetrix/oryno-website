@@ -15,11 +15,15 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    let services = isHerosmsDemoMode()
-      ? POPULAR_SERVICES
-      : await getHerosmsServices();
+    const demo = isHerosmsDemoMode();
+    console.log("[herosms-services]", demo ? "DEMO" : "LIVE");
 
-    if (!services.length) services = POPULAR_SERVICES;
+    let services = demo ? POPULAR_SERVICES : await getHerosmsServices();
+
+    if (!services.length) {
+      console.warn("[herosms-services] empty — using popular fallback");
+      services = POPULAR_SERVICES;
+    }
 
     // Put popular codes first
     const popularCodes = new Set(POPULAR_SERVICES.map((s) => s.code));
@@ -32,11 +36,11 @@ export async function GET() {
 
     return NextResponse.json({
       ok: true,
-      demo: isHerosmsDemoMode(),
+      demo,
       services,
     });
   } catch (error) {
-    console.error("[herosms-services]", error);
+    console.error("[herosms-services] LIVE failed — demo fallback", error);
     return NextResponse.json({
       ok: true,
       demo: true,

@@ -19,11 +19,14 @@ import {
   getHerosmsStatus,
   herosmsMarkup,
   isHerosmsDemoMode,
+  isHerosmsLive,
   purchaseHerosmsEmail,
   setHerosmsStatus,
 } from "./client";
 import { countryFlagEmoji } from "./countries";
 import { herosmsErrorToEnglish, normalizeEmailSite } from "./errors";
+
+const LOG_PREFIX = "[herosms]";
 
 async function debitWallet(input: {
   userId: string;
@@ -222,10 +225,23 @@ export async function purchaseVirtualNumber(input: {
     let phoneNumber: string;
     let simulated = false;
 
+    console.log(LOG_PREFIX, "purchase number start", {
+      live: isHerosmsLive(),
+      service: input.service,
+      heroCountryId: input.heroCountryId,
+      priceUsd: input.priceUsd,
+      chargeAmount,
+      currency,
+    });
+
     if (isHerosmsDemoMode()) {
       simulated = true;
       activationId = `demo_${Date.now()}`;
       phoneNumber = `+23480${String(Date.now()).slice(-8)}`;
+      console.log(LOG_PREFIX, "purchase number DEMO", {
+        activationId,
+        phoneNumber,
+      });
     } else {
       const num = await getHerosmsNumber({
         service: input.service,
@@ -234,11 +250,15 @@ export async function purchaseVirtualNumber(input: {
       });
       activationId = num.activationId;
       phoneNumber = num.phoneNumber;
+      console.log(LOG_PREFIX, "purchase number LIVE", {
+        activationId,
+        phoneNumber,
+      });
       // Mark ready to receive SMS
       try {
         await setHerosmsStatus(activationId, 1);
-      } catch {
-        // non-fatal
+      } catch (e) {
+        console.warn(LOG_PREFIX, "setStatus(1) non-fatal", e);
       }
     }
 
@@ -287,6 +307,7 @@ export async function purchaseVirtualNumber(input: {
     const reason = herosmsErrorToEnglish(
       error instanceof Error ? error.message : "Purchase failed",
     );
+    console.error(LOG_PREFIX, "purchase number failed — refunding", reason);
     await refundDebit({
       walletId: prepared.wallet.id,
       transactionId: prepared.transaction.id,
@@ -339,11 +360,22 @@ export async function purchaseEmailActivation(input: {
     let email: string;
     let simulated = false;
 
+    console.log(LOG_PREFIX, "purchase email start", {
+      live: isHerosmsLive(),
+      site,
+      domain,
+      service: input.service,
+      priceUsd: input.priceUsd,
+      chargeAmount,
+      currency,
+    });
+
     if (isHerosmsDemoMode()) {
       simulated = true;
       emailId = `demo_email_${Date.now()}`;
       const localPart = `oryno${String(Date.now()).slice(-6)}`;
       email = `${localPart}@${domain}`;
+      console.log(LOG_PREFIX, "purchase email DEMO", { emailId, email });
     } else {
       const bought = await purchaseHerosmsEmail({
         site,
@@ -352,6 +384,7 @@ export async function purchaseEmailActivation(input: {
       });
       emailId = bought.emailId;
       email = bought.email;
+      console.log(LOG_PREFIX, "purchase email LIVE", { emailId, email });
     }
 
     await db
@@ -388,6 +421,7 @@ export async function purchaseEmailActivation(input: {
     const reason = herosmsErrorToEnglish(
       error instanceof Error ? error.message : "Purchase failed",
     );
+    console.error(LOG_PREFIX, "purchase email failed — refunding", reason);
     await refundDebit({
       walletId: prepared.wallet.id,
       transactionId: prepared.transaction.id,
@@ -400,17 +434,20 @@ export async function purchaseEmailActivation(input: {
 
 export async function pollNumberStatus(activationId: string) {
   if (activationId.startsWith("demo_") || isHerosmsDemoMode()) {
+    console.log(LOG_PREFIX, "poll number DEMO", { activationId });
     return {
       status: "STATUS_OK" as const,
       code: "482913",
       demo: true,
     };
   }
+  console.log(LOG_PREFIX, "poll number LIVE", { activationId });
   return getHerosmsStatus(activationId);
 }
 
 export async function pollEmailStatus(emailId: string) {
   if (emailId.startsWith("demo_") || isHerosmsDemoMode()) {
+    console.log(LOG_PREFIX, "poll email DEMO", { emailId });
     return {
       id: emailId,
       status: "OK",
@@ -419,12 +456,15 @@ export async function pollEmailStatus(emailId: string) {
       demo: true,
     };
   }
+  console.log(LOG_PREFIX, "poll email LIVE", { emailId });
   return getHerosmsEmailStatus(emailId);
 }
 
 export async function cancelEmail(emailId: string) {
   if (emailId.startsWith("demo_") || isHerosmsDemoMode()) {
+    console.log(LOG_PREFIX, "cancel email DEMO", { emailId });
     return { ok: true, demo: true };
   }
+  console.log(LOG_PREFIX, "cancel email LIVE", { emailId });
   return cancelHerosmsEmail(emailId);
 }

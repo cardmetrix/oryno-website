@@ -4,6 +4,19 @@ import { herosmsErrorToEnglish, normalizeEmailSite } from "./errors";
 const DEFAULT_BASE = "https://hero-sms.com/stubs/handler_api.php";
 const EMAIL_BASE = "https://hero-sms.com/api/v1";
 
+const LOG_PREFIX = "[herosms]";
+
+function truncate(value: string, max = 400) {
+  const s = value.replace(/\s+/g, " ").trim();
+  return s.length <= max ? s : `${s.slice(0, max)}…`;
+}
+
+function maskKey(key: string) {
+  if (!key) return "(empty)";
+  if (key.length <= 8) return "****";
+  return `${key.slice(0, 4)}…${key.slice(-4)}`;
+}
+
 export function herosmsApiKey() {
   return (process.env.HEROSMS_API_KEY || "").trim();
 }
@@ -24,8 +37,23 @@ export function hasHerosmsKeys() {
   return Boolean(herosmsApiKey());
 }
 
+/**
+ * Force demo catalog/purchases even when a key is set.
+ * HEROSMS_DEMO=true|1 → demo; false|0 → live (if key present).
+ */
+export function isHerosmsDemoForced() {
+  const flag = (process.env.HEROSMS_DEMO || "").toLowerCase();
+  return flag === "true" || flag === "1";
+}
+
+/** Live when API key is present and HEROSMS_DEMO is not forcing demo. */
+export function isHerosmsLive() {
+  return hasHerosmsKeys() && !isHerosmsDemoForced();
+}
+
+/** Demo mode when keys are missing or HEROSMS_DEMO=true. */
 export function isHerosmsDemoMode() {
-  return !hasHerosmsKeys();
+  return !isHerosmsLive();
 }
 
 /** Retail markup on top of FX buy rate (default 15%). */
@@ -34,7 +62,26 @@ export function herosmsMarkup() {
   return Number.isFinite(raw) && raw >= 1 ? raw : 1.15;
 }
 
-async function heroGet(action: string, params: Record<string, string | number> = {}) {
+let loggedMode = false;
+function logHerosmsModeOnce() {
+  if (loggedMode) return;
+  loggedMode = true;
+  console.log(LOG_PREFIX, "mode", {
+    live: isHerosmsLive(),
+    demo: isHerosmsDemoMode(),
+    hasKey: hasHerosmsKeys(),
+    key: maskKey(herosmsApiKey()),
+    smsBase: herosmsBaseUrl(),
+    emailBase: herosmsEmailBaseUrl(),
+    markup: herosmsMarkup(),
+  });
+}
+
+async function heroGet(
+  action: string,
+  params: Record<string, string | number> = {},
+) {
+  logHerosmsModeOnce();
   const key = herosmsApiKey();
   if (!key) throw new Error("HEROSMS_API_KEY is not configured");
 
@@ -46,11 +93,25 @@ async function heroGet(action: string, params: Record<string, string | number> =
     ),
   });
 
-  const res = await fetch(`${herosmsBaseUrl()}?${qs.toString()}`, {
+  const url = `${herosmsBaseUrl()}?${qs.toString()}`;
+  console.log(LOG_PREFIX, "sms request", {
+    action,
+    params,
+    url: url.replace(key, maskKey(key)),
+  });
+
+  const started = Date.now();
+  const res = await fetch(url, {
     cache: "no-store",
     headers: { Accept: "application/json" },
   });
   const text = await res.text();
+  console.log(LOG_PREFIX, "sms response", {
+    action,
+    status: res.status,
+    ms: Date.now() - started,
+    body: truncate(text),
+  });
   return { status: res.status, text };
 }
 
@@ -66,10 +127,15 @@ export async function getHerosmsBalance() {
   const { text } = await heroGet("getBalance");
   // ACCESS_BALANCE:123.45
   if (text.startsWith("ACCESS_BALANCE:")) {
-    return Number(text.split(":")[1]);
+    const balance = Number(text.split(":")[1]);
+    console.log(LOG_PREFIX, "balance", { balance });
+    return balance;
   }
   const json = tryParseJson(text) as { balance?: number } | null;
-  if (json && typeof json.balance === "number") return json.balance;
+  if (json && typeof json.balance === "number") {
+    console.log(LOG_PREFIX, "balance", { balance: json.balance });
+    return json.balance;
+  }
   throw new Error(text || "Failed to get HeroSMS balance");
 }
 
@@ -81,7 +147,7 @@ export async function getHerosmsCountries(): Promise<HeroCountry[]> {
   }
 
   const rows = Object.values(json as Record<string, Record<string, unknown>>);
-  return rows
+  const countries = rows
     .map((row) =>
       mapHeroCountry({
         id: row.id as number,
@@ -93,6 +159,9 @@ export async function getHerosmsCountries(): Promise<HeroCountry[]> {
     )
     .filter((c) => c.visible)
     .sort((a, b) => a.name.localeCompare(b.name));
+
+  console.log(LOG_PREFIX, "countries", { count: countries.length });
+  return countries;
 }
 
 export async function getHerosmsServices(): Promise<HeroService[]> {
@@ -103,6 +172,7 @@ export async function getHerosmsServices(): Promise<HeroService[]> {
   } | null;
 
   if (json?.services?.length) {
+    console.log(LOG_PREFIX, "services", { count: json.services.length });
     return json.services.map((s) => ({
       code: s.code,
       name: s.name,
@@ -129,6 +199,12 @@ export async function getHerosmsPrices(options?: {
   if (!json || typeof json !== "object") {
     throw new Error(text || "Failed to load prices");
   }
+  const keys = Object.keys(json as object);
+  console.log(LOG_PREFIX, "prices", {
+    service: options?.service,
+    country: options?.country,
+    countryCount: keys.length,
+  });
   return json as Record<string, unknown>;
 }
 
@@ -148,17 +224,20 @@ export async function getHerosmsNumber(input: {
   if (input.operator) params.operator = input.operator;
 
   const tryOnce = async (p: Record<string, string | number>) => {
+    console.log(LOG_PREFIX, "getNumber", p);
     const { text } = await heroGet("getNumber", p);
     if (text.startsWith("ACCESS_NUMBER:")) {
       const parts = text.split(":");
       const activationId = parts[1];
       const phoneNumber = parts.slice(2).join(":");
-      return {
+      const result = {
         activationId,
         phoneNumber: phoneNumber?.startsWith("+")
           ? phoneNumber
           : `+${phoneNumber}`,
       };
+      console.log(LOG_PREFIX, "getNumber ok", result);
+      return result;
     }
     const json = tryParseJson(text) as {
       activationId?: string | number;
@@ -168,10 +247,12 @@ export async function getHerosmsNumber(input: {
     } | null;
     if (json?.activationId != null && (json.phone || json.number)) {
       const phone = String(json.phone || json.number);
-      return {
+      const result = {
         activationId: String(json.activationId),
         phoneNumber: phone.startsWith("+") ? phone : `+${phone}`,
       };
+      console.log(LOG_PREFIX, "getNumber ok", result);
+      return result;
     }
     throw new Error(json?.error || text || "Failed to get number");
   };
@@ -180,8 +261,10 @@ export async function getHerosmsNumber(input: {
     return await tryOnce(params);
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
+    console.error(LOG_PREFIX, "getNumber failed", truncate(msg));
     // Retry without maxPrice when the provider rejects the ceiling
     if (/WRONG_MAX_PRICE/i.test(msg) && params.maxPrice != null) {
+      console.log(LOG_PREFIX, "getNumber retry without maxPrice");
       const { maxPrice: _drop, ...rest } = params;
       return tryOnce(rest);
     }
@@ -192,17 +275,32 @@ export async function getHerosmsNumber(input: {
 export async function getHerosmsStatus(activationId: string) {
   const { text } = await heroGet("getStatus", { id: activationId });
   if (text.startsWith("STATUS_OK:")) {
-    return { status: "STATUS_OK" as const, code: text.split(":")[1] ?? "" };
+    const result = {
+      status: "STATUS_OK" as const,
+      code: text.split(":")[1] ?? "",
+    };
+    console.log(LOG_PREFIX, "number status", { activationId, ...result });
+    return result;
   }
   if (text === "STATUS_WAIT_CODE" || text.startsWith("STATUS_WAIT")) {
-    return { status: "STATUS_WAIT_CODE" as const, code: null };
+    const result = { status: "STATUS_WAIT_CODE" as const, code: null };
+    console.log(LOG_PREFIX, "number status", { activationId, ...result });
+    return result;
   }
   if (text === "STATUS_CANCEL") {
-    return { status: "STATUS_CANCEL" as const, code: null };
+    const result = { status: "STATUS_CANCEL" as const, code: null };
+    console.log(LOG_PREFIX, "number status", { activationId, ...result });
+    return result;
   }
   if (text.startsWith("STATUS_OK")) {
-    return { status: "STATUS_OK" as const, code: text.replace("STATUS_OK:", "") };
+    const result = {
+      status: "STATUS_OK" as const,
+      code: text.replace("STATUS_OK:", ""),
+    };
+    console.log(LOG_PREFIX, "number status", { activationId, ...result });
+    return result;
   }
+  console.log(LOG_PREFIX, "number status", { activationId, status: text });
   return { status: text, code: null };
 }
 
@@ -210,17 +308,17 @@ export async function setHerosmsStatus(
   activationId: string,
   status: 1 | 3 | 6 | 8,
 ) {
+  console.log(LOG_PREFIX, "setStatus", { activationId, status });
   const { text } = await heroGet("setStatus", {
     id: activationId,
     status,
   });
+  console.log(LOG_PREFIX, "setStatus result", { activationId, text: truncate(text) });
   return text;
 }
 
-async function emailFetch(
-  path: string,
-  init?: RequestInit,
-) {
+async function emailFetch(path: string, init?: RequestInit) {
+  logHerosmsModeOnce();
   const key = herosmsApiKey();
   if (!key) throw new Error("Email service is not configured");
 
@@ -228,7 +326,17 @@ async function emailFetch(
   const authStyles = [`ApiKey ${key}`, key] as const;
   let lastError = "Failed to reach email service";
 
-  for (const authorization of authStyles) {
+  for (let i = 0; i < authStyles.length; i++) {
+    const authorization = authStyles[i];
+    const method = (init?.method || "GET").toUpperCase();
+    console.log(LOG_PREFIX, "email request", {
+      method,
+      path,
+      authStyle: i === 0 ? "ApiKey" : "raw",
+      body: init?.body ? truncate(String(init.body)) : undefined,
+    });
+
+    const started = Date.now();
     const res = await fetch(`${herosmsEmailBaseUrl()}${path}`, {
       ...init,
       headers: {
@@ -247,6 +355,15 @@ async function emailFetch(
       details?: string | Record<string, unknown>;
       message?: string;
     } | null;
+
+    console.log(LOG_PREFIX, "email response", {
+      method,
+      path,
+      status: res.status,
+      ms: Date.now() - started,
+      ok: res.ok,
+      body: truncate(JSON.stringify(json ?? {})),
+    });
 
     if (res.ok) return json;
 
@@ -269,6 +386,7 @@ async function emailFetch(
     }
   }
 
+  console.error(LOG_PREFIX, "email error", lastError);
   throw new Error(lastError);
 }
 
@@ -279,6 +397,7 @@ export async function getHerosmsEmailDomains() {
     cost: number;
     count: number;
   }[];
+  console.log(LOG_PREFIX, "email domains", { count: data.length });
   return data;
 }
 
@@ -310,6 +429,8 @@ export async function purchaseHerosmsEmail(input: {
   const service =
     input.service?.trim() || SITE_SERVICE_CODES[site] || undefined;
 
+  console.log(LOG_PREFIX, "purchase email", { site, domain, service });
+
   const json = await emailFetch("/emails", {
     method: "POST",
     body: JSON.stringify({
@@ -337,18 +458,21 @@ export async function purchaseHerosmsEmail(input: {
 
   const row = Array.isArray(data) ? data[0] : data;
   if (!row?.email) throw new Error("No email returned from the email service");
-  return {
+  const result = {
     emailId: String(row.id ?? ""),
     email: row.email,
     site: row.site || site,
     domain: row.domain || domain,
     costUsd: Number(row.cost) || 0,
   };
+  console.log(LOG_PREFIX, "purchase email ok", result);
+  return result;
 }
 
 export async function getHerosmsEmailStatus(emailId: string) {
+  console.log(LOG_PREFIX, "email status", { emailId });
   const json = await emailFetch(`/emails/${encodeURIComponent(emailId)}`);
-  return json?.data as {
+  const data = json?.data as {
     id?: number;
     site?: string;
     email?: string;
@@ -357,9 +481,16 @@ export async function getHerosmsEmailStatus(emailId: string) {
     cost?: number;
     message?: string;
   };
+  console.log(LOG_PREFIX, "email status result", {
+    emailId,
+    status: data?.status,
+    hasCode: Boolean(data?.value),
+  });
+  return data;
 }
 
 export async function cancelHerosmsEmail(emailId: string) {
+  console.log(LOG_PREFIX, "cancel email", { emailId });
   return emailFetch(`/emails/${encodeURIComponent(emailId)}`, {
     method: "DELETE",
   });

@@ -29,6 +29,7 @@ export async function GET(req: Request) {
       POPULAR_SERVICES.find((s) => s.code === service)?.name || service;
 
     if (isHerosmsDemoMode()) {
+      console.log("[herosms-prices] DEMO catalog", { service, countryParam });
       const countries = countryParam
         ? FALLBACK_COUNTRIES.filter((c) => String(c.id) === countryParam)
         : FALLBACK_COUNTRIES;
@@ -62,6 +63,7 @@ export async function GET(req: Request) {
       });
     }
 
+    console.log("[herosms-prices] LIVE catalog", { service, countryParam });
     const prices = await getHerosmsPrices({
       service,
       ...(countryParam ? { country: Number(countryParam) } : {}),
@@ -138,6 +140,10 @@ export async function GET(req: Request) {
     }
 
     offers.sort((a, b) => a.priceLocal - b.priceLocal);
+    console.log("[herosms-prices] LIVE offers", {
+      service,
+      count: offers.length,
+    });
 
     return NextResponse.json({
       ok: true,
@@ -148,7 +154,7 @@ export async function GET(req: Request) {
       offers,
     });
   } catch (error) {
-    console.error("[herosms-prices]", error);
+    console.error("[herosms-prices] LIVE failed", error);
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "Failed to load prices",

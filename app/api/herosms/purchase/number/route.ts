@@ -43,6 +43,12 @@ export async function POST(req: Request) {
       );
     }
 
+    console.log("[herosms-purchase-number] request", {
+      heroCountryId: body.heroCountryId,
+      service: body.service,
+      priceUsd,
+    });
+
     const result = await purchaseVirtualNumber({
       userId: user.id,
       countryCode: user.countryCode,
@@ -53,6 +59,12 @@ export async function POST(req: Request) {
       serviceName: body.serviceName || body.service,
       priceUsd,
       priceLocal: Number(body.priceLocal) || 0,
+    });
+
+    console.log("[herosms-purchase-number] ok", {
+      simulated: result.simulated,
+      activationId: result.activationId,
+      phoneNumber: result.phoneNumber,
     });
 
     const amountFormatted = formatMoney(result.amount, result.currency);
