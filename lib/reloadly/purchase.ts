@@ -15,6 +15,7 @@ import {
 } from "@/lib/wallet";
 import { categoryForSlug } from "@/lib/sogo/catalog";
 import {
+  assertReloadlyReady,
   fetchReloadlyCards,
   fetchReloadlyProduct,
   isReloadlyDemoMode,
@@ -207,7 +208,8 @@ export async function buyGiftCard(input: {
   const product = await fetchReloadlyProduct(input.productId);
   if (!product) throw new Error("Gift card product not found");
 
-  if (product.denominationType === "FIXED") {
+  const denomType = (product.denominationType || "FIXED").toUpperCase();
+  if (denomType === "FIXED" && product.denominations.length) {
     if (!product.denominations.includes(input.unitPrice)) {
       throw new Error("That amount isn’t available for this card");
     }
@@ -231,6 +233,9 @@ export async function buyGiftCard(input: {
     unitPrice: input.unitPrice,
     countryCode: input.countryCode,
   });
+
+  // Fail fast on provider auth/balance before debiting the user wallet
+  await assertReloadlyReady(0.01);
 
   const brand = await ensureBrand(product.brandName, product.brandName);
   const customIdentifier = `oryno-${randomUUID()}`;

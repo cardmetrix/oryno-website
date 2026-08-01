@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
 import {
+  fetchReloadlyProduct,
   fetchReloadlyProducts,
   isReloadlyDemoMode,
+  isReloadlySandbox,
   quoteGiftCardBuy,
   reloadlyErrorToEnglish,
 } from "@/lib/reloadly";
@@ -22,37 +24,63 @@ export async function GET(req: Request) {
     const productId = Number(searchParams.get("productId") || "0");
     const unitPrice = Number(searchParams.get("unitPrice") || "0");
 
-    const products = await fetchReloadlyProducts({
+    console.log("[reloadly-products]", {
       countryCode,
-      productName: q || undefined,
-      size: 50,
-      page: 1,
+      q,
+      productId: productId || undefined,
+      demo: isReloadlyDemoMode(),
+      sandbox: isReloadlySandbox(),
     });
 
+    // Quote a specific product amount
     if (productId > 0 && unitPrice > 0) {
-      const product = products.find((p) => p.productId === productId);
+      let product =
+        (await fetchReloadlyProduct(productId)) ||
+        (await fetchReloadlyProducts({ countryCode })).find(
+          (p) => p.productId === productId,
+        ) ||
+        null;
+
       if (!product) {
         return NextResponse.json({ error: "Product not found" }, { status: 404 });
       }
+
       const quote = await quoteGiftCardBuy({
         product,
         unitPrice,
         countryCode: user.countryCode,
       });
+
       return NextResponse.json({
-        products,
+        ok: true,
+        product,
         quote,
         demo: isReloadlyDemoMode(),
+        sandbox: isReloadlySandbox(),
       });
     }
 
-    return NextResponse.json({
-      products,
+    const products = await fetchReloadlyProducts({
+      countryCode,
+      productName: q || undefined,
+    });
+
+    console.log("[reloadly-products] ok", {
+      countryCode,
+      count: products.length,
       demo: isReloadlyDemoMode(),
+    });
+
+    return NextResponse.json({
+      ok: true,
+      products,
+      count: products.length,
+      demo: isReloadlyDemoMode(),
+      sandbox: isReloadlySandbox(),
       countryCode,
     });
   } catch (error) {
-    console.error("[reloadly-products]", error);
+    console.error("[reloadly-products] failed", error);
     return NextResponse.json(
       {
         error: reloadlyErrorToEnglish(

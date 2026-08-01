@@ -217,10 +217,15 @@ export const DEMO_RELOADLY_PRODUCTS: ReloadlyProduct[] = [
 
 export function toBuyProductView(p: ReloadlyProduct): BuyProductView {
   const map = p.fixedRecipientToSenderDenominationsMap || {};
-  const dens =
-    p.fixedRecipientDenominations?.filter((n) => Number.isFinite(n)) ?? [];
+  const dens = (
+    p.fixedRecipientDenominations?.filter((n) => Number.isFinite(n)) ?? []
+  ).slice().sort((a, b) => a - b);
   const brandName = p.brand?.brandName || p.productName;
+  const type = (p.denominationType || "FIXED").toUpperCase();
+  const isRange = type === "RANGE";
 
+  // FIXED with no dens is unusual — leave empty so UI shows free amount / error.
+  // RANGE uses min/max instead of fake denomination chips.
   return {
     productId: p.productId,
     name: p.productName,
@@ -230,9 +235,13 @@ export function toBuyProductView(p: ReloadlyProduct): BuyProductView {
     imageFallbacks: buyProductImageFallbacks(p),
     denominationType: p.denominationType || "FIXED",
     recipientCurrency: p.recipientCurrencyCode || "USD",
-    denominations: dens.length ? dens : [10, 25, 50, 100],
-    minAmount: p.minRecipientDenomination ?? null,
-    maxAmount: p.maxRecipientDenomination ?? null,
+    denominations: dens,
+    minAmount:
+      p.minRecipientDenomination ??
+      (dens.length ? dens[0] : isRange ? 1 : null),
+    maxAmount:
+      p.maxRecipientDenomination ??
+      (dens.length ? dens[dens.length - 1] : null),
     senderPriceMap: Object.fromEntries(
       Object.entries(map).map(([k, v]) => [String(k), Number(v)]),
     ),

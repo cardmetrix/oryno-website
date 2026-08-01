@@ -47,11 +47,12 @@ type BuyProduct = {
   maxAmount: number | null;
 };
 
-const BUY_COUNTRIES = [
+const FALLBACK_BUY_COUNTRIES = [
   { code: "US", label: "United States" },
   { code: "GB", label: "United Kingdom" },
   { code: "NG", label: "Nigeria" },
   { code: "CA", label: "Canada" },
+  { code: "AU", label: "Australia" },
 ];
 
 export default function GiftCardsLivePage() {
@@ -66,8 +67,11 @@ export default function GiftCardsLivePage() {
   const [sellCategory, setSellCategory] = useState("All");
 
   const [buyProducts, setBuyProducts] = useState<BuyProduct[]>([]);
+  const [buyCountries, setBuyCountries] = useState(FALLBACK_BUY_COUNTRIES);
   const [buyLoading, setBuyLoading] = useState(false);
+  const [buyError, setBuyError] = useState<string | null>(null);
   const [buyDemo, setBuyDemo] = useState(false);
+  const [buySandbox, setBuySandbox] = useState(false);
   const [buyQuery, setBuyQuery] = useState("");
   const [buyCountry, setBuyCountry] = useState("US");
 
@@ -132,8 +136,36 @@ export default function GiftCardsLivePage() {
     }
   }, []);
 
+  const loadBuyCountries = useCallback(async () => {
+    try {
+      const res = await fetch("/api/reloadly/countries");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to load countries");
+      const rows = Array.isArray(data.countries) ? data.countries : [];
+      if (rows.length) {
+        setBuyCountries(
+          rows.map((c: { code: string; label: string }) => ({
+            code: String(c.code).toUpperCase(),
+            label: String(c.label),
+          })),
+        );
+        setBuyCountry((prev) => {
+          const codes = new Set(
+            rows.map((c: { code: string }) => String(c.code).toUpperCase()),
+          );
+          return codes.has(prev) ? prev : String(rows[0].code).toUpperCase();
+        });
+      }
+      setBuyDemo(Boolean(data.demo));
+      setBuySandbox(Boolean(data.sandbox));
+    } catch {
+      setBuyCountries(FALLBACK_BUY_COUNTRIES);
+    }
+  }, []);
+
   const loadBuy = useCallback(async () => {
     setBuyLoading(true);
+    setBuyError(null);
     try {
       const res = await fetch(
         `/api/reloadly/products?countryCode=${encodeURIComponent(buyCountry)}`,
@@ -142,8 +174,12 @@ export default function GiftCardsLivePage() {
       if (!res.ok) throw new Error(data.error || "Failed to load");
       setBuyProducts(data.products ?? []);
       setBuyDemo(Boolean(data.demo));
-    } catch {
+      setBuySandbox(Boolean(data.sandbox));
+    } catch (e) {
       setBuyProducts([]);
+      setBuyError(
+        e instanceof Error ? e.message : "Failed to load gift cards",
+      );
     } finally {
       setBuyLoading(false);
     }
@@ -152,6 +188,10 @@ export default function GiftCardsLivePage() {
   useEffect(() => {
     void loadSell();
   }, [loadSell]);
+
+  useEffect(() => {
+    if (mode === "buy") void loadBuyCountries();
+  }, [mode, loadBuyCountries]);
 
   useEffect(() => {
     if (mode === "buy") void loadBuy();
@@ -321,7 +361,7 @@ export default function GiftCardsLivePage() {
                 onChange={(e) => setBuyCountry(e.target.value)}
                 className="mt-1.5 h-12 w-full rounded-xl border border-border bg-background px-3 text-base sm:text-sm"
               >
-                {BUY_COUNTRIES.map((c) => (
+                {buyCountries.map((c) => (
                   <option key={c.code} value={c.code}>
                     {c.label}
                   </option>
@@ -350,12 +390,26 @@ export default function GiftCardsLivePage() {
                   {buyLoading
                     ? "Loading…"
                     : `${filteredBuy.length} products · tap to buy`}
-                  {buyDemo ? " · demo catalog" : ""}
+                  {buyDemo
+                    ? " · demo catalog"
+                    : buySandbox
+                      ? " · sandbox"
+                      : " · live"}
                 </p>
               </div>
               <ShoppingBag className="h-5 w-5 text-primary" />
             </div>
+            {buyError ? (
+              <div className="border-b border-border px-4 py-4 text-sm text-destructive sm:px-5">
+                {buyError}
+              </div>
+            ) : null}
             <div className="divide-y divide-border">
+              {!buyLoading && !buyError && filteredBuy.length === 0 ? (
+                <p className="px-4 py-8 text-center text-sm text-muted-foreground sm:px-5">
+                  No gift cards for this country yet. Try another country.
+                </p>
+              ) : null}
               {buyLoading
                 ? Array.from({ length: 6 }).map((_, i) => (
                     <div

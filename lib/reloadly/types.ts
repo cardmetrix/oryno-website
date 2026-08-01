@@ -27,6 +27,15 @@ export type ReloadlyProductsPage = {
   size?: number;
 };
 
+export type ReloadlyCountry = {
+  isoName: string;
+  /** Some payloads use isoCode */
+  isoCode?: string;
+  name: string;
+  currencyCode?: string | null;
+  flagUrl?: string | null;
+};
+
 export type ReloadlyOrderResponse = {
   transactionId: number;
   amount: number;

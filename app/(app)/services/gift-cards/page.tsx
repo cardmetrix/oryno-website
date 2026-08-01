@@ -101,6 +101,14 @@ const CARD_COUNTRIES = [
   { code: "AU", label: "Australia", currency: "AUD" },
 ];
 
+const FALLBACK_BUY_COUNTRIES = [
+  { code: "US", label: "United States" },
+  { code: "GB", label: "United Kingdom" },
+  { code: "CA", label: "Canada" },
+  { code: "NG", label: "Nigeria" },
+  { code: "AU", label: "Australia" },
+];
+
 function currencyForCardCountry(
   countryCode: string,
   brandCurrencies?: string[],
@@ -205,10 +213,11 @@ function GiftCardsPageContent() {
 
   // ── Buy state ───────────────────────────────────────────────
   const [buyProducts, setBuyProducts] = useState<BuyProduct[]>([]);
+  const [buyCountries, setBuyCountries] = useState(FALLBACK_BUY_COUNTRIES);
   const [buyLoading, setBuyLoading] = useState(false);
   const [buyDemo, setBuyDemo] = useState(false);
   const [buyCountry, setBuyCountry] = useState(
-    () => countryParam || "US",
+    () => (countryParam || "US").toUpperCase(),
   );
   const [selectedBuy, setSelectedBuy] = useState<BuyProduct | null>(null);
   const [buyAmount, setBuyAmount] = useState("25");
@@ -280,6 +289,41 @@ function GiftCardsPageContent() {
       cancelled = true;
     };
   }, []);
+
+  // Load Reloadly countries for Buy tab
+  useEffect(() => {
+    if (mode !== "buy") return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/reloadly/countries");
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to load countries");
+        if (cancelled) return;
+        const rows = Array.isArray(data.countries) ? data.countries : [];
+        if (rows.length) {
+          setBuyCountries(
+            rows.map((c: { code: string; label: string }) => ({
+              code: String(c.code).toUpperCase(),
+              label: String(c.label),
+            })),
+          );
+          setBuyCountry((prev) => {
+            const codes = new Set(
+              rows.map((c: { code: string }) => String(c.code).toUpperCase()),
+            );
+            return codes.has(prev) ? prev : String(rows[0].code).toUpperCase();
+          });
+        }
+        setBuyDemo(Boolean(data.demo));
+      } catch {
+        if (!cancelled) setBuyCountries(FALLBACK_BUY_COUNTRIES);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [mode]);
 
   // Load buy products when Buy tab active
   useEffect(() => {
@@ -1070,10 +1114,37 @@ function GiftCardsPageContent() {
                     delay={0.04}
                     className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6"
                   >
-                    <p className="text-xs font-semibold text-muted-foreground">
+                    <label className="block text-xs font-semibold text-muted-foreground">
+                      Card country
+                      <select
+                        value={buyCountry}
+                        onChange={(e) => {
+                          setBuyCountry(e.target.value);
+                          setSelectedBuy(null);
+                          setBuyQuote(null);
+                        }}
+                        className="mt-1.5 h-12 w-full rounded-xl border border-border bg-background px-3 text-base sm:text-sm"
+                      >
+                        {buyCountries.map((c) => (
+                          <option key={c.code} value={c.code}>
+                            {c.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <p className="mt-4 text-xs font-semibold text-muted-foreground">
                       Amount ({selectedBuy.recipientCurrency})
+                      {(selectedBuy.denominationType || "").toUpperCase() ===
+                      "RANGE"
+                        ? selectedBuy.minAmount != null &&
+                          selectedBuy.maxAmount != null
+                          ? ` · ${selectedBuy.minAmount}–${selectedBuy.maxAmount}`
+                          : ""
+                        : ""}
                     </p>
-                    {selectedBuy.denominationType === "FIXED" ? (
+                    {(selectedBuy.denominationType || "").toUpperCase() ===
+                      "FIXED" && selectedBuy.denominations.length ? (
                       <div className="mt-2 flex flex-wrap gap-2">
                         {selectedBuy.denominations.map((d) => (
                           <button
