@@ -43,9 +43,13 @@ export async function GET(req: Request) {
     const query = searchParams.get("q") || "";
     const currency = currencyForCountry(user.countryCode);
 
-    const raw = isJapDemoMode()
-      ? FALLBACK_JAP_SERVICES
-      : await getJapServices();
+    const demo = isJapDemoMode();
+    console.log("[jap-services]", demo ? "DEMO" : "LIVE", {
+      platform,
+      query,
+    });
+
+    const raw = demo ? FALLBACK_JAP_SERVICES : await getJapServices();
 
     const enriched = raw.map(enrichJapService);
     const filtered = filterJapServices(enriched, { platform, query });
@@ -92,9 +96,15 @@ export async function GET(req: Request) {
       new Set(enriched.map((s) => s.platform)),
     ).sort((a, b) => a.localeCompare(b));
 
+    console.log("[jap-services] ok", {
+      demo,
+      total: enriched.length,
+      count: services.length,
+    });
+
     return NextResponse.json({
       ok: true,
-      demo: isJapDemoMode(),
+      demo,
       currency,
       platforms: [
         "All",
@@ -106,7 +116,7 @@ export async function GET(req: Request) {
       services,
     });
   } catch (error) {
-    console.error("[jap-services]", error);
+    console.error("[jap-services] LIVE failed", error);
     return NextResponse.json(
       {
         error:

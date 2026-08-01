@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
 import { createNotification } from "@/lib/notifications-service";
 import { formatMoney } from "@/lib/transactions";
-import { purchaseJapBoost } from "@/lib/jap";
+import { japErrorToEnglish, purchaseJapBoost } from "@/lib/jap";
 
 export const runtime = "nodejs";
 
@@ -43,6 +43,13 @@ export async function POST(req: Request) {
       );
     }
 
+    console.log("[jap-purchase] request", {
+      serviceId: body.serviceId,
+      platform: body.platform,
+      metric: body.metric,
+      quantity: body.quantity,
+    });
+
     const result = await purchaseJapBoost({
       userId: user.id,
       countryCode: user.countryCode,
@@ -54,6 +61,11 @@ export async function POST(req: Request) {
       quantity: Number(body.quantity),
       rateUsd: Number(body.rateUsd) || 0,
       priceLocal: Number(body.priceLocal) || undefined,
+    });
+
+    console.log("[jap-purchase] ok", {
+      simulated: result.simulated,
+      orderId: result.orderId,
     });
 
     const amountFormatted = formatMoney(result.amount, result.currency);
@@ -88,11 +100,10 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     console.error("[jap-purchase]", error);
+    const raw =
+      error instanceof Error ? error.message : "Failed to place boost";
     return NextResponse.json(
-      {
-        error:
-          error instanceof Error ? error.message : "Failed to place boost",
-      },
+      { error: japErrorToEnglish(raw) },
       { status: 400 },
     );
   }

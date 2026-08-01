@@ -19,10 +19,11 @@ export async function GET(
       return NextResponse.json({ error: "Missing order id" }, { status: 400 });
     }
 
+    console.log("[jap-status]", { orderId: id });
     const data = await pollJapOrderStatus(id);
     return NextResponse.json({ ok: true, data });
   } catch (error) {
-    console.error("[jap-status]", error);
+    console.error("[jap-status] failed", error);
     return NextResponse.json(
       {
         error:

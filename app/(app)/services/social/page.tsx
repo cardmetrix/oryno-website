@@ -97,6 +97,7 @@ export default function SocialBoostPage() {
   const [receipt, setReceipt] = useState("");
   const [statusLabel, setStatusLabel] = useState<string | null>(null);
   const [polling, setPolling] = useState(false);
+  const [liveMode, setLiveMode] = useState(false);
 
   // Load the full catalog once — platform/type/package filter client-side.
   useEffect(() => {
@@ -110,6 +111,7 @@ export default function SocialBoostPage() {
         if (!res.ok) throw new Error(data.error || "Failed to load services");
         if (cancelled) return;
 
+        setLiveMode(data.demo === false);
         const nextPlatforms: string[] = (data.platforms ?? []).filter(
           (p: string) => p && p !== "All",
         );
@@ -477,7 +479,11 @@ export default function SocialBoostPage() {
     <AppShell hideNav>
       <PageHeader
         title="Social Boosting"
-        subtitle="Grow followers, likes, views"
+        subtitle={
+          liveMode
+            ? "Live boosts · followers, likes, views"
+            : "Grow followers, likes, views"
+        }
         backHref="/services"
       />
 

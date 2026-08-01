@@ -1,10 +1,24 @@
 /**
- * JustAnotherPanel (JAP) API client
+ * JustAnotherPanel (JAP) API client — live social boosting
  * Docs: https://justanotherpanel.com/api
  * Endpoint: POST https://justanotherpanel.com/api/v2
  */
 
+import { japErrorToEnglish } from "./errors";
+
 const DEFAULT_BASE = "https://justanotherpanel.com/api/v2";
+const LOG_PREFIX = "[jap]";
+
+function truncate(value: string, max = 400) {
+  const s = value.replace(/\s+/g, " ").trim();
+  return s.length <= max ? s : `${s.slice(0, max)}…`;
+}
+
+function maskKey(key: string) {
+  if (!key) return "(empty)";
+  if (key.length <= 8) return "****";
+  return `${key.slice(0, 4)}…${key.slice(-4)}`;
+}
 
 export function japApiKey() {
   return (process.env.JAP_API_KEY || "").trim();
@@ -20,14 +34,40 @@ export function hasJapKeys() {
   return Boolean(japApiKey());
 }
 
+/** Force demo even when a key is set. JAP_DEMO=true|1 */
+export function isJapDemoForced() {
+  const flag = (process.env.JAP_DEMO || "").toLowerCase();
+  return flag === "true" || flag === "1";
+}
+
+/** Live when API key is present and JAP_DEMO is not forcing demo. */
+export function isJapLive() {
+  return hasJapKeys() && !isJapDemoForced();
+}
+
+/** Demo mode when keys are missing or JAP_DEMO=true. */
 export function isJapDemoMode() {
-  return !hasJapKeys();
+  return !isJapLive();
 }
 
 /** Retail markup on top of FX buy rate (default 30%). */
 export function japMarkup() {
   const raw = Number(process.env.JAP_MARKUP || "1.30");
-  return Number.isFinite(raw) && raw >= 1 ? raw : 1.30;
+  return Number.isFinite(raw) && raw >= 1 ? raw : 1.3;
+}
+
+let loggedMode = false;
+function logJapModeOnce() {
+  if (loggedMode) return;
+  loggedMode = true;
+  console.log(LOG_PREFIX, "mode", {
+    live: isJapLive(),
+    demo: isJapDemoMode(),
+    hasKey: hasJapKeys(),
+    key: maskKey(japApiKey()),
+    base: japBaseUrl(),
+    markup: japMarkup(),
+  });
 }
 
 const JAP_SERVICES_TTL_MS = 10 * 60 * 1000;
@@ -55,6 +95,7 @@ export type JapOrderStatus = {
 };
 
 async function japPost(params: Record<string, string | number>) {
+  logJapModeOnce();
   const key = japApiKey();
   if (!key) throw new Error("JAP_API_KEY is not configured");
 
@@ -64,6 +105,15 @@ async function japPost(params: Record<string, string | number>) {
     body.set(k, String(v));
   }
 
+  const action = String(params.action || "");
+  console.log(LOG_PREFIX, "request", {
+    action,
+    params: Object.fromEntries(
+      Object.entries(params).filter(([k]) => k !== "key"),
+    ),
+  });
+
+  const started = Date.now();
   const res = await fetch(japBaseUrl(), {
     method: "POST",
     headers: {
@@ -75,11 +125,18 @@ async function japPost(params: Record<string, string | number>) {
   });
 
   const text = await res.text();
+  console.log(LOG_PREFIX, "response", {
+    action,
+    status: res.status,
+    ms: Date.now() - started,
+    body: truncate(text),
+  });
+
   let json: unknown = null;
   try {
     json = JSON.parse(text);
   } catch {
-    throw new Error(text || `Boost service error (${res.status})`);
+    throw new Error(japErrorToEnglish(text || `Boost service error (${res.status})`));
   }
 
   if (
@@ -88,11 +145,13 @@ async function japPost(params: Record<string, string | number>) {
     "error" in json &&
     (json as { error?: string }).error
   ) {
-    throw new Error(String((json as { error: string }).error));
+    throw new Error(
+      japErrorToEnglish(String((json as { error: string }).error)),
+    );
   }
 
   if (!res.ok) {
-    throw new Error(`Boost service error (${res.status})`);
+    throw new Error(japErrorToEnglish(`Boost service error (${res.status})`));
   }
 
   return json;
@@ -103,18 +162,46 @@ export async function getJapBalance() {
     balance?: string;
     currency?: string;
   };
-  return {
+  const result = {
     balance: Number(json.balance) || 0,
     currency: json.currency || "USD",
   };
+  console.log(LOG_PREFIX, "balance", result);
+  return result;
+}
+
+/**
+ * Verify live API key + balance before charging the user wallet.
+ */
+export async function assertJapReady(minUsd = 0.01) {
+  if (!isJapLive()) {
+    throw new Error("JAP_API_KEY is not configured");
+  }
+  try {
+    const { balance, currency } = await getJapBalance();
+    console.log(LOG_PREFIX, "preflight balance", { balance, currency, minUsd });
+    if (!Number.isFinite(balance)) {
+      throw new Error("incorrect api key");
+    }
+    if (balance < minUsd) {
+      throw new Error("not enough funds");
+    }
+    return { balance, currency };
+  } catch (error) {
+    throw new Error(
+      japErrorToEnglish(
+        error instanceof Error ? error.message : "Boost service unavailable",
+      ),
+    );
+  }
 }
 
 export async function getJapServices(): Promise<JapService[]> {
   const now = Date.now();
-  if (
-    japServicesCache &&
-    now - japServicesCache.at < JAP_SERVICES_TTL_MS
-  ) {
+  if (japServicesCache && now - japServicesCache.at < JAP_SERVICES_TTL_MS) {
+    console.log(LOG_PREFIX, "services cache hit", {
+      count: japServicesCache.data.length,
+    });
     return japServicesCache.data;
   }
 
@@ -138,6 +225,7 @@ export async function getJapServices(): Promise<JapService[]> {
     })
     .filter((s) => Number.isFinite(s.service) && s.service > 0 && s.name);
 
+  console.log(LOG_PREFIX, "services", { count: data.length });
   japServicesCache = { at: now, data };
   return data;
 }
@@ -147,6 +235,7 @@ export async function addJapOrder(input: {
   link: string;
   quantity: number;
 }) {
+  console.log(LOG_PREFIX, "add order", input);
   const json = (await japPost({
     action: "add",
     service: input.service,
@@ -155,13 +244,23 @@ export async function addJapOrder(input: {
   })) as { order?: number | string };
 
   if (json.order == null) throw new Error("No order id returned");
-  return { orderId: String(json.order) };
+  const result = { orderId: String(json.order) };
+  console.log(LOG_PREFIX, "add order ok", result);
+  return result;
 }
 
-export async function getJapOrderStatus(orderId: string): Promise<JapOrderStatus> {
+export async function getJapOrderStatus(
+  orderId: string,
+): Promise<JapOrderStatus> {
+  console.log(LOG_PREFIX, "order status", { orderId });
   const json = (await japPost({
     action: "status",
     order: orderId,
   })) as JapOrderStatus;
+  console.log(LOG_PREFIX, "order status result", {
+    orderId,
+    status: json.status,
+    remains: json.remains,
+  });
   return json;
 }

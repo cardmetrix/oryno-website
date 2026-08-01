@@ -15,11 +15,16 @@ import {
 } from "@/lib/wallet";
 import {
   addJapOrder,
+  assertJapReady,
   getJapOrderStatus,
   isJapDemoMode,
+  isJapLive,
   japMarkup,
 } from "./client";
 import { japUsdCost } from "./catalog";
+import { japErrorToEnglish } from "./errors";
+
+const LOG_PREFIX = "[jap]";
 
 async function debitWallet(input: {
   userId: string;
@@ -213,6 +218,22 @@ export async function purchaseJapBoost(input: {
     price: chargeAmount,
   });
 
+  console.log(LOG_PREFIX, "purchase start", {
+    live: isJapLive(),
+    serviceId: input.serviceId,
+    platform: input.platform,
+    metric: input.metric,
+    quantity: input.quantity,
+    priceUsd,
+    chargeAmount,
+    currency,
+  });
+
+  // Fail before debiting wallet when live provider is down / empty
+  if (!isJapDemoMode()) {
+    await assertJapReady(Math.max(0.01, priceUsd * 0.5));
+  }
+
   const debit = await debitWallet({
     userId: input.userId,
     countryCode: input.countryCode,
@@ -235,6 +256,7 @@ export async function purchaseJapBoost(input: {
     if (isJapDemoMode()) {
       simulated = true;
       orderId = `demo_jap_${Date.now()}`;
+      console.log(LOG_PREFIX, "purchase DEMO", { orderId });
     } else {
       const placed = await addJapOrder({
         service: input.serviceId,
@@ -242,6 +264,7 @@ export async function purchaseJapBoost(input: {
         quantity: input.quantity,
       });
       orderId = placed.orderId;
+      console.log(LOG_PREFIX, "purchase LIVE", { orderId });
     }
 
     const [order] = await db
@@ -289,19 +312,23 @@ export async function purchaseJapBoost(input: {
       package: pkg,
     };
   } catch (error) {
-    const reason = error instanceof Error ? error.message : "Purchase failed";
+    const reason = japErrorToEnglish(
+      error instanceof Error ? error.message : "Purchase failed",
+    );
+    console.error(LOG_PREFIX, "purchase failed — refunding", reason);
     await refundDebit({
       walletId: debit.wallet.id,
       transactionId: debit.transaction.id,
       amount: chargeAmount,
       reason,
     });
-    throw error instanceof Error ? error : new Error(reason);
+    throw new Error(reason);
   }
 }
 
 export async function pollJapOrderStatus(orderId: string) {
   if (orderId.startsWith("demo_") || isJapDemoMode()) {
+    console.log(LOG_PREFIX, "poll DEMO", { orderId });
     return {
       status: "In progress",
       start_count: "0",
@@ -310,5 +337,6 @@ export async function pollJapOrderStatus(orderId: string) {
       currency: "USD",
     };
   }
+  console.log(LOG_PREFIX, "poll LIVE", { orderId });
   return getJapOrderStatus(orderId);
 }
