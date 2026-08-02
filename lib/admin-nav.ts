@@ -1,4 +1,5 @@
 import {
+  BadgeCheck,
   BarChart3,
   Bell,
   CreditCard,
@@ -24,6 +25,7 @@ export type AdminNavItem = {
 export const adminNav: AdminNavItem[] = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard },
   { href: "/admin/users", label: "Users", icon: Users },
+  { href: "/admin/kyc", label: "KYC", icon: BadgeCheck },
   { href: "/admin/wallets", label: "Wallets", icon: Wallet },
   { href: "/admin/gift-cards", label: "Gift Cards", icon: Gift },
   { href: "/admin/virtual-numbers", label: "Virtual Numbers", icon: Phone },
