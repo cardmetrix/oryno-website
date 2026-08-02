@@ -71,7 +71,7 @@ export function AdminShell({
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
               transition={{ type: "spring", stiffness: 380, damping: 34 }}
-              className="absolute inset-y-0 left-0 flex w-[min(88vw,300px)] flex-col border-r border-border bg-background px-4 py-5 shadow-[0_20px_60px_rgba(28,28,30,0.28)]"
+              className="absolute inset-y-0 left-0 flex w-[min(88vw,300px)] flex-col border-r border-border bg-background px-3 py-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[0_20px_60px_rgba(28,28,30,0.28)] sm:px-4"
             >
               <button
                 type="button"
@@ -89,6 +89,7 @@ export function AdminShell({
               />
               <AdminFooter
                 admin={admin}
+                compact
                 onLogout={() => void logoutAdmin(router)}
               />
             </motion.aside>
@@ -143,7 +144,7 @@ export function AdminShell({
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-          className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8"
+          className="mx-auto w-full max-w-7xl px-3 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8"
         >
           {children}
         </motion.main>
@@ -217,21 +218,35 @@ function AdminNav({
 function AdminFooter({
   onLogout,
   admin,
+  compact = false,
 }: {
   onLogout: () => void;
   admin?: { name: string; email: string; role: string };
+  compact?: boolean;
 }) {
   return (
-    <div className="mt-auto space-y-3 border-t border-border pt-4">
-      <div className="rounded-[16px] bg-gradient-to-br from-oryno-orange to-oryno-orange-soft p-4 text-white shadow-[var(--shadow-orange)]">
+    <div className="mt-auto space-y-3 border-t border-border pt-3">
+      <div
+        className={cn(
+          "rounded-[16px] bg-gradient-to-br from-oryno-orange to-oryno-orange-soft text-white shadow-[var(--shadow-orange)]",
+          compact ? "p-3" : "p-4",
+        )}
+      >
         <div className="flex items-center justify-between gap-2">
-          <p className="text-sm font-bold">Live console</p>
+          <p className={cn("font-bold", compact ? "text-xs" : "text-sm")}>
+            Live console
+          </p>
           <span className="inline-flex items-center gap-1.5 rounded-full bg-white/18 px-2 py-0.5 text-[10px] font-bold tracking-wide uppercase ring-1 ring-white/25">
             <span className="h-1.5 w-1.5 rounded-full bg-white" />
             Online
           </span>
         </div>
-        <p className="mt-1 text-xs text-white/85">
+        <p
+          className={cn(
+            "mt-1 truncate text-white/85",
+            compact ? "text-[11px]" : "text-xs",
+          )}
+        >
           {admin
             ? `${admin.email}`
             : "Manage users, wallets, providers, countries & gateways."}
@@ -241,7 +256,10 @@ function AdminFooter({
           whileHover={{ y: -1 }}
           whileTap={{ scale: 0.98 }}
           onClick={onLogout}
-          className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-[12px] bg-oryno-charcoal text-sm font-semibold text-white"
+          className={cn(
+            "mt-2.5 inline-flex w-full items-center justify-center gap-2 rounded-[12px] bg-oryno-charcoal text-sm font-semibold text-white",
+            compact ? "h-9" : "mt-3 h-10",
+          )}
         >
           <LogOut className="h-4 w-4" strokeWidth={1.75} />
           Log out

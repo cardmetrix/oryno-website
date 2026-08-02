@@ -119,8 +119,8 @@ export default function AdminUsersPage() {
         title="Users"
         subtitle="Balances, KYC, suspend / activate, and wallet controls"
         actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative">
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
+            <div className="relative w-full sm:w-auto">
               <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <input
                 value={q}
@@ -129,27 +129,29 @@ export default function AdminUsersPage() {
                 className="h-11 w-full rounded-[14px] border border-border bg-background pr-3 pl-9 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 sm:w-52"
               />
             </div>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="h-11 rounded-[14px] border border-border bg-background px-3 text-sm"
-            >
-              <option value="">All status</option>
-              <option value="active">Active</option>
-              <option value="suspended">Suspended</option>
-              <option value="deleted">Deleted</option>
-            </select>
-            <select
-              value={kycFilter}
-              onChange={(e) => setKycFilter(e.target.value)}
-              className="h-11 rounded-[14px] border border-border bg-background px-3 text-sm"
-            >
-              <option value="">All KYC</option>
-              <option value="unverified">Unverified</option>
-              <option value="pending">Pending</option>
-              <option value="verified">Verified</option>
-              <option value="rejected">Rejected</option>
-            </select>
+            <div className="grid grid-cols-2 gap-2 sm:contents">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="h-11 w-full rounded-[14px] border border-border bg-background px-3 text-sm sm:w-auto"
+              >
+                <option value="">All status</option>
+                <option value="active">Active</option>
+                <option value="suspended">Suspended</option>
+                <option value="deleted">Deleted</option>
+              </select>
+              <select
+                value={kycFilter}
+                onChange={(e) => setKycFilter(e.target.value)}
+                className="h-11 w-full rounded-[14px] border border-border bg-background px-3 text-sm sm:w-auto"
+              >
+                <option value="">All KYC</option>
+                <option value="unverified">Unverified</option>
+                <option value="pending">Pending</option>
+                <option value="verified">Verified</option>
+                <option value="rejected">Rejected</option>
+              </select>
+            </div>
           </div>
         }
       />
@@ -340,9 +342,9 @@ function UserManageSheet({
                 {detail.wallets.map((w) => (
                   <div
                     key={w.id}
-                    className="flex items-center justify-between rounded-xl border border-border px-3 py-2.5"
+                    className="flex flex-col gap-2 rounded-xl border border-border px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between"
                   >
-                    <div>
+                    <div className="min-w-0">
                       <p className="text-sm font-semibold">
                         {w.balanceFormatted}
                         {w.isPrimary ? (
@@ -355,7 +357,7 @@ function UserManageSheet({
                         {w.currency} · {w.statusLabel}
                       </p>
                     </div>
-                    <div className="flex gap-1">
+                    <div className="flex shrink-0 gap-1">
                       <button
                         type="button"
                         disabled={busy || w.status === "frozen"}
@@ -365,7 +367,7 @@ function UserManageSheet({
                             `${w.currency} wallet frozen`,
                           )
                         }
-                        className="rounded-lg border border-border px-2 py-1 text-[11px] font-semibold disabled:opacity-50"
+                        className="flex-1 rounded-lg border border-border px-2 py-1.5 text-[11px] font-semibold disabled:opacity-50 sm:flex-none"
                       >
                         Freeze
                       </button>
@@ -378,7 +380,7 @@ function UserManageSheet({
                             `${w.currency} wallet unfrozen`,
                           )
                         }
-                        className="rounded-lg border border-border px-2 py-1 text-[11px] font-semibold disabled:opacity-50"
+                        className="flex-1 rounded-lg border border-border px-2 py-1.5 text-[11px] font-semibold disabled:opacity-50 sm:flex-none"
                       >
                         Unfreeze
                       </button>
@@ -565,14 +567,16 @@ function UserManageSheet({
   if (isMobile) {
     return (
       <Drawer open={open} onOpenChange={(v) => !v && onClose()}>
-        <DrawerContent className="max-h-[92svh] px-4">
-          <DrawerHeader className="px-0 text-left">
+        <DrawerContent className="flex max-h-[92svh] flex-col px-4">
+          <DrawerHeader className="shrink-0 px-0 text-left">
             <DrawerTitle>Manage user</DrawerTitle>
             <DrawerDescription>
               Full account, wallet, and KYC controls
             </DrawerDescription>
           </DrawerHeader>
-          <div className="overflow-y-auto">{body}</div>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+            {body}
+          </div>
         </DrawerContent>
       </Drawer>
     );

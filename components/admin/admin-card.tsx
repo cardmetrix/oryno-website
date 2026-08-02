@@ -24,18 +24,20 @@ export function AdminCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
       className={cn(
-        "rounded-[22px] border border-border bg-background p-5 shadow-[var(--shadow-soft)] sm:p-6",
+        "rounded-[18px] border border-border bg-background p-3.5 shadow-[var(--shadow-soft)] sm:rounded-[22px] sm:p-6",
         className,
       )}
     >
       {title || action ? (
-        <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
           {title ? (
-            <h2 className="text-base font-semibold text-foreground">{title}</h2>
+            <h2 className="min-w-0 text-base font-semibold text-foreground">
+              {title}
+            </h2>
           ) : (
             <span />
           )}
-          {action}
+          {action ? <div className="shrink-0">{action}</div> : null}
         </div>
       ) : null}
       {children}

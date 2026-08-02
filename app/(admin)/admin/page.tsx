@@ -78,7 +78,30 @@ export default function AdminOverviewPage() {
               {data.giftCardOrders.length === 0 ? (
                 <AdminEmptyBlock message="No gift card orders yet." />
               ) : (
-                <div className="overflow-x-auto">
+                <div className="space-y-3 md:hidden">
+                  {data.giftCardOrders.map((order) => (
+                    <div
+                      key={order.id}
+                      className="rounded-[14px] border border-border bg-muted/25 p-3"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-foreground">
+                            {order.id}
+                          </p>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {order.user}
+                          </p>
+                        </div>
+                        <StatusBadge status={order.status} />
+                      </div>
+                      <p className="mt-2 text-xs text-foreground">
+                        {order.brand} · {order.type}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+                <div className="hidden overflow-x-auto md:block">
                   <table className="w-full min-w-[520px] text-left text-sm">
                     <thead>
                       <tr className="border-b border-border text-xs text-muted-foreground">

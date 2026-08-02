@@ -105,26 +105,36 @@ export default function AdminReportsPage() {
             {series.length === 0 ? (
               <AdminEmptyBlock message="No transactions in the last 30 days." />
             ) : (
-              <div className="flex h-52 items-end gap-2 sm:gap-3">
-                {series.map((item, index) => (
-                  <div
-                    key={item.day}
-                    className="flex flex-1 flex-col items-center gap-2"
-                    title={`${item.day}: ${item.total}`}
-                  >
-                    <motion.div
-                      initial={{ height: 0 }}
-                      animate={{
-                        height: `${Math.max(6, (item.total / max) * 100)}%`,
-                      }}
-                      transition={{ delay: 0.1 + index * 0.03, duration: 0.45 }}
-                      className="w-full max-w-10 rounded-t-[10px] bg-gradient-to-t from-oryno-orange to-oryno-orange-soft"
-                    />
-                    <span className="text-[10px] font-medium text-muted-foreground">
-                      {item.day.slice(5)}
-                    </span>
-                  </div>
-                ))}
+              <div className="-mx-1 overflow-x-auto px-1 pb-1">
+                <div className="flex h-52 min-w-[420px] items-end gap-2 sm:min-w-0 sm:gap-3">
+                  {series.map((item, index) => (
+                    <div
+                      key={item.day}
+                      className="flex min-w-0 flex-1 flex-col items-center gap-2"
+                      title={`${item.day}: ${item.total}`}
+                    >
+                      <motion.div
+                        initial={{ height: 0 }}
+                        animate={{
+                          height: `${Math.max(6, (item.total / max) * 100)}%`,
+                        }}
+                        transition={{
+                          delay: 0.1 + index * 0.03,
+                          duration: 0.45,
+                        }}
+                        className="w-full max-w-10 rounded-t-[10px] bg-gradient-to-t from-oryno-orange to-oryno-orange-soft"
+                      />
+                      <span className="text-[10px] font-medium text-muted-foreground">
+                        <span className="sm:hidden">
+                          {item.day.slice(8)}
+                        </span>
+                        <span className="hidden sm:inline">
+                          {item.day.slice(5)}
+                        </span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </AdminCard>

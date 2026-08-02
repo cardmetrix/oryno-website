@@ -96,7 +96,7 @@ export default function AdminKycPage() {
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value)}
-            className="h-11 rounded-[14px] border border-border bg-background px-3 text-sm"
+            className="h-11 w-full rounded-[14px] border border-border bg-background px-3 text-sm sm:w-auto"
           >
             <option value="">All</option>
             <option value="pending">Pending</option>
@@ -234,20 +234,20 @@ export default function AdminKycPage() {
                 </p>
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                 <DocLink href={review.idFrontUrl} label="Front ID" />
                 <DocLink href={review.idBackUrl} label="Back ID" />
                 <DocLink href={review.selfieUrl} label="Selfie" />
               </div>
 
               {review.idFrontUrl || review.selfieUrl ? (
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {review.idFrontUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={review.idFrontUrl}
                       alt="ID front"
-                      className="h-32 w-full rounded-xl object-cover border border-border"
+                      className="h-40 w-full rounded-xl border border-border object-cover sm:h-32"
                     />
                   ) : null}
                   {review.selfieUrl ? (
@@ -255,7 +255,7 @@ export default function AdminKycPage() {
                     <img
                       src={review.selfieUrl}
                       alt="Selfie"
-                      className="h-32 w-full rounded-xl object-cover border border-border"
+                      className="h-40 w-full rounded-xl border border-border object-cover sm:h-32"
                     />
                   ) : null}
                 </div>

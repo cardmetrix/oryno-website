@@ -125,7 +125,7 @@ export default function AdminCountriesPage() {
                     {country.servicesLabel}
                   </p>
 
-                  <div className="mt-4 grid grid-cols-3 gap-1.5">
+                  <div className="mt-4 grid grid-cols-3 gap-1 sm:gap-1.5">
                     {COUNTRY_STATUS_OPTIONS.map((opt) => {
                       const active = country.status === opt.value;
                       return (
@@ -135,7 +135,7 @@ export default function AdminCountriesPage() {
                           disabled={busyCode === country.code || active}
                           onClick={() => void setStatus(country.code, opt.value)}
                           className={cn(
-                            "h-9 rounded-xl text-[11px] font-semibold transition",
+                            "h-9 rounded-xl px-0.5 text-[10px] font-semibold transition sm:text-[11px]",
                             active
                               ? "bg-primary text-primary-foreground"
                               : "border border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground",

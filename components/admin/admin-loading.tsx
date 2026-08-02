@@ -58,7 +58,7 @@ function TableSkeleton({ rows }: { rows: number }) {
         <Skeleton className="h-4 w-36 rounded-full" />
         <Skeleton className="h-9 w-28 rounded-[12px]" />
       </div>
-      <div className="mb-3 grid grid-cols-4 gap-3 border-b border-border pb-3">
+      <div className="mb-3 hidden grid-cols-4 gap-3 border-b border-border pb-3 md:grid">
         <Skeleton className="h-3 w-16 rounded-full" />
         <Skeleton className="h-3 w-20 rounded-full" />
         <Skeleton className="h-3 w-14 rounded-full" />
@@ -71,7 +71,7 @@ function TableSkeleton({ rows }: { rows: number }) {
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.05, duration: 0.3 }}
-            className="grid grid-cols-4 items-center gap-3"
+            className="rounded-[14px] border border-border/70 p-3 md:grid md:grid-cols-4 md:items-center md:gap-3 md:rounded-none md:border-0 md:p-0"
           >
             <div className="flex items-center gap-3">
               <Skeleton className="h-10 w-10 shrink-0 rounded-2xl" />
@@ -80,9 +80,11 @@ function TableSkeleton({ rows }: { rows: number }) {
                 <Skeleton className="h-3 w-20 rounded-full" />
               </div>
             </div>
-            <Skeleton className="h-3.5 w-20 rounded-full" />
-            <Skeleton className="h-6 w-16 rounded-full" />
-            <Skeleton className="ml-auto h-3.5 w-24 rounded-full" />
+            <div className="mt-3 grid grid-cols-2 gap-2 md:mt-0 md:contents">
+              <Skeleton className="h-3.5 w-20 rounded-full" />
+              <Skeleton className="h-6 w-16 rounded-full" />
+              <Skeleton className="col-span-2 h-3.5 w-24 rounded-full md:col-span-1 md:ml-auto" />
+            </div>
           </motion.div>
         ))}
       </div>
