@@ -32,7 +32,7 @@ export default function AdminProvidersPage() {
       />
 
       <AdminCard>
-        {loading ? <AdminLoadingBlock /> : null}
+        {loading ? <AdminLoadingBlock variant="table" rows={6} /> : null}
         {error ? <AdminErrorBlock message={error} onRetry={reload} /> : null}
         {data ? (
           data.providers.length === 0 ? (

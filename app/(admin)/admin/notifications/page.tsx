@@ -33,7 +33,7 @@ export default function AdminNotificationsPage() {
         subtitle="Campaigns and recent user notifications"
       />
 
-      {loading ? <AdminLoadingBlock /> : null}
+      {loading ? <AdminLoadingBlock variant="split" /> : null}
       {error ? <AdminErrorBlock message={error} onRetry={reload} /> : null}
 
       {data ? (

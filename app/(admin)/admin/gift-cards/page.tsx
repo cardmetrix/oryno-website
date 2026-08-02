@@ -34,7 +34,7 @@ export default function AdminGiftCardsPage() {
         subtitle="Sogo sell + Reloadly buy · live orders and brand rates"
       />
 
-      {loading ? <AdminLoadingBlock /> : null}
+      {loading ? <AdminLoadingBlock variant="split" /> : null}
       {error ? <AdminErrorBlock message={error} onRetry={reload} /> : null}
 
       {data ? (

@@ -62,7 +62,7 @@ export default function AdminOverviewPage() {
         }
       />
 
-      {loading ? <AdminLoadingBlock /> : null}
+      {loading ? <AdminLoadingBlock variant="overview" /> : null}
       {error ? <AdminErrorBlock message={error} onRetry={reload} /> : null}
 
       {data ? (

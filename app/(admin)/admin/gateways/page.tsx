@@ -32,7 +32,7 @@ export default function AdminGatewaysPage() {
       />
 
       <AdminCard>
-        {loading ? <AdminLoadingBlock /> : null}
+        {loading ? <AdminLoadingBlock variant="table" rows={4} /> : null}
         {error ? <AdminErrorBlock message={error} onRetry={reload} /> : null}
         {data ? (
           data.gateways.length === 0 ? (

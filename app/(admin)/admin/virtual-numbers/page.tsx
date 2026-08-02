@@ -32,7 +32,7 @@ export default function AdminVirtualNumbersPage() {
       />
 
       <AdminCard>
-        {loading ? <AdminLoadingBlock /> : null}
+        {loading ? <AdminLoadingBlock variant="table" /> : null}
         {error ? <AdminErrorBlock message={error} onRetry={reload} /> : null}
         {data ? (
           data.stock.length === 0 ? (

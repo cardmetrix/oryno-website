@@ -63,7 +63,7 @@ export default function AdminSettingsPage() {
         subtitle="Console preferences, security, and operational defaults"
       />
 
-      {loading ? <AdminLoadingBlock /> : null}
+      {loading ? <AdminLoadingBlock variant="settings" /> : null}
       {error ? <AdminErrorBlock message={error} onRetry={reload} /> : null}
 
       {settings ? (

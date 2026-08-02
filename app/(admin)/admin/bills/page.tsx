@@ -33,7 +33,7 @@ export default function AdminBillsPage() {
       />
 
       <AdminCard>
-        {loading ? <AdminLoadingBlock /> : null}
+        {loading ? <AdminLoadingBlock variant="table" /> : null}
         {error ? <AdminErrorBlock message={error} onRetry={reload} /> : null}
         {data ? (
           data.providers.length === 0 ? (

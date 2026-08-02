@@ -52,7 +52,7 @@ export default function AdminWalletsPage() {
       />
 
       <AdminCard>
-        {loading ? <AdminLoadingBlock /> : null}
+        {loading ? <AdminLoadingBlock variant="table" rows={8} /> : null}
         {error ? <AdminErrorBlock message={error} onRetry={reload} /> : null}
         {!loading && !error && data ? (
           data.wallets.length === 0 ? (

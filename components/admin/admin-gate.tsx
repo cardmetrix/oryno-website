@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
+import { AdminLoadingBlock } from "@/components/admin/admin-loading";
 import { AdminShell } from "@/components/admin/admin-shell";
 
 type MeState = {
@@ -90,8 +91,17 @@ export function AdminGate({ children }: { children: React.ReactNode }) {
 
   if (!ready) {
     return (
-      <div className="flex min-h-[100svh] items-center justify-center bg-[image:var(--app-shell-gradient)]">
-        <div className="h-10 w-10 animate-pulse rounded-full bg-oryno-orange-muted" />
+      <div className="min-h-[100svh] bg-[image:var(--app-shell-gradient)] px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mx-auto w-full max-w-7xl space-y-5 lg:pl-[272px]">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 animate-pulse rounded-[14px] bg-muted" />
+            <div className="space-y-2">
+              <div className="h-4 w-32 animate-pulse rounded-full bg-muted" />
+              <div className="h-3 w-48 animate-pulse rounded-full bg-muted" />
+            </div>
+          </div>
+          <AdminLoadingBlock variant="overview" />
+        </div>
       </div>
     );
   }

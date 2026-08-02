@@ -34,7 +34,12 @@ export default function AdminReferralsPage() {
         subtitle="Codes, joins, and earnings from the database"
       />
 
-      {loading ? <AdminLoadingBlock /> : null}
+      {loading ? (
+        <div className="space-y-5">
+          <AdminLoadingBlock variant="stats" />
+          <AdminLoadingBlock variant="table" />
+        </div>
+      ) : null}
       {error ? <AdminErrorBlock message={error} onRetry={reload} /> : null}
 
       {data ? (

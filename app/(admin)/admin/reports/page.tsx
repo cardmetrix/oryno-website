@@ -66,7 +66,7 @@ export default function AdminReportsPage() {
         }
       />
 
-      {loading ? <AdminLoadingBlock /> : null}
+      {loading ? <AdminLoadingBlock variant="reports" /> : null}
       {error ? <AdminErrorBlock message={error} onRetry={reload} /> : null}
 
       {data ? (

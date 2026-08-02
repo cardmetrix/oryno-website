@@ -1,6 +1,7 @@
 import { and, count, desc, eq, gte, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { withAdminApi, titleCaseStatus } from "@/lib/admin/api";
+import { countryStatusLabel } from "@/lib/admin/countries";
 import { db } from "@/lib/db";
 import {
   countries,
@@ -135,7 +136,7 @@ export async function GET() {
         currency: c.currency,
         services: (c.enabledServices || []).join(", ") || "—",
         gateway: "Paystack",
-        status: titleCaseStatus(c.status),
+        status: countryStatusLabel(c.status),
       })),
     });
   });
