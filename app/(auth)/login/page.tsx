@@ -2,16 +2,44 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { FormEvent, Suspense, useMemo, useState } from "react";
+import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
 import { useSignIn } from "@clerk/nextjs";
 import { motion } from "framer-motion";
+import { ArrowLeft } from "lucide-react";
 import { AuthField, authInputClassName } from "@/components/auth/auth-field";
 import { AuthSplitLayout } from "@/components/auth/auth-split-layout";
 import { PasswordField } from "@/components/auth/password-field";
 import { SocialAuth } from "@/components/auth/social-auth";
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSlot,
+} from "@/components/ui/input-otp";
 import { clerkErrorMessage } from "@/lib/auth/clerk-errors";
 import { syncSessionToDatabase } from "@/lib/auth/client-sync";
 import { AUTH_LINKS } from "@/lib/auth-links";
+
+type LoginStep = "credentials" | "otp";
+
+type SignInLike = NonNullable<ReturnType<typeof useSignIn>["signIn"]>;
+
+function getEmailOtpFactor(resource: SignInLike) {
+  const factor = (resource.supportedSecondFactors || []).find(
+    (f: { strategy: string }) => f.strategy === "email_code",
+  ) as
+    | {
+        strategy: "email_code";
+        emailAddressId: string;
+        safeIdentifier: string;
+      }
+    | undefined;
+
+  if (!factor) return null;
+  return {
+    emailAddressId: factor.emailAddressId,
+    safeIdentifier: factor.safeIdentifier,
+  };
+}
 
 function LoginForm() {
   const router = useRouter();
@@ -21,6 +49,11 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
+  const [step, setStep] = useState<LoginStep>("credentials");
+  const [otp, setOtp] = useState("");
+  const [seconds, setSeconds] = useState(0);
+  const [otpEmail, setOtpEmail] = useState("");
+  const [emailAddressId, setEmailAddressId] = useState("");
 
   const canSubmit =
     isLoaded &&
@@ -42,6 +75,59 @@ function LoginForm() {
     return null;
   }, [searchParams]);
 
+  useEffect(() => {
+    if (seconds <= 0) return;
+    const t = window.setTimeout(() => setSeconds((s) => s - 1), 1000);
+    return () => window.clearTimeout(t);
+  }, [seconds]);
+
+  function redirectAfterLogin() {
+    const redirectUrl = searchParams.get("redirect_url");
+    const safeRedirect =
+      redirectUrl &&
+      redirectUrl.startsWith("/") &&
+      !redirectUrl.startsWith("//")
+        ? redirectUrl
+        : "/dashboard";
+    router.replace(safeRedirect);
+  }
+
+  async function finishSignIn(sessionId: string | null | undefined) {
+    if (!sessionId || !setActive) {
+      throw new Error("No session was created after verification.");
+    }
+    await setActive({ session: sessionId });
+    const sync = await syncSessionToDatabase();
+    if (!sync.ok) {
+      setError(sync.error ?? "Signed in, but account sync failed.");
+      if (sync.code === "account_disabled") {
+        router.replace("/login?error=account_disabled");
+      }
+      return;
+    }
+    redirectAfterLogin();
+  }
+
+  async function sendEmailOtp(resource: SignInLike) {
+    const emailFactor = getEmailOtpFactor(resource);
+    if (!emailFactor) {
+      throw new Error(
+        "Email OTP is not available for this sign-in. Enable email verification in Clerk.",
+      );
+    }
+
+    await resource.prepareSecondFactor({
+      strategy: "email_code",
+      emailAddressId: emailFactor.emailAddressId,
+    });
+
+    setEmailAddressId(emailFactor.emailAddressId);
+    setOtpEmail(emailFactor.safeIdentifier || identifier.trim());
+    setOtp("");
+    setSeconds(54);
+    setStep("otp");
+  }
+
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!canSubmit || !signIn || !setActive) return;
@@ -56,41 +142,29 @@ function LoginForm() {
       });
 
       if (result.status === "complete") {
-        await setActive({ session: result.createdSessionId });
-        const sync = await syncSessionToDatabase();
-        if (!sync.ok) {
-          setError(sync.error ?? "Signed in, but account sync failed.");
-          if (sync.code === "account_disabled") {
-            router.replace("/login?error=account_disabled");
-          }
-          return;
-        }
-        const redirectUrl = searchParams.get("redirect_url");
-        const safeRedirect =
-          redirectUrl &&
-          redirectUrl.startsWith("/") &&
-          !redirectUrl.startsWith("//")
-            ? redirectUrl
-            : "/dashboard";
-        router.replace(safeRedirect);
+        await finishSignIn(result.createdSessionId);
         return;
       }
 
-      // OAuth/transfer or incomplete sign-in that became a sign-up
+      // After password, Clerk may require email OTP (client trust / verification)
       if (
-        result.status === "needs_new_password" ||
-        result.status === "needs_first_factor" ||
-        result.status === "needs_second_factor"
+        result.status === "needs_second_factor" ||
+        (result.status as string) === "needs_client_trust"
       ) {
-        setError(
-          result.status === "needs_second_factor"
-            ? "Additional verification is required. Check your email or authenticator app."
-            : "Additional steps are required to finish signing in.",
-        );
+        await sendEmailOtp(result);
         return;
       }
 
-      // Missing profile fields after identifier auth — continue page
+      if (result.status === "needs_new_password") {
+        setError("You need to set a new password before signing in.");
+        return;
+      }
+
+      if (result.status === "needs_first_factor") {
+        setError("Additional steps are required to finish signing in.");
+        return;
+      }
+
       router.push("/continue");
     } catch (err) {
       const message = clerkErrorMessage(
@@ -105,6 +179,130 @@ function LoginForm() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function onVerifyOtp(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!isLoaded || !signIn || !setActive) return;
+
+    const code = otp.replace(/\D/g, "");
+    if (code.length < 6) {
+      setError("Enter the 6-digit code from your email.");
+      return;
+    }
+
+    setError(null);
+    setLoading(true);
+
+    try {
+      const result = await signIn.attemptSecondFactor({
+        strategy: "email_code",
+        code,
+      });
+
+      if (result.status === "complete") {
+        await finishSignIn(result.createdSessionId);
+        return;
+      }
+
+      setError("Verification incomplete. Request a new code and try again.");
+    } catch (err) {
+      setError(clerkErrorMessage(err, "Invalid or expired code. Try resend."));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function resend() {
+    if (!isLoaded || !signIn || !emailAddressId) return;
+    setError(null);
+    try {
+      await signIn.prepareSecondFactor({
+        strategy: "email_code",
+        emailAddressId,
+      });
+      setSeconds(54);
+      setOtp("");
+    } catch (err) {
+      setError(clerkErrorMessage(err, "Could not resend the code."));
+    }
+  }
+
+  if (step === "otp") {
+    return (
+      <AuthSplitLayout
+        title="Verify it’s you"
+        subtitle={`We’ve sent a 6-digit code to ${otpEmail || "your email"}.`}
+        panelTitle="One more step to your wallet."
+        panelSubtitle="Confirm the code from your email to finish signing in."
+        top={
+          <button
+            type="button"
+            onClick={() => {
+              setStep("credentials");
+              setError(null);
+              setOtp("");
+              setEmailAddressId("");
+            }}
+            className="inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ArrowLeft className="h-4 w-4" strokeWidth={1.75} />
+            Back to Sign In
+          </button>
+        }
+      >
+        <form onSubmit={onVerifyOtp} className="flex flex-col">
+          <InputOTP
+            maxLength={6}
+            value={otp}
+            onChange={setOtp}
+            containerClassName="justify-between gap-2"
+          >
+            <InputOTPGroup className="w-full justify-between gap-2">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <InputOTPSlot
+                  key={i}
+                  index={i}
+                  className="h-12 w-11 rounded-[12px] border border-border text-base sm:h-14 sm:w-12"
+                />
+              ))}
+            </InputOTPGroup>
+          </InputOTP>
+
+          <p className="mt-5 text-center text-sm text-muted-foreground">
+            Didn&apos;t get a code?{" "}
+            {seconds > 0 ? (
+              <span className="font-semibold text-foreground">
+                Resend in {seconds}s
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => void resend()}
+                className="font-semibold text-primary"
+              >
+                Resend
+              </button>
+            )}
+          </p>
+
+          {error ? (
+            <p className="mt-4 text-sm text-destructive">{error}</p>
+          ) : null}
+
+          <motion.button
+            type="submit"
+            disabled={!isLoaded || loading || otp.length < 6}
+            whileHover={otp.length >= 6 ? { y: -2 } : undefined}
+            whileTap={otp.length >= 6 ? { scale: 0.985 } : undefined}
+            className="btn-primary mt-8 h-12 w-full text-base disabled:opacity-50"
+          >
+            {loading ? "Verifying…" : "Verify & Sign In"}
+          </motion.button>
+          <div id="clerk-captcha" className="mt-4" />
+        </form>
+      </AuthSplitLayout>
+    );
   }
 
   return (
