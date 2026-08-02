@@ -180,7 +180,7 @@ export default function AdminLoginPage() {
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
                 {me?.canBootstrap
-                  ? "Your email is on the admin allowlist. Enter the passcode to create your admin access."
+                  ? "Your email is on the admin allowlist. Enter the passcode to activate all env-listed admins."
                   : "Enter the admin passcode to unlock the console."}
               </p>
               {email ? (

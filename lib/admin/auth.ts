@@ -1,6 +1,6 @@
 import { createHash, randomBytes, timingSafeEqual } from "crypto";
 import { cookies, headers } from "next/headers";
-import { and, count, eq, isNull, gt } from "drizzle-orm";
+import { and, eq, isNull, gt } from "drizzle-orm";
 import { currentUser } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { adminAuditLogs, admins, adminSessions } from "@/lib/db/schema";
@@ -26,21 +26,35 @@ function adminPasscode() {
   return (process.env.ADMIN_PASSCODE || "").trim();
 }
 
-/** Comma / semicolon / newline separated emails from env. */
-export function bootstrapEmails(): string[] {
-  const raw = [
-    process.env.ADMIN_BOOTSTRAP_EMAIL || "",
-    process.env.ADMIN_BOOTSTRAP_EMAILS || "",
-  ].join(",");
-
-  const seen = new Set<string>();
-  const list: string[] = [];
-  for (const part of raw.split(/[,;\n]+/)) {
+function pushEmails(raw: string, into: string[], seen: Set<string>) {
+  for (const part of raw.split(/[,;\n|]+/)) {
     const email = part.trim().toLowerCase();
     if (!email || !email.includes("@") || seen.has(email)) continue;
     seen.add(email);
-    list.push(email);
+    into.push(email);
   }
+}
+
+/**
+ * All admin emails from env — unlimited count.
+ * Reads (in order):
+ * - ADMIN_BOOTSTRAP_EMAILS / ADMIN_EMAILS / ADMIN_BOOTSTRAP_EMAIL (comma-separated)
+ * - ADMIN_EMAIL_1, ADMIN_EMAIL_2, … ADMIN_EMAIL_100
+ */
+export function bootstrapEmails(): string[] {
+  const seen = new Set<string>();
+  const list: string[] = [];
+
+  pushEmails(process.env.ADMIN_BOOTSTRAP_EMAILS || "", list, seen);
+  pushEmails(process.env.ADMIN_EMAILS || "", list, seen);
+  pushEmails(process.env.ADMIN_BOOTSTRAP_EMAIL || "", list, seen);
+
+  for (let i = 1; i <= 100; i++) {
+    const key = `ADMIN_EMAIL_${i}`;
+    const value = process.env[key];
+    if (value) pushEmails(value, list, seen);
+  }
+
   return list;
 }
 
@@ -110,9 +124,9 @@ export async function findAdminByEmail(email: string) {
 }
 
 /**
- * Create an admin row for a bootstrap-listed email (if not already present).
- * Supports multiple emails in ADMIN_BOOTSTRAP_EMAIL / ADMIN_BOOTSTRAP_EMAILS.
- * First bootstrap admin becomes super_admin; later ones become admin.
+ * Upsert every env-listed admin email into `admins`.
+ * First email in the env list → super_admin; the rest → admin.
+ * Returns the row for the signing-in email.
  */
 export async function ensureBootstrapAdmin(input: {
   email: string;
@@ -121,24 +135,75 @@ export async function ensureBootstrapAdmin(input: {
   const email = input.email.trim().toLowerCase();
   if (!isBootstrapEmail(email)) return null;
 
-  const existing = await findAdminByEmail(email);
-  if (existing) return existing.active ? existing : null;
+  const allowlist = bootstrapEmails();
+  if (!allowlist.length) return null;
 
-  const [{ value: total }] = await db.select({ value: count() }).from(admins);
-  const role = Number(total) === 0 ? "super_admin" : "admin";
+  const existingRows = await db.select().from(admins);
+  const byEmail = new Map(
+    existingRows.map((row) => [row.email.toLowerCase(), row]),
+  );
 
-  const [created] = await db
-    .insert(admins)
-    .values({
-      name: input.name.slice(0, 160),
-      email,
-      role,
-      active: true,
-      lastLoginAt: new Date(),
-    })
-    .returning();
+  for (let i = 0; i < allowlist.length; i++) {
+    const adminEmail = allowlist[i];
+    const role = i === 0 ? "super_admin" : "admin";
+    const current = byEmail.get(adminEmail);
 
-  return created ?? null;
+    if (current) {
+      // Keep existing role unless still defaulting first env email to super_admin
+      if (
+        i === 0 &&
+        current.role !== "super_admin" &&
+        current.active &&
+        !existingRows.some(
+          (r) => r.role === "super_admin" && r.email.toLowerCase() !== adminEmail,
+        )
+      ) {
+        const [updated] = await db
+          .update(admins)
+          .set({ role: "super_admin", updatedAt: new Date() })
+          .where(eq(admins.id, current.id))
+          .returning();
+        if (updated) byEmail.set(adminEmail, updated);
+      }
+      continue;
+    }
+
+    const displayName =
+      adminEmail === email
+        ? input.name.slice(0, 160)
+        : adminEmail.split("@")[0]?.slice(0, 160) || adminEmail;
+
+    const [created] = await db
+      .insert(admins)
+      .values({
+        name: displayName,
+        email: adminEmail,
+        role,
+        active: true,
+        lastLoginAt: adminEmail === email ? new Date() : null,
+      })
+      .returning();
+
+    if (created) byEmail.set(adminEmail, created);
+  }
+
+  const self = byEmail.get(email);
+  if (!self || !self.active) return null;
+
+  if (self.email.toLowerCase() === email) {
+    const [touched] = await db
+      .update(admins)
+      .set({
+        name: input.name.slice(0, 160) || self.name,
+        lastLoginAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(admins.id, self.id))
+      .returning();
+    return touched ?? self;
+  }
+
+  return self;
 }
 
 export async function resolveAdminForClerk(): Promise<{
