@@ -78,59 +78,61 @@ export default function AdminOverviewPage() {
               {data.giftCardOrders.length === 0 ? (
                 <AdminEmptyBlock message="No gift card orders yet." />
               ) : (
-                <div className="space-y-3 md:hidden">
-                  {data.giftCardOrders.map((order) => (
-                    <div
-                      key={order.id}
-                      className="rounded-[14px] border border-border bg-muted/25 p-3"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-foreground">
-                            {order.id}
-                          </p>
-                          <p className="truncate text-xs text-muted-foreground">
-                            {order.user}
-                          </p>
+                <>
+                  <div className="space-y-3 md:hidden">
+                    {data.giftCardOrders.map((order) => (
+                      <div
+                        key={order.id}
+                        className="rounded-[14px] border border-border bg-muted/25 p-3"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-foreground">
+                              {order.id}
+                            </p>
+                            <p className="truncate text-xs text-muted-foreground">
+                              {order.user}
+                            </p>
+                          </div>
+                          <StatusBadge status={order.status} />
                         </div>
-                        <StatusBadge status={order.status} />
+                        <p className="mt-2 text-xs text-foreground">
+                          {order.brand} · {order.type}
+                        </p>
                       </div>
-                      <p className="mt-2 text-xs text-foreground">
-                        {order.brand} · {order.type}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-                <div className="hidden overflow-x-auto md:block">
-                  <table className="w-full min-w-[520px] text-left text-sm">
-                    <thead>
-                      <tr className="border-b border-border text-xs text-muted-foreground">
-                        <th className="pb-3 font-semibold">Order</th>
-                        <th className="pb-3 font-semibold">User</th>
-                        <th className="pb-3 font-semibold">Brand</th>
-                        <th className="pb-3 font-semibold">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {data.giftCardOrders.map((order) => (
-                        <tr key={order.id}>
-                          <td className="py-3 font-semibold text-foreground">
-                            {order.id}
-                          </td>
-                          <td className="py-3 text-muted-foreground">
-                            {order.user}
-                          </td>
-                          <td className="py-3 text-foreground">
-                            {order.brand} · {order.type}
-                          </td>
-                          <td className="py-3">
-                            <StatusBadge status={order.status} />
-                          </td>
+                    ))}
+                  </div>
+                  <div className="hidden overflow-x-auto md:block">
+                    <table className="w-full min-w-[520px] text-left text-sm">
+                      <thead>
+                        <tr className="border-b border-border text-xs text-muted-foreground">
+                          <th className="pb-3 font-semibold">Order</th>
+                          <th className="pb-3 font-semibold">User</th>
+                          <th className="pb-3 font-semibold">Brand</th>
+                          <th className="pb-3 font-semibold">Status</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {data.giftCardOrders.map((order) => (
+                          <tr key={order.id}>
+                            <td className="py-3 font-semibold text-foreground">
+                              {order.id}
+                            </td>
+                            <td className="py-3 text-muted-foreground">
+                              {order.user}
+                            </td>
+                            <td className="py-3 text-foreground">
+                              {order.brand} · {order.type}
+                            </td>
+                            <td className="py-3">
+                              <StatusBadge status={order.status} />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
             </AdminCard>
 
