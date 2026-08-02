@@ -5,6 +5,7 @@ import {
 } from "@clerk/nextjs/server";
 import { ADMIN_SESSION_COOKIE } from "@/lib/admin/cookie";
 import { applyCorsHeaders } from "@/lib/external/cors";
+import { resolveExternalToInternal } from "@/lib/external/paths";
 
 const isPublicRoute = createRouteMatcher([
   "/",
@@ -56,15 +57,43 @@ export default clerkMiddleware(async (auth, request) => {
     return NextResponse.next();
   }
 
-  // External mobile API — CORS preflight + pass through (auth in handlers)
+  // External mobile API — CORS + rewrite to first-party /api/* (keeps Bearer auth)
   if (isExternalApi(request)) {
     if (request.method === "OPTIONS") {
       const res = new NextResponse(null, { status: 204 });
       applyCorsHeaders(res.headers, request);
       return res;
     }
-    const res = NextResponse.next();
+
+    // Catalog/health stays on its own route handler
+    if (pathname === "/api/external/v1" || pathname === "/api/external/v1/") {
+      const res = NextResponse.next();
+      applyCorsHeaders(res.headers, request);
+      return res;
+    }
+
+    const remainder = pathname.replace(/^\/api\/external\/v1/, "") || "/";
+    const resolved = resolveExternalToInternal(remainder);
+
+    if (!resolved.ok) {
+      const res = NextResponse.json(
+        { error: resolved.error },
+        { status: resolved.status },
+      );
+      applyCorsHeaders(res.headers, request);
+      return res;
+    }
+
+    const url = request.nextUrl.clone();
+    url.pathname = `/api${resolved.internalPath}`;
+    console.log(
+      `[external-api] rewrite ${pathname} → ${url.pathname}${url.search}`,
+    );
+
+    const res = NextResponse.rewrite(url);
     applyCorsHeaders(res.headers, request);
+    res.headers.set("X-Oryno-Api-Version", "1");
+    res.headers.set("X-Oryno-Internal-Path", resolved.internalPath);
     return res;
   }
 
