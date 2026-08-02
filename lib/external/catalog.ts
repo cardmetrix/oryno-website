@@ -1,0 +1,63 @@
+import { EXTERNAL_PATH_ALIASES } from "@/lib/external/paths";
+
+export const EXTERNAL_API_VERSION = "1";
+
+export const EXTERNAL_API_CATALOG = {
+  version: EXTERNAL_API_VERSION,
+  name: "ORYNO External API",
+  basePath: "/api/external/v1",
+  auth: {
+    type: "bearer",
+    scheme: "Clerk session JWT",
+    header: "Authorization: Bearer <token>",
+  },
+  notes: [
+    "Mobile and third-party clients should use this surface.",
+    "Provider secrets never leave the ORYNO server.",
+    "Friendly /services/* aliases are remapped to provider routes.",
+    "Legacy provider paths (/vtpass, /jap, /herosms, /reloadly, /sogo) remain available.",
+  ],
+  endpoints: {
+    auth: ["POST /auth/sync", "POST /auth/logout"],
+    wallet: [
+      "GET /wallet",
+      "POST /wallet/fund",
+      "POST /wallet/fund/simulate",
+      "GET|POST /wallet/deposit-account",
+      "POST /wallet/withdraw",
+      "GET|POST|PATCH|DELETE /wallet/banks",
+      "POST /wallet/banks/resolve",
+      "GET /wallet/fx",
+      "POST /wallet/convert",
+      "POST /wallet/usd/fund",
+      "POST /wallet/usd/verify",
+    ],
+    history: ["GET /transactions", "GET /transactions/:id"],
+    notifications: ["GET|PATCH|DELETE /notifications"],
+    profile: ["GET|PATCH /profile", "GET|PATCH /me/country", "GET|PATCH /settings", "GET|POST /settings/kyc"],
+    support: ["POST /support/error-report"],
+    services: [
+      "GET /services",
+      "POST /services/airtime/purchase",
+      "POST /services/data/purchase",
+      "POST /services/bills/verify",
+      "POST /services/bills/purchase",
+      "GET /services/social?platform=",
+      "POST /services/social/purchase",
+      "GET /services/gift-cards/countries",
+      "GET /services/gift-cards/products",
+      "POST /services/gift-cards/buy",
+      "GET /services/gift-cards/sell/catalog",
+      "GET /services/gift-cards/sell/rates",
+      "POST /services/gift-cards/sell",
+      "GET /services/numbers/countries",
+      "GET /services/numbers/services",
+      "GET /services/numbers/prices",
+      "POST /services/numbers/purchase",
+      "GET /services/emails/domains",
+      "POST /services/emails/purchase",
+    ],
+    public: ["GET /geo/country", "POST /geo/country"],
+  },
+  aliases: EXTERNAL_PATH_ALIASES,
+} as const;

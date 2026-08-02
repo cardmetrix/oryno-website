@@ -4,6 +4,7 @@ import {
   createRouteMatcher,
 } from "@clerk/nextjs/server";
 import { ADMIN_SESSION_COOKIE } from "@/lib/admin/cookie";
+import { applyCorsHeaders } from "@/lib/external/cors";
 
 const isPublicRoute = createRouteMatcher([
   "/",
@@ -16,7 +17,11 @@ const isPublicRoute = createRouteMatcher([
   "/sso-callback(.*)",
   "/api/webhooks(.*)",
   "/api/geo(.*)",
+  // Mobile / external clients authenticate inside route handlers via Bearer JWT
+  "/api/external(.*)",
 ]);
+
+const isExternalApi = createRouteMatcher(["/api/external(.*)"]);
 
 // Don't auto-bounce /register or /otp — users may finish email OTP
 // after a session cookie appears mid-flow.
@@ -49,6 +54,18 @@ export default clerkMiddleware(async (auth, request) => {
 
   if (pathname.startsWith("/api/uploadthing")) {
     return NextResponse.next();
+  }
+
+  // External mobile API — CORS preflight + pass through (auth in handlers)
+  if (isExternalApi(request)) {
+    if (request.method === "OPTIONS") {
+      const res = new NextResponse(null, { status: 204 });
+      applyCorsHeaders(res.headers, request);
+      return res;
+    }
+    const res = NextResponse.next();
+    applyCorsHeaders(res.headers, request);
+    return res;
   }
 
   // Admin APIs authenticate themselves (Clerk + session)
