@@ -97,7 +97,7 @@ function LoginForm() {
       throw new Error("No session was created after verification.");
     }
     await setActive({ session: sessionId });
-    const sync = await syncSessionToDatabase();
+    const sync = await syncSessionToDatabase({ announceLogin: true });
     if (!sync.ok) {
       setError(sync.error ?? "Signed in, but account sync failed.");
       if (sync.code === "account_disabled") {

@@ -1,7 +1,27 @@
 import { detectUserCountry } from "@/lib/geo/client-detect";
 import { getCountryInfo } from "@/lib/country";
 
-export async function syncSessionToDatabase(): Promise<{
+const LOGIN_ANNOUNCED_KEY = "oryno_login_announced";
+
+export function markLoginAnnounced() {
+  if (typeof window === "undefined") return;
+  sessionStorage.setItem(LOGIN_ANNOUNCED_KEY, "1");
+}
+
+export function clearLoginAnnounced() {
+  if (typeof window === "undefined") return;
+  sessionStorage.removeItem(LOGIN_ANNOUNCED_KEY);
+}
+
+export function wasLoginAnnounced() {
+  if (typeof window === "undefined") return false;
+  return sessionStorage.getItem(LOGIN_ANNOUNCED_KEY) === "1";
+}
+
+export async function syncSessionToDatabase(options?: {
+  /** Fire login notification + email (login / first session after OAuth). */
+  announceLogin?: boolean;
+}): Promise<{
   ok: boolean;
   error?: string;
   code?: string;
@@ -20,12 +40,15 @@ export async function syncSessionToDatabase(): Promise<{
     // server will fall back to Google IP geolocation
   }
 
+  const announceLogin = options?.announceLogin === true;
+
   const res = await fetch("/api/auth/sync", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       countryCode,
       forceCountry: Boolean(countryCode),
+      announceLogin,
     }),
   });
 
@@ -57,6 +80,10 @@ export async function syncSessionToDatabase(): Promise<{
         updatedAt: Date.now(),
       }),
     );
+  }
+
+  if (announceLogin) {
+    markLoginAnnounced();
   }
 
   return {

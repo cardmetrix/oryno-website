@@ -32,10 +32,13 @@ export function Screenshots({ shots }: ScreenshotsProps) {
           <motion.h2 variants={fadeUp} className="section-title">
             Clean screens. Confident actions.
           </motion.h2>
-        
+          <motion.p variants={fadeUp} className="section-copy mx-auto mt-3">
+            Real product screens — wallet, gift cards, data, bills, numbers, and
+            more.
+          </motion.p>
         </motion.div>
 
-        <div className="mt-14 grid grid-cols-2 gap-6 md:grid-cols-4 md:gap-8">
+        <div className="mt-14 grid grid-cols-2 gap-6 sm:gap-8 md:grid-cols-3 lg:grid-cols-4">
           {shots.map((shot, index) => (
             <motion.div
               key={shot.file}
@@ -44,7 +47,7 @@ export function Screenshots({ shots }: ScreenshotsProps) {
               viewport={{ once: true, margin: "-40px" }}
               transition={{
                 duration: 0.5,
-                delay: index * 0.08,
+                delay: Math.min(index * 0.06, 0.36),
                 ease: [0.22, 1, 0.36, 1],
               }}
               whileHover={{ y: -10, rotate: index % 2 === 0 ? -1.5 : 1.5 }}
@@ -56,6 +59,7 @@ export function Screenshots({ shots }: ScreenshotsProps) {
                 src={shot.src}
                 fileName={shot.file}
                 className="w-full max-w-[220px]"
+                priority={index < 2}
               />
               <p className="mt-4 text-sm font-medium text-foreground">
                 {shot.label}

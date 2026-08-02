@@ -7,6 +7,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { LogOut, X } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
 import { isNavActive, primaryNav, serviceNav } from "@/lib/app-nav";
+import { announceLogout } from "@/lib/auth/client-logout";
 import { AUTH_LINKS } from "@/lib/auth-links";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -20,6 +21,7 @@ export function Sidebar() {
 
   async function handleLogout() {
     close();
+    await announceLogout();
     await signOut({ redirectUrl: AUTH_LINKS.signIn });
     router.push(AUTH_LINKS.signIn);
   }

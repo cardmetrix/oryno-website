@@ -8,6 +8,7 @@ import {
   resolveAdminForClerk,
   ADMIN_SESSION_COOKIE,
 } from "@/lib/admin/auth";
+import { notifyAdminLogin } from "@/lib/notify/auth-events";
 
 export const runtime = "nodejs";
 
@@ -77,6 +78,13 @@ export async function POST(req: Request) {
     }
 
     const session = await createAdminSession(admin);
+
+    try {
+      await notifyAdminLogin(admin);
+    } catch (notifyError) {
+      console.error("[admin-login-notify]", notifyError);
+    }
+
     const res = NextResponse.json({
       ok: true,
       admin: {

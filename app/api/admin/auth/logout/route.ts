@@ -5,6 +5,7 @@ import {
   revokeAdminSession,
   writeAdminAudit,
 } from "@/lib/admin-auth";
+import { notifyAdminLogout } from "@/lib/notify/auth-events";
 
 export const runtime = "nodejs";
 
@@ -18,6 +19,11 @@ export async function POST() {
         entityType: "admin",
         entityId: session.admin.id,
       });
+      try {
+        await notifyAdminLogout(session.admin);
+      } catch (notifyError) {
+        console.error("[admin-logout-notify]", notifyError);
+      }
     }
     await revokeAdminSession();
 

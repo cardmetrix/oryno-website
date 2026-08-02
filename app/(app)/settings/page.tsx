@@ -27,6 +27,7 @@ import { SettingsSkeleton } from "@/components/app/settings-skeleton";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Switch } from "@/components/ui/switch";
 import { useCountry } from "@/components/providers/country-provider";
+import { announceLogout } from "@/lib/auth/client-logout";
 import { AUTH_LINKS } from "@/lib/auth-links";
 import {
   languageLabel as resolveLanguageLabel,
@@ -286,7 +287,12 @@ export default function SettingsPage() {
         <motion.button
           type="button"
           whileTap={{ scale: 0.985 }}
-          onClick={() => void signOut({ redirectUrl: AUTH_LINKS.signIn })}
+          onClick={() =>
+            void (async () => {
+              await announceLogout();
+              await signOut({ redirectUrl: AUTH_LINKS.signIn });
+            })()
+          }
           className="flex h-12 w-full items-center justify-center gap-2 rounded-[18px] border border-destructive/25 bg-destructive/8 text-sm font-bold text-destructive"
         >
           <LogOut className="h-4 w-4" />

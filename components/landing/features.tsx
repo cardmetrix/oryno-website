@@ -7,6 +7,7 @@ import {
   Tv,
   Phone,
   Megaphone,
+  Mail,
   ShieldCheck,
 } from "lucide-react";
 import { motion } from "framer-motion";
@@ -17,8 +18,13 @@ const features: {
   icon: typeof Smartphone | typeof GiftCardIcon;
   title: string;
   description: string;
-  soon?: boolean;
 }[] = [
+  {
+    icon: GiftCardIcon,
+    title: "Gift Cards",
+    description:
+      "Sell and buy gift cards with live rates — credit lands in your wallet.",
+  },
   {
     icon: Smartphone,
     title: "Airtime",
@@ -49,16 +55,16 @@ const features: {
       "Purchase numbers by country for SMS verification and rentals.",
   },
   {
+    icon: Mail,
+    title: "Rent Email",
+    description:
+      "Temporary inboxes for OTP and sign-ups — rent a domain and receive codes.",
+  },
+  {
     icon: Megaphone,
     title: "Social Boosting",
     description:
       "Grow your presence with simple, built-in social media boosting tools.",
-  },
-  {
-    icon: GiftCardIcon,
-    title: "Gift Cards",
-    description: "Sell gift cards for live Naira rates credited to your wallet.",
-    soon: true,
   },
   {
     icon: ShieldCheck,
@@ -111,14 +117,9 @@ export function Features() {
                 <div className="icon-tile mb-4 transition-transform duration-300 group-hover:scale-110 group-hover:bg-oryno-orange-muted">
                   <Icon className="h-5 w-5" strokeWidth={1.75} />
                 </div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-base font-semibold text-foreground">
-                    {feature.title}
-                  </h3>
-                  {feature.soon ? (
-                    <span className="badge-soon">Soon</span>
-                  ) : null}
-                </div>
+                <h3 className="text-base font-semibold text-foreground">
+                  {feature.title}
+                </h3>
                 <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                   {feature.description}
                 </p>

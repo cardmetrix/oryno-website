@@ -1,6 +1,7 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { notifications } from "@/lib/db/schema";
+import { deliverNotificationEmail } from "@/lib/email/notify-email";
 import type {
   AppNotificationDto,
   NotificationType,
@@ -13,6 +14,10 @@ export type CreateNotificationInput = {
   type?: NotificationType | string;
   metadata?: Record<string, unknown>;
   unread?: boolean;
+  /** Send branded email (default true). */
+  email?: boolean;
+  /** Ignore email preference toggle (login/security). */
+  forceEmail?: boolean;
 };
 
 function formatRelativeTime(date: Date) {
@@ -62,8 +67,27 @@ export async function createNotification(input: CreateNotificationInput) {
       metadata: input.metadata ?? null,
     })
     .returning();
+
+  if (input.email !== false && row) {
+    const href =
+      typeof input.metadata?.href === "string" ? input.metadata.href : null;
+    void deliverNotificationEmail({
+      userId: input.userId,
+      title: input.title,
+      body: input.body,
+      type: input.type,
+      href,
+      force: input.forceEmail === true,
+    }).catch((error) => {
+      console.error("[notify-email]", error);
+    });
+  }
+
   return row;
 }
+
+/** Alias used for clarity at call sites that intentionally notify + email. */
+export const notifyUser = createNotification;
 
 export async function listUserNotifications(userId: string, limit = 50) {
   return db.query.notifications.findMany({

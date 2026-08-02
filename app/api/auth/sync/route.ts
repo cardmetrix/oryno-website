@@ -3,6 +3,7 @@ import { clerkClient, currentUser } from "@clerk/nextjs/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
 import { getCountryInfo, resolveCountryCode } from "@/lib/country";
 import { detectCountryWithGoogle } from "@/lib/geo/google-country";
+import { notifyUserLogin } from "@/lib/notify/auth-events";
 import { currencyForCountry, ensurePrimaryWallet } from "@/lib/wallet";
 
 export const runtime = "nodejs";
@@ -15,6 +16,7 @@ export async function POST(req: Request) {
       lat?: number;
       lng?: number;
       forceCountry?: boolean;
+      announceLogin?: boolean;
     };
 
     // Geo must never take down sync — fall back to NG if Google fails
@@ -83,6 +85,14 @@ export async function POST(req: Request) {
       }
     } catch (metaError) {
       console.error("[auth-sync-metadata]", metaError);
+    }
+
+    if (body.announceLogin === true) {
+      try {
+        await notifyUserLogin(user);
+      } catch (loginNotifyError) {
+        console.error("[auth-sync-login-notify]", loginNotifyError);
+      }
     }
 
     return NextResponse.json({

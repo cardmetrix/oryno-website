@@ -4,7 +4,10 @@ import { useEffect, useRef } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { syncSessionToDatabase } from "@/lib/auth/client-sync";
+import {
+  syncSessionToDatabase,
+  wasLoginAnnounced,
+} from "@/lib/auth/client-sync";
 import { getCountryInfo } from "@/lib/country";
 
 const TOAST_KEY = "oryno_country_toast";
@@ -20,7 +23,10 @@ export function AuthSessionSync() {
     ran.current = true;
 
     void (async () => {
-      const result = await syncSessionToDatabase();
+      // Announce login once per browser session (covers OAuth when login page didn't).
+      const result = await syncSessionToDatabase({
+        announceLogin: !wasLoginAnnounced(),
+      });
       if (!result.ok && result.code === "account_disabled") {
         router.replace("/login?error=account_disabled");
         return;

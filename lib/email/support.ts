@@ -1,19 +1,11 @@
-import { Resend } from "resend";
+import { getResend, mailFrom, supportInbox } from "@/lib/email/client";
+import {
+  escapeHtml,
+  paragraphsToHtml,
+  renderBrandedEmail,
+} from "@/lib/email/template";
 
-export function supportInbox() {
-  return (
-    process.env.RESEND_SUPPORT_EMAIL?.trim() ||
-    process.env.RESEND_FROM_EMAIL?.match(/<([^>]+)>/)?.[1] ||
-    "support@oryno.com"
-  );
-}
-
-export function supportFrom() {
-  return (
-    process.env.RESEND_FROM_EMAIL?.trim() ||
-    "ORYNO <support@oryno.com>"
-  );
-}
+export { supportInbox, mailFrom as supportFrom } from "@/lib/email/client";
 
 export async function sendSupportErrorReport(input: {
   errorMessage: string;
@@ -25,12 +17,11 @@ export async function sendSupportErrorReport(input: {
   url?: string | null;
   userAgent?: string | null;
 }) {
-  const key = process.env.RESEND_API_KEY?.trim();
-  if (!key) {
+  const resend = getResend();
+  if (!resend) {
     throw new Error("Email is not configured");
   }
 
-  const resend = new Resend(key);
   const to = supportInbox();
   const subject = `[ORYNO Error] ${input.page || "App"} — ${input.errorMessage.slice(0, 80)}`;
 
@@ -48,14 +39,46 @@ export async function sendSupportErrorReport(input: {
       ? `\nUser note:\n${input.userNote.trim()}`
       : null,
     `\nSent at: ${new Date().toISOString()}`,
-  ].filter(Boolean);
+  ].filter(Boolean) as string[];
+
+  const detailRows = [
+    ["Error", input.errorMessage],
+    ["Page", input.page],
+    ["URL", input.url],
+    ["Name", input.userName],
+    ["Email", input.userEmail],
+    ["User ID", input.userId],
+    ["Device", input.userAgent],
+  ]
+    .filter(([, v]) => Boolean(v))
+    .map(
+      ([label, value]) =>
+        `<tr><td style="padding:6px 0;color:#8e8e93;width:100px;vertical-align:top;">${escapeHtml(String(label))}</td><td style="padding:6px 0;color:#1c1c1e;">${escapeHtml(String(value))}</td></tr>`,
+    )
+    .join("");
+
+  const html = renderBrandedEmail({
+    title: "App error report",
+    preheader: subject,
+    bodyHtml: `
+      <p style="margin:0 0 12px;">A user reported an error from the ORYNO app.</p>
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="font-size:14px;">${detailRows}</table>
+      ${
+        input.userNote?.trim()
+          ? `<p style="margin:16px 0 0;"><strong>User note</strong></p>${paragraphsToHtml(input.userNote.trim())}`
+          : ""
+      }
+    `,
+    footerNote: "Internal support notification from the ORYNO app.",
+  });
 
   const { error } = await resend.emails.send({
-    from: supportFrom(),
+    from: mailFrom(),
     to: [to],
     replyTo: input.userEmail || undefined,
     subject,
     text: lines.join("\n"),
+    html,
   });
 
   if (error) {

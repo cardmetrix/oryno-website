@@ -375,6 +375,7 @@ export async function syncClerkUserToDb(
         body: "Your wallet is ready. Fund it to pay for airtime, data, bills, and more.",
         type: "system",
         metadata: { href: "/fund", kind: "welcome" },
+        forceEmail: true,
       });
       await createNotification({
         userId: dbUser.id,
@@ -382,6 +383,7 @@ export async function syncClerkUserToDb(
         body: "A personal virtual card was issued for your wallet. Open Home to view your card number.",
         type: "success",
         metadata: { href: "/dashboard", kind: "card_issued" },
+        forceEmail: true,
       });
     } catch {
       // non-blocking

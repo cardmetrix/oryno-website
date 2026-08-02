@@ -32,7 +32,7 @@ export const adminNav: AdminNavItem[] = [
   { href: "/admin/providers", label: "Providers", icon: Wifi },
   { href: "/admin/bills", label: "Bill Providers", icon: Zap },
   { href: "/admin/referrals", label: "Referrals", icon: BarChart3 },
-  { href: "/admin/notifications", label: "Notifications", icon: Bell },
+  { href: "/admin/notifications", label: "Email & Alerts", icon: Bell },
   { href: "/admin/countries", label: "Countries", icon: Globe2 },
   { href: "/admin/gateways", label: "Gateways", icon: CreditCard },
   { href: "/admin/reports", label: "Reports", icon: LineChart },
