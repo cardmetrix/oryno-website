@@ -29,7 +29,6 @@ export function PhoneFrame({
       )}
     >
       <div className="phone-shell relative overflow-hidden">
-        <div className="phone-notch" />
         <div className="phone-screen">
           {src ? (
             // eslint-disable-next-line @next/next/no-img-element -- local public screenshots
