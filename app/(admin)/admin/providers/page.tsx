@@ -1,60 +1,71 @@
 "use client";
 
-import { motion } from "framer-motion";
 import { AdminCard } from "@/components/admin/admin-card";
+import {
+  AdminEmptyBlock,
+  AdminErrorBlock,
+  AdminLoadingBlock,
+} from "@/components/admin/admin-loading";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AdminTable } from "@/components/admin/admin-table";
 import { StatusBadge } from "@/components/admin/status-badge";
-import { serviceProviders } from "@/lib/admin-data";
+import { useAdminQuery } from "@/lib/admin/use-admin-query";
+
+type Provider = {
+  id: string;
+  name: string;
+  type: string;
+  country: string;
+  status: string;
+};
 
 export default function AdminProvidersPage() {
+  const { data, loading, error, reload } = useAdminQuery<{
+    providers: Provider[];
+  }>("/api/admin/providers");
+
   return (
     <>
       <AdminPageHeader
-        title="Airtime & Data Providers"
-        subtitle="Configured per country — not hardcoded in product logic"
-        actions={
-          <motion.button
-            type="button"
-            whileHover={{ y: -2 }}
-            whileTap={{ scale: 0.98 }}
-            className="btn-primary h-11 px-4 text-sm"
-          >
-            Add provider
-          </motion.button>
-        }
+        title="Providers"
+        subtitle="Live / sandbox / demo status for integrated services"
       />
 
       <AdminCard>
-        <AdminTable
-          rows={serviceProviders}
-          rowKey={(row) => row.id}
-          columns={[
-            {
-              key: "name",
-              header: "Provider",
-              cell: (row) => (
-                <span className="font-semibold text-foreground">{row.name}</span>
-              ),
-            },
-            { key: "type", header: "Type", cell: (row) => row.type },
-            { key: "country", header: "Country", cell: (row) => row.country },
-            {
-              key: "status",
-              header: "Status",
-              cell: (row) => <StatusBadge status={row.status} />,
-            },
-            {
-              key: "actions",
-              header: "",
-              cell: () => (
-                <button type="button" className="text-sm font-semibold text-primary">
-                  Configure
-                </button>
-              ),
-            },
-          ]}
-        />
+        {loading ? <AdminLoadingBlock /> : null}
+        {error ? <AdminErrorBlock message={error} onRetry={reload} /> : null}
+        {data ? (
+          data.providers.length === 0 ? (
+            <AdminEmptyBlock message="No providers configured." />
+          ) : (
+            <AdminTable
+              rows={data.providers}
+              rowKey={(row) => row.id}
+              columns={[
+                {
+                  key: "name",
+                  header: "Provider",
+                  cell: (row) => (
+                    <span className="font-semibold text-foreground">
+                      {row.name}
+                    </span>
+                  ),
+                },
+                { key: "type", header: "Services", cell: (row) => row.type },
+                {
+                  key: "country",
+                  header: "Scope",
+                  cell: (row) => row.country,
+                },
+                {
+                  key: "status",
+                  header: "Mode",
+                  cell: (row) => <StatusBadge status={row.status} />,
+                },
+              ]}
+            />
+          )
+        ) : null}
       </AdminCard>
     </>
   );

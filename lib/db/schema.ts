@@ -1183,6 +1183,13 @@ export const adminsRelations = relations(admins, ({ many }) => ({
   auditLogs: many(adminAuditLogs),
 }));
 
+export const adminSessionsRelations = relations(adminSessions, ({ one }) => ({
+  admin: one(admins, {
+    fields: [adminSessions.adminId],
+    references: [admins.id],
+  }),
+}));
+
 export const referralCodesRelations = relations(
   referralCodes,
   ({ one, many }) => ({

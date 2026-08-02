@@ -1,0 +1,336 @@
+import { createHash, randomBytes, timingSafeEqual } from "crypto";
+import { cookies, headers } from "next/headers";
+import { and, count, eq, isNull, gt } from "drizzle-orm";
+import { currentUser } from "@clerk/nextjs/server";
+import { db } from "@/lib/db";
+import { adminAuditLogs, admins, adminSessions } from "@/lib/db/schema";
+import { ADMIN_SESSION_COOKIE } from "@/lib/admin/cookie";
+
+export { ADMIN_SESSION_COOKIE };
+
+export type AdminRole =
+  | "super_admin"
+  | "admin"
+  | "support"
+  | "finance"
+  | "viewer";
+
+export type AdminRecord = typeof admins.$inferSelect;
+
+export type AdminSessionContext = {
+  admin: AdminRecord;
+  sessionId: string;
+};
+
+function adminPasscode() {
+  return (process.env.ADMIN_PASSCODE || "").trim();
+}
+
+/** Comma / semicolon / newline separated emails from env. */
+export function bootstrapEmails(): string[] {
+  const raw = [
+    process.env.ADMIN_BOOTSTRAP_EMAIL || "",
+    process.env.ADMIN_BOOTSTRAP_EMAILS || "",
+  ].join(",");
+
+  const seen = new Set<string>();
+  const list: string[] = [];
+  for (const part of raw.split(/[,;\n]+/)) {
+    const email = part.trim().toLowerCase();
+    if (!email || !email.includes("@") || seen.has(email)) continue;
+    seen.add(email);
+    list.push(email);
+  }
+  return list;
+}
+
+function isBootstrapEmail(email: string) {
+  return bootstrapEmails().includes(email.trim().toLowerCase());
+}
+
+function sessionHours() {
+  const n = Number(process.env.ADMIN_SESSION_HOURS || "12");
+  return Number.isFinite(n) && n > 0 ? n : 12;
+}
+
+export function hashToken(token: string) {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+function safeEqual(a: string, b: string) {
+  const left = Buffer.from(a);
+  const right = Buffer.from(b);
+  if (left.length !== right.length) return false;
+  return timingSafeEqual(left, right);
+}
+
+export function isValidAdminPasscode(code: string) {
+  const expected = adminPasscode();
+  if (!expected) return false;
+  return safeEqual(code.replace(/\s/g, ""), expected);
+}
+
+async function clerkEmail(): Promise<{
+  clerkId: string;
+  email: string;
+  name: string;
+} | null> {
+  let clerkUser;
+  try {
+    clerkUser = await currentUser();
+  } catch {
+    return null;
+  }
+  if (!clerkUser) return null;
+
+  const email =
+    clerkUser.primaryEmailAddress?.emailAddress ||
+    clerkUser.emailAddresses?.[0]?.emailAddress ||
+    "";
+  if (!email) return null;
+
+  const name =
+    [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") ||
+    clerkUser.username ||
+    email;
+
+  return {
+    clerkId: clerkUser.id,
+    email: email.trim().toLowerCase(),
+    name,
+  };
+}
+
+export async function findAdminByEmail(email: string) {
+  return (
+    (await db.query.admins.findFirst({
+      where: eq(admins.email, email.trim().toLowerCase()),
+    })) ?? null
+  );
+}
+
+/**
+ * Create an admin row for a bootstrap-listed email (if not already present).
+ * Supports multiple emails in ADMIN_BOOTSTRAP_EMAIL / ADMIN_BOOTSTRAP_EMAILS.
+ * First bootstrap admin becomes super_admin; later ones become admin.
+ */
+export async function ensureBootstrapAdmin(input: {
+  email: string;
+  name: string;
+}): Promise<AdminRecord | null> {
+  const email = input.email.trim().toLowerCase();
+  if (!isBootstrapEmail(email)) return null;
+
+  const existing = await findAdminByEmail(email);
+  if (existing) return existing.active ? existing : null;
+
+  const [{ value: total }] = await db.select({ value: count() }).from(admins);
+  const role = Number(total) === 0 ? "super_admin" : "admin";
+
+  const [created] = await db
+    .insert(admins)
+    .values({
+      name: input.name.slice(0, 160),
+      email,
+      role,
+      active: true,
+      lastLoginAt: new Date(),
+    })
+    .returning();
+
+  return created ?? null;
+}
+
+export async function resolveAdminForClerk(): Promise<{
+  clerk: { clerkId: string; email: string; name: string };
+  admin: AdminRecord | null;
+  reason?: "not_signed_in" | "not_admin" | "inactive";
+}> {
+  const clerk = await clerkEmail();
+  if (!clerk) {
+    return {
+      clerk: { clerkId: "", email: "", name: "" },
+      admin: null,
+      reason: "not_signed_in",
+    };
+  }
+
+  const admin = await findAdminByEmail(clerk.email);
+
+  if (!admin) {
+    return { clerk, admin: null, reason: "not_admin" };
+  }
+  if (!admin.active) {
+    return { clerk, admin: null, reason: "inactive" };
+  }
+
+  return { clerk, admin };
+}
+
+/** True when this Clerk user is listed for bootstrap and not yet an admin. */
+export async function canBootstrapAdmin(email: string) {
+  const normalized = email.trim().toLowerCase();
+  if (!isBootstrapEmail(normalized)) return false;
+  const existing = await findAdminByEmail(normalized);
+  return !existing;
+}
+
+export async function getAdminSession(): Promise<AdminSessionContext | null> {
+  const jar = await cookies();
+  const token = jar.get(ADMIN_SESSION_COOKIE)?.value;
+  if (!token) return null;
+
+  const tokenHash = hashToken(token);
+  const session = await db.query.adminSessions.findFirst({
+    where: and(
+      eq(adminSessions.tokenHash, tokenHash),
+      isNull(adminSessions.revokedAt),
+      gt(adminSessions.expiresAt, new Date()),
+    ),
+    with: { admin: true },
+  });
+
+  if (!session?.admin || !session.admin.active) return null;
+
+  // Also require the session admin still matches the signed-in Clerk email
+  const clerk = await clerkEmail();
+  if (!clerk || clerk.email !== session.admin.email.toLowerCase()) {
+    return null;
+  }
+
+  return { admin: session.admin, sessionId: session.id };
+}
+
+export async function requireAdminApi(): Promise<
+  | { ok: true; admin: AdminRecord; sessionId: string }
+  | { ok: false; status: 401 | 403; error: string }
+> {
+  const clerk = await clerkEmail();
+  if (!clerk) {
+    return { ok: false, status: 401, error: "Sign in required" };
+  }
+
+  const session = await getAdminSession();
+  if (!session) {
+    return {
+      ok: false,
+      status: 401,
+      error: "Admin session required. Enter the passcode.",
+    };
+  }
+
+  if (session.admin.email.toLowerCase() !== clerk.email) {
+    return { ok: false, status: 403, error: "Admin session mismatch" };
+  }
+
+  return {
+    ok: true,
+    admin: session.admin,
+    sessionId: session.sessionId,
+  };
+}
+
+export function assertAdminRole(
+  admin: AdminRecord,
+  allowed: AdminRole[] = [
+    "super_admin",
+    "admin",
+    "support",
+    "finance",
+    "viewer",
+  ],
+) {
+  return allowed.includes(admin.role as AdminRole);
+}
+
+async function clientMeta() {
+  const h = await headers();
+  return {
+    ipAddress: (h.get("x-forwarded-for") || h.get("x-real-ip") || "")
+      .split(",")[0]
+      ?.trim()
+      .slice(0, 64) || null,
+    userAgent: (h.get("user-agent") || "").slice(0, 500) || null,
+  };
+}
+
+export async function writeAdminAudit(input: {
+  adminId: string | null;
+  action: string;
+  entityType?: string;
+  entityId?: string;
+  meta?: Record<string, unknown>;
+}) {
+  try {
+    const meta = await clientMeta();
+    await db.insert(adminAuditLogs).values({
+      adminId: input.adminId,
+      action: input.action.slice(0, 120),
+      entityType: input.entityType?.slice(0, 80),
+      entityId: input.entityId?.slice(0, 80),
+      meta: input.meta,
+      ipAddress: meta.ipAddress,
+    });
+  } catch (error) {
+    console.error("[admin-audit]", error);
+  }
+}
+
+export async function createAdminSession(admin: AdminRecord) {
+  const token = randomBytes(32).toString("hex");
+  const tokenHash = hashToken(token);
+  const expiresAt = new Date(Date.now() + sessionHours() * 60 * 60 * 1000);
+  const meta = await clientMeta();
+
+  const [row] = await db
+    .insert(adminSessions)
+    .values({
+      adminId: admin.id,
+      tokenHash,
+      expiresAt,
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+    })
+    .returning();
+
+  await db
+    .update(admins)
+    .set({ lastLoginAt: new Date(), updatedAt: new Date() })
+    .where(eq(admins.id, admin.id));
+
+  await writeAdminAudit({
+    adminId: admin.id,
+    action: "admin.login",
+    entityType: "admin",
+    entityId: admin.id,
+  });
+
+  return {
+    token,
+    expiresAt,
+    sessionId: row?.id,
+    maxAgeSec: sessionHours() * 60 * 60,
+  };
+}
+
+export async function revokeAdminSession(token?: string | null) {
+  const jar = await cookies();
+  const value = token || jar.get(ADMIN_SESSION_COOKIE)?.value;
+  if (!value) return;
+
+  const tokenHash = hashToken(value);
+  await db
+    .update(adminSessions)
+    .set({ revokedAt: new Date() })
+    .where(eq(adminSessions.tokenHash, tokenHash));
+}
+
+export function adminCookieOptions(maxAgeSec: number) {
+  return {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax" as const,
+    path: "/",
+    maxAge: maxAgeSec,
+  };
+}

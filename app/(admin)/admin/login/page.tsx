@@ -1,44 +1,99 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useAuth, useUser } from "@clerk/nextjs";
 import { motion } from "framer-motion";
-import { KeyRound, ShieldCheck } from "lucide-react";
+import { KeyRound, ShieldAlert, ShieldCheck } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
-import {
-  ADMIN_PASSCODE,
-  ADMIN_SESSION_COOKIE,
-  isValidAdminPasscode,
-} from "@/lib/admin-auth";
+
+type MeResponse = {
+  ok?: boolean;
+  signedIn?: boolean;
+  isAdmin?: boolean;
+  canBootstrap?: boolean;
+  session?: boolean;
+  email?: string;
+  reason?: string;
+  admin?: { name: string; email: string; role: string };
+  error?: string;
+};
 
 export default function AdminLoginPage() {
   const router = useRouter();
+  const { isLoaded, isSignedIn } = useAuth();
+  const { user } = useUser();
   const [passcode, setPasscode] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(true);
+  const [me, setMe] = useState<MeResponse | null>(null);
 
   useEffect(() => {
-    const authed = document.cookie
-      .split(";")
-      .some((part) => part.trim().startsWith(`${ADMIN_SESSION_COOKIE}=1`));
-    if (authed) router.replace("/admin");
-  }, [router]);
-
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    setError("");
-
-    if (!isValidAdminPasscode(passcode)) {
-      setError("Incorrect passcode. Try again.");
+    if (!isLoaded) return;
+    if (!isSignedIn) {
+      setChecking(false);
       return;
     }
 
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/admin/auth/me", { cache: "no-store" });
+        const data = (await res.json()) as MeResponse;
+        if (cancelled) return;
+        setMe(data);
+        if (data.session && data.isAdmin) {
+          router.replace("/admin");
+          return;
+        }
+      } catch {
+        if (!cancelled) setMe(null);
+      } finally {
+        if (!cancelled) setChecking(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoaded, isSignedIn, router]);
+
+  async function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError("");
     setLoading(true);
-    document.cookie = `${ADMIN_SESSION_COOKIE}=1; path=/; max-age=${60 * 60 * 12}; SameSite=Lax`;
-    window.setTimeout(() => {
+    try {
+      const res = await fetch("/api/admin/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ passcode }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to unlock admin");
       router.replace("/admin");
-    }, 350);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to unlock admin");
+    } finally {
+      setLoading(false);
+    }
   }
+
+  const email =
+    me?.email ||
+    user?.primaryEmailAddress?.emailAddress ||
+    user?.emailAddresses?.[0]?.emailAddress ||
+    "";
+
+  const denied =
+    isSignedIn &&
+    me &&
+    !me.isAdmin &&
+    !me.canBootstrap &&
+    me.reason !== "inactive";
+
+  const inactive = me?.reason === "inactive";
 
   return (
     <div className="relative flex min-h-[100svh] items-center justify-center overflow-hidden bg-[image:var(--app-shell-gradient)] px-5 py-10">
@@ -64,74 +119,130 @@ export default function AdminLoginPage() {
               ORYNO Admin
             </p>
             <p className="text-sm text-muted-foreground">
-              Passcode access · Phase 1 console
+              Clerk account + admin passcode
             </p>
           </div>
         </div>
 
-        <div className="mt-6 rounded-[18px] bg-oryno-orange-muted px-4 py-3">
-          <p className="inline-flex items-center gap-2 text-sm font-semibold text-primary">
-            <ShieldCheck className="h-4 w-4" strokeWidth={1.75} />
-            Secure admin entry
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Enter the admin passcode to manage users, wallets, providers,
-            countries, and gateways.
-          </p>
-        </div>
-
-        <form onSubmit={onSubmit} className="mt-6 space-y-4">
-          <label className="block">
-            <span className="text-sm font-semibold text-foreground">
-              Admin passcode
-            </span>
-            <div className="mt-2 flex h-14 items-center gap-3 rounded-[16px] border border-border bg-muted/40 px-4 transition focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/15">
-              <KeyRound
-                className="h-5 w-5 shrink-0 text-muted-foreground"
-                strokeWidth={1.75}
-              />
-              <input
-                type="password"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                value={passcode}
-                onChange={(e) =>
-                  setPasscode(e.target.value.replace(/[^\d]/g, "").slice(0, 6))
-                }
-                placeholder="6-digit passcode"
-                required
-                className="w-full bg-transparent text-lg font-semibold tracking-[0.35em] text-foreground outline-none placeholder:text-sm placeholder:tracking-normal placeholder:font-medium placeholder:text-muted-foreground"
-              />
+        {!isLoaded || checking ? (
+          <div className="mt-8 flex justify-center py-10">
+            <div className="h-10 w-10 animate-pulse rounded-full bg-oryno-orange-muted" />
+          </div>
+        ) : !isSignedIn ? (
+          <div className="mt-6 space-y-4">
+            <div className="rounded-[18px] bg-oryno-orange-muted px-4 py-3">
+              <p className="inline-flex items-center gap-2 text-sm font-semibold text-primary">
+                <ShieldCheck className="h-4 w-4" strokeWidth={1.75} />
+                Sign in required
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Only signed-in users with an admin role can unlock the console.
+              </p>
             </div>
-          </label>
-
-          {error ? (
-            <motion.p
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="text-sm font-medium text-[var(--oryno-error)]"
+            <Link
+              href="/login?redirect_url=/admin/login"
+              className="btn-primary flex h-12 w-full items-center justify-center text-base"
             >
-              {error}
-            </motion.p>
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              Demo passcode:{" "}
-              <span className="font-semibold text-foreground">
-                {ADMIN_PASSCODE}
-              </span>
-            </p>
-          )}
+              Sign in to continue
+            </Link>
+          </div>
+        ) : denied || inactive ? (
+          <div className="mt-6 space-y-4">
+            <div className="rounded-[18px] border border-border bg-muted/40 px-4 py-4">
+              <p className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--oryno-error)]">
+                <ShieldAlert className="h-4 w-4" strokeWidth={1.75} />
+                {inactive ? "Admin disabled" : "Not an admin"}
+              </p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {inactive
+                  ? "This admin account has been deactivated."
+                  : "Your account is not an admin. Ask a super admin to add your email to the admins list."}
+              </p>
+              {email ? (
+                <p className="mt-2 text-xs font-semibold text-foreground">
+                  Signed in as {email}
+                </p>
+              ) : null}
+            </div>
+            <Link
+              href="/dashboard"
+              className="btn-secondary flex h-12 w-full items-center justify-center text-base"
+            >
+              Back to app
+            </Link>
+          </div>
+        ) : (
+          <>
+            <div className="mt-6 rounded-[18px] bg-oryno-orange-muted px-4 py-3">
+              <p className="inline-flex items-center gap-2 text-sm font-semibold text-primary">
+                <ShieldCheck className="h-4 w-4" strokeWidth={1.75} />
+                Secure admin entry
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {me?.canBootstrap
+                  ? "Your email is on the admin allowlist. Enter the passcode to create your admin access."
+                  : "Enter the admin passcode to unlock the console."}
+              </p>
+              {email ? (
+                <p className="mt-2 text-xs font-semibold text-foreground">
+                  {email}
+                  {me?.admin?.role ? ` · ${me.admin.role}` : ""}
+                </p>
+              ) : null}
+            </div>
 
-          <motion.button
-            type="submit"
-            disabled={loading || passcode.length < 6}
-            whileHover={passcode.length >= 6 ? { y: -2 } : undefined}
-            whileTap={passcode.length >= 6 ? { scale: 0.985 } : undefined}
-            className="btn-primary h-12 w-full text-base disabled:opacity-50"
-          >
-            {loading ? "Unlocking…" : "Unlock admin"}
-          </motion.button>
-        </form>
+            <form onSubmit={onSubmit} className="mt-6 space-y-4">
+              <label className="block">
+                <span className="text-sm font-semibold text-foreground">
+                  Admin passcode
+                </span>
+                <div className="mt-2 flex h-14 items-center gap-3 rounded-[16px] border border-border bg-muted/40 px-4 transition focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/15">
+                  <KeyRound
+                    className="h-5 w-5 shrink-0 text-muted-foreground"
+                    strokeWidth={1.75}
+                  />
+                  <input
+                    type="password"
+                    autoComplete="current-password"
+                    value={passcode}
+                    onChange={(e) => setPasscode(e.target.value)}
+                    placeholder="Enter passcode"
+                    required
+                    className="w-full bg-transparent text-base font-semibold tracking-wide text-foreground outline-none placeholder:text-sm placeholder:tracking-normal placeholder:font-medium placeholder:text-muted-foreground"
+                  />
+                </div>
+              </label>
+
+              {error ? (
+                <motion.p
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-sm font-medium text-[var(--oryno-error)]"
+                >
+                  {error}
+                </motion.p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Passcode is set with{" "}
+                  <span className="font-semibold text-foreground">
+                    ADMIN_PASSCODE
+                  </span>{" "}
+                  on the server.
+                </p>
+              )}
+
+              <motion.button
+                type="submit"
+                disabled={loading || passcode.length < 4}
+                whileHover={passcode.length >= 4 ? { y: -2 } : undefined}
+                whileTap={passcode.length >= 4 ? { scale: 0.985 } : undefined}
+                className="btn-primary h-12 w-full text-base disabled:opacity-50"
+              >
+                {loading ? "Unlocking…" : "Unlock admin"}
+              </motion.button>
+            </form>
+          </>
+        )}
       </motion.div>
     </div>
   );

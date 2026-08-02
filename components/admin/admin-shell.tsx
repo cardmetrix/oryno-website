@@ -7,16 +7,25 @@ import { AnimatePresence, motion } from "framer-motion";
 import { LogOut, Menu, X } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { ADMIN_SESSION_COOKIE } from "@/lib/admin-auth";
 import { adminNav, isAdminNavActive } from "@/lib/admin-nav";
 import { cn } from "@/lib/utils";
 
-function logoutAdmin(router: ReturnType<typeof useRouter>) {
-  document.cookie = `${ADMIN_SESSION_COOKIE}=; path=/; max-age=0; SameSite=Lax`;
+async function logoutAdmin(router: ReturnType<typeof useRouter>) {
+  try {
+    await fetch("/api/admin/auth/logout", { method: "POST" });
+  } catch {
+    // ignore
+  }
   router.replace("/admin/login");
 }
 
-export function AdminShell({ children }: { children: React.ReactNode }) {
+export function AdminShell({
+  children,
+  admin,
+}: {
+  children: React.ReactNode;
+  admin?: { name: string; email: string; role: string };
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -39,7 +48,10 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-[272px] flex-col border-r border-border/80 bg-background/90 px-4 py-5 backdrop-blur-xl lg:flex">
         <AdminBrand />
         <AdminNav pathname={pathname} activeLayoutId="admin-nav-desktop" />
-        <AdminFooter onLogout={() => logoutAdmin(router)} />
+        <AdminFooter
+          admin={admin}
+          onLogout={() => void logoutAdmin(router)}
+        />
       </aside>
 
       <AnimatePresence>
@@ -75,7 +87,10 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                 onNavigate={() => setOpen(false)}
                 activeLayoutId="admin-nav-mobile"
               />
-              <AdminFooter onLogout={() => logoutAdmin(router)} />
+              <AdminFooter
+                admin={admin}
+                onLogout={() => void logoutAdmin(router)}
+              />
             </motion.aside>
           </div>
         ) : null}
@@ -98,21 +113,23 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                   ORYNO Admin
                 </p>
                 <p className="truncate text-xs text-muted-foreground">
-                  Country-configurable control center
+                  {admin
+                    ? `${admin.name} · ${admin.role.replace(/_/g, " ")}`
+                    : "Country-configurable control center"}
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <span className="hidden items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1 text-xs font-semibold text-foreground shadow-[var(--shadow-soft)] sm:inline-flex">
                 <span className="h-2 w-2 rounded-full bg-[var(--oryno-success)]" />
-                Online
+                Live
               </span>
               <ThemeToggle variant="icon" />
               <motion.button
                 type="button"
                 whileHover={{ y: -1 }}
                 whileTap={{ scale: 0.97 }}
-                onClick={() => logoutAdmin(router)}
+                onClick={() => void logoutAdmin(router)}
                 className="inline-flex h-10 items-center gap-1.5 rounded-[14px] border border-border bg-background px-3 text-sm font-semibold text-foreground shadow-[var(--shadow-soft)]"
               >
                 <LogOut className="h-4 w-4" strokeWidth={1.75} />
@@ -197,19 +214,27 @@ function AdminNav({
   );
 }
 
-function AdminFooter({ onLogout }: { onLogout: () => void }) {
+function AdminFooter({
+  onLogout,
+  admin,
+}: {
+  onLogout: () => void;
+  admin?: { name: string; email: string; role: string };
+}) {
   return (
     <div className="mt-auto space-y-3 border-t border-border pt-4">
       <div className="rounded-[16px] bg-gradient-to-br from-oryno-orange to-oryno-orange-soft p-4 text-white shadow-[var(--shadow-orange)]">
         <div className="flex items-center justify-between gap-2">
-          <p className="text-sm font-bold">Phase 1 control</p>
+          <p className="text-sm font-bold">Live console</p>
           <span className="inline-flex items-center gap-1.5 rounded-full bg-white/18 px-2 py-0.5 text-[10px] font-bold tracking-wide uppercase ring-1 ring-white/25">
             <span className="h-1.5 w-1.5 rounded-full bg-white" />
             Online
           </span>
         </div>
         <p className="mt-1 text-xs text-white/85">
-          Manage users, wallets, providers, countries & gateways.
+          {admin
+            ? `${admin.email}`
+            : "Manage users, wallets, providers, countries & gateways."}
         </p>
         <motion.button
           type="button"

@@ -3,7 +3,7 @@ import {
   clerkMiddleware,
   createRouteMatcher,
 } from "@clerk/nextjs/server";
-import { ADMIN_SESSION_COOKIE } from "@/lib/admin-auth";
+import { ADMIN_SESSION_COOKIE } from "@/lib/admin/cookie";
 
 const isPublicRoute = createRouteMatcher([
   "/",
@@ -16,7 +16,6 @@ const isPublicRoute = createRouteMatcher([
   "/sso-callback(.*)",
   "/api/webhooks(.*)",
   "/api/geo(.*)",
-  "/admin(.*)",
 ]);
 
 // Don't auto-bounce /register or /otp — users may finish email OTP
@@ -41,6 +40,10 @@ const isAppRoute = createRouteMatcher([
   "/about(.*)",
 ]);
 
+const isAdminRoute = createRouteMatcher(["/admin(.*)"]);
+const isAdminLogin = createRouteMatcher(["/admin/login"]);
+const isAdminApi = createRouteMatcher(["/api/admin(.*)"]);
+
 export default clerkMiddleware(async (auth, request) => {
   const { pathname } = request.nextUrl;
 
@@ -48,21 +51,32 @@ export default clerkMiddleware(async (auth, request) => {
     return NextResponse.next();
   }
 
-  // Admin uses a separate passcode cookie (not Clerk)
-  const isAdminRoute = pathname.startsWith("/admin");
-  const isAdminLogin = pathname === "/admin/login";
-  const hasAdminSession =
-    request.cookies.get(ADMIN_SESSION_COOKIE)?.value === "1";
-
-  if (isAdminRoute && !isAdminLogin && !hasAdminSession) {
-    return NextResponse.redirect(new URL("/admin/login", request.url));
+  // Admin APIs authenticate themselves (Clerk + session)
+  if (isAdminApi(request)) {
+    return NextResponse.next();
   }
 
-  if (isAdminLogin && hasAdminSession) {
-    return NextResponse.redirect(new URL("/admin", request.url));
-  }
+  // Admin UI requires Clerk + passcode session cookie
+  if (isAdminRoute(request)) {
+    const { userId } = await auth();
+    if (!userId) {
+      const login = new URL("/login", request.url);
+      login.searchParams.set(
+        "redirect_url",
+        `${request.nextUrl.pathname}${request.nextUrl.search}`,
+      );
+      return NextResponse.redirect(login);
+    }
 
-  if (isAdminRoute) {
+    const hasAdminSession = Boolean(
+      request.cookies.get(ADMIN_SESSION_COOKIE)?.value,
+    );
+
+    // Cookie presence only — full validation is server-side via /api/admin/auth/me
+    if (!isAdminLogin(request) && !hasAdminSession) {
+      return NextResponse.redirect(new URL("/admin/login", request.url));
+    }
+
     return NextResponse.next();
   }
 

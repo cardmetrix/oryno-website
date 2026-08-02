@@ -65,7 +65,14 @@ function LoginForm() {
           }
           return;
         }
-        router.replace("/dashboard");
+        const redirectUrl = searchParams.get("redirect_url");
+        const safeRedirect =
+          redirectUrl &&
+          redirectUrl.startsWith("/") &&
+          !redirectUrl.startsWith("//")
+            ? redirectUrl
+            : "/dashboard";
+        router.replace(safeRedirect);
         return;
       }
 

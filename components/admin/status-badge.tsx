@@ -25,6 +25,11 @@ const tones: Record<string, string> = {
   Low: "bg-muted text-[var(--oryno-warning)]",
   "Buy out": "bg-muted text-[var(--oryno-error)]",
   "In stock": "bg-oryno-orange-muted text-primary",
+  Demo: "bg-muted text-muted-foreground",
+  Sandbox: "bg-muted text-[var(--oryno-warning)]",
+  Test: "bg-muted text-[var(--oryno-warning)]",
+  Disabled: "bg-muted text-muted-foreground",
+  Rejected: "bg-muted text-[var(--oryno-error)]",
 };
 
 export function StatusBadge({
