@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { clerkClient } from "@clerk/nextjs/server";
-import { ensureAppUser } from "@/lib/auth/current-user";
+import { ensureAppUserDetailed } from "@/lib/auth/current-user";
 import { getCountryInfo, resolveCountryCode } from "@/lib/country";
 import { detectCountryWithGoogle } from "@/lib/geo/google-country";
 import { notifyUserLogin } from "@/lib/notify/auth-events";
@@ -19,7 +19,6 @@ export async function POST(req: Request) {
       announceLogin?: boolean;
     };
 
-    // Geo must never take down sync — fall back to NG if Google fails
     const detected = await detectCountryWithGoogle({
       lat: typeof body.lat === "number" ? body.lat : undefined,
       lng: typeof body.lng === "number" ? body.lng : undefined,
@@ -36,14 +35,12 @@ export async function POST(req: Request) {
       ? resolveCountryCode(body.countryCode)
       : detected.countryCode;
 
-    // Only overwrite an existing country when Google actually resolved an ISO code
-    // (or the client explicitly sent one). Avoid resetting users when geo fails.
     const confident =
       Boolean(body.countryCode) ||
       Boolean(detected.detectedIso) ||
       detected.source === "latlng";
 
-    const user = await ensureAppUser({
+    const { user, debug } = await ensureAppUserDetailed({
       touchLogin: true,
       countryCode,
       forceCountry: body.forceCountry === true && confident,
@@ -51,16 +48,12 @@ export async function POST(req: Request) {
     });
 
     if (!user) {
-      const authHeader = req.headers.get("authorization");
-      console.warn("[auth-sync] unauthorized", {
-        hasBearer: Boolean(authHeader?.toLowerCase().startsWith("bearer ")),
-        client: req.headers.get("x-oryno-client"),
-      });
+      console.warn("[auth-sync] unauthorized", debug);
       return NextResponse.json(
         {
           error: "Unauthorized",
           code: "clerk_bearer_rejected",
-          hint: "Mobile Bearer JWT was not accepted. Check server logs for [resolveClerkUser].",
+          debug,
         },
         { status: 401 },
       );
