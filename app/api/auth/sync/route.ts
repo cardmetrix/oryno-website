@@ -80,17 +80,19 @@ export async function POST(req: Request) {
     );
 
     try {
-      const client = await clerkClient();
-      await client.users.updateUser(user.clerkId, {
-        publicMetadata: {
-          countryCode: country.code,
-          currency: country.currency,
-        },
-        unsafeMetadata: {
-          countryCode: country.code,
-          currency: country.currency,
-        },
-      });
+      if (user.clerkId) {
+        const client = await clerkClient();
+        await client.users.updateUser(user.clerkId, {
+          publicMetadata: {
+            countryCode: country.code,
+            currency: country.currency,
+          },
+          unsafeMetadata: {
+            countryCode: country.code,
+            currency: country.currency,
+          },
+        });
+      }
     } catch (metaError) {
       console.error("[auth-sync-metadata]", metaError);
     }
