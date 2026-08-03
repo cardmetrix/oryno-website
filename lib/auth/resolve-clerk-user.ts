@@ -139,34 +139,64 @@ export async function resolveClerkUser(request?: Request): Promise<{
 
     let userId: string | null = null;
 
-    // 3a) verifyToken (legacy wrapper returns payload OR throws)
-    try {
-      const options: {
-        secretKey: string;
-        clockSkewInMs: number;
-        jwtKey?: string;
-      } = {
-        secretKey,
-        clockSkewInMs: 60_000,
-      };
-      if (process.env.CLERK_JWT_KEY?.trim()) {
-        options.jwtKey = process.env.CLERK_JWT_KEY;
+    // 3a) Fast path for Expo: active Backend session matching JWT claims
+    // (works even when verifyToken/azp quirks reject native tokens)
+    if (peeked?.sub && peeked?.sid) {
+      try {
+        const now = Math.floor(Date.now() / 1000);
+        const notExpired =
+          typeof peeked.exp !== "number" || peeked.exp + 60 >= now;
+        const session = await client.sessions.getSession(peeked.sid);
+        if (
+          notExpired &&
+          session.status === "active" &&
+          session.userId === peeked.sub
+        ) {
+          userId = peeked.sub;
+          debug.steps.getSession = `ok:${userId}`;
+          console.log("[resolveClerkUser] getSession ok", { sub: userId });
+        } else {
+          debug.steps.getSession = `mismatch:status=${session.status},userId=${session.userId},expired=${!notExpired}`;
+        }
+      } catch (getSessionError) {
+        debug.steps.getSession =
+          getSessionError instanceof Error
+            ? `throw:${getSessionError.message}`
+            : "throw";
+        console.warn("[resolveClerkUser] getSession failed", getSessionError);
       }
+    }
 
-      const verified = await verifyToken(token, options);
-      userId = extractUserIdFromVerifyResult(verified);
-      debug.steps.verifyToken = userId
-        ? `ok:${userId}`
-        : `no_sub:${JSON.stringify(verified)?.slice(0, 120)}`;
-      if (userId) {
-        console.log("[resolveClerkUser] verifyToken ok", { sub: userId });
+    // 3b) verifyToken (legacy wrapper returns payload OR throws)
+    if (!userId) {
+      try {
+        const options: {
+          secretKey: string;
+          clockSkewInMs: number;
+          jwtKey?: string;
+        } = {
+          secretKey,
+          clockSkewInMs: 60_000,
+        };
+        if (process.env.CLERK_JWT_KEY?.trim()) {
+          options.jwtKey = process.env.CLERK_JWT_KEY;
+        }
+
+        const verified = await verifyToken(token, options);
+        userId = extractUserIdFromVerifyResult(verified);
+        debug.steps.verifyToken = userId
+          ? `ok:${userId}`
+          : `no_sub:${JSON.stringify(verified)?.slice(0, 120)}`;
+        if (userId) {
+          console.log("[resolveClerkUser] verifyToken ok", { sub: userId });
+        }
+      } catch (verifyError) {
+        debug.steps.verifyToken =
+          verifyError instanceof Error
+            ? `throw:${verifyError.message}`
+            : "throw";
+        console.warn("[resolveClerkUser] verifyToken threw", verifyError);
       }
-    } catch (verifyError) {
-      debug.steps.verifyToken =
-        verifyError instanceof Error
-          ? `throw:${verifyError.message}`
-          : "throw";
-      console.warn("[resolveClerkUser] verifyToken threw", verifyError);
     }
 
     // 3b) sessions.verifySession(sid, token)
@@ -255,39 +285,6 @@ export async function resolveClerkUser(request?: Request): Promise<{
         console.warn(
           "[resolveClerkUser] authenticateRequest error",
           authReqError,
-        );
-      }
-    }
-
-    // 3d) Active session via Backend API + unexpired token claims
-    if (!userId && peeked?.sub && peeked?.sid) {
-      try {
-        const now = Math.floor(Date.now() / 1000);
-        const notExpired =
-          typeof peeked.exp !== "number" || peeked.exp + 60 >= now;
-        const session = await client.sessions.getSession(peeked.sid);
-        if (
-          notExpired &&
-          session.status === "active" &&
-          session.userId === peeked.sub
-        ) {
-          userId = peeked.sub;
-          debug.steps.getSession = `ok:${userId}`;
-          console.warn(
-            "[resolveClerkUser] accepting active session via getSession",
-            { sub: userId },
-          );
-        } else {
-          debug.steps.getSession = `mismatch:status=${session.status},userId=${session.userId},expired=${!notExpired}`;
-        }
-      } catch (getSessionError) {
-        debug.steps.getSession =
-          getSessionError instanceof Error
-            ? `throw:${getSessionError.message}`
-            : "throw";
-        console.warn(
-          "[resolveClerkUser] getSession fallback failed",
-          getSessionError,
         );
       }
     }
