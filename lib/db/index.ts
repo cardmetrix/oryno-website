@@ -7,8 +7,11 @@ if (process.env.NODE_ENV !== "production") {
   config({ path: ".env" });
 }
 
+type Db = ReturnType<typeof drizzle<typeof schema>>;
+
 const globalForDb = globalThis as unknown as {
   __orynoSql?: ReturnType<typeof postgres>;
+  __orynoDb?: Db;
 };
 
 function createClient() {
@@ -18,21 +21,60 @@ function createClient() {
   }
 
   // Vercel/serverless: keep pool tiny so we don't exhaust Neon connections.
-  const max = process.env.NODE_ENV === "production" ? 1 : 10;
+  const max = process.env.NODE_ENV === "production" ? 1 : 5;
   const disableSsl = /sslmode=disable/i.test(url);
 
   return postgres(url, {
     prepare: false,
     max,
     idle_timeout: 20,
-    connect_timeout: 10,
+    max_lifetime: 60 * 10,
+    // Hotspot / flaky networks were hitting CONNECT_TIMEOUT at 10s.
+    connect_timeout: 30,
     ...(disableSsl ? {} : { ssl: "require" as const }),
   });
 }
 
-const client = globalForDb.__orynoSql ?? createClient();
+function ensureDb(): Db {
+  if (!globalForDb.__orynoSql || !globalForDb.__orynoDb) {
+    globalForDb.__orynoSql = createClient();
+    globalForDb.__orynoDb = drizzle(globalForDb.__orynoSql, { schema });
+  }
+  return globalForDb.__orynoDb;
+}
 
-// Reuse across warm serverless invocations + Next.js HMR in dev
-globalForDb.__orynoSql = client;
+/** Drop the pooled client after fatal connect errors so the next request reconnects. */
+export async function resetDbClient(reason?: unknown) {
+  const current = globalForDb.__orynoSql;
+  globalForDb.__orynoSql = undefined;
+  globalForDb.__orynoDb = undefined;
+  if (current) {
+    try {
+      await current.end({ timeout: 1 });
+    } catch {
+      // ignore close errors
+    }
+  }
+  if (reason) {
+    console.warn("[db] reset client after connection error", reason);
+  }
+}
 
-export const db = drizzle(client, { schema });
+export function isDbConnectivityError(error: unknown): boolean {
+  const text =
+    error instanceof Error
+      ? `${error.message} ${String((error as { cause?: unknown }).cause ?? "")}`
+      : String(error);
+  return /CONNECT_TIMEOUT|ETIMEDOUT|ECONNRESET|ECONNREFUSED|connection.*closed|ENOTFOUND/i.test(
+    text,
+  );
+}
+
+/** Live db handle — always uses the current pool (survives resetDbClient). */
+export const db = new Proxy({} as Db, {
+  get(_target, prop, receiver) {
+    const instance = ensureDb();
+    const value = Reflect.get(instance as object, prop, receiver);
+    return typeof value === "function" ? (value as Function).bind(instance) : value;
+  },
+});
