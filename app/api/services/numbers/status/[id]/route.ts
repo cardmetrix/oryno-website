@@ -1,0 +1,12 @@
+import type { NextRequest } from "next/server";
+
+export const runtime = "nodejs";
+
+/** Friendly mobile alias → /api/herosms/status/number/[id]. */
+export async function GET(
+  req: NextRequest,
+  ctx: { params: Promise<{ id: string }> },
+) {
+  const mod = await import("@/app/api/herosms/status/number/[id]/route");
+  return mod.GET(req as never, ctx as never);
+}

@@ -9,6 +9,14 @@ export function reloadlyErrorToEnglish(message: string, code?: string) {
   if (code && CODE_HINTS[code]) return CODE_HINTS[code];
   const m = (message || "").toLowerCase();
   if (!m) return "Something went wrong. Please try again.";
+  if (
+    m.includes("access denied") ||
+    m.includes("access_denied") ||
+    m.includes("service not enabled") ||
+    m.includes("invalid_client")
+  ) {
+    return "Gift card buying credentials don’t match this environment. Check Reloadly sandbox/live keys, or set RELOADLY_DEMO=true.";
+  }
   if (m.includes("reloadly") || m.includes("authentication")) {
     return "Gift card buying is temporarily unavailable. Please try again.";
   }

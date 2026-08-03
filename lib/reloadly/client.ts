@@ -27,8 +27,46 @@ const COUNTRY_CACHE_TTL_MS = 30 * 60 * 1000;
 
 let cachedToken: { token: string; expiresAt: number; audience: string } | null =
   null;
+/** Set when OAuth succeeds so API calls match the token's environment. */
+let resolvedBaseUrl: string | null = null;
 let productsCache = new Map<string, { at: number; data: BuyProductView[] }>();
 let countriesCache: { at: number; data: ReloadlyCountry[] } | null = null;
+
+const SANDBOX_AUDIENCE = "https://giftcards-sandbox.reloadly.com";
+const LIVE_AUDIENCE = "https://giftcards.reloadly.com";
+
+function demoCountries(): ReloadlyCountry[] {
+  return [
+    { isoName: "US", name: "United States", currencyCode: "USD" },
+    { isoName: "GB", name: "United Kingdom", currencyCode: "GBP" },
+    { isoName: "CA", name: "Canada", currencyCode: "CAD" },
+    { isoName: "NG", name: "Nigeria", currencyCode: "NGN" },
+    { isoName: "AU", name: "Australia", currencyCode: "AUD" },
+  ];
+}
+
+function demoProducts(country: string, q: string): BuyProductView[] {
+  return DEMO_RELOADLY_PRODUCTS.filter((p) => {
+    const iso = (p.country?.isoName || "US").toUpperCase();
+    if (country && iso !== country && !p.global) return false;
+    if (!q) return true;
+    return (
+      p.productName.toLowerCase().includes(q) ||
+      (p.brand?.brandName || "").toLowerCase().includes(q)
+    );
+  }).map(toBuyProductView);
+}
+
+function isAccessDeniedMessage(message: string) {
+  const m = message.toLowerCase();
+  return (
+    m.includes("access denied") ||
+    m.includes("access_denied") ||
+    m.includes("unauthorized") ||
+    m.includes("invalid_client") ||
+    m.includes("service not enabled")
+  );
+}
 
 function truncate(value: string, max = 400) {
   const s = value.replace(/\s+/g, " ").trim();
@@ -66,6 +104,7 @@ export function isReloadlyDemoForced() {
 export function reloadlyBaseUrl() {
   const override = process.env.RELOADLY_BASE_URL?.trim().replace(/\/$/, "");
   if (override) return override;
+  if (resolvedBaseUrl) return resolvedBaseUrl;
   return isReloadlySandbox() ? SANDBOX_BASE : LIVE_BASE;
 }
 
@@ -102,24 +141,7 @@ function logModeOnce() {
   });
 }
 
-async function getAccessToken() {
-  logModeOnce();
-  if (!hasReloadlyKeys()) {
-    throw new Error("RELOADLY_CLIENT_ID / RELOADLY_CLIENT_SECRET not configured");
-  }
-
-  const audience = isReloadlySandbox()
-    ? "https://giftcards-sandbox.reloadly.com"
-    : "https://giftcards.reloadly.com";
-
-  if (
-    cachedToken &&
-    cachedToken.audience === audience &&
-    Date.now() < cachedToken.expiresAt - 60_000
-  ) {
-    return cachedToken.token;
-  }
-
+async function requestAccessToken(audience: string) {
   console.log(LOG_PREFIX, "auth request", { audience });
   const started = Date.now();
   const res = await fetch(AUTH_URL, {
@@ -139,27 +161,91 @@ async function getAccessToken() {
     expires_in?: number;
     message?: string;
     error?: string;
+    error_description?: string;
   };
 
   console.log(LOG_PREFIX, "auth response", {
     status: res.status,
     ms: Date.now() - started,
     ok: Boolean(json.access_token),
+    error: json.error || json.message || undefined,
+    detail: json.error_description
+      ? truncate(json.error_description, 160)
+      : undefined,
   });
 
   if (!res.ok || !json.access_token) {
-    throw new Error(
-      reloadlyErrorToEnglish(
-        json.message || json.error || "Failed to authenticate gift card service",
-      ),
-    );
+    const reason =
+      json.error_description ||
+      json.message ||
+      json.error ||
+      "Failed to authenticate gift card service";
+    throw new Error(reason);
   }
 
-  cachedToken = {
+  return {
     token: json.access_token,
     expiresAt: Date.now() + (json.expires_in || 3600) * 1000,
     audience,
   };
+}
+
+async function getAccessToken() {
+  logModeOnce();
+  if (!hasReloadlyKeys()) {
+    throw new Error("RELOADLY_CLIENT_ID / RELOADLY_CLIENT_SECRET not configured");
+  }
+
+  const preferred = isReloadlySandbox() ? SANDBOX_AUDIENCE : LIVE_AUDIENCE;
+  const alternate =
+    preferred === SANDBOX_AUDIENCE ? LIVE_AUDIENCE : SANDBOX_AUDIENCE;
+
+  if (
+    cachedToken &&
+    Date.now() < cachedToken.expiresAt - 60_000 &&
+    (cachedToken.audience === preferred || cachedToken.audience === alternate)
+  ) {
+    resolvedBaseUrl = cachedToken.audience;
+    return cachedToken.token;
+  }
+
+  try {
+    cachedToken = await requestAccessToken(preferred);
+  } catch (preferredError) {
+    const preferredMsg =
+      preferredError instanceof Error
+        ? preferredError.message
+        : "Gift card auth failed";
+    if (!isAccessDeniedMessage(preferredMsg)) {
+      throw new Error(reloadlyErrorToEnglish(preferredMsg));
+    }
+
+    console.warn(LOG_PREFIX, "preferred audience denied — trying alternate", {
+      preferred,
+      alternate,
+      reason: truncate(preferredMsg, 160),
+    });
+
+    try {
+      cachedToken = await requestAccessToken(alternate);
+      console.warn(LOG_PREFIX, "using alternate Reloadly environment", {
+        audience: alternate,
+        hint: "Update RELOADLY_SANDBOX to match your Reloadly dashboard keys",
+      });
+    } catch (alternateError) {
+      const alternateMsg =
+        alternateError instanceof Error
+          ? alternateError.message
+          : preferredMsg;
+      throw new Error(
+        reloadlyErrorToEnglish(
+          alternateMsg || preferredMsg || "Access Denied",
+        ),
+      );
+    }
+  }
+
+  resolvedBaseUrl = cachedToken.audience;
   return cachedToken.token;
 }
 
@@ -310,15 +396,7 @@ export async function fetchReloadlyProducts(options?: {
 
   if (isReloadlyDemoMode()) {
     console.log(LOG_PREFIX, "products DEMO", { country, q });
-    return DEMO_RELOADLY_PRODUCTS.filter((p) => {
-      const iso = (p.country?.isoName || "US").toUpperCase();
-      if (country && iso !== country && !p.global) return false;
-      if (!q) return true;
-      return (
-        p.productName.toLowerCase().includes(q) ||
-        (p.brand?.brandName || "").toLowerCase().includes(q)
-      );
-    }).map(toBuyProductView);
+    return demoProducts(country, q);
   }
 
   const cacheKey = `${country}|${q}`;
@@ -333,59 +411,72 @@ export async function fetchReloadlyProducts(options?: {
 
   console.log(LOG_PREFIX, "products LIVE fetch", { country, q });
 
-  let rows: ReloadlyProduct[] = [];
   try {
-    // Best: full catalog for ISO country
-    rows = await fetchProductsByCountryPath(country);
-    console.log(LOG_PREFIX, "products by country path", {
+    let rows: ReloadlyProduct[] = [];
+    try {
+      // Best: full catalog for ISO country
+      rows = await fetchProductsByCountryPath(country);
+      console.log(LOG_PREFIX, "products by country path", {
+        country,
+        count: rows.length,
+      });
+    } catch (error) {
+      console.warn(
+        LOG_PREFIX,
+        "country products path failed — paginated fallback",
+        error instanceof Error ? error.message : error,
+      );
+      if (
+        error instanceof Error &&
+        isAccessDeniedMessage(error.message)
+      ) {
+        throw error;
+      }
+    }
+
+    if (!rows.length) {
+      rows = await fetchProductsPaginated({
+        countryCode: country,
+        productName: options?.productName,
+      });
+    }
+
+    // If country path returned everything but user is searching, filter client-side
+    let views = normalizeProducts(rows);
+    if (q) {
+      views = views.filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          p.brandName.toLowerCase().includes(q),
+      );
+    }
+
+    console.log(LOG_PREFIX, "products LIVE ok", {
       country,
-      count: rows.length,
+      count: views.length,
     });
+
+    productsCache.set(cacheKey, { at: Date.now(), data: views });
+    return views;
   } catch (error) {
-    console.warn(
-      LOG_PREFIX,
-      "country products path failed — paginated fallback",
-      error instanceof Error ? error.message : error,
-    );
+    const message = error instanceof Error ? error.message : String(error);
+    if (isAccessDeniedMessage(message)) {
+      console.warn(
+        LOG_PREFIX,
+        "products auth failed — demo catalog fallback",
+        truncate(message, 160),
+      );
+      return demoProducts(country, q);
+    }
+    throw error;
   }
-
-  if (!rows.length) {
-    rows = await fetchProductsPaginated({
-      countryCode: country,
-      productName: options?.productName,
-    });
-  }
-
-  // If country path returned everything but user is searching, filter client-side
-  let views = normalizeProducts(rows);
-  if (q) {
-    views = views.filter(
-      (p) =>
-        p.name.toLowerCase().includes(q) ||
-        p.brandName.toLowerCase().includes(q),
-    );
-  }
-
-  console.log(LOG_PREFIX, "products LIVE ok", {
-    country,
-    count: views.length,
-  });
-
-  productsCache.set(cacheKey, { at: Date.now(), data: views });
-  return views;
 }
 
 export async function fetchReloadlyCountries(): Promise<ReloadlyCountry[]> {
   logModeOnce();
 
   if (isReloadlyDemoMode()) {
-    return [
-      { isoName: "US", name: "United States", currencyCode: "USD" },
-      { isoName: "GB", name: "United Kingdom", currencyCode: "GBP" },
-      { isoName: "CA", name: "Canada", currencyCode: "CAD" },
-      { isoName: "NG", name: "Nigeria", currencyCode: "NGN" },
-      { isoName: "AU", name: "Australia", currencyCode: "AUD" },
-    ];
+    return demoCountries();
   }
 
   if (
@@ -396,30 +487,43 @@ export async function fetchReloadlyCountries(): Promise<ReloadlyCountry[]> {
   }
 
   console.log(LOG_PREFIX, "countries LIVE fetch");
-  const json = await reloadlyFetch<ReloadlyCountry[] | { content?: ReloadlyCountry[] }>(
-    "/countries",
-  );
-  const rows = Array.isArray(json)
-    ? json
-    : Array.isArray(json?.content)
-      ? json.content
-      : [];
+  try {
+    const json = await reloadlyFetch<
+      ReloadlyCountry[] | { content?: ReloadlyCountry[] }
+    >("/countries");
+    const rows = Array.isArray(json)
+      ? json
+      : Array.isArray(json?.content)
+        ? json.content
+        : [];
 
-  const data = rows
-    .map((c) => ({
-      isoName: String(c.isoName || c.isoCode || "")
-        .trim()
-        .toUpperCase(),
-      name: String(c.name || c.isoName || "").trim(),
-      currencyCode: String(c.currencyCode || "").trim().toUpperCase() || null,
-      flagUrl: c.flagUrl || null,
-    }))
-    .filter((c) => c.isoName.length === 2 && c.name)
-    .sort((a, b) => a.name.localeCompare(b.name));
+    const data = rows
+      .map((c) => ({
+        isoName: String(c.isoName || c.isoCode || "")
+          .trim()
+          .toUpperCase(),
+        name: String(c.name || c.isoName || "").trim(),
+        currencyCode: String(c.currencyCode || "").trim().toUpperCase() || null,
+        flagUrl: c.flagUrl || null,
+      }))
+      .filter((c) => c.isoName.length === 2 && c.name)
+      .sort((a, b) => a.name.localeCompare(b.name));
 
-  console.log(LOG_PREFIX, "countries LIVE ok", { count: data.length });
-  countriesCache = { at: Date.now(), data };
-  return data;
+    console.log(LOG_PREFIX, "countries LIVE ok", { count: data.length });
+    countriesCache = { at: Date.now(), data };
+    return data;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (isAccessDeniedMessage(message)) {
+      console.warn(
+        LOG_PREFIX,
+        "countries auth failed — demo catalog fallback",
+        truncate(message, 160),
+      );
+      return demoCountries();
+    }
+    throw error;
+  }
 }
 
 export async function fetchReloadlyProduct(
