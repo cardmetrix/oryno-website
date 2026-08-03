@@ -142,19 +142,6 @@ export default clerkMiddleware(
 
   return NextResponse.next();
 },
-  {
-    // Allow Expo / native session tokens whose azp is the Clerk FAPI or app scheme
-    authorizedParties: [
-      "https://orynoafrica.com",
-      "https://www.orynoafrica.com",
-      "https://clerk.orynoafrica.com",
-      "http://localhost:3000",
-      "http://127.0.0.1:3000",
-      "http://localhost:8081",
-      "oryno://",
-      "exp://",
-    ],
-  },
 );
 
 export const config = {
