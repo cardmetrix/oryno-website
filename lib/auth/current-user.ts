@@ -1,7 +1,8 @@
-import { auth, currentUser } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
+import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
+import { resolveClerkUser } from "@/lib/auth/resolve-clerk-user";
 import {
   mapClerkSdkUser,
   syncClerkUserToDb,
@@ -10,7 +11,10 @@ import {
 
 export async function requireClerkAuth() {
   const { userId } = await auth();
-  return userId;
+  if (userId) return userId;
+
+  const user = await resolveClerkUser();
+  return user?.id ?? null;
 }
 
 /** Ensures the signed-in Clerk user exists in Postgres and returns the DB row. */
@@ -21,7 +25,7 @@ export async function ensureAppUser(options?: {
 }): Promise<SyncedUser | null> {
   let clerkUser;
   try {
-    clerkUser = await currentUser();
+    clerkUser = await resolveClerkUser();
   } catch (error) {
     console.error("[ensureAppUser-clerk]", error);
     return null;

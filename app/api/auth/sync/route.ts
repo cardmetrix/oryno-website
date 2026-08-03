@@ -50,6 +50,11 @@ export async function POST(req: Request) {
     });
 
     if (!user) {
+      const authHeader = req.headers.get("authorization");
+      console.warn("[auth-sync] unauthorized", {
+        hasBearer: Boolean(authHeader?.toLowerCase().startsWith("bearer ")),
+        client: req.headers.get("x-oryno-client"),
+      });
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
