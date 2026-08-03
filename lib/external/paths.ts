@@ -37,6 +37,10 @@ export const EXTERNAL_PATH_ALIASES: Record<string, string> = {
   "/services/bills/variations": "/vtpass/variations",
   "/services/vtpass": "/vtpass/services",
   "/services/variations": "/vtpass/variations",
+  "/services/international/countries": "/vtpass/international/countries",
+  "/services/international/product-types":
+    "/vtpass/international/product-types",
+  "/services/international/operators": "/vtpass/international/operators",
 
   // Social
   "/services/social": "/jap/services",
@@ -83,6 +87,50 @@ function applyAlias(path: string): string {
   }
 
   return path;
+}
+
+/**
+ * Rewrite first-party `/api/services/*` friendly paths → real `/api/*` handlers.
+ * `/api/services` (exact) is the catalog and must not be rewritten.
+ */
+export function resolveApiServicesRewrite(pathname: string): {
+  ok: true;
+  internalPath: string;
+} | {
+  ok: false;
+  status: number;
+  error: string;
+} {
+  const path = normalizeExternalPath(pathname);
+
+  if (path === "/api/services") {
+    return {
+      ok: false,
+      status: 404,
+      error: "Catalog route should not be rewritten.",
+    };
+  }
+
+  if (!path.startsWith("/api/services/")) {
+    return {
+      ok: false,
+      status: 404,
+      error: "Not a services API path.",
+    };
+  }
+
+  const remainder = path.slice("/api".length); // /services/...
+  const aliased = applyAlias(remainder);
+
+  if (aliased === remainder || !aliased.startsWith("/")) {
+    return {
+      ok: false,
+      status: 404,
+      error: "Unknown service endpoint.",
+    };
+  }
+
+  return { ok: true, internalPath: aliased };
 }
 
 /** Map `/api/external/v1/...` remainder to an internal `/api/...` path (no /api prefix). */

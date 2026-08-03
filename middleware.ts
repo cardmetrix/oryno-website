@@ -5,7 +5,10 @@ import {
 } from "@clerk/nextjs/server";
 import { ADMIN_SESSION_COOKIE } from "@/lib/admin/cookie";
 import { applyCorsHeaders } from "@/lib/external/cors";
-import { resolveExternalToInternal } from "@/lib/external/paths";
+import {
+  resolveApiServicesRewrite,
+  resolveExternalToInternal,
+} from "@/lib/external/paths";
 
 const isPublicRoute = createRouteMatcher([
   "/",
@@ -56,6 +59,22 @@ export default clerkMiddleware(
 
   if (pathname.startsWith("/api/uploadthing")) {
     return NextResponse.next();
+  }
+
+  // Friendly /api/services/* aliases (when route files are missing / stale)
+  if (
+    pathname.startsWith("/api/services/") &&
+    pathname !== "/api/services/"
+  ) {
+    const resolved = resolveApiServicesRewrite(pathname);
+    if (resolved.ok) {
+      const url = request.nextUrl.clone();
+      url.pathname = `/api${resolved.internalPath}`;
+      console.log(
+        `[services-api] rewrite ${pathname} → ${url.pathname}${url.search}`,
+      );
+      return NextResponse.rewrite(url);
+    }
   }
 
   // External mobile API — CORS + rewrite to first-party /api/* (keeps Bearer auth)
