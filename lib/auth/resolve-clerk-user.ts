@@ -24,15 +24,37 @@ function bearerFromAuthorization(value: string | null): string | null {
   return match?.[1]?.trim() || null;
 }
 
+/** Decode JWT payload without verifying (sid/sub peek only). */
+function decodeJwtPayload(token: string): {
+  sub?: string;
+  sid?: string;
+  azp?: string;
+  iss?: string;
+} | null {
+  try {
+    const part = token.split(".")[1];
+    if (!part) return null;
+    const json = Buffer.from(
+      part.replace(/-/g, "+").replace(/_/g, "/"),
+      "base64",
+    ).toString("utf8");
+    return JSON.parse(json) as {
+      sub?: string;
+      sid?: string;
+      azp?: string;
+      iss?: string;
+    };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Resolves the Clerk user for:
  * - Web (session cookies)
  * - Mobile Expo (Authorization: Bearer <session JWT>)
- *
- * Native tokens often fail cookie-only helpers and azp checks — verify the JWT
- * with the secret key first, then load the user from the Backend API.
  */
-export async function resolveClerkUser(): Promise<User | null> {
+export async function resolveClerkUser(request?: Request): Promise<User | null> {
   // 1) Web / middleware-hydrated session
   try {
     const fromHelper = await currentUser();
@@ -54,7 +76,7 @@ export async function resolveClerkUser(): Promise<User | null> {
 
   // 3) Explicit Bearer JWT verification (Expo / cross-origin)
   try {
-    const h = await headers();
+    const h = request ? request.headers : await headers();
     const token = bearerFromAuthorization(h.get("authorization"));
     if (!token) {
       console.warn("[resolveClerkUser] no clerk session and no Bearer token");
@@ -67,70 +89,124 @@ export async function resolveClerkUser(): Promise<User | null> {
       return null;
     }
 
-    // Prefer signature verification without azp lock — Expo azp varies by client.
+    const peeked = decodeJwtPayload(token);
+    console.log("[resolveClerkUser] bearer peek", {
+      sub: peeked?.sub,
+      sid: peeked?.sid,
+      azp: peeked?.azp,
+      iss: peeked?.iss,
+    });
+
+    const client = await clerkClient();
     let userId: string | null = null;
-    try {
-      const payload = await verifyToken(token, { secretKey });
-      userId = typeof payload.sub === "string" ? payload.sub : null;
+
+    // 3a) verifyToken — returns { data, errors }, does NOT throw on failure
+    const verified = await verifyToken(token, {
+      secretKey,
+      jwtKey: process.env.CLERK_JWT_KEY,
+    });
+
+    if (verified.data?.sub) {
+      userId = verified.data.sub;
       console.log("[resolveClerkUser] verifyToken ok", {
         sub: userId,
-        azp: (payload as { azp?: string }).azp,
-        iss: (payload as { iss?: string }).iss,
+        azp: (verified.data as { azp?: string }).azp,
+        iss: (verified.data as { iss?: string }).iss,
       });
-    } catch (verifyError) {
-      console.warn("[resolveClerkUser] verifyToken failed, trying authenticateRequest", {
-        message:
-          verifyError instanceof Error ? verifyError.message : String(verifyError),
+    } else {
+      console.warn("[resolveClerkUser] verifyToken failed", {
+        errors: verified.errors?.map((e) => e.message ?? String(e)),
       });
+    }
 
-      const host =
-        h.get("x-forwarded-host") || h.get("host") || "orynoafrica.com";
-      const proto = h.get("x-forwarded-proto") || "https";
-      const url = `${proto}://${host}/`;
-
-      const client = await clerkClient();
-      const requestState = await client.authenticateRequest(
-        new Request(url, {
-          headers: {
-            authorization: `Bearer ${token}`,
-            cookie: h.get("cookie") || "",
-            origin: h.get("origin") || "https://orynoafrica.com",
-            "user-agent": h.get("user-agent") || "oryno-africa",
-          },
-        }),
-        {
-          secretKey,
-          acceptsToken: "any",
-          authorizedParties: AUTHORIZED_PARTIES,
-        },
-      );
-
-      const authenticated =
-        ("isAuthenticated" in requestState &&
-          Boolean(
-            (requestState as { isAuthenticated?: boolean }).isAuthenticated,
-          )) ||
-        ("isSignedIn" in requestState &&
-          Boolean((requestState as { isSignedIn?: boolean }).isSignedIn));
-
-      if (!authenticated) {
-        console.warn("[resolveClerkUser] bearer rejected", {
-          status: (requestState as { status?: string }).status,
-          reason: (requestState as { reason?: string }).reason,
-          message: (requestState as { message?: string }).message,
+    // 3b) Classic mobile path: sessions.verifySession(sid, token)
+    if (!userId && peeked?.sid) {
+      try {
+        const session = await client.sessions.verifySession(peeked.sid, token);
+        userId = session.userId || peeked.sub || null;
+        console.log("[resolveClerkUser] verifySession ok", {
+          sub: userId,
+          status: session.status,
         });
-        return null;
+      } catch (sessionError) {
+        console.warn("[resolveClerkUser] verifySession failed", {
+          message:
+            sessionError instanceof Error
+              ? sessionError.message
+              : String(sessionError),
+        });
       }
+    }
 
-      userId = requestState.toAuth()?.userId ?? null;
+    // 3c) authenticateRequest with the real Request when available
+    if (!userId) {
+      try {
+        const host =
+          h.get("x-forwarded-host") || h.get("host") || "orynoafrica.com";
+        const proto = h.get("x-forwarded-proto") || "https";
+        const url = request?.url || `${proto}://${host}/`;
+
+        const requestState = await client.authenticateRequest(
+          request ??
+            new Request(url, {
+              headers: {
+                authorization: `Bearer ${token}`,
+                cookie: h.get("cookie") || "",
+                origin: h.get("origin") || "https://orynoafrica.com",
+                "user-agent": h.get("user-agent") || "oryno-africa",
+              },
+            }),
+          {
+            secretKey,
+            acceptsToken: "any",
+            authorizedParties: AUTHORIZED_PARTIES,
+          },
+        );
+
+        const authenticated =
+          ("isAuthenticated" in requestState &&
+            Boolean(
+              (requestState as { isAuthenticated?: boolean }).isAuthenticated,
+            )) ||
+          ("isSignedIn" in requestState &&
+            Boolean((requestState as { isSignedIn?: boolean }).isSignedIn));
+
+        if (authenticated) {
+          userId = requestState.toAuth()?.userId ?? null;
+          console.log("[resolveClerkUser] authenticateRequest ok", { sub: userId });
+        } else {
+          console.warn("[resolveClerkUser] authenticateRequest rejected", {
+            status: (requestState as { status?: string }).status,
+            reason: (requestState as { reason?: string }).reason,
+            message: (requestState as { message?: string }).message,
+          });
+        }
+      } catch (authReqError) {
+        console.warn("[resolveClerkUser] authenticateRequest error", authReqError);
+      }
+    }
+
+    // Last resort: if token peeks a user id and session is active via Backend API
+    if (!userId && peeked?.sub && peeked?.sid) {
+      try {
+        const session = await client.sessions.getSession(peeked.sid);
+        if (session.status === "active" && session.userId === peeked.sub) {
+          userId = peeked.sub;
+          console.warn(
+            "[resolveClerkUser] accepting active session via getSession fallback",
+            { sub: userId },
+          );
+        }
+      } catch (getSessionError) {
+        console.warn("[resolveClerkUser] getSession fallback failed", getSessionError);
+      }
     }
 
     if (!userId) {
-      console.warn("[resolveClerkUser] token verified but no userId/sub");
+      console.warn("[resolveClerkUser] all bearer strategies failed");
       return null;
     }
 
-    const client = await clerkClient();
     return await client.users.getUser(userId);
   } catch (error) {
     console.error("[resolveClerkUser] bearer", error);

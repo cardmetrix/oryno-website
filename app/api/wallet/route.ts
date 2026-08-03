@@ -18,13 +18,19 @@ import { formatMoney } from "@/lib/transactions";
 
 export const runtime = "nodejs";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     await ensureWalletSchema();
 
-    const user = await ensureAppUser();
+    const user = await ensureAppUser({ request: req });
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json(
+        {
+          error: "Unauthorized",
+          code: "clerk_bearer_rejected",
+        },
+        { status: 401 },
+      );
     }
 
     const currency = currencyForCountry(user.countryCode);

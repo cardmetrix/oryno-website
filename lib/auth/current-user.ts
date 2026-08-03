@@ -22,10 +22,11 @@ export async function ensureAppUser(options?: {
   touchLogin?: boolean;
   countryCode?: string | null;
   forceCountry?: boolean;
+  request?: Request;
 }): Promise<SyncedUser | null> {
   let clerkUser;
   try {
-    clerkUser = await resolveClerkUser();
+    clerkUser = await resolveClerkUser(options?.request);
   } catch (error) {
     console.error("[ensureAppUser-clerk]", error);
     return null;

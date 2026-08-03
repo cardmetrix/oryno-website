@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { clerkClient, currentUser } from "@clerk/nextjs/server";
+import { clerkClient } from "@clerk/nextjs/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
 import { getCountryInfo, resolveCountryCode } from "@/lib/country";
 import { detectCountryWithGoogle } from "@/lib/geo/google-country";
@@ -47,6 +47,7 @@ export async function POST(req: Request) {
       touchLogin: true,
       countryCode,
       forceCountry: body.forceCountry === true && confident,
+      request: req,
     });
 
     if (!user) {
@@ -55,7 +56,14 @@ export async function POST(req: Request) {
         hasBearer: Boolean(authHeader?.toLowerCase().startsWith("bearer ")),
         client: req.headers.get("x-oryno-client"),
       });
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json(
+        {
+          error: "Unauthorized",
+          code: "clerk_bearer_rejected",
+          hint: "Mobile Bearer JWT was not accepted. Check server logs for [resolveClerkUser].",
+        },
+        { status: 401 },
+      );
     }
 
     if (user.status === "suspended" || user.status === "deleted") {
@@ -72,22 +80,17 @@ export async function POST(req: Request) {
     );
 
     try {
-      const clerkUser = await currentUser();
-      if (clerkUser) {
-        const client = await clerkClient();
-        await client.users.updateUser(clerkUser.id, {
-          publicMetadata: {
-            ...clerkUser.publicMetadata,
-            countryCode: country.code,
-            currency: country.currency,
-          },
-          unsafeMetadata: {
-            ...clerkUser.unsafeMetadata,
-            countryCode: country.code,
-            currency: country.currency,
-          },
-        });
-      }
+      const client = await clerkClient();
+      await client.users.updateUser(user.clerkId, {
+        publicMetadata: {
+          countryCode: country.code,
+          currency: country.currency,
+        },
+        unsafeMetadata: {
+          countryCode: country.code,
+          currency: country.currency,
+        },
+      });
     } catch (metaError) {
       console.error("[auth-sync-metadata]", metaError);
     }
