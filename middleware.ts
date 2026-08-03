@@ -50,7 +50,8 @@ const isAdminRoute = createRouteMatcher(["/admin(.*)"]);
 const isAdminLogin = createRouteMatcher(["/admin/login"]);
 const isAdminApi = createRouteMatcher(["/api/admin(.*)"]);
 
-export default clerkMiddleware(async (auth, request) => {
+export default clerkMiddleware(
+  async (auth, request) => {
   const { pathname } = request.nextUrl;
 
   if (pathname.startsWith("/api/uploadthing")) {
@@ -140,7 +141,21 @@ export default clerkMiddleware(async (auth, request) => {
   }
 
   return NextResponse.next();
-});
+},
+  {
+    // Allow Expo / native session tokens whose azp is the Clerk FAPI or app scheme
+    authorizedParties: [
+      "https://orynoafrica.com",
+      "https://www.orynoafrica.com",
+      "https://clerk.orynoafrica.com",
+      "http://localhost:3000",
+      "http://127.0.0.1:3000",
+      "http://localhost:8081",
+      "oryno://",
+      "exp://",
+    ],
+  },
+);
 
 export const config = {
   matcher: [
