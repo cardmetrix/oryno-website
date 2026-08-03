@@ -1,14 +1,14 @@
-import { NextResponse } from "next/server";
 import {
-  adminCookieOptions,
-  canBootstrapAdmin,
-  createAdminSession,
-  ensureBootstrapAdmin,
-  isValidAdminPasscode,
-  resolveAdminForClerk,
-  ADMIN_SESSION_COOKIE,
+    ADMIN_SESSION_COOKIE,
+    adminCookieOptions,
+    canBootstrapAdmin,
+    createAdminSession,
+    ensureBootstrapAdmin,
+    isValidAdminPasscode,
+    resolveAdminForClerk,
 } from "@/lib/admin/auth";
 import { notifyAdminLogin } from "@/lib/notify/auth-events";
+import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
@@ -87,6 +87,9 @@ export async function POST(req: Request) {
 
     const res = NextResponse.json({
       ok: true,
+      // Returned for mobile / native clients that cannot use HttpOnly cookies.
+      sessionToken: session.token,
+      expiresAt: session.expiresAt.toISOString(),
       admin: {
         id: admin.id,
         name: admin.name,

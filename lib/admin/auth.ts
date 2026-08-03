@@ -1,10 +1,10 @@
-import { createHash, randomBytes, timingSafeEqual } from "crypto";
-import { cookies, headers } from "next/headers";
-import { and, eq, isNull, gt } from "drizzle-orm";
-import { currentUser } from "@clerk/nextjs/server";
+import { ADMIN_SESSION_COOKIE } from "@/lib/admin/cookie";
 import { db } from "@/lib/db";
 import { adminAuditLogs, admins, adminSessions } from "@/lib/db/schema";
-import { ADMIN_SESSION_COOKIE } from "@/lib/admin/cookie";
+import { currentUser } from "@clerk/nextjs/server";
+import { createHash, randomBytes, timingSafeEqual } from "crypto";
+import { and, eq, gt, isNull } from "drizzle-orm";
+import { cookies, headers } from "next/headers";
 
 export { ADMIN_SESSION_COOKIE };
 
@@ -240,9 +240,21 @@ export async function canBootstrapAdmin(email: string) {
   return !existing;
 }
 
-export async function getAdminSession(): Promise<AdminSessionContext | null> {
+/** Mobile / non-cookie clients send the raw session token here. */
+export const ADMIN_SESSION_HEADER = "x-oryno-admin-session";
+
+async function readAdminSessionToken(): Promise<string | null> {
   const jar = await cookies();
-  const token = jar.get(ADMIN_SESSION_COOKIE)?.value;
+  const fromCookie = jar.get(ADMIN_SESSION_COOKIE)?.value;
+  if (fromCookie) return fromCookie;
+
+  const h = await headers();
+  const fromHeader = h.get(ADMIN_SESSION_HEADER)?.trim();
+  return fromHeader || null;
+}
+
+export async function getAdminSession(): Promise<AdminSessionContext | null> {
+  const token = await readAdminSessionToken();
   if (!token) return null;
 
   const tokenHash = hashToken(token);
@@ -379,8 +391,7 @@ export async function createAdminSession(admin: AdminRecord) {
 }
 
 export async function revokeAdminSession(token?: string | null) {
-  const jar = await cookies();
-  const value = token || jar.get(ADMIN_SESSION_COOKIE)?.value;
+  const value = token || (await readAdminSessionToken());
   if (!value) return;
 
   const tokenHash = hashToken(value);
