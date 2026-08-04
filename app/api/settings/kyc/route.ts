@@ -4,6 +4,10 @@ import { desc, eq } from "drizzle-orm";
 import { ensureAppUser } from "@/lib/auth/current-user";
 import { db } from "@/lib/db";
 import { kycSubmissions, users } from "@/lib/db/schema";
+import {
+  uploadKycImage,
+  type KycImagePayload,
+} from "@/lib/kyc-upload";
 import { createNotification } from "@/lib/notifications-service";
 
 export const runtime = "nodejs";
@@ -74,6 +78,10 @@ export async function POST(req: Request) {
       idFrontUrl?: string;
       idBackUrl?: string;
       selfieUrl?: string;
+      /** Mobile clients upload images as base64 (same pattern as gift-card sell). */
+      idFrontImage?: KycImagePayload;
+      idBackImage?: KycImagePayload;
+      selfieImage?: KycImagePayload;
       step?: number;
       submit?: boolean;
     };
@@ -83,13 +91,33 @@ export async function POST(req: Request) {
       orderBy: [desc(kycSubmissions.createdAt)],
     });
 
+    let uploadedFront: string | null = null;
+    let uploadedBack: string | null = null;
+    let uploadedSelfie: string | null = null;
+    try {
+      uploadedFront = await uploadKycImage(body.idFrontImage);
+      uploadedBack = await uploadKycImage(body.idBackImage);
+      uploadedSelfie = await uploadKycImage(body.selfieImage);
+    } catch (uploadError) {
+      return NextResponse.json(
+        {
+          error:
+            uploadError instanceof Error
+              ? uploadError.message
+              : "Failed to upload KYC images",
+        },
+        { status: 400 },
+      );
+    }
+
     const payload = {
       step: body.step ?? latest?.step ?? 1,
       idType: body.idType?.trim() || latest?.idType || null,
       idNumber: body.idNumber?.trim() || latest?.idNumber || null,
-      idFrontUrl: body.idFrontUrl || latest?.idFrontUrl || null,
-      idBackUrl: body.idBackUrl || latest?.idBackUrl || null,
-      selfieUrl: body.selfieUrl || latest?.selfieUrl || null,
+      idFrontUrl:
+        uploadedFront || body.idFrontUrl || latest?.idFrontUrl || null,
+      idBackUrl: uploadedBack || body.idBackUrl || latest?.idBackUrl || null,
+      selfieUrl: uploadedSelfie || body.selfieUrl || latest?.selfieUrl || null,
       status: body.submit ? ("pending" as const) : (latest?.status ?? "pending"),
       updatedAt: new Date(),
     };
