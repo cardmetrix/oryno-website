@@ -100,8 +100,8 @@ function SidebarContent({
         onClick={onNavigate}
         className="mb-8 flex items-center gap-2.5 px-2 pr-12 md:pr-2"
       >
-        {/* Same crop as wallet card — scales out the PNG’s white edge */}
-        <span className="relative h-9 w-9 shrink-0 overflow-hidden rounded-xl bg-[#FF6A00] shadow-[var(--shadow-orange)]">
+        {/* Same crop as wallet card — keeps prior logo corner radius */}
+        <span className="relative h-9 w-9 shrink-0 overflow-hidden rounded-[22%] bg-[#FF6A00] shadow-[var(--shadow-orange)]">
           <Image
             src={BRAND_LOGO_SRC}
             alt="ORYNO"
