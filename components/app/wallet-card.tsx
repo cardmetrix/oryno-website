@@ -93,7 +93,7 @@ export function WalletCard({
 
             <div className="relative flex flex-col gap-3 p-3.5 sm:p-4">
               <div className="flex items-center gap-2.5">
-                <span className="relative h-9 w-9 shrink-0 overflow-hidden rounded-xl bg-[#FF6A00] ring-1 ring-white/25">
+                <span className="relative h-9 w-9 shrink-0 overflow-hidden rounded-[22%] bg-[#FF6A00] ring-1 ring-white/25">
                   <Image
                     src={BRAND_LOGO_SRC}
                     alt="ORYNO"
