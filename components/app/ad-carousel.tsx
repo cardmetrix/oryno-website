@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
+import { isExternalAdHref } from "@/lib/admin/ads";
 
 type AdSlide = {
   id: string;
@@ -105,7 +106,7 @@ export function AdCarousel() {
           <div className={`absolute inset-0 bg-gradient-to-r ${ad.overlay}`} />
           <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-black/10 md:from-black/25" />
 
-          <Link
+          <AdLink
             href={ad.href}
             className="group absolute inset-0 flex items-end justify-between gap-3 p-3.5 sm:p-4 md:p-5 lg:p-6"
           >
@@ -130,7 +131,7 @@ export function AdCarousel() {
             <span className="mb-0.5 hidden h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/25 bg-white/15 text-white backdrop-blur-sm transition group-hover:border-white/40 group-hover:bg-white/25 md:mb-1 md:flex lg:h-11 lg:w-11">
               <ArrowRight className="h-4 w-4" strokeWidth={2} />
             </span>
-          </Link>
+          </AdLink>
         </motion.div>
       </AnimatePresence>
 
@@ -160,5 +161,34 @@ export function AdCarousel() {
         ))}
       </div>
     </div>
+  );
+}
+
+function AdLink({
+  href,
+  className,
+  children,
+}: {
+  href: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  if (isExternalAdHref(href)) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={className}
+      >
+        {children}
+      </a>
+    );
+  }
+
+  return (
+    <Link href={href} className={className}>
+      {children}
+    </Link>
   );
 }

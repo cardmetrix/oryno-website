@@ -7,6 +7,7 @@ import {
   DEFAULT_OVERLAY_COLORS,
   isAdPlacement,
   isAdStatus,
+  normalizeAdHref,
   parseDateInput,
   shapeAd,
   type AdPlacement,
@@ -73,14 +74,14 @@ export async function PATCH(req: Request, ctx: Ctx) {
       patch.subtitle = String(body.subtitle || "").trim() || null;
     }
     if (body.href != null) {
-      const href = String(body.href).trim();
-      if (!href.startsWith("/")) {
+      const hrefResult = normalizeAdHref(String(body.href));
+      if (!hrefResult.ok) {
         return NextResponse.json(
-          { error: "Link must start with / (e.g. /services/gift-cards)" },
+          { error: hrefResult.error },
           { status: 400 },
         );
       }
-      patch.href = href;
+      patch.href = hrefResult.href;
     }
     if (body.badge !== undefined) {
       patch.badge = String(body.badge || "").trim() || null;

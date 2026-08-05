@@ -7,8 +7,10 @@ import {
   AD_STATUS_OPTIONS,
   DEFAULT_OVERLAY,
   DEFAULT_OVERLAY_COLORS,
+  AD_SERVICE_LINK_OPTIONS,
   isAdPlacement,
   isAdStatus,
+  normalizeAdHref,
   parseDateInput,
   shapeAd,
   type AdPlacement,
@@ -44,6 +46,7 @@ export async function GET(req: Request) {
       ok: true,
       statusOptions: AD_STATUS_OPTIONS,
       placementOptions: AD_PLACEMENT_OPTIONS,
+      serviceLinkOptions: AD_SERVICE_LINK_OPTIONS,
       ads: rows.map(shapeAd),
     });
   });
@@ -69,7 +72,7 @@ export async function POST(req: Request) {
     };
 
     const title = String(body.title || "").trim();
-    const href = String(body.href || "").trim();
+    const hrefResult = normalizeAdHref(String(body.href || ""));
     const subtitle = String(body.subtitle || "").trim() || null;
     const badge = String(body.badge || "").trim() || null;
     const overlay = String(body.overlay || "").trim() || DEFAULT_OVERLAY;
@@ -92,12 +95,10 @@ export async function POST(req: Request) {
     if (!title) {
       return NextResponse.json({ error: "Title is required" }, { status: 400 });
     }
-    if (!href.startsWith("/")) {
-      return NextResponse.json(
-        { error: "Link must start with / (e.g. /services/gift-cards)" },
-        { status: 400 },
-      );
+    if (!hrefResult.ok) {
+      return NextResponse.json({ error: hrefResult.error }, { status: 400 });
     }
+    const href = hrefResult.href;
     if (startsAt && endsAt && endsAt.getTime() <= startsAt.getTime()) {
       return NextResponse.json(
         { error: "Expiry must be after the start date" },

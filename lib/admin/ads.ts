@@ -1,3 +1,5 @@
+import { servicesDirectory } from "@/lib/services-directory";
+
 export const AD_STATUS_OPTIONS = [
   { value: "draft", label: "Draft", description: "Hidden from users" },
   { value: "live", label: "Live", description: "Shown in the carousel" },
@@ -13,6 +15,72 @@ export const AD_PLACEMENT_OPTIONS = [
 ] as const;
 
 export type AdPlacement = (typeof AD_PLACEMENT_OPTIONS)[number]["value"];
+
+/** Preset destinations for ad links — services + common app screens. */
+export const AD_SERVICE_LINK_OPTIONS = [
+  { id: "custom", label: "Custom URL (enter manually)", href: "" },
+  { id: "dashboard", label: "Home / Dashboard", href: "/dashboard" },
+  { id: "wallet", label: "Wallet", href: "/wallet" },
+  { id: "fund", label: "Fund wallet", href: "/fund" },
+  { id: "withdraw", label: "Withdraw", href: "/withdraw" },
+  { id: "services", label: "All services", href: "/services" },
+  ...servicesDirectory.map((s) => ({
+    id: s.id,
+    label: s.label,
+    href: s.href,
+  })),
+] as const;
+
+export type AdServiceLinkId = (typeof AD_SERVICE_LINK_OPTIONS)[number]["id"];
+
+export function findAdServiceLinkByHref(href: string) {
+  const normalized = href.trim();
+  return AD_SERVICE_LINK_OPTIONS.find(
+    (opt) => opt.id !== "custom" && opt.href === normalized,
+  );
+}
+
+/** Accept in-app paths (`/…`) or absolute http(s) web links. */
+export function normalizeAdHref(raw: string):
+  | { ok: true; href: string }
+  | { ok: false; error: string } {
+  const href = raw.trim();
+  if (!href) {
+    return { ok: false, error: "Link is required" };
+  }
+
+  if (href.length > 255) {
+    return { ok: false, error: "Link is too long (max 255 characters)" };
+  }
+
+  if (href.startsWith("/") && !href.startsWith("//")) {
+    return { ok: true, href };
+  }
+
+  try {
+    const url = new URL(href);
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return {
+        ok: false,
+        error: "Web links must use http:// or https://",
+      };
+    }
+    if (url.href.length > 255) {
+      return { ok: false, error: "Link is too long (max 255 characters)" };
+    }
+    return { ok: true, href: url.href };
+  } catch {
+    return {
+      ok: false,
+      error:
+        "Enter a service path (e.g. /services/gift-cards) or a full URL (https://…)",
+    };
+  }
+}
+
+export function isExternalAdHref(href: string) {
+  return /^https?:\/\//i.test(href.trim());
+}
 
 export const DEFAULT_OVERLAY =
   "from-oryno-charcoal/85 via-oryno-charcoal/40 to-transparent";

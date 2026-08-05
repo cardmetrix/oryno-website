@@ -29,8 +29,10 @@ import {
 } from "@/components/ui/dialog";
 import {
   AD_PLACEMENT_OPTIONS,
+  AD_SERVICE_LINK_OPTIONS,
   AD_STATUS_OPTIONS,
   DEFAULT_OVERLAY,
+  findAdServiceLinkByHref,
   type AdPlacement,
   type AdStatus,
 } from "@/lib/admin/ads";
@@ -57,15 +59,23 @@ type Ad = {
   active: boolean;
 };
 
+type ServiceLinkOption = {
+  id: string;
+  label: string;
+  href: string;
+};
+
 type Response = {
   ads: Ad[];
   statusOptions: typeof AD_STATUS_OPTIONS;
   placementOptions: typeof AD_PLACEMENT_OPTIONS;
+  serviceLinkOptions?: ServiceLinkOption[];
 };
 
 type FormState = {
   title: string;
   subtitle: string;
+  linkOptionId: string;
   href: string;
   badge: string;
   imageUrl: string;
@@ -77,10 +87,15 @@ type FormState = {
   overlay: string;
 };
 
+const DEFAULT_SERVICE_LINK =
+  AD_SERVICE_LINK_OPTIONS.find((o) => o.id === "gift-cards") ??
+  AD_SERVICE_LINK_OPTIONS.find((o) => o.id !== "custom")!;
+
 const emptyForm = (): FormState => ({
   title: "",
   subtitle: "",
-  href: "/services/gift-cards",
+  linkOptionId: DEFAULT_SERVICE_LINK.id,
+  href: DEFAULT_SERVICE_LINK.href,
   badge: "",
   imageUrl: "",
   placement: "home_carousel",
@@ -90,6 +105,14 @@ const emptyForm = (): FormState => ({
   endsAt: "",
   overlay: DEFAULT_OVERLAY,
 });
+
+function formFromHref(href: string): Pick<FormState, "linkOptionId" | "href"> {
+  const match = findAdServiceLinkByHref(href);
+  if (match) {
+    return { linkOptionId: match.id, href: match.href };
+  }
+  return { linkOptionId: "custom", href };
+}
 
 function toLocalInput(iso: string | null) {
   if (!iso) return "";
@@ -113,11 +136,17 @@ export default function AdminAdsPage() {
     ? data.statusOptions
     : AD_STATUS_OPTIONS;
 
+  const serviceLinkOptions = data?.serviceLinkOptions?.length
+    ? data.serviceLinkOptions
+    : AD_SERVICE_LINK_OPTIONS;
+
   const ads = useMemo(() => {
     const rows = data?.ads ?? [];
     if (!filter) return rows;
     return rows.filter((a) => a.status === filter);
   }, [data?.ads, filter]);
+
+  const isCustomLink = form.linkOptionId === "custom";
 
   function openCreate() {
     setEditing(null);
@@ -127,10 +156,12 @@ export default function AdminAdsPage() {
 
   function openEdit(ad: Ad) {
     setEditing(ad);
+    const link = formFromHref(ad.href);
     setForm({
       title: ad.title,
       subtitle: ad.subtitle || "",
-      href: ad.href,
+      linkOptionId: link.linkOptionId,
+      href: link.href,
       badge: ad.badge || "",
       imageUrl: ad.imageUrl,
       placement: ad.placement,
@@ -141,6 +172,16 @@ export default function AdminAdsPage() {
       overlay: ad.overlay || DEFAULT_OVERLAY,
     });
     setOpen(true);
+  }
+
+  function onLinkOptionChange(optionId: string) {
+    const option = serviceLinkOptions.find((o) => o.id === optionId);
+    if (!option) return;
+    setForm((f) => ({
+      ...f,
+      linkOptionId: option.id,
+      href: option.id === "custom" ? f.href : option.href,
+    }));
   }
 
   async function onSave(e: FormEvent) {
@@ -406,14 +447,41 @@ export default function AdminAdsPage() {
               />
             </Field>
             <Field label="App / web link">
-              <input
-                required
-                value={form.href}
-                onChange={(e) => setForm((f) => ({ ...f, href: e.target.value }))}
+              <select
+                value={form.linkOptionId}
+                onChange={(e) => onLinkOptionChange(e.target.value)}
                 className={inputClass}
-                placeholder="/services/gift-cards"
-              />
+              >
+                {serviceLinkOptions.map((opt) => (
+                  <option key={opt.id} value={opt.id}>
+                    {opt.label}
+                    {opt.href ? ` — ${opt.href}` : ""}
+                  </option>
+                ))}
+              </select>
             </Field>
+            {isCustomLink ? (
+              <Field label="Custom URL">
+                <input
+                  required
+                  value={form.href}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, href: e.target.value }))
+                  }
+                  className={inputClass}
+                  placeholder="/services/gift-cards or https://example.com"
+                />
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Use an in-app path (starts with /) or a full https:// web link.
+                </p>
+              </Field>
+            ) : (
+              <p className="-mt-1 text-[11px] text-muted-foreground">
+                Opens{" "}
+                <span className="font-medium text-foreground">{form.href}</span>{" "}
+                when the ad is tapped.
+              </p>
+            )}
             <Field label="Badge (optional)">
               <input
                 value={form.badge}
