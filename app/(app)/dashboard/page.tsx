@@ -60,15 +60,12 @@ export default function DashboardPage() {
     <AppShell>
       <DashboardHeader />
 
-      <div className="grid items-stretch gap-4 sm:gap-5 lg:grid-cols-[1.35fr_0.85fr] lg:gap-6">
+      <div className="grid items-stretch gap-4 sm:gap-5 lg:grid-cols-1 lg:gap-6 lg:has-[.ad-carousel]:grid-cols-[1.35fr_0.85fr]">
         <MotionSection delay={0.04} className="min-w-0">
           <WalletCard />
-         
         </MotionSection>
 
-        <MotionSection delay={0.08} className="min-w-0 lg:h-full">
-          <AdCarousel />
-        </MotionSection>
+        <AdCarousel />
       </div>
 
       <MotionSection delay={0.14} className="mt-6">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
@@ -16,38 +16,13 @@ type AdSlide = {
   badge?: string | null;
 };
 
-const FALLBACK_ADS: AdSlide[] = [
-  {
-    id: "gift",
-    href: "/services/gift-cards",
-    title: "Gift Cards",
-    subtitle: "Sell for live Naira rates",
-    imageUrl: "/brand/auth-panel.jpg",
-    overlay: "from-oryno-charcoal/85 via-oryno-charcoal/40 to-transparent",
-  },
-  {
-    id: "boost",
-    href: "/services/social",
-    title: "Social Boost",
-    subtitle: "Grow followers, likes & views",
-    imageUrl: "/brand/auth-panel.jpg",
-    overlay: "from-[#1C1C1E]/90 via-[#FF6A00]/30 to-transparent",
-    badge: "Popular",
-  },
-  {
-    id: "numbers",
-    href: "/services/virtual-numbers",
-    title: "Virtual Numbers",
-    subtitle: "SMS verification lines worldwide",
-    imageUrl: "/brand/auth-panel.jpg",
-    overlay: "from-oryno-orange/75 via-oryno-charcoal/45 to-transparent",
-  },
-];
-
 const INTERVAL_MS = 10_000;
+const DEFAULT_OVERLAY =
+  "from-oryno-charcoal/85 via-oryno-charcoal/40 to-transparent";
 
 export function AdCarousel() {
-  const [ads, setAds] = useState<AdSlide[]>(FALLBACK_ADS);
+  const [ads, setAds] = useState<AdSlide[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
@@ -57,7 +32,7 @@ export function AdCarousel() {
         const res = await fetch("/api/ads?placement=home_carousel", {
           cache: "no-store",
         });
-        if (!res.ok) return;
+        if (!res.ok) throw new Error("Failed");
         const json = (await res.json()) as {
           ads?: Array<{
             id: string;
@@ -69,23 +44,23 @@ export function AdCarousel() {
             badge?: string | null;
           }>;
         };
-        if (cancelled || !json.ads?.length) return;
+        if (cancelled) return;
         setAds(
-          json.ads.map((ad) => ({
+          (json.ads ?? []).map((ad) => ({
             id: ad.id,
             href: ad.href,
             title: ad.title,
             subtitle: ad.subtitle,
             imageUrl: ad.imageUrl,
-            overlay:
-              ad.overlay ||
-              "from-oryno-charcoal/85 via-oryno-charcoal/40 to-transparent",
+            overlay: ad.overlay || DEFAULT_OVERLAY,
             badge: ad.badge,
           })),
         );
         setIndex(0);
       } catch {
-        // Keep fallback creatives when the API is unavailable.
+        if (!cancelled) setAds([]);
+      } finally {
+        if (!cancelled) setLoaded(true);
       }
     })();
     return () => {
@@ -101,15 +76,14 @@ export function AdCarousel() {
     return () => window.clearInterval(id);
   }, [ads.length]);
 
-  const safeIndex = ads.length ? index % ads.length : 0;
-  const ad = ads[safeIndex] ?? FALLBACK_ADS[0];
-  const remote = useMemo(
-    () => /^https?:\/\//i.test(ad.imageUrl),
-    [ad.imageUrl],
-  );
+  if (!loaded || ads.length === 0) return null;
+
+  const safeIndex = index % ads.length;
+  const ad = ads[safeIndex];
+  const remote = /^https?:\/\//i.test(ad.imageUrl);
 
   return (
-    <div className="relative h-[128px] w-full overflow-hidden rounded-[22px] border border-border/80 bg-muted shadow-[var(--shadow-soft)] sm:h-[148px] md:h-[172px] md:rounded-[28px] lg:h-full lg:min-h-[200px]">
+    <div className="ad-carousel relative h-[128px] w-full overflow-hidden rounded-[22px] border border-border/80 bg-muted shadow-[var(--shadow-soft)] sm:h-[148px] md:h-[172px] md:rounded-[28px] lg:h-full lg:min-h-[200px]">
       <AnimatePresence mode="wait">
         <motion.div
           key={ad.id}
