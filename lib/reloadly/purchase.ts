@@ -176,14 +176,20 @@ export async function quoteGiftCardBuy(input: {
 
   // Treat mapped/sender amounts as USD face for local FX (common Reloadly account setup)
   const quote = await quoteLocalUsd(currency);
-  const local = roundMoney(usdFace * quote.buyRate * reloadlyMarkup());
+  const { priceUsdToLocal } = await import("@/lib/pricing/service-pricing");
+  const priced = await priceUsdToLocal({
+    provider: "reloadly",
+    serviceKey: String(input.product.productId),
+    usd: usdFace,
+    buyRate: quote.buyRate,
+  });
 
   return {
     usdFace,
-    local,
+    local: priced.local,
     currency,
     rate: quote.buyRate,
-    markup: reloadlyMarkup(),
+    markup: priced.markup,
     demo: isReloadlyDemoMode(),
   };
 }

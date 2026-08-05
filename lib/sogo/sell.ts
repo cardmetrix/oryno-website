@@ -18,7 +18,6 @@ import {
   extractNgnRate,
   fetchSogoSellRates,
   isSogoDemoMode,
-  sogoSellPayoutShare,
   submitSogoGiftCardSell,
 } from "./client";
 import { sogoErrorToEnglish } from "./errors";
@@ -115,14 +114,20 @@ export async function quoteGiftCardSell(input: {
 
   const providerPayout =
     Math.round(input.cardAmount * ratePerUnit * 100) / 100;
-  const share = sogoSellPayoutShare();
-  // userPayout follows provider payout exactly when share === 1
-  const userPayout = Math.round(providerPayout * share * 100) / 100;
+  const { getSogoPayoutShare, priceLocalAmount } = await import(
+    "@/lib/pricing/service-pricing"
+  );
+  const share = await getSogoPayoutShare();
+  const priced = await priceLocalAmount({
+    provider: "sogo",
+    serviceKey: input.slug,
+    amount: providerPayout,
+  });
 
   return {
     ratePerUnit, // exact NGN-per-unit from provider (or demo mirror)
     providerPayout,
-    userPayout,
+    userPayout: priced.local,
     currency: "NGN" as const,
     share,
     demo: isSogoDemoMode(),
@@ -254,8 +259,16 @@ export async function sellGiftCard(input: {
     const providerPayout = Number(
       data.payout_amount?.raw ?? quote.providerPayout,
     );
-    const share = sogoSellPayoutShare();
-    const userPayout = Math.round(providerPayout * share * 100) / 100;
+    const { getSogoPayoutShare, priceLocalAmount } = await import(
+      "@/lib/pricing/service-pricing"
+    );
+    const share = await getSogoPayoutShare();
+    const priced = await priceLocalAmount({
+      provider: "sogo",
+      serviceKey: input.slug,
+      amount: providerPayout,
+    });
+    const userPayout = priced.local;
     const lockedRatePerUnit =
       input.cardAmount > 0
         ? Math.round((providerPayout / input.cardAmount) * 10000) / 10000
@@ -488,8 +501,19 @@ export async function handleSogoWebhookEvent(event: SogoWebhookEvent) {
             event.data.amount ??
             txRow.amount,
     );
-    const share = sogoSellPayoutShare();
-    const userPayout = Math.round(providerPayout * share * 100) / 100;
+    const { priceLocalAmount } = await import("@/lib/pricing/service-pricing");
+    const brandSlug =
+      typeof txRow.metadata === "object" &&
+      txRow.metadata &&
+      "slug" in txRow.metadata
+        ? String((txRow.metadata as { slug?: string }).slug || "")
+        : "";
+    const priced = await priceLocalAmount({
+      provider: "sogo",
+      serviceKey: brandSlug || undefined,
+      amount: providerPayout,
+    });
+    const userPayout = priced.local;
 
     const result = await settleGiftCardSellSuccess({
       orderId,

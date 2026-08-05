@@ -123,11 +123,18 @@ async function refundDebit(input: {
 export async function usdToLocalJapPrice(
   usd: number,
   countryCode?: string | null,
+  serviceKey?: string | null,
 ) {
   const currency = currencyForCountry(countryCode);
   const quote = await quoteLocalUsd(currency);
-  const local = roundMoney(usd * quote.buyRate * japMarkup());
-  return { local, currency, quote };
+  const { priceUsdToLocal } = await import("@/lib/pricing/service-pricing");
+  const priced = await priceUsdToLocal({
+    provider: "jap",
+    serviceKey,
+    usd,
+    buyRate: quote.buyRate,
+  });
+  return { local: priced.local, currency, quote, markup: priced.markup };
 }
 
 async function ensureSocialPackage(input: {
@@ -203,11 +210,10 @@ export async function purchaseJapBoost(input: {
   const { local, currency } = await usdToLocalJapPrice(
     priceUsd,
     input.countryCode,
+    String(input.serviceId),
   );
-  const chargeAmount =
-    Number.isFinite(input.priceLocal) && (input.priceLocal as number) > 0
-      ? roundMoney(input.priceLocal as number)
-      : local;
+  // Always charge admin/server retail — ignore client-posted priceLocal for security.
+  const chargeAmount = local;
 
   const pkg = await ensureSocialPackage({
     countryCode: resolveCountryCode(input.countryCode),

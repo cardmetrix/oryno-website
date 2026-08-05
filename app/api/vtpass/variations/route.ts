@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
+import { priceLocalAmount } from "@/lib/pricing/service-pricing";
 import {
   fallbackVariationsFor,
   getVtpassVariations,
@@ -50,20 +51,35 @@ export async function GET(req: Request) {
       variations = fallbackVariationsFor(serviceID);
     }
 
+    const priced = await Promise.all(
+      variations.map(async (v) => {
+        const base = Number(v.charged_amount ?? v.variation_amount) || 0;
+        const key = `${serviceID}:${v.variation_code || v.name}`;
+        const result = await priceLocalAmount({
+          provider: "vtpass",
+          serviceKey: key,
+          amount: base,
+        });
+        return {
+          variationCode: v.variation_code,
+          name: v.name,
+          amount: result.local,
+          listAmount: result.listLocal,
+          priceOverride: result.overrideApplied,
+          fixedPrice: String(v.fixedPrice || "").toLowerCase() === "yes",
+          variationAmount: v.variation_amount,
+          chargedAmount: v.charged_amount,
+          variationRate: v.variation_rate,
+        };
+      }),
+    );
+
     return NextResponse.json({
       ok: true,
       demo: isVtpassDemoMode(),
       serviceID,
       serviceName,
-      variations: variations.map((v) => ({
-        variationCode: v.variation_code,
-        name: v.name,
-        amount: Number(v.charged_amount ?? v.variation_amount) || 0,
-        fixedPrice: String(v.fixedPrice || "").toLowerCase() === "yes",
-        variationAmount: v.variation_amount,
-        chargedAmount: v.charged_amount,
-        variationRate: v.variation_rate,
-      })),
+      variations: priced,
     });
   } catch (error) {
     console.error("[vtpass-variations]", error);

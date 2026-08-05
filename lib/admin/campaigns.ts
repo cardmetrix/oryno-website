@@ -8,6 +8,7 @@ import {
 } from "@/lib/admin/email-templates";
 import { sendBrandedEmail } from "@/lib/email/send";
 import { createNotification } from "@/lib/notifications-service";
+import { deliverNotificationPush } from "@/lib/push/deliver";
 
 export type CampaignAudienceMode = "all" | "selected" | "individual";
 
@@ -293,8 +294,18 @@ export async function sendCampaign(
             templateId: input.templateId || "custom",
           },
           email: false,
+          push: true,
         });
         notified = 1;
+      } else if (sendEmail) {
+        // Email-only campaign: push without creating a second inbox item.
+        void deliverNotificationPush({
+          userId: user.id,
+          title: personalizedTitle,
+          body: personalizedBody,
+          type: notificationType,
+          href: ctaHref,
+        }).catch((error) => console.error("[campaign-push]", error));
       }
 
       if (sendEmail && user.email) {

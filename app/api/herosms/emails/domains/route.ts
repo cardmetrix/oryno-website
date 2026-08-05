@@ -46,7 +46,12 @@ export async function GET(req: Request) {
     const list = [];
     for (const d of domains) {
       const costUsd = Number(d.cost) || 0.1;
-      const { local } = await usdToLocalPrice(costUsd, user.countryCode);
+      const domainName = String(d.name || "").toLowerCase();
+      const { local } = await usdToLocalPrice(
+        costUsd,
+        user.countryCode,
+        `email:${site}:${domainName}`,
+      );
       list.push({
         name: d.name,
         costUsd,

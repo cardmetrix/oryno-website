@@ -119,6 +119,49 @@ export async function ensureWalletSchema() {
         CREATE INDEX IF NOT EXISTS "ads_ends_at_idx"
         ON "ads" USING btree ("ends_at")
       `);
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS "user_push_tokens" (
+          "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+          "user_id" uuid NOT NULL REFERENCES "users"("id") ON DELETE cascade,
+          "token" text NOT NULL,
+          "platform" varchar(20) DEFAULT 'unknown' NOT NULL,
+          "device_id" varchar(120),
+          "app_version" varchar(40),
+          "last_seen_at" timestamp with time zone DEFAULT now() NOT NULL,
+          "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+          "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+        )
+      `);
+      await db.execute(sql`
+        CREATE UNIQUE INDEX IF NOT EXISTS "user_push_tokens_token_uidx"
+        ON "user_push_tokens" USING btree ("token")
+      `);
+      await db.execute(sql`
+        CREATE INDEX IF NOT EXISTS "user_push_tokens_user_idx"
+        ON "user_push_tokens" USING btree ("user_id")
+      `);
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS "service_price_overrides" (
+          "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+          "provider" varchar(40) NOT NULL,
+          "service_key" varchar(160) NOT NULL,
+          "label" varchar(200),
+          "mode" varchar(20) DEFAULT 'percent' NOT NULL,
+          "value" numeric(18, 6) NOT NULL,
+          "active" boolean DEFAULT true NOT NULL,
+          "metadata" jsonb,
+          "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+          "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+        )
+      `);
+      await db.execute(sql`
+        CREATE UNIQUE INDEX IF NOT EXISTS "service_price_overrides_provider_key_uidx"
+        ON "service_price_overrides" USING btree ("provider","service_key")
+      `);
+      await db.execute(sql`
+        CREATE INDEX IF NOT EXISTS "service_price_overrides_provider_idx"
+        ON "service_price_overrides" USING btree ("provider")
+      `);
     })().catch((error) => {
       ready = null;
       console.error("[ensure-wallet-schema]", error);

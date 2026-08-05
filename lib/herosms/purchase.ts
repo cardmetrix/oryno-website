@@ -127,11 +127,18 @@ async function refundDebit(input: {
 export async function usdToLocalPrice(
   usd: number,
   countryCode?: string | null,
+  serviceKey?: string | null,
 ) {
   const currency = currencyForCountry(countryCode);
   const quote = await quoteLocalUsd(currency);
-  const local = roundMoney(usd * quote.buyRate * herosmsMarkup());
-  return { local, currency, quote };
+  const { priceUsdToLocal } = await import("@/lib/pricing/service-pricing");
+  const priced = await priceUsdToLocal({
+    provider: "herosms",
+    serviceKey,
+    usd,
+    buyRate: quote.buyRate,
+  });
+  return { local: priced.local, currency, quote, markup: priced.markup };
 }
 
 async function ensureOffer(input: {
@@ -185,13 +192,13 @@ export async function purchaseVirtualNumber(input: {
   priceUsd: number;
   priceLocal: number;
 }) {
+  const serviceKey = `${input.heroCountryId}:${input.service}`;
   const { local, currency } = await usdToLocalPrice(
     input.priceUsd,
     input.countryCode,
+    serviceKey,
   );
-  // Prefer client-quoted local if close; else recompute
-  const chargeAmount =
-    input.priceLocal > 0 ? input.priceLocal : local;
+  const chargeAmount = local;
 
   const offer = await ensureOffer({
     countryCode: (input.iso || input.countryCode || "NG").slice(0, 2).toUpperCase(),
@@ -333,12 +340,13 @@ export async function purchaseEmailActivation(input: {
   priceUsd: number;
   priceLocal?: number;
 }) {
+  const serviceKey = `email:${input.site}:${input.domain}`;
   const { local, currency } = await usdToLocalPrice(
     input.priceUsd,
     input.countryCode,
+    serviceKey,
   );
-  const chargeAmount =
-    input.priceLocal && input.priceLocal > 0 ? input.priceLocal : local;
+  const chargeAmount = local;
 
   const site = normalizeEmailSite(input.site);
   const domain = input.domain.trim().toLowerCase().replace(/^@/, "");

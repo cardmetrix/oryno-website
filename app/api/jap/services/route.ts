@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
-import { quoteLocalUsd, roundMoney } from "@/lib/fx/rates";
+import { quoteLocalUsd } from "@/lib/fx/rates";
 import { currencyForCountry } from "@/lib/wallet";
 import {
   FALLBACK_JAP_SERVICES,
@@ -8,9 +8,9 @@ import {
   filterJapServices,
   getJapServices,
   isJapDemoMode,
-  japMarkup,
   japUsdCost,
 } from "@/lib/jap";
+import { priceUsdToLocal } from "@/lib/pricing/service-pricing";
 
 export const runtime = "nodejs";
 
@@ -65,32 +65,46 @@ export async function GET(req: Request) {
             .slice(0, 400);
 
     const quote = await quoteLocalUsd(currency);
-    const markup = japMarkup();
-    const toLocal = (usd: number) =>
-      roundMoney(usd * quote.buyRate * markup);
 
-    const services = sliced.map((s) => {
-      const sampleQty = Math.min(Math.max(s.min, 1000), s.max);
-      const priceUsd = japUsdCost(s.rate, sampleQty);
-      return {
-        service: s.service,
-        name: s.name,
-        type: s.type,
-        category: s.category,
-        platform: s.platform,
-        metric: s.metric,
-        quality: s.quality,
-        rate: s.rate,
-        min: s.min,
-        max: s.max,
-        refill: s.refill,
-        cancel: s.cancel,
-        currency,
-        priceLocalPerThousand: toLocal(s.rate),
-        sampleQuantity: sampleQty,
-        samplePriceLocal: toLocal(priceUsd),
-      };
-    });
+    const services = await Promise.all(
+      sliced.map(async (s) => {
+        const sampleQty = Math.min(Math.max(s.min, 1000), s.max);
+        const priceUsd = japUsdCost(s.rate, sampleQty);
+        const key = String(s.service);
+        const perThousand = await priceUsdToLocal({
+          provider: "jap",
+          serviceKey: key,
+          usd: s.rate,
+          buyRate: quote.buyRate,
+        });
+        const sample = await priceUsdToLocal({
+          provider: "jap",
+          serviceKey: key,
+          usd: priceUsd,
+          buyRate: quote.buyRate,
+        });
+        return {
+          service: s.service,
+          name: s.name,
+          type: s.type,
+          category: s.category,
+          platform: s.platform,
+          metric: s.metric,
+          quality: s.quality,
+          rate: s.rate,
+          min: s.min,
+          max: s.max,
+          refill: s.refill,
+          cancel: s.cancel,
+          currency,
+          priceLocalPerThousand: perThousand.local,
+          sampleQuantity: sampleQty,
+          samplePriceLocal: sample.local,
+          listPriceLocal: sample.listLocal,
+          priceOverride: sample.overrideApplied,
+        };
+      }),
+    );
 
     const platforms = Array.from(
       new Set(enriched.map((s) => s.platform)),

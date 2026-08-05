@@ -17,8 +17,10 @@ import {
   ensurePrimaryWallet,
   toWalletSummary,
 } from "@/lib/wallet";
+import { priceLocalAmount } from "@/lib/pricing/service-pricing";
 import {
   generateVtpassRequestId,
+  getVtpassVariations,
   isVtpassDemoMode,
   isVtpassPendingCode,
   isVtpassSuccessCode,
@@ -26,8 +28,69 @@ import {
   payVtpass,
   requeryVtpass,
 } from "./client";
-import { inferDataPlanCategory } from "./catalog";
+import { fallbackVariationsFor, inferDataPlanCategory } from "./catalog";
 import type { VtpassPayResponse } from "./types";
+
+/** Face amount to provider; retail amount charged to wallet (admin markup/override). */
+async function resolveVtpassRetail(input: {
+  serviceID: string;
+  variationCode?: string | null;
+  faceAmount: number;
+}) {
+  const serviceKey = input.variationCode
+    ? `${input.serviceID}:${input.variationCode}`
+    : `${input.serviceID}:open`;
+  const priced = await priceLocalAmount({
+    provider: "vtpass",
+    serviceKey,
+    amount: input.faceAmount,
+  });
+  return {
+    face: input.faceAmount,
+    retail: priced.local,
+    serviceKey,
+    overrideApplied: priced.overrideApplied,
+  };
+}
+
+async function lookupVariationFace(input: {
+  serviceID: string;
+  variationCode: string;
+  fallbackAmount: number;
+  operatorId?: string;
+  productTypeId?: string | number;
+  /** When true, only use catalog face for fixed-price plans */
+  fixedOnly?: boolean;
+}) {
+  try {
+    let variations;
+    if (isVtpassDemoMode() && input.serviceID !== "foreign-airtime") {
+      variations = fallbackVariationsFor(input.serviceID);
+    } else {
+      const live = await getVtpassVariations(input.serviceID, {
+        operator_id: input.operatorId,
+        product_type_id:
+          input.productTypeId != null ? String(input.productTypeId) : undefined,
+      });
+      variations = live.variations;
+    }
+    const match = variations.find(
+      (v) => v.variation_code === input.variationCode,
+    );
+    if (match) {
+      const face = Number(match.charged_amount ?? match.variation_amount) || 0;
+      const fixed = String(match.fixedPrice || "").toLowerCase() === "yes";
+      if (input.fixedOnly) {
+        if (fixed && face > 0) return face;
+        return input.fallbackAmount;
+      }
+      if (face > 0) return face;
+    }
+  } catch {
+    // fall through
+  }
+  return input.fallbackAmount;
+}
 
 const NETWORK_COLORS: Record<
   string,
@@ -380,7 +443,23 @@ export async function purchaseAirtime(input: {
     throw new Error("Minimum airtime amount is ₦50");
   }
 
-  const cashback = estimateAirtimeCashback(input.amount);
+  let faceAmount = input.amount;
+  if (input.mode === "international" && input.variationCode) {
+    faceAmount = await lookupVariationFace({
+      serviceID: "foreign-airtime",
+      variationCode: input.variationCode,
+      fallbackAmount: input.amount,
+      operatorId: input.operatorId,
+      productTypeId: input.productTypeId,
+    });
+  }
+
+  const priced = await resolveVtpassRetail({
+    serviceID: input.serviceID,
+    variationCode: input.variationCode,
+    faceAmount,
+  });
+  const cashback = estimateAirtimeCashback(priced.retail);
   const market = resolveCountryCode(input.countryCode);
   const network = await ensureTelecomNetwork(
     market,
@@ -392,7 +471,7 @@ export async function purchaseAirtime(input: {
   const prepared = await debitForPurchase({
     userId: input.userId,
     countryCode: input.countryCode,
-    amount: input.amount,
+    amount: priced.retail,
     category: "airtime",
     title: `${network.name} Airtime`,
     subtitle: phone,
@@ -400,6 +479,8 @@ export async function purchaseAirtime(input: {
       serviceID: input.serviceID,
       mode: input.mode ?? "local",
       cashback,
+      faceAmount: priced.face,
+      serviceKey: priced.serviceKey,
     },
   });
 
@@ -409,7 +490,7 @@ export async function purchaseAirtime(input: {
       userId: input.userId,
       networkId: network.id,
       phone,
-      amount: input.amount.toFixed(2),
+      amount: priced.retail.toFixed(2),
       cashbackAmount: cashback.toFixed(2),
       status: "processing",
       saveBeneficiary: Boolean(input.saveBeneficiary),
@@ -426,7 +507,7 @@ export async function purchaseAirtime(input: {
             serviceID: "foreign-airtime",
             billersCode: phone,
             variation_code: input.variationCode!,
-            amount: input.amount,
+            amount: priced.face,
             phone,
             operator_id: input.operatorId!,
             country_code: input.countryIso!,
@@ -436,7 +517,7 @@ export async function purchaseAirtime(input: {
         : {
             request_id: prepared.requestId,
             serviceID: input.serviceID,
-            amount: input.amount,
+            amount: priced.face,
             phone,
           };
 
@@ -520,6 +601,20 @@ export async function purchaseData(input: {
   if (phone.length < 10) throw new Error("Enter a valid phone number");
   if (!input.variationCode) throw new Error("Select a data plan");
 
+  const faceAmount = await lookupVariationFace({
+    serviceID:
+      input.mode === "international" ? "foreign-airtime" : input.serviceID,
+    variationCode: input.variationCode,
+    fallbackAmount: input.amount,
+    operatorId: input.operatorId,
+    productTypeId: input.productTypeId,
+  });
+  const priced = await resolveVtpassRetail({
+    serviceID: input.serviceID,
+    variationCode: input.variationCode,
+    faceAmount,
+  });
+
   const country = (input.countryCode || "NG").toUpperCase().slice(0, 2);
   const network = await ensureTelecomNetwork(
     country,
@@ -531,19 +626,21 @@ export async function purchaseData(input: {
     networkId: network.id,
     variationCode: input.variationCode,
     name: input.variationName,
-    amount: input.amount,
+    amount: priced.retail,
   });
 
   const prepared = await debitForPurchase({
     userId: input.userId,
     countryCode: input.countryCode,
-    amount: input.amount,
+    amount: priced.retail,
     category: "data",
     title: `${network.name} Data`,
     subtitle: `${input.variationName} · ${phone}`,
     metadata: {
       serviceID: input.serviceID,
       variationCode: input.variationCode,
+      faceAmount: priced.face,
+      serviceKey: priced.serviceKey,
     },
   });
 
@@ -554,7 +651,7 @@ export async function purchaseData(input: {
       networkId: network.id,
       planId: plan.id,
       phone,
-      amount: input.amount.toFixed(2),
+      amount: priced.retail.toFixed(2),
       status: "processing",
       transactionId: prepared.transaction.id,
       providerRef: prepared.requestId,
@@ -569,7 +666,7 @@ export async function purchaseData(input: {
             serviceID: "foreign-airtime",
             billersCode: phone,
             variation_code: input.variationCode,
-            amount: input.amount,
+            amount: priced.face,
             phone,
             operator_id: input.operatorId!,
             country_code: input.countryIso!,
@@ -581,7 +678,7 @@ export async function purchaseData(input: {
             serviceID: input.serviceID,
             billersCode: phone,
             variation_code: input.variationCode,
-            amount: input.amount,
+            amount: priced.face,
             phone,
           };
 
@@ -667,6 +764,19 @@ export async function purchaseBill(input: {
   if (!input.variationCode) throw new Error("Select a plan or meter type");
   if (input.amount < 100) throw new Error("Minimum bill amount is ₦100");
 
+  // Fixed-price TV/plans use provider face; open amounts (electricity) use user amount.
+  const faceAmount = await lookupVariationFace({
+    serviceID: input.serviceID,
+    variationCode: input.variationCode,
+    fallbackAmount: input.amount,
+    fixedOnly: true,
+  });
+  const priced = await resolveVtpassRetail({
+    serviceID: input.serviceID,
+    variationCode: input.variationCode,
+    faceAmount,
+  });
+
   const country = (input.countryCode || "NG").toUpperCase().slice(0, 2);
   const provider = await ensureBillProvider({
     countryCode: country,
@@ -678,7 +788,7 @@ export async function purchaseBill(input: {
   const prepared = await debitForPurchase({
     userId: input.userId,
     countryCode: input.countryCode,
-    amount: input.amount,
+    amount: priced.retail,
     category: "bill",
     title: input.serviceName,
     subtitle: customerRef,
@@ -686,6 +796,8 @@ export async function purchaseBill(input: {
       serviceID: input.serviceID,
       variationCode: input.variationCode,
       billCategory: input.category,
+      faceAmount: priced.face,
+      serviceKey: priced.serviceKey,
     },
   });
 
@@ -695,7 +807,7 @@ export async function purchaseBill(input: {
       userId: input.userId,
       providerId: provider.id,
       customerRef,
-      amount: input.amount.toFixed(2),
+      amount: priced.retail.toFixed(2),
       status: "processing",
       transactionId: prepared.transaction.id,
       providerRef: prepared.requestId,
@@ -708,7 +820,7 @@ export async function purchaseBill(input: {
       serviceID: input.serviceID,
       billersCode: customerRef,
       variation_code: input.variationCode,
-      amount: input.amount,
+      amount: priced.face,
       phone: phone || "08011111111",
       ...(input.category === "electricity"
         ? { type: input.variationCode }

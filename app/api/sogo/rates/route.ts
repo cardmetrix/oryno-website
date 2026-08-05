@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
+import { getSogoPayoutShare } from "@/lib/pricing/service-pricing";
 import {
   extractNgnRate,
   fetchSogoSellRates,
   isSogoDemoMode,
   quoteGiftCardSell,
   sogoErrorToEnglish,
-  sogoSellPayoutShare,
 } from "@/lib/sogo";
 
 export const runtime = "nodejs";
@@ -30,6 +30,7 @@ export async function GET(req: Request) {
       | "no_receipt"
       | null;
     const amount = Number(searchParams.get("amount") || "0");
+    const payoutShare = await getSogoPayoutShare();
 
     const rates = await fetchSogoSellRates(slug);
 
@@ -44,7 +45,7 @@ export async function GET(req: Request) {
       return NextResponse.json({
         rates,
         quote,
-        payoutShare: sogoSellPayoutShare(),
+        payoutShare,
         demo: isSogoDemoMode(),
         source: isSogoDemoMode() ? "demo" : "provider",
       });
@@ -74,7 +75,7 @@ export async function GET(req: Request) {
     return NextResponse.json({
       rates,
       simplified,
-      payoutShare: sogoSellPayoutShare(),
+      payoutShare,
       demo: isSogoDemoMode(),
       source: isSogoDemoMode() ? "demo" : "provider",
     });

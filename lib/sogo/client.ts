@@ -65,6 +65,7 @@ export function isSogoDemoMode() {
  * Default 1 = pass through the exact provider rate (no ORYNO haircut).
  * Set e.g. 0.97 only if you intentionally keep a margin.
  */
+/** Sync env fallback. Prefer `getSogoPayoutShare()` for retail. */
 export function sogoSellPayoutShare() {
   const raw = Number(process.env.SOGO_SELL_PAYOUT_SHARE ?? "1");
   if (!Number.isFinite(raw) || raw <= 0 || raw > 1) return 1;

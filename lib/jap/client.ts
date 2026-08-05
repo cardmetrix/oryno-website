@@ -50,7 +50,7 @@ export function isJapDemoMode() {
   return !isJapLive();
 }
 
-/** Retail markup on top of FX buy rate (default 30%). */
+/** Sync env fallback (logging). Prefer `getProviderMarkup('jap')` for retail. */
 export function japMarkup() {
   const raw = Number(process.env.JAP_MARKUP || "1.30");
   return Number.isFinite(raw) && raw >= 1 ? raw : 1.3;

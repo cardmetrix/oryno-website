@@ -38,7 +38,11 @@ export async function GET(req: Request) {
       const offers: HeroPriceOffer[] = [];
       for (const c of countries) {
         const priceUsd = 0.12 + (c.id % 7) * 0.03;
-        const { local } = await usdToLocalPrice(priceUsd, user.countryCode);
+        const { local } = await usdToLocalPrice(
+          priceUsd,
+          user.countryCode,
+          `${c.id}:${service}`,
+        );
         offers.push({
           countryId: c.id,
           countryName: c.name,
@@ -106,7 +110,11 @@ export async function GET(req: Request) {
       const fallback = FALLBACK_COUNTRIES.find((c) => c.id === id);
       const iso = resolveCountryIso(id, fallback?.name) || fallback?.iso || null;
       const name = fallback?.name || `Country ${id}`;
-      const { local } = await usdToLocalPrice(cost, user.countryCode);
+      const { local } = await usdToLocalPrice(
+        cost,
+        user.countryCode,
+        `${id}:${service}`,
+      );
 
       offers.push({
         countryId: id,

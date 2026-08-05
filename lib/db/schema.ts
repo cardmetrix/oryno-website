@@ -981,6 +981,29 @@ export const notifications = pgTable(
   ],
 );
 
+/** Expo / FCM device tokens for mobile push delivery. */
+export const userPushTokens = pgTable(
+  "user_push_tokens",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    token: text("token").notNull(),
+    platform: varchar("platform", { length: 20 }).notNull().default("unknown"),
+    deviceId: varchar("device_id", { length: 120 }),
+    appVersion: varchar("app_version", { length: 40 }),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex("user_push_tokens_token_uidx").on(t.token),
+    index("user_push_tokens_user_idx").on(t.userId),
+  ],
+);
+
 export const notificationCampaigns = pgTable("notification_campaigns", {
   id: uuid("id").defaultRandom().primaryKey(),
   title: varchar("title", { length: 160 }).notNull(),
@@ -1139,6 +1162,34 @@ export const platformSettings = pgTable("platform_settings", {
   ...timestamps,
 });
 
+/**
+ * Per-SKU / per-service retail price overrides.
+ * Group (provider-wide) markups live in platform_settings key `service_pricing`.
+ */
+export const servicePriceOverrides = pgTable(
+  "service_price_overrides",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    provider: varchar("provider", { length: 40 }).notNull(),
+    /** Stable key e.g. jap service id, herosms country:service, reloadly productId, vtpass serviceID:variation */
+    serviceKey: varchar("service_key", { length: 160 }).notNull(),
+    label: varchar("label", { length: 200 }),
+    /** markup = multiplier (≥1); fixed = absolute local price; percent = ±% on default retail */
+    mode: varchar("mode", { length: 20 }).notNull().default("percent"),
+    value: numeric("value", { precision: 18, scale: 6 }).notNull(),
+    active: boolean("active").notNull().default(true),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex("service_price_overrides_provider_key_uidx").on(
+      t.provider,
+      t.serviceKey,
+    ),
+    index("service_price_overrides_provider_idx").on(t.provider),
+  ],
+);
+
 // ─── Relations ───────────────────────────────────────────────────────────────
 
 export const countriesRelations = relations(countries, ({ many }) => ({
@@ -1167,9 +1218,17 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   }),
   transactions: many(transactions),
   notifications: many(notifications),
+  pushTokens: many(userPushTokens),
   referralCode: one(referralCodes, {
     fields: [users.id],
     references: [referralCodes.userId],
+  }),
+}));
+
+export const userPushTokensRelations = relations(userPushTokens, ({ one }) => ({
+  user: one(users, {
+    fields: [userPushTokens.userId],
+    references: [users.id],
   }),
 }));
 

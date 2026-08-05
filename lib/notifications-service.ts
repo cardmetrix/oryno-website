@@ -6,6 +6,7 @@ import type {
   AppNotificationDto,
   NotificationType,
 } from "@/lib/notification-types";
+import { deliverNotificationPush } from "@/lib/push/deliver";
 
 export type CreateNotificationInput = {
   userId: string;
@@ -18,6 +19,10 @@ export type CreateNotificationInput = {
   email?: boolean;
   /** Ignore email preference toggle (login/security). */
   forceEmail?: boolean;
+  /** Send mobile push (default true — mirrors email). */
+  push?: boolean;
+  /** Ignore push preference toggle (login/security). */
+  forcePush?: boolean;
 };
 
 function formatRelativeTime(date: Date) {
@@ -68,19 +73,36 @@ export async function createNotification(input: CreateNotificationInput) {
     })
     .returning();
 
-  if (input.email !== false && row) {
+  if (row) {
     const href =
       typeof input.metadata?.href === "string" ? input.metadata.href : null;
-    void deliverNotificationEmail({
-      userId: input.userId,
-      title: input.title,
-      body: input.body,
-      type: input.type,
-      href,
-      force: input.forceEmail === true,
-    }).catch((error) => {
-      console.error("[notify-email]", error);
-    });
+
+    if (input.email !== false) {
+      void deliverNotificationEmail({
+        userId: input.userId,
+        title: input.title,
+        body: input.body,
+        type: input.type,
+        href,
+        force: input.forceEmail === true,
+      }).catch((error) => {
+        console.error("[notify-email]", error);
+      });
+    }
+
+    if (input.push !== false) {
+      void deliverNotificationPush({
+        userId: input.userId,
+        notificationId: row.id,
+        title: input.title,
+        body: input.body,
+        type: input.type,
+        href,
+        force: input.forcePush === true || input.forceEmail === true,
+      }).catch((error) => {
+        console.error("[notify-push]", error);
+      });
+    }
   }
 
   return row;
