@@ -74,6 +74,51 @@ export async function ensureWalletSchema() {
         ON "withdrawals" USING btree ("provider_ref")
         WHERE "provider_ref" IS NOT NULL
       `);
+      await db.execute(sql`
+        DO $$ BEGIN
+          CREATE TYPE "public"."ad_status" AS ENUM('draft', 'live', 'paused', 'archived');
+        EXCEPTION WHEN duplicate_object THEN null;
+        END $$
+      `);
+      await db.execute(sql`
+        DO $$ BEGIN
+          CREATE TYPE "public"."ad_placement" AS ENUM('home_carousel', 'promo_banner');
+        EXCEPTION WHEN duplicate_object THEN null;
+        END $$
+      `);
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS "ads" (
+          "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+          "title" varchar(120) NOT NULL,
+          "subtitle" varchar(200),
+          "image_url" text NOT NULL,
+          "href" varchar(255) NOT NULL,
+          "badge" varchar(40),
+          "overlay" varchar(200),
+          "overlay_colors" jsonb,
+          "placement" "ad_placement" DEFAULT 'home_carousel' NOT NULL,
+          "status" "ad_status" DEFAULT 'draft' NOT NULL,
+          "sort_order" integer DEFAULT 0 NOT NULL,
+          "starts_at" timestamp with time zone,
+          "ends_at" timestamp with time zone,
+          "created_by_admin_id" uuid,
+          "metadata" jsonb,
+          "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+          "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+        )
+      `);
+      await db.execute(sql`
+        CREATE INDEX IF NOT EXISTS "ads_status_placement_idx"
+        ON "ads" USING btree ("status","placement")
+      `);
+      await db.execute(sql`
+        CREATE INDEX IF NOT EXISTS "ads_sort_idx"
+        ON "ads" USING btree ("sort_order")
+      `);
+      await db.execute(sql`
+        CREATE INDEX IF NOT EXISTS "ads_ends_at_idx"
+        ON "ads" USING btree ("ends_at")
+      `);
     })().catch((error) => {
       ready = null;
       console.error("[ensure-wallet-schema]", error);

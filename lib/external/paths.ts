@@ -10,6 +10,7 @@ export const EXTERNAL_ALLOWED_ROOTS = new Set([
   "wallet",
   "transactions",
   "notifications",
+  "ads",
   "profile",
   "settings",
   "me",

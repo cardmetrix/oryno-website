@@ -1,18 +1,28 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 
-const ads = [
+type AdSlide = {
+  id: string;
+  href: string;
+  title: string;
+  subtitle: string | null;
+  imageUrl: string;
+  overlay: string;
+  badge?: string | null;
+};
+
+const FALLBACK_ADS: AdSlide[] = [
   {
     id: "gift",
     href: "/services/gift-cards",
     title: "Gift Cards",
     subtitle: "Sell for live Naira rates",
-    image: "/brand/auth-panel.jpg",
+    imageUrl: "/brand/auth-panel.jpg",
     overlay: "from-oryno-charcoal/85 via-oryno-charcoal/40 to-transparent",
   },
   {
@@ -20,7 +30,7 @@ const ads = [
     href: "/services/social",
     title: "Social Boost",
     subtitle: "Grow followers, likes & views",
-    image: "/brand/auth-panel.jpg",
+    imageUrl: "/brand/auth-panel.jpg",
     overlay: "from-[#1C1C1E]/90 via-[#FF6A00]/30 to-transparent",
     badge: "Popular",
   },
@@ -29,7 +39,7 @@ const ads = [
     href: "/services/virtual-numbers",
     title: "Virtual Numbers",
     subtitle: "SMS verification lines worldwide",
-    image: "/brand/auth-panel.jpg",
+    imageUrl: "/brand/auth-panel.jpg",
     overlay: "from-oryno-orange/75 via-oryno-charcoal/45 to-transparent",
   },
 ];
@@ -37,16 +47,66 @@ const ads = [
 const INTERVAL_MS = 10_000;
 
 export function AdCarousel() {
+  const [ads, setAds] = useState<AdSlide[]>(FALLBACK_ADS);
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/ads?placement=home_carousel", {
+          cache: "no-store",
+        });
+        if (!res.ok) return;
+        const json = (await res.json()) as {
+          ads?: Array<{
+            id: string;
+            href: string;
+            title: string;
+            subtitle: string | null;
+            imageUrl: string;
+            overlay?: string;
+            badge?: string | null;
+          }>;
+        };
+        if (cancelled || !json.ads?.length) return;
+        setAds(
+          json.ads.map((ad) => ({
+            id: ad.id,
+            href: ad.href,
+            title: ad.title,
+            subtitle: ad.subtitle,
+            imageUrl: ad.imageUrl,
+            overlay:
+              ad.overlay ||
+              "from-oryno-charcoal/85 via-oryno-charcoal/40 to-transparent",
+            badge: ad.badge,
+          })),
+        );
+        setIndex(0);
+      } catch {
+        // Keep fallback creatives when the API is unavailable.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (ads.length <= 1) return;
     const id = window.setInterval(() => {
       setIndex((i) => (i + 1) % ads.length);
     }, INTERVAL_MS);
     return () => window.clearInterval(id);
-  }, []);
+  }, [ads.length]);
 
-  const ad = ads[index];
+  const safeIndex = ads.length ? index % ads.length : 0;
+  const ad = ads[safeIndex] ?? FALLBACK_ADS[0];
+  const remote = useMemo(
+    () => /^https?:\/\//i.test(ad.imageUrl),
+    [ad.imageUrl],
+  );
 
   return (
     <div className="relative h-[128px] w-full overflow-hidden rounded-[22px] border border-border/80 bg-muted shadow-[var(--shadow-soft)] sm:h-[148px] md:h-[172px] md:rounded-[28px] lg:h-full lg:min-h-[200px]">
@@ -60,16 +120,15 @@ export function AdCarousel() {
           className="absolute inset-0"
         >
           <Image
-            src={ad.image}
+            src={ad.imageUrl}
             alt={ad.title}
             fill
             className="object-cover object-[center_30%] md:object-center"
             sizes="(max-width: 1024px) 100vw, 40vw"
-            priority={index === 0}
+            priority={safeIndex === 0}
+            unoptimized={remote}
           />
-          <div
-            className={`absolute inset-0 bg-gradient-to-r ${ad.overlay}`}
-          />
+          <div className={`absolute inset-0 bg-gradient-to-r ${ad.overlay}`} />
           <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-black/10 md:from-black/25" />
 
           <Link
@@ -101,7 +160,6 @@ export function AdCarousel() {
         </motion.div>
       </AnimatePresence>
 
-      {/* Progress */}
       <div className="absolute inset-x-0 top-0 h-0.5 bg-black/20 md:h-1">
         <motion.div
           key={`progress-${ad.id}`}
@@ -112,7 +170,6 @@ export function AdCarousel() {
         />
       </div>
 
-      {/* Dots — top-right so they never clash with copy/CTA */}
       <div className="absolute top-2.5 right-2.5 flex gap-1 sm:top-3 sm:right-3 md:top-4 md:right-4 md:gap-1.5">
         {ads.map((item, i) => (
           <button
@@ -121,7 +178,7 @@ export function AdCarousel() {
             aria-label={`Go to ad ${i + 1}`}
             onClick={() => setIndex(i)}
             className={`h-1.5 rounded-full transition-all md:h-2 ${
-              i === index
+              i === safeIndex
                 ? "w-4 bg-white md:w-5"
                 : "w-1.5 bg-white/45 hover:bg-white/70 md:w-2"
             }`}

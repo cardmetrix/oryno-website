@@ -79,6 +79,7 @@ export const UploadButton: React.FC<UploadButtonProps> = ({
       cryptocurrencyLogo: "image/*",
       transactionImage: "image/*",
       kycDocument: "image/*",
+      adImage: "image/*",
       copyTraderProfile: "image/*",
     };
     return acceptTypesMap[endpoint] || "image/*";

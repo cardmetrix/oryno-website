@@ -1,17 +1,17 @@
 import { relations } from "drizzle-orm";
 import {
-  boolean,
-  index,
-  integer,
-  jsonb,
-  numeric,
-  pgEnum,
-  pgTable,
-  text,
-  timestamp,
-  uniqueIndex,
-  uuid,
-  varchar,
+    boolean,
+    index,
+    integer,
+    jsonb,
+    numeric,
+    pgEnum,
+    pgTable,
+    text,
+    timestamp,
+    uniqueIndex,
+    uuid,
+    varchar,
 } from "drizzle-orm/pg-core";
 
 /** Shared timestamp columns */
@@ -1033,6 +1033,51 @@ export const supportMessages = pgTable(
     ...timestamps,
   },
   (t) => [index("support_messages_ticket_idx").on(t.ticketId)],
+);
+
+// ─── 11b. Ads / home carousel ────────────────────────────────────────────────
+
+export const adStatusEnum = pgEnum("ad_status", [
+  "draft",
+  "live",
+  "paused",
+  "archived",
+]);
+
+export const adPlacementEnum = pgEnum("ad_placement", [
+  "home_carousel",
+  "promo_banner",
+]);
+
+export const ads = pgTable(
+  "ads",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    title: varchar("title", { length: 120 }).notNull(),
+    subtitle: varchar("subtitle", { length: 200 }),
+    imageUrl: text("image_url").notNull(),
+    href: varchar("href", { length: 255 }).notNull(),
+    badge: varchar("badge", { length: 40 }),
+    /** Tailwind gradient classes for website AdCarousel overlay */
+    overlay: varchar("overlay", { length: 200 }),
+    /** RGBA color stops for mobile AdCarousel LinearGradient */
+    overlayColors: jsonb("overlay_colors").$type<string[]>(),
+    placement: adPlacementEnum("placement")
+      .notNull()
+      .default("home_carousel"),
+    status: adStatusEnum("status").notNull().default("draft"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    startsAt: timestamp("starts_at", { withTimezone: true }),
+    endsAt: timestamp("ends_at", { withTimezone: true }),
+    createdByAdminId: uuid("created_by_admin_id"),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+    ...timestamps,
+  },
+  (t) => [
+    index("ads_status_placement_idx").on(t.status, t.placement),
+    index("ads_sort_idx").on(t.sortOrder),
+    index("ads_ends_at_idx").on(t.endsAt),
+  ],
 );
 
 // ─── 12. Admin ───────────────────────────────────────────────────────────────

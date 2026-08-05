@@ -34,6 +34,7 @@ export const EXTERNAL_API_CATALOG = {
     ],
     history: ["GET /transactions", "GET /transactions/:id"],
     notifications: ["GET|PATCH|DELETE /notifications"],
+    ads: ["GET /ads"],
     profile: ["GET|PATCH /profile", "GET|PATCH /me/country", "GET|PATCH /settings", "GET|POST /settings/kyc"],
     support: ["POST /support/error-report"],
     services: [
