@@ -14,6 +14,15 @@ function bearerFromAuthorization(value: string | null): string | null {
   return match?.[1]?.trim() || null;
 }
 
+function tokenFromHeaders(h: Headers): string | null {
+  return (
+    bearerFromAuthorization(h.get("authorization")) ||
+    h.get("x-oryno-clerk-token")?.trim() ||
+    bearerFromAuthorization(h.get("x-authorization")) ||
+    null
+  );
+}
+
 /** Decode JWT payload without verifying (sid/sub peek only). */
 function decodeJwtPayload(token: string): {
   sub?: string;
@@ -109,7 +118,7 @@ export async function resolveClerkUser(request?: Request): Promise<{
   // 3) Explicit Bearer JWT (Expo)
   try {
     const h = request ? request.headers : await headers();
-    const token = bearerFromAuthorization(h.get("authorization"));
+    const token = tokenFromHeaders(h);
     debug.hasBearer = Boolean(token);
     if (!token) {
       debug.steps.bearer = "missing";

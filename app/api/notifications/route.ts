@@ -12,9 +12,9 @@ import {
 
 export const runtime = "nodejs";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    const user = await ensureAppUser();
+    const user = await ensureAppUser({ request: req });
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -47,7 +47,7 @@ export async function GET() {
 
 export async function PATCH(req: Request) {
   try {
-    const user = await ensureAppUser();
+    const user = await ensureAppUser({ request: req });
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -90,7 +90,7 @@ export async function PATCH(req: Request) {
 
 export async function DELETE(req: Request) {
   try {
-    const user = await ensureAppUser();
+    const user = await ensureAppUser({ request: req });
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

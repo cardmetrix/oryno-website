@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 
 export async function POST(req: Request) {
   try {
-    const user = await ensureAppUser();
+    const user = await ensureAppUser({ request: req });
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -54,7 +54,7 @@ export async function POST(req: Request) {
 
 export async function DELETE(req: Request) {
   try {
-    const user = await ensureAppUser();
+    const user = await ensureAppUser({ request: req });
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
