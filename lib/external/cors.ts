@@ -56,7 +56,7 @@ export function corsHeaders(request: NextRequest): Headers {
   );
   headers.set(
     "Access-Control-Allow-Headers",
-    "Authorization, Content-Type, Accept, X-Requested-With, X-Oryno-Client, X-Oryno-App-Version",
+    "Authorization, Content-Type, Accept, X-Requested-With, X-Oryno-Client, X-Oryno-App-Version, X-Oryno-Admin-Session",
   );
   headers.set("Access-Control-Max-Age", "86400");
   headers.set("Access-Control-Expose-Headers", "X-Oryno-Api-Version");

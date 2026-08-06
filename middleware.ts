@@ -23,6 +23,24 @@ const isPublicRoute = createRouteMatcher([
   "/api/geo(.*)",
   // Mobile / external clients authenticate inside route handlers via Bearer JWT
   "/api/external(.*)",
+  // First-party APIs also authenticate in handlers (Expo may call /api/* directly)
+  "/api/auth(.*)",
+  "/api/wallet(.*)",
+  "/api/transactions(.*)",
+  "/api/notifications(.*)",
+  "/api/devices(.*)",
+  "/api/ads(.*)",
+  "/api/profile(.*)",
+  "/api/settings(.*)",
+  "/api/me(.*)",
+  "/api/support(.*)",
+  "/api/services(.*)",
+  "/api/vtpass(.*)",
+  "/api/herosms(.*)",
+  "/api/jap(.*)",
+  "/api/reloadly(.*)",
+  "/api/sogo(.*)",
+  "/api/mobile-health(.*)",
 ]);
 
 const isExternalApi = createRouteMatcher(["/api/external(.*)"]);
