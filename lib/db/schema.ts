@@ -1103,6 +1103,27 @@ export const ads = pgTable(
   ],
 );
 
+/** Mobile app auth onboarding carousel slides (admin-managed). */
+export const onboardingSlides = pgTable(
+  "onboarding_slides",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    title: varchar("title", { length: 120 }).notNull(),
+    subtitle: varchar("subtitle", { length: 280 }).notNull(),
+    imageUrl: text("image_url").notNull(),
+    accent: varchar("accent", { length: 32 }),
+    status: adStatusEnum("status").notNull().default("draft"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdByAdminId: uuid("created_by_admin_id"),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+    ...timestamps,
+  },
+  (t) => [
+    index("onboarding_slides_status_idx").on(t.status),
+    index("onboarding_slides_sort_idx").on(t.sortOrder),
+  ],
+);
+
 // ─── 12. Admin ───────────────────────────────────────────────────────────────
 
 export const admins = pgTable("admins", {

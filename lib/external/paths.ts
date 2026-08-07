@@ -12,6 +12,7 @@ export const EXTERNAL_ALLOWED_ROOTS = new Set([
   "notifications",
   "devices",
   "ads",
+  "onboarding",
   "profile",
   "settings",
   "me",
