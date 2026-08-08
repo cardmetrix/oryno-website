@@ -32,7 +32,11 @@ export const EXTERNAL_API_CATALOG = {
       "POST /wallet/usd/fund",
       "POST /wallet/usd/verify",
     ],
-    history: ["GET /transactions", "GET /transactions/:id"],
+    history: [
+      "GET /transactions",
+      "GET /transactions/:id",
+      "POST /transactions/statement",
+    ],
     notifications: ["GET|PATCH|DELETE /notifications"],
     devices: ["POST|DELETE /devices"],
     ads: ["GET /ads"],

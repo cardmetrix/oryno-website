@@ -5,6 +5,12 @@ import {
   renderBrandedEmail,
 } from "@/lib/email/template";
 
+export type EmailAttachment = {
+  filename: string;
+  content: Buffer | string;
+  contentType?: string;
+};
+
 export type SendBrandedEmailInput = {
   to: string | string[];
   subject: string;
@@ -15,6 +21,7 @@ export type SendBrandedEmailInput = {
   cta?: { label: string; href: string };
   footerNote?: string;
   replyTo?: string;
+  attachments?: EmailAttachment[];
 };
 
 export async function sendBrandedEmail(input: SendBrandedEmailInput) {
@@ -46,6 +53,12 @@ export async function sendBrandedEmail(input: SendBrandedEmailInput) {
     cta: input.cta,
   });
 
+  const attachments = input.attachments?.map((file) => ({
+    filename: file.filename,
+    content: file.content,
+    contentType: file.contentType,
+  }));
+
   const { error, data } = await resend.emails.send({
     from: mailFrom(),
     to,
@@ -53,6 +66,7 @@ export async function sendBrandedEmail(input: SendBrandedEmailInput) {
     subject: input.subject,
     html,
     text,
+    ...(attachments?.length ? { attachments } : {}),
   });
 
   if (error) {
