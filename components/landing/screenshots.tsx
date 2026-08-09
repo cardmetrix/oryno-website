@@ -18,7 +18,7 @@ type ScreenshotsProps = {
 export function Screenshots({ shots }: ScreenshotsProps) {
   return (
     <section id="screenshots" className="surface-white py-24 sm:py-28">
-      <div className="mx-auto max-w-6xl px-5 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-6xl px-5 sm:px-6 md:max-w-none md:px-0">
         <motion.div
           className="mx-auto max-w-2xl text-center"
           variants={stagger}

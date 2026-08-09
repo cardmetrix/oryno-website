@@ -39,7 +39,7 @@ export function SiteHeader() {
           : "bg-transparent",
       )}
     >
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-5 sm:px-6 lg:px-8">
+      <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-3 px-5 sm:px-6 md:max-w-none md:px-0">
         <a href="#top" className="flex shrink-0 items-center gap-2.5">
           <BrandLogo
             size={36}

@@ -34,7 +34,7 @@ export function Hero({ homeSrc, walletSrc }: HeroProps) {
         transition={{ duration: 9, repeat: Infinity, ease: "easeInOut" }}
       />
 
-      <div className="relative mx-auto grid min-h-[calc(100svh-4rem)] max-w-6xl items-center gap-12 px-5 pb-16 pt-10 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:gap-10 lg:px-8 lg:pb-20 lg:pt-8">
+      <div className="relative mx-auto grid min-h-[calc(100svh-4rem)] w-full max-w-6xl items-center gap-12 px-5 pb-16 pt-10 sm:px-6 md:max-w-none md:px-0 lg:grid-cols-[1.05fr_0.95fr] lg:gap-10 lg:pb-20 lg:pt-8">
         <motion.div
           className="max-w-xl"
           variants={stagger}
