@@ -1,5 +1,7 @@
 import { and, asc, eq, gte, lt } from "drizzle-orm";
 import ExcelJS from "exceljs";
+import fs from "fs";
+import path from "path";
 import PDFDocument from "pdfkit";
 
 import { appBaseUrl } from "@/lib/email/client";
@@ -11,6 +13,60 @@ import {
   toAppTransaction,
   type AppTransaction,
 } from "@/lib/transactions";
+
+
+/** Bundled TTF so PDFKit never needs missing Helvetica.afm in production. */
+function statementFontPath() {
+  const candidates = [
+    path.join(process.cwd(), "assets/fonts/NotoSans-Regular.ttf"),
+    path.join(process.cwd(), "vendor/fonts/NotoSans-Regular.ttf"),
+  ];
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  return candidates[0];
+}
+
+/**
+ * If a deploy stripped pdfkit's AFM metrics, restore them from vendored copies.
+ * No-op on read-only filesystems; the custom TTF path is the primary fix.
+ */
+function ensurePdfkitAfmData() {
+  try {
+    const vendorDir = path.join(process.cwd(), "vendor/pdfkit-data");
+    if (!fs.existsSync(vendorDir)) return;
+
+    const dataDirs = [
+      path.join(process.cwd(), "node_modules/pdfkit/js/data"),
+    ];
+    try {
+      const pnpmDir = path.join(process.cwd(), "node_modules/.pnpm");
+      if (fs.existsSync(pnpmDir)) {
+        for (const entry of fs.readdirSync(pnpmDir)) {
+          if (!entry.startsWith("pdfkit@")) continue;
+          dataDirs.push(
+            path.join(pnpmDir, entry, "node_modules/pdfkit/js/data"),
+          );
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    for (const dataDir of dataDirs) {
+      const marker = path.join(dataDir, "Helvetica.afm");
+      if (fs.existsSync(marker)) continue;
+      if (!fs.existsSync(path.dirname(dataDir))) continue;
+      fs.mkdirSync(dataDir, { recursive: true });
+      for (const file of fs.readdirSync(vendorDir)) {
+        if (!file.endsWith(".afm") && !file.endsWith(".icc")) continue;
+        fs.copyFileSync(path.join(vendorDir, file), path.join(dataDir, file));
+      }
+    }
+  } catch {
+    // Ignore — custom font path still used below.
+  }
+}
 
 export type StatementFormat = "pdf" | "xlsx";
 
@@ -77,9 +133,18 @@ async function buildPdfBuffer(opts: {
   const summary = summarize(opts.items);
   const currency = opts.items[0]?.currency ?? "NGN";
 
+  ensurePdfkitAfmData();
+  const fontPath = statementFontPath();
+  if (!fs.existsSync(fontPath)) {
+    throw new Error(
+      "Statement font is missing from the server bundle. Redeploy after including assets/fonts.",
+    );
+  }
+
   const doc = new PDFDocument({
     margin: 48,
     size: "A4",
+    font: fontPath,
     info: {
       Title: `ORYNO Statement ${opts.monthKey}`,
       Author: "ORYNO",

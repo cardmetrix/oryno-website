@@ -1,5 +1,22 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // pdfkit reads .afm font metrics from disk; keep it external and include data files
+  // so standalone/NFT deploys don't 500 on Helvetica.afm.
+  serverExternalPackages: ['pdfkit', 'exceljs'],
+  outputFileTracingIncludes: {
+    '/api/transactions/statement': [
+      './assets/fonts/**/*',
+      './vendor/pdfkit-data/**/*',
+      './node_modules/pdfkit/js/data/**/*',
+      './node_modules/.pnpm/pdfkit@*/node_modules/pdfkit/js/data/**/*',
+    ],
+    '/api/external/v1/[...path]': [
+      './assets/fonts/**/*',
+      './vendor/pdfkit-data/**/*',
+      './node_modules/pdfkit/js/data/**/*',
+      './node_modules/.pnpm/pdfkit@*/node_modules/pdfkit/js/data/**/*',
+    ],
+  },
   experimental: {
     optimizePackageImports: ['framer-motion'],
   },
