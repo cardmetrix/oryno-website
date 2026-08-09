@@ -79,10 +79,9 @@ export async function POST(req: Request) {
       bankCode,
     });
 
-    // Prefer Paystack-resolved name; allow client override only if empty.
+    // Prefer client name when provided (manual entry); else Paystack-resolved.
     const accountName =
-      resolved.accountName ||
-      (body.accountName ?? "").trim();
+      (body.accountName ?? "").trim() || resolved.accountName;
     if (!accountName) {
       return NextResponse.json(
         { error: "Could not resolve account name" },
