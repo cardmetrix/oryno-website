@@ -27,6 +27,8 @@ type Submission = {
   id: string;
   status: string;
   statusLabel: string;
+  targetLevel?: number;
+  levelLabel?: string;
   idType: string | null;
   idNumber: string | null;
   idFrontUrl: string | null;
@@ -39,6 +41,7 @@ type Submission = {
     name: string;
     email: string;
     country: string;
+    kycLevel?: number;
   };
 };
 
@@ -161,8 +164,17 @@ export default function AdminKycPage() {
                   cell: (row) => row.user.country,
                 },
                 {
+                  key: "level",
+                  header: "Level",
+                  cell: (row) => (
+                    <span className="text-sm font-semibold">
+                      {row.levelLabel || `Level ${row.targetLevel || 1}`}
+                    </span>
+                  ),
+                },
+                {
                   key: "id",
-                  header: "ID",
+                  header: "Document",
                   cell: (row) => (
                     <span className="text-sm">
                       {row.idType || "—"}
@@ -208,7 +220,9 @@ export default function AdminKycPage() {
       >
         <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Review KYC</DialogTitle>
+            <DialogTitle>
+              Review Level {review?.targetLevel || 1} KYC
+            </DialogTitle>
             <DialogDescription>
               {review?.user.name} · {review?.user.email}
             </DialogDescription>
@@ -218,14 +232,24 @@ export default function AdminKycPage() {
             <div className="space-y-4">
               <div className="flex flex-wrap gap-2">
                 <StatusBadge status={review.statusLabel} />
+                <StatusBadge
+                  status={review.levelLabel || `Level ${review.targetLevel || 1}`}
+                />
                 <span className="text-xs text-muted-foreground">
                   {review.user.country}
+                  {typeof review.user.kycLevel === "number"
+                    ? ` · current L${review.user.kycLevel}`
+                    : ""}
                 </span>
               </div>
 
               <div className="rounded-xl border border-border p-3 text-sm">
                 <p>
-                  <span className="text-muted-foreground">Type:</span>{" "}
+                  <span className="text-muted-foreground">Target level:</span>{" "}
+                  {review.targetLevel || 1}
+                </p>
+                <p className="mt-1">
+                  <span className="text-muted-foreground">Document:</span>{" "}
                   {review.idType || "—"}
                 </p>
                 <p className="mt-1">

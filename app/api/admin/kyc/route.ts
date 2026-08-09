@@ -15,6 +15,7 @@ export async function GET(req: Request) {
       .select({
         id: kycSubmissions.id,
         status: kycSubmissions.status,
+        targetLevel: kycSubmissions.targetLevel,
         idType: kycSubmissions.idType,
         idNumber: kycSubmissions.idNumber,
         idFrontUrl: kycSubmissions.idFrontUrl,
@@ -28,6 +29,7 @@ export async function GET(req: Request) {
         userName: users.fullName,
         userEmail: users.email,
         userKyc: users.kycStatus,
+        userKycLevel: users.kycLevel,
         countryCode: users.countryCode,
         countryName: countries.name,
       })
@@ -54,6 +56,8 @@ export async function GET(req: Request) {
         id: r.id,
         status: r.status,
         statusLabel: titleCaseStatus(r.status),
+        targetLevel: r.targetLevel,
+        levelLabel: `Level ${r.targetLevel}`,
         idType: r.idType,
         idNumber: r.idNumber,
         idFrontUrl: r.idFrontUrl,
@@ -68,6 +72,7 @@ export async function GET(req: Request) {
           name: r.userName,
           email: r.userEmail,
           kyc: r.userKyc,
+          kycLevel: r.userKycLevel,
           country: r.countryName || r.countryCode || "—",
         },
       })),

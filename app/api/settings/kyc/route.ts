@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import { currentUser } from "@clerk/nextjs/server";
 import { desc, eq } from "drizzle-orm";
+import {
+  getLevelDef,
+  isValidIdTypeForLevel,
+  nextKycLevel,
+  normalizeKycLevel,
+  type AccountLevelId,
+} from "@/lib/account-levels";
 import { ensureAppUser } from "@/lib/auth/current-user";
 import { db } from "@/lib/db";
 import { kycSubmissions, users } from "@/lib/db/schema";
@@ -11,6 +18,24 @@ import {
 import { createNotification } from "@/lib/notifications-service";
 
 export const runtime = "nodejs";
+
+function submissionDto(row: typeof kycSubmissions.$inferSelect) {
+  return {
+    id: row.id,
+    step: row.step,
+    targetLevel: row.targetLevel,
+    idType: row.idType,
+    idNumber: row.idNumber,
+    idFrontUrl: row.idFrontUrl,
+    idBackUrl: row.idBackUrl,
+    selfieUrl: row.selfieUrl,
+    status: row.status,
+    rejectionReason: row.rejectionReason,
+    submittedAt:
+      row.updatedAt?.toISOString?.() ?? row.createdAt?.toISOString?.() ?? null,
+    createdAt: row.createdAt?.toISOString?.() ?? null,
+  };
+}
 
 export async function GET() {
   try {
@@ -24,6 +49,7 @@ export async function GET() {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
+    const kycLevel = normalizeKycLevel(dbUser.kycLevel);
     const latest = await db.query.kycSubmissions.findFirst({
       where: eq(kycSubmissions.userId, dbUser.id),
       orderBy: [desc(kycSubmissions.createdAt)],
@@ -31,21 +57,9 @@ export async function GET() {
 
     return NextResponse.json({
       kycStatus: dbUser.kycStatus,
-      submission: latest
-        ? {
-            id: latest.id,
-            step: latest.step,
-            idType: latest.idType,
-            idNumber: latest.idNumber,
-            idFrontUrl: latest.idFrontUrl,
-            idBackUrl: latest.idBackUrl,
-            selfieUrl: latest.selfieUrl,
-            status: latest.status,
-            rejectionReason: latest.rejectionReason,
-            submittedAt: latest.updatedAt?.toISOString?.() ?? latest.createdAt?.toISOString?.() ?? null,
-            createdAt: latest.createdAt?.toISOString?.() ?? null,
-          }
-        : null,
+      kycLevel,
+      nextLevel: nextKycLevel(kycLevel),
+      submission: latest ? submissionDto(latest) : null,
     });
   } catch (error) {
     console.error("[kyc-get]", error);
@@ -65,26 +79,60 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    if (dbUser.kycStatus === "verified") {
+    const kycLevel = normalizeKycLevel(dbUser.kycLevel);
+    if (kycLevel >= 3) {
       return NextResponse.json(
-        { error: "KYC is already verified." },
+        { error: "You are already fully verified (Level 3)." },
+        { status: 400 },
+      );
+    }
+
+    if (dbUser.kycStatus === "pending") {
+      return NextResponse.json(
+        { error: "A KYC submission is already under review." },
         { status: 400 },
       );
     }
 
     const body = (await req.json()) as {
+      targetLevel?: number;
       idType?: string;
       idNumber?: string;
       idFrontUrl?: string;
       idBackUrl?: string;
       selfieUrl?: string;
-      /** Mobile clients upload images as base64 (same pattern as gift-card sell). */
       idFrontImage?: KycImagePayload;
       idBackImage?: KycImagePayload;
       selfieImage?: KycImagePayload;
       step?: number;
       submit?: boolean;
     };
+
+    const requested =
+      body.targetLevel === 1 || body.targetLevel === 2 || body.targetLevel === 3
+        ? (body.targetLevel as AccountLevelId)
+        : nextKycLevel(kycLevel);
+
+    if (!requested) {
+      return NextResponse.json(
+        { error: "No further KYC level available." },
+        { status: 400 },
+      );
+    }
+
+    if (requested !== kycLevel + 1 && !(kycLevel === 0 && requested === 1)) {
+      return NextResponse.json(
+        {
+          error: `Submit Level ${kycLevel + 1} documents next.`,
+        },
+        { status: 400 },
+      );
+    }
+
+    const levelDef = getLevelDef(requested);
+    if (!levelDef) {
+      return NextResponse.json({ error: "Invalid KYC level" }, { status: 400 });
+    }
 
     const latest = await db.query.kycSubmissions.findFirst({
       where: eq(kycSubmissions.userId, dbUser.id),
@@ -110,9 +158,13 @@ export async function POST(req: Request) {
       );
     }
 
+    const defaultIdType = levelDef.kyc.idTypes[0];
+    const idType = body.idType?.trim() || latest?.idType || defaultIdType;
+
     const payload = {
-      step: body.step ?? latest?.step ?? 1,
-      idType: body.idType?.trim() || latest?.idType || null,
+      step: body.step ?? latest?.step ?? requested,
+      targetLevel: requested,
+      idType,
       idNumber: body.idNumber?.trim() || latest?.idNumber || null,
       idFrontUrl:
         uploadedFront || body.idFrontUrl || latest?.idFrontUrl || null,
@@ -120,19 +172,51 @@ export async function POST(req: Request) {
       selfieUrl: uploadedSelfie || body.selfieUrl || latest?.selfieUrl || null,
       status: body.submit ? ("pending" as const) : (latest?.status ?? "pending"),
       updatedAt: new Date(),
+      rejectionReason: null as string | null,
     };
 
     if (body.submit) {
-      if (!payload.idType || !payload.idNumber || !payload.idFrontUrl) {
+      if (!isValidIdTypeForLevel(requested, payload.idType)) {
         return NextResponse.json(
-          { error: "ID type, number, and front image are required." },
+          {
+            error: `Choose a valid document type for Level ${requested}: ${levelDef.kyc.idTypes.join(", ")}.`,
+          },
+          { status: 400 },
+        );
+      }
+      if (levelDef.kyc.numberRequired && !payload.idNumber) {
+        return NextResponse.json(
+          { error: `${levelDef.kyc.numberLabel} is required.` },
+          { status: 400 },
+        );
+      }
+      if (requested === 2 && payload.idNumber && !/^\d{11}$/.test(payload.idNumber)) {
+        return NextResponse.json(
+          { error: "BVN must be exactly 11 digits." },
+          { status: 400 },
+        );
+      }
+      if (levelDef.kyc.frontRequired && !payload.idFrontUrl) {
+        return NextResponse.json(
+          { error: `${levelDef.kyc.frontLabel} is required.` },
+          { status: 400 },
+        );
+      }
+      if (levelDef.kyc.selfieRequired && !payload.selfieUrl) {
+        return NextResponse.json(
+          { error: "Selfie is required for Level 1." },
           { status: 400 },
         );
       }
     }
 
+    const canReuse =
+      latest &&
+      latest.status !== "verified" &&
+      normalizeKycLevel(latest.targetLevel) === requested;
+
     let submission;
-    if (latest && latest.status !== "verified") {
+    if (canReuse) {
       const [updated] = await db
         .update(kycSubmissions)
         .set(payload)
@@ -159,12 +243,13 @@ export async function POST(req: Request) {
       try {
         await createNotification({
           userId: dbUser.id,
-          title: "KYC under review",
-          body: "Your identity documents were received. We’ll notify you when verification is complete — usually within a few hours.",
+          title: `Level ${requested} KYC under review`,
+          body: `Your ${levelDef.shortName} documents were received. We’ll notify you when Level ${requested} is approved.`,
           type: "kyc",
           metadata: {
             href: "/settings/kyc",
             kycStatus: "pending",
+            targetLevel: requested,
             submissionId: submission.id,
           },
         });
@@ -176,22 +261,9 @@ export async function POST(req: Request) {
     return NextResponse.json({
       ok: true,
       kycStatus: body.submit ? "pending" : dbUser.kycStatus,
-      submission: {
-        id: submission.id,
-        step: submission.step,
-        idType: submission.idType,
-        idNumber: submission.idNumber,
-        idFrontUrl: submission.idFrontUrl,
-        idBackUrl: submission.idBackUrl,
-        selfieUrl: submission.selfieUrl,
-        status: submission.status,
-        rejectionReason: submission.rejectionReason,
-        submittedAt:
-          submission.updatedAt?.toISOString?.() ??
-          submission.createdAt?.toISOString?.() ??
-          null,
-        createdAt: submission.createdAt?.toISOString?.() ?? null,
-      },
+      kycLevel,
+      nextLevel: nextKycLevel(kycLevel),
+      submission: submissionDto(submission),
     });
   } catch (error) {
     console.error("[kyc-post]", error);

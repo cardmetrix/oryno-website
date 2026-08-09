@@ -23,6 +23,7 @@ export async function GET(req: Request) {
         username: users.username,
         status: users.status,
         kyc: users.kycStatus,
+        kycLevel: users.kycLevel,
         countryCode: users.countryCode,
         countryName: countries.name,
         lastLoginAt: users.lastLoginAt,
@@ -92,7 +93,8 @@ export async function GET(req: Request) {
         status: u.status,
         statusLabel: titleCaseStatus(u.status),
         kyc: u.kyc,
-        kycLabel: titleCaseStatus(u.kyc),
+        kycLevel: u.kycLevel,
+        kycLabel: `L${u.kycLevel} · ${titleCaseStatus(u.kyc)}`,
         balance: primary
           ? primary.balanceFormatted
           : formatMoney(0, "NGN"),

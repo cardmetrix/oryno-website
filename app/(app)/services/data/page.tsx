@@ -230,6 +230,7 @@ export default function DataPage() {
               subtitle={`${selected.name} delivered to ${phone}`}
               amountLabel="Amount charged"
               amount={receipt || money(selected.amount)}
+              onDismiss={() => setSuccess(false)}
               secondaryAction={{
                 label: "Back to Home",
                 href: "/dashboard",

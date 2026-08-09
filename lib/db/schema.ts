@@ -279,6 +279,8 @@ export const users = pgTable(
     ),
     status: userStatusEnum("status").notNull().default("active"),
     kycStatus: kycStatusEnum("kyc_status").notNull().default("unverified"),
+    /** Highest approved KYC tier: 0 none, 1 ID, 2 BVN, 3 proof of address. */
+    kycLevel: integer("kyc_level").notNull().default(0),
     language: varchar("language", { length: 16 }).notNull().default("en"),
     theme: themeEnum("theme").notNull().default("light"),
     referralCodeId: uuid("referral_code_id"),
@@ -350,6 +352,8 @@ export const kycSubmissions = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     step: integer("step").notNull().default(1),
+    /** KYC tier this submission unlocks (1 ID, 2 BVN, 3 utility bill). */
+    targetLevel: integer("target_level").notNull().default(1),
     idType: varchar("id_type", { length: 64 }),
     idNumber: varchar("id_number", { length: 64 }),
     idFrontUrl: text("id_front_url"),

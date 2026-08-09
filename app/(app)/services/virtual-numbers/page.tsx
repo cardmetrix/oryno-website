@@ -250,6 +250,7 @@ export default function VirtualNumbersPage() {
               subtitle="Use this number for verification."
               amountLabel="Amount charged"
               amount={receipt}
+              onDismiss={() => setSuccess(false)}
               secondaryAction={{
                 label: "Back to Home",
                 href: "/dashboard",

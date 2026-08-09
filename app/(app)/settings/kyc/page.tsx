@@ -19,12 +19,19 @@ import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
 import { AuthField, authInputClassName } from "@/components/auth/auth-field";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  getLevelDef,
+  nextKycLevel,
+  normalizeKycLevel,
+  type AccountLevelId,
+} from "@/lib/account-levels";
 import { useUploadThing } from "@/lib/uploadthing";
 import { cn } from "@/lib/utils";
 
 type Submission = {
   id: string;
   step: number;
+  targetLevel?: number;
   idType: string | null;
   idNumber: string | null;
   idFrontUrl: string | null;
@@ -36,18 +43,16 @@ type Submission = {
   createdAt?: string | null;
 };
 
-const ID_TYPES = ["NIN Slip", "National ID", "Passport", "Driver License"];
-
 const REVIEW_STEPS = [
   {
     key: "submitted",
     label: "Documents submitted",
-    detail: "ID and selfie received securely",
+    detail: "Your KYC package was received securely",
   },
   {
     key: "review",
     label: "Under review",
-    detail: "Our team is verifying your identity",
+    detail: "Our team is verifying your documents",
   },
   {
     key: "done",
@@ -73,8 +78,9 @@ export default function KycPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [kycStatus, setKycStatus] = useState("unverified");
+  const [kycLevel, setKycLevel] = useState(0);
   const [submission, setSubmission] = useState<Submission | null>(null);
-  const [idType, setIdType] = useState("NIN Slip");
+  const [idType, setIdType] = useState("NIN");
   const [idNumber, setIdNumber] = useState("");
   const [idFrontUrl, setIdFrontUrl] = useState<string | null>(null);
   const [idBackUrl, setIdBackUrl] = useState<string | null>(null);
@@ -83,26 +89,49 @@ export default function KycPage() {
     "front" | "back" | "selfie" | null
   >(null);
 
-  const step = useMemo(() => {
-    if (kycStatus === "verified" || kycStatus === "pending") return 4;
-    if (selfieUrl) return 3;
-    if (idFrontUrl && idNumber) return 2;
-    return 1;
-  }, [kycStatus, selfieUrl, idFrontUrl, idNumber]);
+  const targetLevel = useMemo(() => {
+    const next = nextKycLevel(kycLevel);
+    if (kycStatus === "pending" && submission?.targetLevel) {
+      return normalizeKycLevel(submission.targetLevel) || next || 1;
+    }
+    return next;
+  }, [kycLevel, kycStatus, submission?.targetLevel]);
+
+  const levelDef = targetLevel ? getLevelDef(targetLevel as AccountLevelId) : null;
 
   const load = useCallback(async () => {
     try {
       const res = await fetch("/api/settings/kyc", { cache: "no-store" });
       if (!res.ok) throw new Error("Failed");
       const json = await res.json();
+      const level = normalizeKycLevel(json.kycLevel);
       setKycStatus(json.kycStatus);
+      setKycLevel(level);
       setSubmission(json.submission);
-      if (json.submission) {
-        setIdType(json.submission.idType || "NIN Slip");
+
+      const next = nextKycLevel(level);
+      const subLevel = normalizeKycLevel(json.submission?.targetLevel) || next || 1;
+      const def = getLevelDef(
+        (json.kycStatus === "pending" ? subLevel : next || 1) as AccountLevelId,
+      );
+      const types = def?.kyc.idTypes ?? ["NIN"];
+
+      if (json.submission && json.kycStatus === "pending") {
+        const match = types.find(
+          (t) =>
+            t.toLowerCase() === (json.submission.idType || "").toLowerCase(),
+        );
+        setIdType(match || types[0]);
         setIdNumber(json.submission.idNumber || "");
         setIdFrontUrl(json.submission.idFrontUrl);
         setIdBackUrl(json.submission.idBackUrl);
         setSelfieUrl(json.submission.selfieUrl);
+      } else if (def) {
+        setIdType(types[0]);
+        setIdNumber("");
+        setIdFrontUrl(null);
+        setIdBackUrl(null);
+        setSelfieUrl(null);
       }
     } catch {
       toast.error("Could not load KYC status");
@@ -114,6 +143,13 @@ export default function KycPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!levelDef) return;
+    if (!levelDef.kyc.idTypes.includes(idType)) {
+      setIdType(levelDef.kyc.idTypes[0]);
+    }
+  }, [levelDef, idType]);
 
   const { startUpload, isUploading } = useUploadThing("kycDocument", {
     onClientUploadComplete: (res) => {
@@ -145,26 +181,33 @@ export default function KycPage() {
   }
 
   async function saveProgress(submit = false) {
+    if (!targetLevel || !levelDef) return;
     setSaving(true);
     try {
       const res = await fetch("/api/settings/kyc", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          targetLevel,
           idType,
           idNumber,
           idFrontUrl,
           idBackUrl,
           selfieUrl,
-          step,
+          step: targetLevel,
           submit,
         }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Save failed");
       setKycStatus(json.kycStatus);
+      setKycLevel(normalizeKycLevel(json.kycLevel));
       setSubmission(json.submission);
-      toast.success(submit ? "KYC submitted for review" : "Progress saved");
+      toast.success(
+        submit
+          ? `Level ${targetLevel} submitted for review`
+          : "Progress saved",
+      );
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Save failed");
     } finally {
@@ -172,7 +215,13 @@ export default function KycPage() {
     }
   }
 
-  const locked = kycStatus === "verified" || kycStatus === "pending";
+  const locked = kycStatus === "pending" || kycLevel >= 3;
+  const canSubmit = Boolean(
+    levelDef &&
+      (!levelDef.kyc.numberRequired || idNumber.trim()) &&
+      (!levelDef.kyc.frontRequired || idFrontUrl) &&
+      (!levelDef.kyc.selfieRequired || selfieUrl),
+  );
   const submittedLabel = formatSubmittedAt(
     submission?.submittedAt || submission?.createdAt,
   );
@@ -182,11 +231,13 @@ export default function KycPage() {
       <PageHeader
         title="KYC Verification"
         subtitle={
-          kycStatus === "verified"
-            ? "Your identity is verified"
+          kycLevel >= 3
+            ? "You’re fully verified (Level 3)"
             : kycStatus === "pending"
-              ? "Pending verification"
-              : `Step ${Math.min(step, 3)} of 3`
+              ? `Level ${submission?.targetLevel || targetLevel} pending review`
+              : targetLevel
+                ? `Upgrade to Level ${targetLevel}`
+                : "Verification"
         }
         backHref="/settings"
       />
@@ -201,6 +252,7 @@ export default function KycPage() {
         <PendingVerificationView
           submission={submission}
           submittedLabel={submittedLabel}
+          targetLevel={submission?.targetLevel || targetLevel || 1}
         />
       ) : (
         <>
@@ -208,52 +260,90 @@ export default function KycPage() {
             <div className="mb-4 h-2 overflow-hidden rounded-full bg-muted">
               <motion.div
                 initial={{ width: 0 }}
-                animate={{
-                  width:
-                    kycStatus === "verified"
-                      ? "100%"
-                      : `${(Math.min(step, 3) / 3) * 100}%`,
-                }}
+                animate={{ width: `${(kycLevel / 3) * 100}%` }}
                 className="h-full rounded-full bg-gradient-to-r from-[#ff8124] via-oryno-orange to-[#e85d00]"
               />
             </div>
 
-            {kycStatus === "verified" ? (
+            {kycLevel >= 3 ? (
               <StatusCard
                 icon={BadgeCheck}
-                title="Verified"
-                body="You have full access to ORYNO limits and payouts."
+                title="Level 3 · Fully verified"
+                body="Unlimited daily limit unlocked with proof of address."
                 tone="success"
               />
             ) : kycStatus === "rejected" ? (
               <StatusCard
                 icon={ShieldAlert}
-                title="Rejected"
+                title="Submission rejected"
                 body={
                   submission?.rejectionReason ||
                   "Please update your documents and resubmit."
                 }
                 tone="error"
               />
+            ) : kycLevel > 0 ? (
+              <StatusCard
+                icon={BadgeCheck}
+                title={`Level ${kycLevel} approved`}
+                body={
+                  levelDef
+                    ? `Next: ${levelDef.requirement} for Level ${targetLevel}.`
+                    : "You’re verified. Upgrade further to raise limits."
+                }
+                tone="success"
+              />
             ) : (
               <p className="text-sm text-muted-foreground">
-                Complete ID upload and selfie to unlock higher wallet limits.
+                {levelDef?.kyc.helpText ||
+                  "Complete identity verification to unlock higher wallet limits."}
               </p>
             )}
+
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              {([1, 2, 3] as const).map((id) => (
+                <div
+                  key={id}
+                  className={cn(
+                    "rounded-xl border px-2 py-2 text-center",
+                    kycLevel >= id
+                      ? "border-primary/30 bg-oryno-orange-muted/50"
+                      : "border-border bg-muted/40",
+                  )}
+                >
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                    L{id}
+                  </p>
+                  <p className="mt-0.5 text-[11px] font-semibold text-foreground">
+                    {id === 1 ? "ID" : id === 2 ? "BVN" : "Address"}
+                  </p>
+                </div>
+              ))}
+            </div>
           </MotionSection>
 
-          {!locked ? (
+          {!locked && levelDef && targetLevel ? (
             <MotionSection
               delay={0.06}
               className="mt-4 space-y-4 rounded-[28px] border border-border bg-background p-5 shadow-[var(--shadow-soft)]"
             >
-              <AuthField label="ID Type">
+              <div>
+                <p className="text-sm font-bold text-foreground">
+                  Level {targetLevel} · {levelDef.shortName}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {levelDef.kyc.helpText}
+                </p>
+              </div>
+
+              <AuthField label="Document type">
                 <select
                   value={idType}
                   onChange={(e) => setIdType(e.target.value)}
                   className={authInputClassName}
+                  disabled={levelDef.kyc.idTypes.length === 1}
                 >
-                  {ID_TYPES.map((type) => (
+                  {levelDef.kyc.idTypes.map((type) => (
                     <option key={type} value={type}>
                       {type}
                     </option>
@@ -261,34 +351,47 @@ export default function KycPage() {
                 </select>
               </AuthField>
 
-              <AuthField label="ID Number">
-                <input
-                  value={idNumber}
-                  onChange={(e) => setIdNumber(e.target.value)}
-                  placeholder="e.g. 12345678901"
-                  className={authInputClassName}
-                />
-              </AuthField>
+              {(levelDef.kyc.numberRequired || targetLevel === 3) && (
+                <AuthField label={levelDef.kyc.numberLabel}>
+                  <input
+                    value={idNumber}
+                    onChange={(e) => setIdNumber(e.target.value)}
+                    placeholder={levelDef.kyc.numberPlaceholder}
+                    inputMode={targetLevel === 2 ? "numeric" : "text"}
+                    maxLength={targetLevel === 2 ? 11 : 64}
+                    className={authInputClassName}
+                  />
+                </AuthField>
+              )}
 
-              <UploadTile
-                label="ID Front"
-                url={idFrontUrl}
-                uploading={isUploading && uploadTarget === "front"}
-                onClick={() => pickFile("front")}
-              />
-              <UploadTile
-                label="ID Back (optional)"
-                url={idBackUrl}
-                uploading={isUploading && uploadTarget === "back"}
-                onClick={() => pickFile("back")}
-              />
-              <UploadTile
-                label="Selfie"
-                url={selfieUrl}
-                uploading={isUploading && uploadTarget === "selfie"}
-                onClick={() => pickFile("selfie")}
-                selfie
-              />
+              {(levelDef.kyc.frontRequired ||
+                levelDef.kyc.frontLabel.includes("optional")) && (
+                <UploadTile
+                  label={levelDef.kyc.frontLabel}
+                  url={idFrontUrl}
+                  uploading={isUploading && uploadTarget === "front"}
+                  onClick={() => pickFile("front")}
+                />
+              )}
+
+              {levelDef.kyc.backLabel ? (
+                <UploadTile
+                  label={levelDef.kyc.backLabel}
+                  url={idBackUrl}
+                  uploading={isUploading && uploadTarget === "back"}
+                  onClick={() => pickFile("back")}
+                />
+              ) : null}
+
+              {levelDef.kyc.selfieRequired ? (
+                <UploadTile
+                  label="Selfie"
+                  url={selfieUrl}
+                  uploading={isUploading && uploadTarget === "selfie"}
+                  onClick={() => pickFile("selfie")}
+                  selfie
+                />
+              ) : null}
 
               <div className="grid grid-cols-2 gap-2.5 pt-1">
                 <button
@@ -301,12 +404,12 @@ export default function KycPage() {
                 </button>
                 <button
                   type="button"
-                  disabled={saving || !idFrontUrl || !idNumber}
+                  disabled={saving || !canSubmit}
                   onClick={() => void saveProgress(true)}
                   className="btn-primary inline-flex h-11 items-center justify-center gap-2 text-sm disabled:opacity-60"
                 >
                   {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                  Submit KYC
+                  Submit Level {targetLevel}
                 </button>
               </div>
             </MotionSection>
@@ -320,12 +423,14 @@ export default function KycPage() {
 function PendingVerificationView({
   submission,
   submittedLabel,
+  targetLevel,
 }: {
   submission: Submission | null;
   submittedLabel: string | null;
+  targetLevel: number;
 }) {
   const docs = [
-    { label: "ID front", url: submission?.idFrontUrl },
+    { label: "Document", url: submission?.idFrontUrl },
     { label: "ID back", url: submission?.idBackUrl },
     { label: "Selfie", url: submission?.selfieUrl },
   ].filter((d) => d.url);
@@ -334,43 +439,21 @@ function PendingVerificationView({
     <div className="space-y-4">
       <MotionSection className="overflow-hidden rounded-[28px] border border-border bg-background shadow-[var(--shadow-soft)]">
         <div className="relative overflow-hidden bg-gradient-to-br from-[#ff8124] via-oryno-orange to-[#c94a00] px-5 pb-8 pt-7 text-white">
-          <motion.div
-            aria-hidden
-            className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/15"
-            animate={{ scale: [1, 1.12, 1], opacity: [0.35, 0.55, 0.35] }}
-            transition={{ duration: 4.5, repeat: Infinity, ease: "easeInOut" }}
-          />
-          <motion.div
-            aria-hidden
-            className="pointer-events-none absolute -bottom-16 left-8 h-36 w-36 rounded-full bg-black/10"
-            animate={{ scale: [1, 1.08, 1] }}
-            transition={{ duration: 5.5, repeat: Infinity, ease: "easeInOut" }}
-          />
-
           <div className="relative flex flex-col items-center text-center">
-            <div className="relative mb-4">
-              <motion.span
-                className="absolute inset-0 rounded-full bg-white/25"
-                animate={{ scale: [1, 1.45, 1], opacity: [0.55, 0, 0.55] }}
-                transition={{ duration: 2.2, repeat: Infinity, ease: "easeOut" }}
-              />
-              <span className="relative flex h-16 w-16 items-center justify-center rounded-full bg-white/20 ring-1 ring-white/35 backdrop-blur-sm">
-                <ShieldCheck className="h-8 w-8" strokeWidth={1.75} />
-              </span>
-            </div>
-
+            <span className="relative mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-white/20 ring-1 ring-white/35">
+              <ShieldCheck className="h-8 w-8" strokeWidth={1.75} />
+            </span>
             <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-white/80">
-              Pending verification
+              Level {targetLevel} pending
             </p>
             <h2 className="mt-2 text-2xl font-bold tracking-tight">
               We’re reviewing your KYC
             </h2>
             <p className="mt-2 max-w-sm text-sm text-white/85">
-              Your documents are in the review queue. You’ll get an in-app
-              notification as soon as a decision is made.
+              Your documents are in the review queue. You’ll get a notification
+              as soon as a decision is made.
             </p>
-
-            <div className="mt-5 inline-flex items-center gap-2 rounded-full bg-black/15 px-3.5 py-2 text-xs font-semibold ring-1 ring-white/20 backdrop-blur-sm">
+            <div className="mt-5 inline-flex items-center gap-2 rounded-full bg-black/15 px-3.5 py-2 text-xs font-semibold ring-1 ring-white/20">
               <Clock3 className="h-3.5 w-3.5" />
               Usually takes a few hours
             </div>
@@ -389,7 +472,7 @@ function PendingVerificationView({
             </div>
             <div className="rounded-2xl border border-border bg-muted/40 px-3.5 py-3">
               <p className="text-[11px] font-medium text-muted-foreground">
-                ID type
+                Document
               </p>
               <p className="mt-1 truncate text-sm font-semibold text-foreground">
                 {submission?.idType || "—"}
@@ -397,116 +480,70 @@ function PendingVerificationView({
             </div>
           </div>
 
-          <div>
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-              Review progress
-            </p>
-            <ol className="space-y-0">
-              {REVIEW_STEPS.map((item, index) => {
-                const done = index === 0;
-                const active = index === 1;
-                const upcoming = index === 2;
-                return (
-                  <li key={item.key} className="flex gap-3">
-                    <div className="flex flex-col items-center">
-                      <span
-                        className={cn(
-                          "flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold",
-                          done && "bg-[var(--oryno-success)] text-white",
-                          active &&
-                            "bg-oryno-orange-muted text-primary ring-2 ring-primary/25",
-                          upcoming && "bg-muted text-muted-foreground",
-                        )}
-                      >
-                        {done ? (
-                          <CheckCircle2 className="h-4 w-4" />
-                        ) : active ? (
-                          <motion.span
-                            className="h-2.5 w-2.5 rounded-full bg-primary"
-                            animate={{ scale: [1, 1.35, 1], opacity: [1, 0.65, 1] }}
-                            transition={{
-                              duration: 1.4,
-                              repeat: Infinity,
-                              ease: "easeInOut",
-                            }}
-                          />
-                        ) : (
-                          index + 1
-                        )}
-                      </span>
-                      {index < REVIEW_STEPS.length - 1 ? (
-                        <span
-                          className={cn(
-                            "my-1 w-0.5 flex-1 min-h-6 rounded-full",
-                            done ? "bg-[var(--oryno-success)]" : "bg-border",
-                          )}
-                        />
-                      ) : null}
-                    </div>
-                    <div className={cn("pb-5", index === REVIEW_STEPS.length - 1 && "pb-0")}>
-                      <p
-                        className={cn(
-                          "text-sm font-semibold",
-                          upcoming ? "text-muted-foreground" : "text-foreground",
-                        )}
-                      >
-                        {item.label}
-                      </p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {item.detail}
-                      </p>
-                    </div>
-                  </li>
-                );
-              })}
-            </ol>
-          </div>
-
-          {docs.length ? (
-            <div>
-              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                Submitted documents
-              </p>
-              <div className="grid grid-cols-3 gap-2.5">
-                {docs.map((doc) => (
+          <ol className="space-y-0">
+            {REVIEW_STEPS.map((item, index) => {
+              const done = index === 0;
+              const active = index === 1;
+              const upcoming = index === 2;
+              return (
+                <li key={item.key} className="flex gap-3">
+                  <div className="flex flex-col items-center">
+                    <span
+                      className={cn(
+                        "flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold",
+                        done && "bg-[var(--oryno-success)] text-white",
+                        active &&
+                          "bg-oryno-orange-muted text-primary ring-2 ring-primary/25",
+                        upcoming && "bg-muted text-muted-foreground",
+                      )}
+                    >
+                      {done ? <CheckCircle2 className="h-4 w-4" /> : index + 1}
+                    </span>
+                    {index < REVIEW_STEPS.length - 1 ? (
+                      <span className="my-1 min-h-6 w-0.5 flex-1 rounded-full bg-border" />
+                    ) : null}
+                  </div>
                   <div
-                    key={doc.label}
-                    className="overflow-hidden rounded-2xl border border-border bg-muted/30"
+                    className={cn(
+                      "pb-5",
+                      index === REVIEW_STEPS.length - 1 && "pb-0",
+                    )}
                   >
-                    <div className="relative aspect-square">
-                      <Image
-                        src={doc.url!}
-                        alt={doc.label}
-                        fill
-                        className="object-cover"
-                        sizes="120px"
-                      />
-                    </div>
-                    <p className="truncate px-2 py-1.5 text-center text-[11px] font-medium text-muted-foreground">
-                      {doc.label}
+                    <p className="text-sm font-semibold text-foreground">
+                      {item.label}
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {item.detail}
                     </p>
                   </div>
-                ))}
-              </div>
+                </li>
+              );
+            })}
+          </ol>
+
+          {docs.length ? (
+            <div className="grid grid-cols-3 gap-2.5">
+              {docs.map((doc) => (
+                <div
+                  key={doc.label}
+                  className="overflow-hidden rounded-2xl border border-border bg-muted/30"
+                >
+                  <div className="relative aspect-square">
+                    <Image
+                      src={doc.url!}
+                      alt={doc.label}
+                      fill
+                      className="object-cover"
+                      sizes="120px"
+                    />
+                  </div>
+                  <p className="truncate px-2 py-1.5 text-center text-[11px] font-medium text-muted-foreground">
+                    {doc.label}
+                  </p>
+                </div>
+              ))}
             </div>
           ) : null}
-
-          <div className="rounded-2xl border border-dashed border-primary/25 bg-oryno-orange-muted/50 px-4 py-3.5">
-            <div className="flex items-start gap-3">
-              <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-background text-primary">
-                <Clock3 className="h-4 w-4" />
-              </span>
-              <div>
-                <p className="text-sm font-semibold text-foreground">
-                  We’ll notify you
-                </p>
-                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                  Check Notifications for the verification result. No need to
-                  resubmit while review is in progress.
-                </p>
-              </div>
-            </div>
-          </div>
         </div>
       </MotionSection>
     </div>

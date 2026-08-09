@@ -586,6 +586,7 @@ export default function SocialBoostPage() {
               amountLabel="Amount charged"
               amount={receipt}
               reference={orderId}
+              onDismiss={() => setSuccess(false)}
               secondaryAction={{
                 label: "Back to Home",
                 href: "/dashboard",

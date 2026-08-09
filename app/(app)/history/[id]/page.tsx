@@ -338,9 +338,6 @@ function renderReceiptCanvas(tx: TransactionReceipt) {
     ["Type", tx.type === "credit" ? "Credit" : "Debit"],
     ["Date", tx.createdAtFormatted],
     ["Reference", tx.reference],
-    ...(tx.balanceAfterFormatted
-      ? [["Balance after", tx.balanceAfterFormatted] as const]
-      : []),
     ["Currency", tx.currency ?? "NGN"],
   ];
   const height = 280 + rows.length * rowH + 60;

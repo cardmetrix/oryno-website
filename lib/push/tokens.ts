@@ -53,8 +53,33 @@ export async function upsertPushToken(input: {
 }
 
 export async function listPushTokensForUser(userId: string) {
-  return db.query.userPushTokens.findMany({
+  const rows = await db.query.userPushTokens.findMany({
     where: eq(userPushTokens.userId, userId),
+  });
+
+  // One push per device: keep the newest token when deviceId is shared.
+  const byDevice = new Map<string, (typeof rows)[number]>();
+  const withoutDevice: typeof rows = [];
+
+  for (const row of rows) {
+    const key = row.deviceId?.trim();
+    if (!key) {
+      withoutDevice.push(row);
+      continue;
+    }
+    const prev = byDevice.get(key);
+    if (!prev || row.lastSeenAt > prev.lastSeenAt) {
+      byDevice.set(key, row);
+    }
+  }
+
+  const deduped = [...byDevice.values(), ...withoutDevice];
+  // Also collapse identical tokens (should already be unique by PK).
+  const seenTokens = new Set<string>();
+  return deduped.filter((row) => {
+    if (seenTokens.has(row.token)) return false;
+    seenTokens.add(row.token);
+    return true;
   });
 }
 

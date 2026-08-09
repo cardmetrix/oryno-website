@@ -245,6 +245,7 @@ export default function AirtimePage() {
               subtitle={`${receiptAmount || money(amountNumber)} sent to ${phone}${selectedNetwork ? ` · ${selectedNetwork.name}` : ""}`}
               amountLabel="Amount charged"
               amount={receiptAmount || money(amountNumber)}
+              onDismiss={() => setSuccess(false)}
               secondaryAction={{
                 label: "Back to Home",
                 href: "/dashboard",

@@ -46,13 +46,18 @@ export default function AccountLevelsPage() {
   }, [load]);
 
   const kycStatus = profile?.kycStatus || "unverified";
-  const current = useMemo(() => resolveUserLevel(kycStatus), [kycStatus]);
+  const kycLevel = profile?.kycLevel ?? 0;
+  const current = useMemo(() => resolveUserLevel(kycLevel), [kycLevel]);
   const levels = useMemo(
     () => getAccountLevels(profile?.countryCode),
     [profile?.countryCode],
   );
-  const cta = useMemo(() => levelCta(kycStatus), [kycStatus]);
-  const progress = ((current.id as AccountLevelId) / 3) * 100;
+  const cta = useMemo(
+    () => levelCta({ kycLevel, kycStatus }),
+    [kycLevel, kycStatus],
+  );
+  const progress = ((Math.max(kycLevel, 0) as AccountLevelId | 0) / 3) * 100;
+  const unlockedId = kycLevel;
 
   return (
     <AppShell hideNav>
@@ -76,12 +81,16 @@ export default function AccountLevelsPage() {
           <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
             <div>
               <h2 className="text-2xl font-bold tracking-tight sm:text-[1.75rem]">
-                {loading ? "Loading…" : current.name}
+                {loading
+                  ? "Loading…"
+                  : kycLevel > 0
+                    ? current.name
+                    : "Unverified"}
               </h2>
               <p className="mt-1 text-sm text-white/85">
                 {loading
                   ? "Syncing account status"
-                  : profile?.kycLabel || "Unverified"}
+                  : profile?.kycLabel || "Complete Level 1 to get started"}
               </p>
             </div>
             <div className="rounded-2xl bg-black/15 px-3.5 py-2 text-right backdrop-blur-sm">
@@ -100,7 +109,7 @@ export default function AccountLevelsPage() {
             <div className="mb-2 flex items-center justify-between text-[11px] font-semibold text-white/80">
               <span>Progress</span>
               <span>
-                Level {current.id} of 3
+                Level {kycLevel} of 3
               </span>
             </div>
             <div className="h-2 overflow-hidden rounded-full bg-black/20">
@@ -117,7 +126,7 @@ export default function AccountLevelsPage() {
                   key={id}
                   className={cn(
                     "h-1.5 flex-1 rounded-full",
-                    id <= current.id ? "bg-white" : "bg-white/25",
+                    id <= unlockedId ? "bg-white" : "bg-white/25",
                   )}
                 />
               ))}
@@ -149,9 +158,9 @@ export default function AccountLevelsPage() {
         </div>
 
         {levels.map((level, index) => {
-          const isCurrent = level.id === current.id;
-          const isUnlocked = level.id <= current.id;
-          const isNext = level.id === current.id + 1;
+          const isCurrent = unlockedId > 0 && level.id === unlockedId;
+          const isUnlocked = level.id <= unlockedId;
+          const isNext = level.id === unlockedId + 1;
 
           return (
             <motion.div
@@ -208,7 +217,10 @@ export default function AccountLevelsPage() {
                     <p className="mt-1 text-sm text-muted-foreground">
                       {level.description}
                     </p>
-                    <p className="mt-2 text-sm font-semibold text-foreground">
+                    <p className="mt-2 text-xs font-medium text-muted-foreground">
+                      Requires · {level.requirement}
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-foreground">
                       Daily limit · {level.dailyLimitLabel}
                     </p>
                   </div>
@@ -253,8 +265,9 @@ export default function AccountLevelsPage() {
                 Raise your limit with KYC
               </p>
               <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                Upload a government ID and selfie. Once approved, you move to
-                Level 3 with the highest daily limit.
+                Level 1 needs NIN, passport, or driver license. Level 2 needs
+                BVN (₦500k/day). Level 3 needs a utility bill for unlimited
+                limits.
               </p>
             </div>
           </div>

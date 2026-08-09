@@ -87,7 +87,9 @@ export default function ProfilePage() {
       countryCode: null,
       countryName: "Loading…",
       kycStatus: "unverified",
+      kycLevel: 0,
       kycLabel: "Checking…",
+      accountLevelName: "Unverified",
       status: "active",
       dailyLimitLabel: "—",
       emailVerified: Boolean(

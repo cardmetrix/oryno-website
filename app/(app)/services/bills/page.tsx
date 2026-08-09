@@ -244,6 +244,7 @@ export default function BillsPage() {
               subtitle={`${selectedService?.name || "Bill"} paid successfully.`}
               amountLabel="Amount charged"
               amount={receipt || money(amountNumber)}
+              onDismiss={() => setSuccess(false)}
               secondaryAction={{
                 label: "Back to Home",
                 href: "/dashboard",

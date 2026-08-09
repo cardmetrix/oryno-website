@@ -228,6 +228,7 @@ export default function EmailRentPage() {
               subtitle="Copy the address and watch for codes."
               amountLabel="Amount charged"
               amount={receipt}
+              onDismiss={() => setSuccess(false)}
               secondaryAction={{
                 label: "Back to Home",
                 href: "/dashboard",

@@ -62,6 +62,7 @@ type UserDetail = {
     status: string;
     statusLabel: string;
     kyc: string;
+    kycLevel?: number;
     kycLabel: string;
     lastLoginAt: string | null;
     createdAt: string | null;
@@ -77,6 +78,7 @@ type UserDetail = {
   kycSubmission: {
     id: string;
     status: string;
+    targetLevel?: number;
     statusLabel: string;
     idType: string | null;
     idNumber: string | null;
@@ -438,17 +440,45 @@ function UserManageSheet({
             </p>
             <div className="grid grid-cols-2 gap-2">
               <ActionBtn
-                disabled={busy || detail.user.kyc === "verified"}
+                disabled={busy}
                 onClick={() =>
-                  void patch({ kycStatus: "verified" }, "KYC verified")
+                  void patch(
+                    { kycStatus: "verified", kycLevel: 1 },
+                    "Set Level 1 (ID)",
+                  )
                 }
-                label="Verify KYC"
+                label="Set Level 1"
+                primary
+              />
+              <ActionBtn
+                disabled={busy}
+                onClick={() =>
+                  void patch(
+                    { kycStatus: "verified", kycLevel: 2 },
+                    "Set Level 2 (BVN)",
+                  )
+                }
+                label="Set Level 2"
+                primary
+              />
+              <ActionBtn
+                disabled={busy}
+                onClick={() =>
+                  void patch(
+                    { kycStatus: "verified", kycLevel: 3 },
+                    "Set Level 3 (Address)",
+                  )
+                }
+                label="Set Level 3"
                 primary
               />
               <ActionBtn
                 disabled={busy || detail.user.kyc === "rejected"}
                 onClick={() =>
-                  void patch({ kycStatus: "rejected" }, "KYC rejected")
+                  void patch(
+                    { kycStatus: "rejected", kycLevel: 0 },
+                    "KYC rejected",
+                  )
                 }
                 label="Reject KYC"
                 danger
@@ -464,7 +494,7 @@ function UserManageSheet({
                 disabled={busy || detail.user.kyc === "unverified"}
                 onClick={() =>
                   void patch(
-                    { kycStatus: "unverified" },
+                    { kycStatus: "unverified", kycLevel: 0 },
                     "KYC reset to unverified",
                   )
                 }

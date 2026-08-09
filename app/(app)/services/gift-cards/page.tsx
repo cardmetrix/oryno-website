@@ -655,45 +655,45 @@ function GiftCardsPageContent() {
             className="space-y-4 sm:space-y-5"
           >
             {sellSuccess ? (
-              <MotionSection>
-                <ServiceSuccess
-                  variant={
-                    sellSuccessStatus === "completed" ? "success" : "pending"
-                  }
-                  title={
-                    sellSuccessStatus === "completed"
-                      ? "Trade completed!"
-                      : "Trade submitted"
-                  }
-                  subtitle={
-                    sellSuccessStatus === "completed"
-                      ? "Your wallet has been credited successfully."
-                      : "We’re reviewing your card. You’ll be notified when it’s approved."
-                  }
-                  amountLabel={
-                    sellSuccessStatus === "completed"
-                      ? "Amount credited"
-                      : "Expected amount"
-                  }
-                  amount={sellReceiptAmount}
-                  reference={sellReceiptRef}
-                  primaryAction={
-                    sellTxId
-                      ? {
-                          label: "View receipt",
-                          href: `/history/${sellTxId}`,
-                          icon: "receipt",
-                        }
-                      : null
-                  }
-                  tertiaryAction={{
-                    label: "Sell another gift card",
-                    onClick: () => setSellSuccess(false),
-                    icon: "plus",
-                  }}
-                />
-              </MotionSection>
-            ) : selectedSell ? (
+              <ServiceSuccess
+                variant={
+                  sellSuccessStatus === "completed" ? "success" : "pending"
+                }
+                title={
+                  sellSuccessStatus === "completed"
+                    ? "Trade completed!"
+                    : "Trade submitted"
+                }
+                subtitle={
+                  sellSuccessStatus === "completed"
+                    ? "Your wallet has been credited successfully."
+                    : "We’re reviewing your card. You’ll be notified when it’s approved."
+                }
+                amountLabel={
+                  sellSuccessStatus === "completed"
+                    ? "Amount credited"
+                    : "Expected amount"
+                }
+                amount={sellReceiptAmount}
+                reference={sellReceiptRef}
+                onDismiss={() => setSellSuccess(false)}
+                primaryAction={
+                  sellTxId
+                    ? {
+                        label: "View receipt",
+                        href: `/history/${sellTxId}`,
+                        icon: "receipt",
+                      }
+                    : null
+                }
+                tertiaryAction={{
+                  label: "Sell another gift card",
+                  onClick: () => setSellSuccess(false),
+                  icon: "plus",
+                }}
+              />
+            ) : null}
+            {selectedSell ? (
               <div className="space-y-4">
                 <button
                   type="button"
@@ -952,89 +952,89 @@ function GiftCardsPageContent() {
             className="space-y-4 sm:space-y-5"
           >
             {buySuccess ? (
-              <MotionSection>
-                <ServiceSuccess
-                  title="Purchase successful!"
-                  subtitle={
-                    selectedBuy
-                      ? `Your ${selectedBuy.brandName} card is ready.`
-                      : "Your gift card is ready."
-                  }
-                  amountLabel="Amount charged"
-                  amount={buyReceiptAmount}
-                  primaryAction={
-                    buyTxId
-                      ? {
-                          label: "View receipt",
-                          href: `/history/${buyTxId}`,
-                          icon: "receipt",
-                        }
-                      : null
-                  }
-                  tertiaryAction={{
-                    label: "Buy another gift card",
-                    onClick: () => setBuySuccess(false),
-                    icon: "plus",
-                  }}
-                >
-                  {buyCards.length ? (
-                    <div className="space-y-2">
-                      {buyCards.map((card, i) => (
-                        <div
-                          key={i}
-                          className="rounded-2xl border border-border bg-muted/40 p-4"
-                        >
-                          {card.cardNumber ? (
-                            <div className="flex items-center justify-between gap-2">
-                              <div>
-                                <p className="text-[11px] text-muted-foreground">
-                                  Code
-                                </p>
-                                <p className="font-mono text-sm font-semibold break-all">
-                                  {card.cardNumber}
-                                </p>
-                              </div>
-                              <button
-                                type="button"
-                                className="rounded-xl bg-background p-2"
-                                onClick={() =>
-                                  copyText(String(card.cardNumber))
-                                }
-                              >
-                                <Copy className="h-4 w-4" />
-                              </button>
+              <ServiceSuccess
+                title="Purchase successful!"
+                subtitle={
+                  selectedBuy
+                    ? `Your ${selectedBuy.brandName} card is ready.`
+                    : "Your gift card is ready."
+                }
+                amountLabel="Amount charged"
+                amount={buyReceiptAmount}
+                onDismiss={() => setBuySuccess(false)}
+                primaryAction={
+                  buyTxId
+                    ? {
+                        label: "View receipt",
+                        href: `/history/${buyTxId}`,
+                        icon: "receipt",
+                      }
+                    : null
+                }
+                tertiaryAction={{
+                  label: "Buy another gift card",
+                  onClick: () => setBuySuccess(false),
+                  icon: "plus",
+                }}
+              >
+                {buyCards.length ? (
+                  <div className="space-y-2">
+                    {buyCards.map((card, i) => (
+                      <div
+                        key={i}
+                        className="rounded-2xl border border-border bg-muted/40 p-4"
+                      >
+                        {card.cardNumber ? (
+                          <div className="flex items-center justify-between gap-2">
+                            <div>
+                              <p className="text-[11px] text-muted-foreground">
+                                Code
+                              </p>
+                              <p className="font-mono text-sm font-semibold break-all">
+                                {card.cardNumber}
+                              </p>
                             </div>
-                          ) : null}
-                          {card.pinCode ? (
-                            <div className="mt-3 flex items-center justify-between gap-2">
-                              <div>
-                                <p className="text-[11px] text-muted-foreground">
-                                  PIN
-                                </p>
-                                <p className="font-mono text-sm font-semibold">
-                                  {card.pinCode}
-                                </p>
-                              </div>
-                              <button
-                                type="button"
-                                className="rounded-xl bg-background p-2"
-                                onClick={() => copyText(String(card.pinCode))}
-                              >
-                                <Copy className="h-4 w-4" />
-                              </button>
+                            <button
+                              type="button"
+                              className="rounded-xl bg-background p-2"
+                              onClick={() =>
+                                copyText(String(card.cardNumber))
+                              }
+                            >
+                              <Copy className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ) : null}
+                        {card.pinCode ? (
+                          <div className="mt-3 flex items-center justify-between gap-2">
+                            <div>
+                              <p className="text-[11px] text-muted-foreground">
+                                PIN
+                              </p>
+                              <p className="font-mono text-sm font-semibold">
+                                {card.pinCode}
+                              </p>
                             </div>
-                          ) : null}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">
-                      Code will also be emailed if provided by the issuer.
-                    </p>
-                  )}
-                </ServiceSuccess>
-              </MotionSection>
-            ) : selectedBuy ? (
+                            <button
+                              type="button"
+                              className="rounded-xl bg-background p-2"
+                              onClick={() => copyText(String(card.pinCode))}
+                            >
+                              <Copy className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Code will also be emailed if provided by the issuer.
+                  </p>
+                )}
+              </ServiceSuccess>
+            ) : null}
+            {selectedBuy ? (
               <div className="space-y-4">
                 <button
                   type="button"

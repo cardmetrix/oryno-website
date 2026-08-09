@@ -1,9 +1,12 @@
 import type { SyncedUser } from "@/lib/auth/sync-user";
 import {
-  DAILY_LIMIT_AMOUNTS,
+  dailyLimitForLevel,
+  formatLevelLimit,
   KYC_LABELS,
+  normalizeKycLevel,
+  resolveUserLevel,
 } from "@/lib/account-levels";
-import { formatCountryMoney, getCountryInfo } from "@/lib/country";
+import { getCountryInfo } from "@/lib/country";
 
 export type ProfileDto = {
   id: string;
@@ -16,7 +19,9 @@ export type ProfileDto = {
   countryCode: string | null;
   countryName: string;
   kycStatus: string;
+  kycLevel: number;
   kycLabel: string;
+  accountLevelName: string;
   status: string;
   dailyLimitLabel: string;
   emailVerified: boolean;
@@ -34,6 +39,11 @@ export function toProfileDto(
     .map((p) => p[0]?.toUpperCase() ?? "")
     .join("");
 
+  const kycLevel = normalizeKycLevel(
+    (user as SyncedUser & { kycLevel?: number }).kycLevel,
+  );
+  const level = resolveUserLevel(kycLevel);
+
   return {
     id: user.id,
     clerkId: user.clerkId,
@@ -47,10 +57,15 @@ export function toProfileDto(
       ? getCountryInfo(user.countryCode).name
       : "Not set",
     kycStatus: user.kycStatus,
-    kycLabel: KYC_LABELS[user.kycStatus] ?? user.kycStatus,
+    kycLevel,
+    kycLabel:
+      kycLevel > 0
+        ? `Level ${kycLevel} · ${KYC_LABELS[user.kycStatus] ?? user.kycStatus}`
+        : (KYC_LABELS[user.kycStatus] ?? user.kycStatus),
+    accountLevelName: kycLevel > 0 ? level.name : "Unverified",
     status: user.status,
-    dailyLimitLabel: formatCountryMoney(
-      DAILY_LIMIT_AMOUNTS[user.kycStatus] ?? 50_000,
+    dailyLimitLabel: formatLevelLimit(
+      dailyLimitForLevel(kycLevel),
       user.countryCode,
     ),
     emailVerified: Boolean(user.emailVerifiedAt),

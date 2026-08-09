@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { resolveCountryCode } from "@/lib/country";
 import { toProfileDto } from "@/lib/profile";
+import { uploadBase64Image, type ImagePayload } from "@/lib/upload-image";
 import { currencyForCountry, ensurePrimaryWallet } from "@/lib/wallet";
 
 export const runtime = "nodejs";
@@ -44,6 +45,7 @@ export async function PATCH(req: Request) {
       phone?: string;
       username?: string;
       avatarUrl?: string;
+      image?: ImagePayload;
       countryCode?: string;
     };
 
@@ -67,8 +69,22 @@ export async function PATCH(req: Request) {
       username = next;
     }
 
-    const avatarUrl =
+    let avatarUrl =
       typeof body.avatarUrl === "string" ? body.avatarUrl : dbUser.avatarUrl;
+
+    if (body.image?.base64) {
+      const uploaded = await uploadBase64Image(
+        body.image,
+        `avatar-${dbUser.id}.jpg`,
+      );
+      if (!uploaded) {
+        return NextResponse.json(
+          { error: "Profile photo upload failed" },
+          { status: 400 },
+        );
+      }
+      avatarUrl = uploaded;
+    }
     const countryCode =
       typeof body.countryCode === "string"
         ? resolveCountryCode(body.countryCode)

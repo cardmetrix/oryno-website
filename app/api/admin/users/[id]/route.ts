@@ -94,7 +94,8 @@ export async function GET(
         status: user.status,
         statusLabel: titleCaseStatus(user.status),
         kyc: user.kycStatus,
-        kycLabel: titleCaseStatus(user.kycStatus),
+        kycLevel: user.kycLevel,
+        kycLabel: `L${user.kycLevel} · ${titleCaseStatus(user.kycStatus)}`,
         lastLoginAt: user.lastLoginAt?.toISOString?.() ?? null,
         createdAt: user.createdAt?.toISOString?.() ?? null,
         emailVerifiedAt: user.emailVerifiedAt?.toISOString?.() ?? null,
@@ -113,6 +114,7 @@ export async function GET(
             id: latestKyc.id,
             status: latestKyc.status,
             statusLabel: titleCaseStatus(latestKyc.status),
+            targetLevel: latestKyc.targetLevel,
             idType: latestKyc.idType,
             idNumber: latestKyc.idNumber,
             idFrontUrl: latestKyc.idFrontUrl,
@@ -154,6 +156,7 @@ export async function PATCH(
     const body = (await req.json().catch(() => ({}))) as {
       status?: string;
       kycStatus?: string;
+      kycLevel?: number;
       fullName?: string;
       phone?: string | null;
       countryCode?: string | null;
@@ -187,6 +190,26 @@ export async function PATCH(
         );
       }
       userPatch.kycStatus = body.kycStatus;
+      if (body.kycStatus === "verified" && body.kycLevel == null) {
+        userPatch.kycLevel = Math.max(user.kycLevel || 0, 1);
+      }
+      if (body.kycStatus === "unverified" || body.kycStatus === "rejected") {
+        if (body.kycLevel == null) userPatch.kycLevel = 0;
+      }
+    }
+
+    if (body.kycLevel != null) {
+      const level = Number(body.kycLevel);
+      if (![0, 1, 2, 3].includes(level)) {
+        return NextResponse.json(
+          { error: "kycLevel must be 0, 1, 2, or 3" },
+          { status: 400 },
+        );
+      }
+      userPatch.kycLevel = level;
+      if (level > 0 && body.kycStatus == null) {
+        userPatch.kycStatus = "verified";
+      }
     }
 
     if (typeof body.fullName === "string" && body.fullName.trim()) {
@@ -315,7 +338,8 @@ export async function PATCH(
             status: updated.status,
             statusLabel: titleCaseStatus(updated.status),
             kyc: updated.kycStatus,
-            kycLabel: titleCaseStatus(updated.kycStatus),
+            kycLevel: updated.kycLevel,
+            kycLabel: `L${updated.kycLevel} · ${titleCaseStatus(updated.kycStatus)}`,
           }
         : null,
     });
