@@ -6,6 +6,7 @@ import { CheckCircle2, Wallet, Wifi } from "lucide-react";
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
+import { ServiceSuccess } from "@/components/app/service-success";
 import { ErrorAlertModal } from "@/components/app/error-alert-modal";
 import { ServiceInstructions } from "@/components/app/service-instructions";
 import {
@@ -224,34 +225,22 @@ export default function DataPage() {
       <AnimatePresence mode="wait">
         {success && selected ? (
           <MotionSection key="success">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.96 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="rounded-2xl border border-border bg-background p-5 text-center shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-8"
-            >
-              <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-oryno-orange-muted text-[var(--oryno-success)]">
-                <CheckCircle2 className="h-7 w-7" />
-              </span>
-              <h2 className="mt-4 text-xl font-bold sm:text-2xl">Data sent</h2>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {selected.name} · {receipt || money(selected.amount)} to {phone}
-              </p>
-              <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
-                <button
-                  type="button"
-                  onClick={() => setSuccess(false)}
-                  className="btn-primary h-12 w-full px-6 sm:w-auto"
-                >
-                  Buy again
-                </button>
-                <a
-                  href="/dashboard"
-                  className="btn-secondary inline-flex h-12 w-full items-center justify-center px-6 sm:w-auto"
-                >
-                  Back to Home
-                </a>
-              </div>
-            </motion.div>
+            <ServiceSuccess
+              title="Data sent!"
+              subtitle={`${selected.name} delivered to ${phone}`}
+              amountLabel="Amount charged"
+              amount={receipt || money(selected.amount)}
+              secondaryAction={{
+                label: "Back to Home",
+                href: "/dashboard",
+                icon: "home",
+              }}
+              tertiaryAction={{
+                label: "Buy again",
+                onClick: () => setSuccess(false),
+                icon: "plus",
+              }}
+            />
           </MotionSection>
         ) : (
           <form

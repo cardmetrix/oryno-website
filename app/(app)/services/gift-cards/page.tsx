@@ -29,6 +29,7 @@ import { ErrorAlertModal } from "@/components/app/error-alert-modal";
 import { GiftCardBrandLogo } from "@/components/app/gift-card-brand-logo";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
+import { ServiceSuccess } from "@/components/app/service-success";
 import { ServiceInstructions } from "@/components/app/service-instructions";
 import {
   Dialog,
@@ -120,11 +121,8 @@ function currencyForCardCountry(
   return brandCurrencies[0] || mapped;
 }
 
-const SUB_TYPES = [
-  { id: "cash_receipt" as const, label: "Cash receipt" },
-  { id: "debit_receipt" as const, label: "Debit receipt" },
-  { id: "no_receipt" as const, label: "No receipt" },
-];
+/** Physical sell trades always use cash receipt (no UI choice). */
+const PHYSICAL_SUB_TYPE = "cash_receipt" as const;
 
 function FormSkeleton() {
   return (
@@ -187,10 +185,7 @@ function GiftCardsPageContent() {
   const [sellLoading, setSellLoading] = useState(true);
   const [sellDemo, setSellDemo] = useState(false);
   const [selectedSell, setSelectedSell] = useState<SellBrand | null>(null);
-  const [cardType, setCardType] = useState<"ecode" | "physical">("ecode");
-  const [subType, setSubType] = useState<
-    "cash_receipt" | "debit_receipt" | "no_receipt"
-  >("cash_receipt");
+  const [cardType, setCardType] = useState<"ecode" | "physical">("physical");
   const [cardCountry, setCardCountry] = useState("US");
   const [cardCurrency, setCardCurrency] = useState("USD");
   const [sellAmount, setSellAmount] = useState("100");
@@ -390,7 +385,9 @@ function GiftCardsPageContent() {
     setCardCurrency(
       currencyForCardCountry(cardCountry, selectedSell.currencies),
     );
-    setCardType(selectedSell.cardTypes.includes("ecode") ? "ecode" : "physical");
+    setCardType(
+      selectedSell.cardTypes.includes("physical") ? "physical" : "ecode",
+    );
     setSellAmount(String(selectedSell.denominations[0] || 100));
     setCode("");
     setImages([]);
@@ -424,7 +421,7 @@ function GiftCardsPageContent() {
           cardType,
           amount: String(value),
         });
-        if (cardType === "physical") qs.set("subType", subType);
+        if (cardType === "physical") qs.set("subType", PHYSICAL_SUB_TYPE);
         const res = await fetch(`/api/sogo/rates?${qs}`);
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Failed to quote");
@@ -442,7 +439,7 @@ function GiftCardsPageContent() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [selectedSell, sellAmount, cardCurrency, cardType, subType]);
+  }, [selectedSell, sellAmount, cardCurrency, cardType]);
 
   // Buy quote
   useEffect(() => {
@@ -533,7 +530,7 @@ function GiftCardsPageContent() {
           brandName: selectedSell.name,
           cardCountry,
           cardType,
-          subType: cardType === "physical" ? subType : null,
+          subType: cardType === "physical" ? PHYSICAL_SUB_TYPE : null,
           cardCurrency,
           cardAmount: Number(sellAmount),
           additionalInfo: cardType === "ecode" ? code.trim() : null,
@@ -659,45 +656,42 @@ function GiftCardsPageContent() {
           >
             {sellSuccess ? (
               <MotionSection>
-                <div className="rounded-2xl border border-border bg-background p-5 text-center shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-8">
-                  <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-oryno-orange-muted text-[var(--oryno-success)]">
-                    {sellSuccessStatus === "completed" ? (
-                      <CheckCircle2 className="h-7 w-7" strokeWidth={1.75} />
-                    ) : (
-                      <Clock3 className="h-7 w-7 text-amber-600" strokeWidth={1.75} />
-                    )}
-                  </span>
-                  <h2 className="mt-4 text-xl font-bold">
-                    {sellSuccessStatus === "completed"
-                      ? "Trade completed"
-                      : "Trade submitted"}
-                  </h2>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    {sellSuccessStatus === "completed"
-                      ? `${sellReceiptAmount} credited to your wallet.`
-                      : `Under review · expected ${sellReceiptAmount}`}
-                  </p>
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    Ref: {sellReceiptRef}
-                  </p>
-                  <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
-                    {sellTxId ? (
-                      <Link
-                        href={`/history/${sellTxId}`}
-                        className="btn-primary inline-flex h-12 items-center justify-center px-6"
-                      >
-                        View receipt
-                      </Link>
-                    ) : null}
-                    <button
-                      type="button"
-                      className="btn-secondary h-12 px-6"
-                      onClick={() => setSellSuccess(false)}
-                    >
-                      Sell another
-                    </button>
-                  </div>
-                </div>
+                <ServiceSuccess
+                  variant={
+                    sellSuccessStatus === "completed" ? "success" : "pending"
+                  }
+                  title={
+                    sellSuccessStatus === "completed"
+                      ? "Trade completed!"
+                      : "Trade submitted"
+                  }
+                  subtitle={
+                    sellSuccessStatus === "completed"
+                      ? "Your wallet has been credited successfully."
+                      : "We’re reviewing your card. You’ll be notified when it’s approved."
+                  }
+                  amountLabel={
+                    sellSuccessStatus === "completed"
+                      ? "Amount credited"
+                      : "Expected amount"
+                  }
+                  amount={sellReceiptAmount}
+                  reference={sellReceiptRef}
+                  primaryAction={
+                    sellTxId
+                      ? {
+                          label: "View receipt",
+                          href: `/history/${sellTxId}`,
+                          icon: "receipt",
+                        }
+                      : null
+                  }
+                  tertiaryAction={{
+                    label: "Sell another gift card",
+                    onClick: () => setSellSuccess(false),
+                    icon: "plus",
+                  }}
+                />
               </MotionSection>
             ) : selectedSell ? (
               <div className="space-y-4">
@@ -765,7 +759,11 @@ function GiftCardsPageContent() {
                     className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6"
                   >
                     <div className="grid grid-cols-2 gap-2">
-                      {selectedSell.cardTypes.map((t) => (
+                      {(
+                        ["physical", "ecode"] as const
+                      )
+                        .filter((t) => selectedSell.cardTypes.includes(t))
+                        .map((t) => (
                         <button
                           key={t}
                           type="button"
@@ -777,7 +775,7 @@ function GiftCardsPageContent() {
                               : "bg-muted text-muted-foreground",
                           )}
                         >
-                          {t === "ecode" ? "E-code" : "Physical"}
+                          {t === "physical" ? "Physical" : "E-code"}
                         </button>
                       ))}
                     </div>
@@ -843,25 +841,6 @@ function GiftCardsPageContent() {
                       />
                     </div>
 
-                    {cardType === "physical" ? (
-                      <label className="mt-4 block text-xs font-semibold text-muted-foreground">
-                        Receipt type
-                        <select
-                          value={subType}
-                          onChange={(e) =>
-                            setSubType(e.target.value as typeof subType)
-                          }
-                          className="mt-1.5 h-12 w-full rounded-xl border border-border bg-background px-3 text-sm"
-                        >
-                          {SUB_TYPES.map((s) => (
-                            <option key={s.id} value={s.id}>
-                              {s.label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    ) : null}
-
                     {cardType === "ecode" ? (
                       <label className="mt-4 block text-xs font-semibold text-muted-foreground">
                         Gift card code
@@ -869,7 +848,7 @@ function GiftCardsPageContent() {
                           value={code}
                           onChange={(e) => setCode(e.target.value)}
                           className="mt-1.5 h-12 w-full rounded-xl border border-border bg-background px-4 font-mono text-sm outline-none focus:border-primary"
-                          placeholder="Paste e-code"
+                          placeholder="Paste E-code"
                           required
                           autoComplete="off"
                         />
@@ -974,18 +953,32 @@ function GiftCardsPageContent() {
           >
             {buySuccess ? (
               <MotionSection>
-                <div className="rounded-2xl border border-border bg-background p-5 text-center shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-8">
-                  <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-oryno-orange-muted text-[var(--oryno-success)]">
-                    <CheckCircle2 className="h-7 w-7" strokeWidth={1.75} />
-                  </span>
-                  <h2 className="mt-4 text-xl font-bold">Gift card purchased</h2>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    Charged {buyReceiptAmount}
-                    {selectedBuy ? ` · ${selectedBuy.brandName}` : ""}
-                  </p>
-
+                <ServiceSuccess
+                  title="Purchase successful!"
+                  subtitle={
+                    selectedBuy
+                      ? `Your ${selectedBuy.brandName} card is ready.`
+                      : "Your gift card is ready."
+                  }
+                  amountLabel="Amount charged"
+                  amount={buyReceiptAmount}
+                  primaryAction={
+                    buyTxId
+                      ? {
+                          label: "View receipt",
+                          href: `/history/${buyTxId}`,
+                          icon: "receipt",
+                        }
+                      : null
+                  }
+                  tertiaryAction={{
+                    label: "Buy another gift card",
+                    onClick: () => setBuySuccess(false),
+                    icon: "plus",
+                  }}
+                >
                   {buyCards.length ? (
-                    <div className="mt-5 space-y-2 text-left">
+                    <div className="space-y-2">
                       {buyCards.map((card, i) => (
                         <div
                           key={i}
@@ -1035,29 +1028,11 @@ function GiftCardsPageContent() {
                       ))}
                     </div>
                   ) : (
-                    <p className="mt-3 text-xs text-muted-foreground">
+                    <p className="text-xs text-muted-foreground">
                       Code will also be emailed if provided by the issuer.
                     </p>
                   )}
-
-                  <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
-                    {buyTxId ? (
-                      <Link
-                        href={`/history/${buyTxId}`}
-                        className="btn-primary inline-flex h-12 items-center justify-center px-6"
-                      >
-                        View receipt
-                      </Link>
-                    ) : null}
-                    <button
-                      type="button"
-                      className="btn-secondary h-12 px-6"
-                      onClick={() => setBuySuccess(false)}
-                    >
-                      Buy another
-                    </button>
-                  </div>
-                </div>
+                </ServiceSuccess>
               </MotionSection>
             ) : selectedBuy ? (
               <div className="space-y-4">

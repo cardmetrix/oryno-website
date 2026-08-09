@@ -6,6 +6,7 @@ import { CheckCircle2, Gift, Smartphone, Wallet } from "lucide-react";
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
+import { ServiceSuccess } from "@/components/app/service-success";
 import { ErrorAlertModal } from "@/components/app/error-alert-modal";
 import { ServiceInstructions } from "@/components/app/service-instructions";
 import {
@@ -239,47 +240,37 @@ export default function AirtimePage() {
       <AnimatePresence mode="wait">
         {success ? (
           <MotionSection key="success">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.96 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="rounded-2xl border border-border bg-background p-5 text-center shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-8"
+            <ServiceSuccess
+              title="Airtime sent!"
+              subtitle={`${receiptAmount || money(amountNumber)} sent to ${phone}${selectedNetwork ? ` · ${selectedNetwork.name}` : ""}`}
+              amountLabel="Amount charged"
+              amount={receiptAmount || money(amountNumber)}
+              secondaryAction={{
+                label: "Back to Home",
+                href: "/dashboard",
+                icon: "home",
+              }}
+              tertiaryAction={{
+                label: "Buy again",
+                onClick: () => setSuccess(false),
+                icon: "plus",
+              }}
             >
-              <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-oryno-orange-muted text-[var(--oryno-success)]">
-                <CheckCircle2 className="h-7 w-7" strokeWidth={1.75} />
-              </span>
-              <h2 className="mt-4 text-xl font-bold text-foreground sm:text-2xl">
-                Airtime sent
-              </h2>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {receiptAmount || money(amountNumber)} sent to {phone}
-                {selectedNetwork ? ` · ${selectedNetwork.name}` : ""}
-              </p>
-              {isNigeria ? (
-                <p className="mt-3 text-sm font-semibold text-primary">
-                  Cashback: {money(cashback)}
-                </p>
+              {isNigeria || walletLabel ? (
+                <div className="space-y-1 text-center text-sm">
+                  {isNigeria ? (
+                    <p className="font-semibold text-primary">
+                      Cashback: {money(cashback)}
+                    </p>
+                  ) : null}
+                  {walletLabel ? (
+                    <p className="text-xs text-muted-foreground">
+                      Wallet balance {walletLabel}
+                    </p>
+                  ) : null}
+                </div>
               ) : null}
-              {walletLabel ? (
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Wallet balance {walletLabel}
-                </p>
-              ) : null}
-              <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
-                <button
-                  type="button"
-                  onClick={() => setSuccess(false)}
-                  className="btn-primary h-12 w-full px-6 sm:w-auto"
-                >
-                  Buy again
-                </button>
-                <a
-                  href="/dashboard"
-                  className="btn-secondary inline-flex h-12 w-full items-center justify-center px-6 sm:w-auto"
-                >
-                  Back to Home
-                </a>
-              </div>
-            </motion.div>
+            </ServiceSuccess>
           </MotionSection>
         ) : (
           <form

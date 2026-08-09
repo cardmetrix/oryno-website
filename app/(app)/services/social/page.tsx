@@ -16,6 +16,7 @@ import {
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
+import { ServiceSuccess } from "@/components/app/service-success";
 import { ErrorAlertModal } from "@/components/app/error-alert-modal";
 import { ServiceInstructions } from "@/components/app/service-instructions";
 import { AuthField, authInputClassName } from "@/components/auth/auth-field";
@@ -571,63 +572,45 @@ export default function SocialBoostPage() {
       <AnimatePresence mode="wait">
         {success && selected ? (
           <MotionSection key="success">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.96 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="rounded-2xl border border-border bg-background p-5 text-center shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-8"
+            <ServiceSuccess
+              variant={
+                statusLabel &&
+                /completed|partial/i.test(statusLabel)
+                  ? "success"
+                  : polling
+                    ? "pending"
+                    : "success"
+              }
+              title="Boost ordered!"
+              subtitle={`${(quantity ?? 0).toLocaleString()} ${selected.metric.toLowerCase()} for ${selected.platform}`}
+              amountLabel="Amount charged"
+              amount={receipt}
+              reference={orderId}
+              secondaryAction={{
+                label: "Back to Home",
+                href: "/dashboard",
+                icon: "home",
+              }}
+              tertiaryAction={{
+                label: "Boost again",
+                onClick: () => {
+                  setSuccess(false);
+                  setStatusLabel(null);
+                  setQuantityText("");
+                  setCustomComments([""]);
+                },
+                icon: "plus",
+              }}
             >
-              <motion.span
-                initial={{ scale: 0.6, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ type: "spring", stiffness: 320, damping: 18 }}
-                className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-oryno-orange-muted text-primary"
-              >
-                <CheckCircle2 className="h-8 w-8" strokeWidth={1.75} />
-              </motion.span>
-              <h2 className="mt-5 text-2xl font-bold text-foreground">
-                Boost ordered
-              </h2>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {(quantity ?? 0).toLocaleString()}{" "}
-                {selected.metric.toLowerCase()} for {selected.platform} ·{" "}
-                {receipt}
-              </p>
               {statusLabel ? (
-                <p className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-primary">
+                <p className="inline-flex items-center gap-2 text-sm font-semibold text-primary">
                   {polling ? (
                     <RefreshCw className="h-3.5 w-3.5 animate-spin" />
                   ) : null}
                   Status: {statusLabel}
                 </p>
               ) : null}
-              <p className="mt-2 text-xs text-muted-foreground">
-                Order #{orderId}
-              </p>
-              <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:justify-center">
-                <motion.button
-                  type="button"
-                  whileHover={{ y: -2 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => {
-                    setSuccess(false);
-                    setStatusLabel(null);
-                    setQuantityText("");
-                    setCustomComments([""]);
-                  }}
-                  className="btn-primary h-12 w-full px-6 sm:w-auto"
-                >
-                  Boost again
-                </motion.button>
-                <motion.a
-                  href="/dashboard"
-                  whileHover={{ y: -2 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="btn-secondary inline-flex h-12 w-full items-center justify-center px-6 sm:w-auto"
-                >
-                  Back to Home
-                </motion.a>
-              </div>
-            </motion.div>
+            </ServiceSuccess>
           </MotionSection>
         ) : (
           <form

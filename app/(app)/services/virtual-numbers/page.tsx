@@ -22,6 +22,7 @@ import {
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
+import { ServiceSuccess } from "@/components/app/service-success";
 import { ErrorAlertModal } from "@/components/app/error-alert-modal";
 import { ServiceInstructions } from "@/components/app/service-instructions";
 import { useCountry } from "@/components/providers/country-provider";
@@ -244,24 +245,28 @@ export default function VirtualNumbersPage() {
       <AnimatePresence mode="wait">
         {success ? (
           <MotionSection key="success">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.96 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="rounded-2xl border border-border bg-background p-5 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-8"
+            <ServiceSuccess
+              title="Number ready!"
+              subtitle="Use this number for verification."
+              amountLabel="Amount charged"
+              amount={receipt}
+              secondaryAction={{
+                label: "Back to Home",
+                href: "/dashboard",
+                icon: "home",
+              }}
+              tertiaryAction={{
+                label: "Get another number",
+                onClick: () => {
+                  setSuccess(false);
+                  setPhoneNumber("");
+                  setActivationId("");
+                  setSmsCode(null);
+                },
+                icon: "plus",
+              }}
             >
-              <div className="text-center">
-                <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-oryno-orange-muted text-[var(--oryno-success)]">
-                  <CheckCircle2 className="h-7 w-7" />
-                </span>
-                <h2 className="mt-4 text-xl font-bold sm:text-2xl">
-                  Number ready
-                </h2>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Use this number for verification · {receipt}
-                </p>
-              </div>
-
-              <div className="mt-6 space-y-3">
+              <div className="space-y-3">
                 <CopyRow label="Phone number" value={phoneNumber} />
                 <CopyRow
                   label="SMS code"
@@ -275,28 +280,7 @@ export default function VirtualNumbersPage() {
                   </p>
                 ) : null}
               </div>
-
-              <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSuccess(false);
-                    setPhoneNumber("");
-                    setActivationId("");
-                    setSmsCode(null);
-                  }}
-                  className="btn-primary h-12 w-full px-6 sm:w-auto"
-                >
-                  Get another number
-                </button>
-                <a
-                  href="/dashboard"
-                  className="btn-secondary inline-flex h-12 w-full items-center justify-center px-6 sm:w-auto"
-                >
-                  Back to Home
-                </a>
-              </div>
-            </motion.div>
+            </ServiceSuccess>
           </MotionSection>
         ) : (
           <form
