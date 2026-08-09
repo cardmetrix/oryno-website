@@ -25,7 +25,7 @@ export function Download() {
         transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
       />
 
-      <div className="relative mx-auto w-full max-w-6xl px-5 sm:px-6 md:max-w-none md:px-0">
+      <div className="relative mx-auto w-full max-w-6xl px-5 sm:px-6 md:max-w-none">
         <motion.div
           variants={stagger}
           initial="hidden"
