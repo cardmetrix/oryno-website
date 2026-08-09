@@ -283,7 +283,7 @@ export default function SettingsPage() {
         </Section>
       </MotionSection>
 
-      <MotionSection delay={0.16} className="mt-2 mb-4">
+      <MotionSection delay={0.16} className="mt-2 mb-8">
         <motion.button
           type="button"
           whileTap={{ scale: 0.985 }}

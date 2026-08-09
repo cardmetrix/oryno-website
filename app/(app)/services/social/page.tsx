@@ -814,7 +814,7 @@ export default function SocialBoostPage() {
                       className="mt-3 inline-flex h-11 items-center gap-2 rounded-[14px] border border-border bg-muted/40 px-3 text-sm font-semibold text-foreground transition hover:bg-muted disabled:opacity-40"
                     >
                       <Plus className="h-4 w-4" strokeWidth={2} />
-                      Add comment
+                      Add more
                     </button>
                     <p
                       className={cn(
