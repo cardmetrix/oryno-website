@@ -1,19 +1,9 @@
 import type { SyncedUser } from "@/lib/auth/sync-user";
+import {
+  DAILY_LIMIT_AMOUNTS,
+  KYC_LABELS,
+} from "@/lib/account-levels";
 import { formatCountryMoney, getCountryInfo } from "@/lib/country";
-
-const KYC_LABELS: Record<string, string> = {
-  unverified: "Unverified",
-  pending: "Pending review",
-  verified: "Verified",
-  rejected: "Rejected",
-};
-
-const DAILY_LIMIT_AMOUNTS: Record<string, number> = {
-  unverified: 50_000,
-  pending: 200_000,
-  verified: 5_000_000,
-  rejected: 0,
-};
 
 export type ProfileDto = {
   id: string;

@@ -8,6 +8,7 @@ import { motion } from "framer-motion";
 import {
   Bell,
   ChevronRight,
+  Gauge,
   HelpCircle,
   History,
   Languages,
@@ -195,6 +196,12 @@ export default function SettingsPage() {
             icon={LockKeyhole}
             label="Security & PIN"
             hint={data.security.hasPin ? "PIN set" : "Set PIN"}
+          />
+          <Row
+            href="/settings/levels"
+            icon={Gauge}
+            label="Account Levels"
+            hint={`${data.profile.dailyLimitLabel} daily`}
           />
           <Row
             href="/settings/kyc"

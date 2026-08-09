@@ -450,7 +450,7 @@ export default function ProfilePage() {
               </p>
             </div>
             <Link
-              href="/settings/kyc"
+              href="/settings/levels"
               className="shrink-0 text-xs font-semibold text-primary"
             >
               View Levels
