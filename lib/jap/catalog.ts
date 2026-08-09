@@ -124,7 +124,41 @@ export const FALLBACK_JAP_SERVICES: JapService[] = [
     refill: true,
     cancel: false,
   },
+  {
+    service: 1003,
+    name: "Instagram Custom Comments",
+    type: "Custom Comments",
+    category: "Instagram",
+    rate: 8,
+    min: 5,
+    max: 100,
+    refill: false,
+    cancel: true,
+  },
 ];
+
+/** JAP packages that require a newline-separated `comments` payload. */
+export function isCustomCommentsService(service: {
+  type?: string | null;
+  quality?: string | null;
+  name?: string | null;
+}) {
+  const hay = `${service.type || ""} ${service.quality || ""} ${service.name || ""}`
+    .toLowerCase()
+    .replace(/[_-]+/g, " ");
+  return /\bcustom\s*comments?\b/.test(hay);
+}
+
+/** Normalize UI / API comment lists into trimmed non-empty lines. */
+export function normalizeCustomComments(
+  input?: string | string[] | null,
+): string[] {
+  if (input == null) return [];
+  const lines = Array.isArray(input)
+    ? input.flatMap((c) => String(c).split(/\r?\n/))
+    : String(input).split(/\r?\n/);
+  return lines.map((line) => line.trim()).filter(Boolean);
+}
 
 export function detectPlatform(
   category: string,

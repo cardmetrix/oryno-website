@@ -7,7 +7,9 @@ import {
   CheckCircle2,
   ChevronDown,
   Link2,
+  Plus,
   RefreshCw,
+  Trash2,
   TrendingUp,
   Wallet,
 } from "lucide-react";
@@ -27,6 +29,7 @@ import {
 } from "@/components/ui/drawer";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { formatCountryMoney } from "@/lib/country";
+import { isCustomCommentsService } from "@/lib/jap/catalog";
 import { cn } from "@/lib/utils";
 
 type JapServiceRow = {
@@ -88,6 +91,7 @@ export default function SocialBoostPage() {
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [quantityText, setQuantityText] = useState("");
+  const [customComments, setCustomComments] = useState<string[]>([""]);
   const [profileUrl, setProfileUrl] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -225,11 +229,25 @@ export default function SocialBoostPage() {
     packagesForType[0] ??
     null;
 
+  const isCustomComments = selected
+    ? isCustomCommentsService(selected)
+    : false;
+  const filledComments = useMemo(
+    () => customComments.map((c) => c.trim()).filter(Boolean),
+    [customComments],
+  );
+
   const minQuantity = selected
-    ? Math.max(QUANTITY_FLOOR, selected.min)
+    ? isCustomComments
+      ? Math.max(1, selected.min)
+      : Math.max(QUANTITY_FLOOR, selected.min)
     : QUANTITY_FLOOR;
   const maxQuantity = selected?.max ?? 1_000_000;
-  const quantity = parseQuantityInput(quantityText);
+  const quantity = isCustomComments
+    ? filledComments.length > 0
+      ? filledComments.length
+      : null
+    : parseQuantityInput(quantityText);
   const quantityValid =
     quantity != null &&
     quantity >= minQuantity &&
@@ -242,6 +260,18 @@ export default function SocialBoostPage() {
 
   const quantityHint = useMemo(() => {
     if (!selected) return "Choose a package first";
+    if (isCustomComments) {
+      if (!filledComments.length) {
+        return `Add ${minQuantity.toLocaleString()}–${maxQuantity.toLocaleString()} custom comments (one per row)`;
+      }
+      if (!quantityValid) {
+        if (filledComments.length < minQuantity) {
+          return `Add at least ${minQuantity.toLocaleString()} comments`;
+        }
+        return `Maximum is ${maxQuantity.toLocaleString()} comments`;
+      }
+      return `${filledComments.length.toLocaleString()} comments · ${formatCountryMoney(priceFor(selected, filledComments.length), country?.code || "NG")}`;
+    }
     if (!quantityText.trim()) {
       return `Enter any amount from ${minQuantity.toLocaleString()}–${maxQuantity.toLocaleString()}`;
     }
@@ -255,6 +285,9 @@ export default function SocialBoostPage() {
     return `${quantity.toLocaleString()} ${selected.metric.toLowerCase()} · ${formatCountryMoney(priceFor(selected, quantity), country?.code || "NG")}`;
   }, [
     selected,
+    isCustomComments,
+    filledComments.length,
+    quantityValid,
     quantityText,
     quantity,
     minQuantity,
@@ -266,9 +299,18 @@ export default function SocialBoostPage() {
     if (!selected || submitting || !quantityValid || quantity == null) {
       return false;
     }
+    if (isCustomComments && filledComments.length !== quantity) return false;
     const link = profileUrl.trim();
     return link.length > 4 && /^(https?:\/\/|@|t\.me\/)/i.test(link);
-  }, [selected, submitting, quantityValid, quantity, profileUrl]);
+  }, [
+    selected,
+    submitting,
+    quantityValid,
+    quantity,
+    isCustomComments,
+    filledComments.length,
+    profileUrl,
+  ]);
 
   const money = (n: number) =>
     formatCountryMoney(n, country?.code || "NG");
@@ -276,6 +318,16 @@ export default function SocialBoostPage() {
   useEffect(() => {
     if (!selected) return;
     setSelectedId(selected.service);
+    if (isCustomCommentsService(selected)) {
+      setCustomComments((prev) => {
+        if (prev.some((c) => c.trim())) return prev;
+        const starter = Math.max(1, Math.min(selected.min, 10));
+        return Array.from({ length: starter }, () => "");
+      });
+      setQuantityText("");
+      return;
+    }
+    setCustomComments([""]);
     setQuantityText((prev) => {
       const n = parseQuantityInput(prev);
       if (n == null) return prev;
@@ -369,6 +421,7 @@ export default function SocialBoostPage() {
     );
     setSelectedId(match?.service ?? null);
     setQuantityText("");
+    setCustomComments([""]);
   }
 
   function onMetricChange(next: string) {
@@ -393,6 +446,7 @@ export default function SocialBoostPage() {
     );
     setSelectedId(match?.service ?? null);
     setQuantityText("");
+    setCustomComments([""]);
   }
 
   function onQualityChange(next: string) {
@@ -405,11 +459,33 @@ export default function SocialBoostPage() {
     );
     setSelectedId(match?.service ?? null);
     setQuantityText("");
+    setCustomComments([""]);
   }
 
   function onPackageChange(serviceId: number) {
     setSelectedId(serviceId);
     setQuantityText("");
+    setCustomComments([""]);
+  }
+
+  function updateComment(index: number, value: string) {
+    setCustomComments((prev) =>
+      prev.map((c, i) => (i === index ? value : c)),
+    );
+  }
+
+  function addCommentRow() {
+    setCustomComments((prev) => {
+      if (prev.length >= maxQuantity) return prev;
+      return [...prev, ""];
+    });
+  }
+
+  function removeCommentRow(index: number) {
+    setCustomComments((prev) => {
+      if (prev.length <= 1) return [""];
+      return prev.filter((_, i) => i !== index);
+    });
   }
 
   function onQuantityTextChange(raw: string) {
@@ -454,6 +530,7 @@ export default function SocialBoostPage() {
           quantity,
           rateUsd: selected.rate,
           priceLocal: amount,
+          ...(isCustomComments ? { comments: filledComments } : {}),
         }),
       });
       const data = await res.json();
@@ -473,7 +550,9 @@ export default function SocialBoostPage() {
     ? "Processing…"
     : selected && quantityValid && quantity != null
       ? `Boost now · ${money(amount)}`
-      : "Enter quantity to continue";
+      : isCustomComments
+        ? "Add custom comments to continue"
+        : "Enter quantity to continue";
 
   return (
     <AppShell hideNav>
@@ -531,6 +610,7 @@ export default function SocialBoostPage() {
                     setSuccess(false);
                     setStatusLabel(null);
                     setQuantityText("");
+                    setCustomComments([""]);
                   }}
                   className="btn-primary h-12 w-full px-6 sm:w-auto"
                 >
@@ -632,58 +712,120 @@ export default function SocialBoostPage() {
                   onChange={(next) => onPackageChange(Number(next))}
                 />
 
-                <div>
-                  <AuthField label="Quantity">
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        disabled={!selected || (quantity ?? 0) <= minQuantity}
-                        onClick={() => nudgeQuantity(-100)}
-                        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] border border-border bg-muted/40 text-lg font-bold text-foreground transition hover:bg-muted disabled:opacity-40"
-                        aria-label="Decrease quantity"
-                      >
-                        −
-                      </button>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        pattern="[0-9,]*"
-                        value={quantityText}
-                        onChange={(e) => onQuantityTextChange(e.target.value)}
-                        onBlur={commitQuantity}
-                        disabled={!selected}
-                        placeholder={`Min ${minQuantity.toLocaleString()}`}
-                        required
-                        className={cn(
-                          authInputClassName,
-                          "text-center text-lg font-bold tabular-nums tracking-tight disabled:opacity-60",
-                        )}
-                        aria-invalid={
-                          Boolean(quantityText.trim()) && !quantityValid
-                        }
-                      />
-                      <button
-                        type="button"
-                        disabled={!selected || (quantity ?? 0) >= maxQuantity}
-                        onClick={() => nudgeQuantity(100)}
-                        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] border border-border bg-muted/40 text-lg font-bold text-foreground transition hover:bg-muted disabled:opacity-40"
-                        aria-label="Increase quantity"
-                      >
-                        +
-                      </button>
+                {!isCustomComments ? (
+                  <div>
+                    <AuthField label="Quantity">
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          disabled={!selected || (quantity ?? 0) <= minQuantity}
+                          onClick={() => nudgeQuantity(-100)}
+                          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] border border-border bg-muted/40 text-lg font-bold text-foreground transition hover:bg-muted disabled:opacity-40"
+                          aria-label="Decrease quantity"
+                        >
+                          −
+                        </button>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9,]*"
+                          value={quantityText}
+                          onChange={(e) => onQuantityTextChange(e.target.value)}
+                          onBlur={commitQuantity}
+                          disabled={!selected}
+                          placeholder={`Min ${minQuantity.toLocaleString()}`}
+                          required
+                          className={cn(
+                            authInputClassName,
+                            "text-center text-lg font-bold tabular-nums tracking-tight disabled:opacity-60",
+                          )}
+                          aria-invalid={
+                            Boolean(quantityText.trim()) && !quantityValid
+                          }
+                        />
+                        <button
+                          type="button"
+                          disabled={!selected || (quantity ?? 0) >= maxQuantity}
+                          onClick={() => nudgeQuantity(100)}
+                          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] border border-border bg-muted/40 text-lg font-bold text-foreground transition hover:bg-muted disabled:opacity-40"
+                          aria-label="Increase quantity"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </AuthField>
+                    <p
+                      className={cn(
+                        "mt-1.5 text-xs",
+                        quantityText.trim() && !quantityValid
+                          ? "font-medium text-destructive"
+                          : "text-muted-foreground",
+                      )}
+                    >
+                      {quantityHint}
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-sm font-semibold text-foreground">
+                        Custom comments
+                      </span>
+                      <span className="text-xs font-medium text-muted-foreground">
+                        {filledComments.length.toLocaleString()}/
+                        {maxQuantity.toLocaleString()}
+                      </span>
                     </div>
-                  </AuthField>
-                  <p
-                    className={cn(
-                      "mt-1.5 text-xs",
-                      quantityText.trim() && !quantityValid
-                        ? "font-medium text-destructive"
-                        : "text-muted-foreground",
-                    )}
-                  >
-                    {quantityHint}
-                  </p>
-                </div>
+                    <div className="mt-2 space-y-2">
+                      {customComments.map((comment, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <span className="w-6 shrink-0 text-center text-xs font-semibold text-muted-foreground">
+                            {index + 1}
+                          </span>
+                          <input
+                            value={comment}
+                            onChange={(e) =>
+                              updateComment(index, e.target.value)
+                            }
+                            placeholder={`Comment ${index + 1}`}
+                            className={cn(
+                              authInputClassName,
+                              "min-w-0 flex-1 text-sm font-medium",
+                            )}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeCommentRow(index)}
+                            disabled={customComments.length <= 1}
+                            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] border border-border bg-muted/40 text-muted-foreground transition hover:bg-muted disabled:opacity-40"
+                            aria-label={`Remove comment ${index + 1}`}
+                          >
+                            <Trash2 className="h-4 w-4" strokeWidth={1.75} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={addCommentRow}
+                      disabled={customComments.length >= maxQuantity}
+                      className="mt-3 inline-flex h-11 items-center gap-2 rounded-[14px] border border-border bg-muted/40 px-3 text-sm font-semibold text-foreground transition hover:bg-muted disabled:opacity-40"
+                    >
+                      <Plus className="h-4 w-4" strokeWidth={2} />
+                      Add comment
+                    </button>
+                    <p
+                      className={cn(
+                        "mt-1.5 text-xs",
+                        filledComments.length > 0 && !quantityValid
+                          ? "font-medium text-destructive"
+                          : "text-muted-foreground",
+                      )}
+                    >
+                      {quantityHint}
+                    </p>
+                  </div>
+                )}
 
                 {selected && quantityValid && quantity != null ? (
                   <div className="rounded-2xl border border-border bg-muted/40 px-4 py-3.5">
@@ -763,7 +905,9 @@ export default function SocialBoostPage() {
                   value={
                     selected && quantityValid && quantity != null
                       ? `${quantity.toLocaleString()} ${selected.metric}`
-                      : "Enter quantity"
+                      : isCustomComments
+                        ? "Add comments"
+                        : "Enter quantity"
                   }
                 />
                 <SummaryRow label="Target" value={profileUrl || "—"} />

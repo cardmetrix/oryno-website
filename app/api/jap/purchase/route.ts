@@ -22,6 +22,7 @@ export async function POST(req: Request) {
       quantity?: number;
       rateUsd?: number;
       priceLocal?: number;
+      comments?: string | string[];
     };
 
     if (!body.serviceId || !body.serviceName?.trim()) {
@@ -36,7 +37,10 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
-    if (!body.quantity || body.quantity <= 0) {
+    const hasComments = Array.isArray(body.comments)
+      ? body.comments.some((c) => String(c || "").trim())
+      : Boolean(String(body.comments || "").trim());
+    if ((!body.quantity || body.quantity <= 0) && !hasComments) {
       return NextResponse.json(
         { error: "Enter a valid quantity" },
         { status: 400 },
@@ -48,6 +52,7 @@ export async function POST(req: Request) {
       platform: body.platform,
       metric: body.metric,
       quantity: body.quantity,
+      hasComments,
     });
 
     const result = await purchaseJapBoost({
@@ -58,9 +63,10 @@ export async function POST(req: Request) {
       platform: body.platform || "Other",
       metric: body.metric || "Boost",
       link: body.link.trim(),
-      quantity: Number(body.quantity),
+      quantity: Number(body.quantity) || 0,
       rateUsd: Number(body.rateUsd) || 0,
       priceLocal: Number(body.priceLocal) || undefined,
+      comments: body.comments,
     });
 
     console.log("[jap-purchase] ok", {

@@ -233,15 +233,35 @@ export async function getJapServices(): Promise<JapService[]> {
 export async function addJapOrder(input: {
   service: number;
   link: string;
-  quantity: number;
+  quantity?: number;
+  /** Newline-separated custom comments (Custom Comments services). */
+  comments?: string;
 }) {
-  console.log(LOG_PREFIX, "add order", input);
-  const json = (await japPost({
-    action: "add",
+  console.log(LOG_PREFIX, "add order", {
     service: input.service,
     link: input.link,
     quantity: input.quantity,
-  })) as { order?: number | string };
+    commentsCount: input.comments
+      ? input.comments.split(/\r?\n/).filter(Boolean).length
+      : 0,
+  });
+
+  const params: Record<string, string | number> = {
+    action: "add",
+    service: input.service,
+    link: input.link,
+  };
+
+  if (input.comments?.trim()) {
+    // Custom Comments: JAP expects comments list; quantity is implied by line count.
+    params.comments = input.comments.trim();
+  } else if (input.quantity != null) {
+    params.quantity = input.quantity;
+  } else {
+    throw new Error("Enter a valid quantity");
+  }
+
+  const json = (await japPost(params)) as { order?: number | string };
 
   if (json.order == null) throw new Error("No order id returned");
   const result = { orderId: String(json.order) };

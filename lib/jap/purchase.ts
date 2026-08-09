@@ -17,11 +17,17 @@ import {
   addJapOrder,
   assertJapReady,
   getJapOrderStatus,
+  getJapServices,
   isJapDemoMode,
   isJapLive,
   japMarkup,
 } from "./client";
-import { japUsdCost } from "./catalog";
+import {
+  FALLBACK_JAP_SERVICES,
+  isCustomCommentsService,
+  japUsdCost,
+  normalizeCustomComments,
+} from "./catalog";
 import { japErrorToEnglish } from "./errors";
 
 const LOG_PREFIX = "[jap]";
@@ -199,14 +205,61 @@ export async function purchaseJapBoost(input: {
   quantity: number;
   rateUsd: number;
   priceLocal?: number;
+  comments?: string | string[];
 }) {
   const link = input.link.trim();
   if (link.length < 4) throw new Error("Enter a valid profile or post link");
-  if (!Number.isFinite(input.quantity) || input.quantity <= 0) {
+
+  let providerService:
+    | { service: number; type: string; name: string; min: number; max: number }
+    | undefined;
+  try {
+    const live = isJapDemoMode()
+      ? FALLBACK_JAP_SERVICES
+      : await getJapServices();
+    providerService = live.find((s) => s.service === input.serviceId);
+  } catch {
+    providerService = FALLBACK_JAP_SERVICES.find(
+      (s) => s.service === input.serviceId,
+    );
+  }
+
+  const needsComments = isCustomCommentsService(
+    providerService ?? {
+      type: "",
+      name: input.serviceName,
+    },
+  );
+
+  const comments = normalizeCustomComments(input.comments);
+  let quantity = Number(input.quantity);
+
+  if (needsComments) {
+    if (!comments.length) {
+      throw new Error("Add at least one custom comment");
+    }
+    quantity = comments.length;
+    const min = Math.max(1, providerService?.min || 1);
+    const max = Math.max(min, providerService?.max || 1_000_000);
+    if (quantity < min) {
+      throw new Error(`Add at least ${min.toLocaleString()} custom comments`);
+    }
+    if (quantity > max) {
+      throw new Error(
+        `You can add at most ${max.toLocaleString()} custom comments`,
+      );
+    }
+  } else if (comments.length) {
+    throw new Error("This package does not accept custom comments");
+  }
+
+  if (!Number.isFinite(quantity) || quantity <= 0) {
     throw new Error("Enter a valid quantity");
   }
 
-  const priceUsd = japUsdCost(input.rateUsd, input.quantity);
+  const commentsPayload = needsComments ? comments.join("\n") : undefined;
+
+  const priceUsd = japUsdCost(input.rateUsd, quantity);
   const { local, currency } = await usdToLocalJapPrice(
     priceUsd,
     input.countryCode,
@@ -220,7 +273,7 @@ export async function purchaseJapBoost(input: {
     platform: input.platform,
     name: input.serviceName,
     metric: input.metric,
-    quantity: input.quantity,
+    quantity,
     price: chargeAmount,
   });
 
@@ -229,7 +282,9 @@ export async function purchaseJapBoost(input: {
     serviceId: input.serviceId,
     platform: input.platform,
     metric: input.metric,
-    quantity: input.quantity,
+    quantity,
+    needsComments,
+    commentsCount: comments.length,
     priceUsd,
     chargeAmount,
     currency,
@@ -245,13 +300,14 @@ export async function purchaseJapBoost(input: {
     countryCode: input.countryCode,
     amount: chargeAmount,
     title: "Social boost",
-    subtitle: `${input.quantity.toLocaleString()} ${input.metric} · ${input.platform}`,
+    subtitle: `${quantity.toLocaleString()} ${input.metric} · ${input.platform}`,
     metadata: {
       kind: "social_boost",
       japServiceId: input.serviceId,
-      quantity: input.quantity,
+      quantity,
       link,
       priceUsd,
+      ...(needsComments ? { customComments: true, commentsCount: comments.length } : {}),
     },
   });
 
@@ -267,7 +323,9 @@ export async function purchaseJapBoost(input: {
       const placed = await addJapOrder({
         service: input.serviceId,
         link,
-        quantity: input.quantity,
+        ...(needsComments
+          ? { comments: commentsPayload }
+          : { quantity }),
       });
       orderId = placed.orderId;
       console.log(LOG_PREFIX, "purchase LIVE", { orderId });
@@ -300,9 +358,12 @@ export async function purchaseJapBoost(input: {
           kind: "social_boost",
           japOrderId: orderId,
           japServiceId: input.serviceId,
-          quantity: input.quantity,
+          quantity,
           link,
           simulated,
+          ...(needsComments
+            ? { customComments: true, commentsCount: comments.length }
+            : {}),
         },
       })
       .where(eq(transactions.id, debit.transaction.id));
