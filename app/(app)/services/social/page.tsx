@@ -324,8 +324,7 @@ export default function SocialBoostPage() {
     if (isCustomCommentsService(selected)) {
       setCustomComments((prev) => {
         if (prev.some((c) => c.trim())) return prev;
-        const starter = Math.max(1, Math.min(selected.min, 10));
-        return Array.from({ length: starter }, () => "");
+        return [""];
       });
       setQuantityText("");
       return;
