@@ -1,10 +1,8 @@
 import { quoteLocalUsd } from "@/lib/fx/rates";
 import {
-  FALLBACK_JAP_SERVICES,
   enrichJapService,
   filterJapServices,
-  getJapServices,
-  isJapDemoMode,
+  getJapServicesSafe,
   japUsdCost,
   JAP_PLATFORMS,
 } from "@/lib/jap";
@@ -41,6 +39,7 @@ import {
   type VtpassServiceCategory,
 } from "@/lib/vtpass";
 import {
+  createUsdPricer,
   getOverrideFor,
   getSogoPayoutShare,
   priceLocalAmount,
@@ -151,8 +150,7 @@ export async function loadAdminPricingCatalog(input: {
     applied.platform = platform;
     if (q) applied.q = q;
 
-    const demo = isJapDemoMode();
-    const raw = demo ? FALLBACK_JAP_SERVICES : await getJapServices();
+    const { services: raw, demo, fallback } = await getJapServicesSafe();
     const enriched = raw.map(enrichJapService);
     const filtered = filterJapServices(enriched, { platform, query: q });
     const sliced =
@@ -164,13 +162,13 @@ export async function loadAdminPricingCatalog(input: {
             .slice(0, 300);
 
     const quote = await quoteLocalUsd(currency);
+    const priceUsd = await createUsdPricer("jap");
     const items: AdminCatalogItem[] = [];
     for (const s of sliced) {
       const serviceKey = String(s.service);
       const sampleQty = Math.min(Math.max(s.min, 1000), s.max);
       const sampleUsd = japUsdCost(s.rate, sampleQty);
-      const priced = await priceUsdToLocal({
-        provider: "jap",
+      const priced = priceUsd({
         serviceKey,
         usd: sampleUsd,
         buyRate: quote.buyRate,
@@ -210,8 +208,10 @@ export async function loadAdminPricingCatalog(input: {
         applied,
       },
       items,
-      demo,
-      hint: "Prices shown for a sample quantity (usually 1,000). Overrides apply per service ID.",
+      demo: demo || fallback,
+      hint: fallback
+        ? "Live boost panel timed out — showing fallback packages until it recovers."
+        : "Prices shown for a sample quantity (usually 1,000). Overrides apply per service ID.",
     };
   }
 

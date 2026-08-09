@@ -268,3 +268,4 @@ export function defaultQuantity(service: Pick<JapService, "min" | "max">) {
   }
   return min;
 }
+

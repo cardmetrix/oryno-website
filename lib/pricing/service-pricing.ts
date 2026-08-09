@@ -207,6 +207,51 @@ function applyOverrideMode(
   return roundMoney(Math.max(0, baseLocal * (1 + value / 100)));
 }
 
+type UsdPriceResult = {
+  local: number;
+  markup: number;
+  overrideApplied: boolean;
+  listLocal: number;
+};
+
+/**
+ * Preload markup + overrides once, then price many USD rows synchronously.
+ * Avoids N async DB hits when building large catalogs (e.g. JAP).
+ */
+export async function createUsdPricer(provider: PricingProvider) {
+  const markup = await getProviderMarkup(provider);
+  const maps = await loadOverrideMaps();
+  const providerMap = maps.get(provider);
+
+  return (input: {
+    serviceKey?: string | null;
+    usd: number;
+    buyRate: number;
+  }): UsdPriceResult => {
+    const listLocal = roundMoney(input.usd * input.buyRate * markup);
+
+    if (!input.serviceKey) {
+      return { local: listLocal, markup, overrideApplied: false, listLocal };
+    }
+
+    const row = providerMap?.get(input.serviceKey);
+    if (!row) {
+      return { local: listLocal, markup, overrideApplied: false, listLocal };
+    }
+
+    const value = Number(row.value);
+    if (row.mode === "markup") {
+      const local = roundMoney(
+        input.usd * input.buyRate * Math.max(1, value),
+      );
+      return { local, markup: value, overrideApplied: true, listLocal };
+    }
+
+    const local = applyOverrideMode(listLocal, row.mode, value);
+    return { local, markup, overrideApplied: true, listLocal };
+  };
+}
+
 /**
  * Convert USD cost → local retail using admin group markup + optional per-SKU override.
  */
@@ -215,36 +260,13 @@ export async function priceUsdToLocal(input: {
   serviceKey?: string | null;
   usd: number;
   buyRate: number;
-}): Promise<{
-  local: number;
-  markup: number;
-  overrideApplied: boolean;
-  listLocal: number;
-}> {
-  const markup = await getProviderMarkup(input.provider);
-  const listLocal = roundMoney(input.usd * input.buyRate * markup);
-
-  if (!input.serviceKey) {
-    return { local: listLocal, markup, overrideApplied: false, listLocal };
-  }
-
-  const maps = await loadOverrideMaps();
-  const row = maps.get(input.provider)?.get(input.serviceKey);
-  if (!row) {
-    return { local: listLocal, markup, overrideApplied: false, listLocal };
-  }
-
-  const value = Number(row.value);
-  // For individual "markup" mode: replace group markup with override multiplier on USD×FX
-  if (row.mode === "markup") {
-    const local = roundMoney(
-      input.usd * input.buyRate * Math.max(1, value),
-    );
-    return { local, markup: value, overrideApplied: true, listLocal };
-  }
-
-  const local = applyOverrideMode(listLocal, row.mode, value);
-  return { local, markup, overrideApplied: true, listLocal };
+}): Promise<UsdPriceResult> {
+  const price = await createUsdPricer(input.provider);
+  return price({
+    serviceKey: input.serviceKey,
+    usd: input.usd,
+    buyRate: input.buyRate,
+  });
 }
 
 /**

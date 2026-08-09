@@ -71,6 +71,16 @@ function logJapModeOnce() {
 }
 
 const JAP_SERVICES_TTL_MS = 10 * 60 * 1000;
+/** Keep serving a previous catalog longer when the live panel is slow/down. */
+const JAP_SERVICES_STALE_MAX_MS = 6 * 60 * 60 * 1000;
+const JAP_TIMEOUT_MS: Record<string, number> = {
+  services: 25_000,
+  balance: 12_000,
+  add: 20_000,
+  status: 12_000,
+};
+const JAP_TIMEOUT_DEFAULT_MS = 15_000;
+
 let japServicesCache: { at: number; data: JapService[] } | null = null;
 
 export type JapService = {
@@ -94,6 +104,31 @@ export type JapOrderStatus = {
   error?: string;
 };
 
+function japTimeoutMs(action: string) {
+  return JAP_TIMEOUT_MS[action] ?? JAP_TIMEOUT_DEFAULT_MS;
+}
+
+function mapJapServicesPayload(json: unknown): JapService[] {
+  if (!Array.isArray(json)) throw new Error("Failed to load boost services");
+
+  return json
+    .map((row) => {
+      const r = row as Record<string, unknown>;
+      return {
+        service: Number(r.service),
+        name: String(r.name ?? ""),
+        type: String(r.type ?? "Default"),
+        category: String(r.category ?? "Other"),
+        rate: Number(r.rate) || 0,
+        min: Number(r.min) || 1,
+        max: Number(r.max) || 100000,
+        refill: Boolean(r.refill),
+        cancel: Boolean(r.cancel),
+      } satisfies JapService;
+    })
+    .filter((s) => Number.isFinite(s.service) && s.service > 0 && s.name);
+}
+
 async function japPost(params: Record<string, string | number>) {
   logJapModeOnce();
   const key = japApiKey();
@@ -114,15 +149,30 @@ async function japPost(params: Record<string, string | number>) {
   });
 
   const started = Date.now();
-  const res = await fetch(japBaseUrl(), {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Accept: "application/json",
-    },
-    body: body.toString(),
-    cache: "no-store",
-  });
+  let res: Response;
+  try {
+    res = await fetch(japBaseUrl(), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Accept: "application/json",
+      },
+      body: body.toString(),
+      cache: "no-store",
+      signal: AbortSignal.timeout(japTimeoutMs(action)),
+    });
+  } catch (error) {
+    const timedOut =
+      error instanceof Error &&
+      (error.name === "TimeoutError" || error.name === "AbortError");
+    throw new Error(
+      timedOut
+        ? "Boost provider timed out. Try again in a moment."
+        : japErrorToEnglish(
+            error instanceof Error ? error.message : "Boost service unavailable",
+          ),
+    );
+  }
 
   const text = await res.text();
   console.log(LOG_PREFIX, "response", {
@@ -201,33 +251,33 @@ export async function getJapServices(): Promise<JapService[]> {
   if (japServicesCache && now - japServicesCache.at < JAP_SERVICES_TTL_MS) {
     console.log(LOG_PREFIX, "services cache hit", {
       count: japServicesCache.data.length,
+      ageMs: now - japServicesCache.at,
     });
     return japServicesCache.data;
   }
 
-  const json = await japPost({ action: "services" });
-  if (!Array.isArray(json)) throw new Error("Failed to load boost services");
-
-  const data = json
-    .map((row) => {
-      const r = row as Record<string, unknown>;
-      return {
-        service: Number(r.service),
-        name: String(r.name ?? ""),
-        type: String(r.type ?? "Default"),
-        category: String(r.category ?? "Other"),
-        rate: Number(r.rate) || 0,
-        min: Number(r.min) || 1,
-        max: Number(r.max) || 100000,
-        refill: Boolean(r.refill),
-        cancel: Boolean(r.cancel),
-      } satisfies JapService;
-    })
-    .filter((s) => Number.isFinite(s.service) && s.service > 0 && s.name);
-
-  console.log(LOG_PREFIX, "services", { count: data.length });
-  japServicesCache = { at: now, data };
-  return data;
+  try {
+    const json = await japPost({ action: "services" });
+    const data = mapJapServicesPayload(json);
+    console.log(LOG_PREFIX, "services", { count: data.length });
+    japServicesCache = { at: now, data };
+    return data;
+  } catch (error) {
+    const ageMs = japServicesCache ? now - japServicesCache.at : null;
+    if (
+      japServicesCache?.data.length &&
+      ageMs != null &&
+      ageMs < JAP_SERVICES_STALE_MAX_MS
+    ) {
+      console.warn(LOG_PREFIX, "services fetch failed; using stale cache", {
+        count: japServicesCache.data.length,
+        ageMs,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return japServicesCache.data;
+    }
+    throw error;
+  }
 }
 
 export async function addJapOrder(input: {

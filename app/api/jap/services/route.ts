@@ -3,16 +3,15 @@ import { ensureAppUser } from "@/lib/auth/current-user";
 import { quoteLocalUsd } from "@/lib/fx/rates";
 import { currencyForCountry } from "@/lib/wallet";
 import {
-  FALLBACK_JAP_SERVICES,
   enrichJapService,
   filterJapServices,
-  getJapServices,
-  isJapDemoMode,
+  getJapServicesSafe,
   japUsdCost,
 } from "@/lib/jap";
-import { priceUsdToLocal } from "@/lib/pricing/service-pricing";
+import { createUsdPricer } from "@/lib/pricing/service-pricing";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 /** Cap packages per platform+metric so the full catalog stays small & fast. */
 function diversifyJapCatalog<
@@ -43,13 +42,17 @@ export async function GET(req: Request) {
     const query = searchParams.get("q") || "";
     const currency = currencyForCountry(user.countryCode);
 
-    const demo = isJapDemoMode();
-    console.log("[jap-services]", demo ? "DEMO" : "LIVE", {
+    const {
+      services: raw,
+      demo,
+      fallback,
+    } = await getJapServicesSafe();
+
+    console.log("[jap-services]", demo ? "DEMO" : fallback ? "FALLBACK" : "LIVE", {
       platform,
       query,
+      rawCount: raw.length,
     });
-
-    const raw = demo ? FALLBACK_JAP_SERVICES : await getJapServices();
 
     const enriched = raw.map(enrichJapService);
     const filtered = filterJapServices(enriched, { platform, query });
@@ -65,46 +68,43 @@ export async function GET(req: Request) {
             .slice(0, 400);
 
     const quote = await quoteLocalUsd(currency);
+    const priceUsd = await createUsdPricer("jap");
 
-    const services = await Promise.all(
-      sliced.map(async (s) => {
-        const sampleQty = Math.min(Math.max(s.min, 1000), s.max);
-        const priceUsd = japUsdCost(s.rate, sampleQty);
-        const key = String(s.service);
-        const perThousand = await priceUsdToLocal({
-          provider: "jap",
-          serviceKey: key,
-          usd: s.rate,
-          buyRate: quote.buyRate,
-        });
-        const sample = await priceUsdToLocal({
-          provider: "jap",
-          serviceKey: key,
-          usd: priceUsd,
-          buyRate: quote.buyRate,
-        });
-        return {
-          service: s.service,
-          name: s.name,
-          type: s.type,
-          category: s.category,
-          platform: s.platform,
-          metric: s.metric,
-          quality: s.quality,
-          rate: s.rate,
-          min: s.min,
-          max: s.max,
-          refill: s.refill,
-          cancel: s.cancel,
-          currency,
-          priceLocalPerThousand: perThousand.local,
-          sampleQuantity: sampleQty,
-          samplePriceLocal: sample.local,
-          listPriceLocal: sample.listLocal,
-          priceOverride: sample.overrideApplied,
-        };
-      }),
-    );
+    const services = sliced.map((s) => {
+      const sampleQty = Math.min(Math.max(s.min, 1000), s.max);
+      const priceUsdSample = japUsdCost(s.rate, sampleQty);
+      const key = String(s.service);
+      const perThousand = priceUsd({
+        serviceKey: key,
+        usd: s.rate,
+        buyRate: quote.buyRate,
+      });
+      const sample = priceUsd({
+        serviceKey: key,
+        usd: priceUsdSample,
+        buyRate: quote.buyRate,
+      });
+      return {
+        service: s.service,
+        name: s.name,
+        type: s.type,
+        category: s.category,
+        platform: s.platform,
+        metric: s.metric,
+        quality: s.quality,
+        rate: s.rate,
+        min: s.min,
+        max: s.max,
+        refill: s.refill,
+        cancel: s.cancel,
+        currency,
+        priceLocalPerThousand: perThousand.local,
+        sampleQuantity: sampleQty,
+        samplePriceLocal: sample.local,
+        listPriceLocal: sample.listLocal,
+        priceOverride: sample.overrideApplied,
+      };
+    });
 
     const platforms = Array.from(
       new Set(enriched.map((s) => s.platform)),
@@ -112,6 +112,7 @@ export async function GET(req: Request) {
 
     console.log("[jap-services] ok", {
       demo,
+      fallback,
       total: enriched.length,
       count: services.length,
     });
@@ -119,6 +120,7 @@ export async function GET(req: Request) {
     return NextResponse.json({
       ok: true,
       demo,
+      fallback,
       currency,
       platforms: [
         "All",
@@ -130,7 +132,7 @@ export async function GET(req: Request) {
       services,
     });
   } catch (error) {
-    console.error("[jap-services] LIVE failed", error);
+    console.error("[jap-services] failed", error);
     return NextResponse.json(
       {
         error:

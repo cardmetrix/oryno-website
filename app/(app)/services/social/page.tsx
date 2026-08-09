@@ -115,7 +115,7 @@ export default function SocialBoostPage() {
         if (!res.ok) throw new Error(data.error || "Failed to load services");
         if (cancelled) return;
 
-        setLiveMode(data.demo === false);
+        setLiveMode(data.demo === false && data.fallback !== true);
         const nextPlatforms: string[] = (data.platforms ?? []).filter(
           (p: string) => p && p !== "All",
         );
@@ -127,6 +127,9 @@ export default function SocialBoostPage() {
         );
         setPlatforms(nextPlatforms);
         setServices(list);
+        if (data.fallback && !list.length) {
+          setError("Boost catalog is temporarily unavailable. Try again shortly.");
+        }
 
         const firstPlatform =
           nextPlatforms.find((p) => list.some((s) => s.platform === p)) ||
