@@ -17,6 +17,7 @@ export async function POST(req: Request) {
       lng?: number;
       forceCountry?: boolean;
       announceLogin?: boolean;
+      referralCode?: string;
     };
 
     const detected = await detectCountryWithGoogle({
@@ -44,6 +45,7 @@ export async function POST(req: Request) {
       touchLogin: true,
       countryCode,
       forceCountry: body.forceCountry === true && confident,
+      referralCode: body.referralCode || null,
       request: req,
     });
 

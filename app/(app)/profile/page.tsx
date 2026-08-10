@@ -512,6 +512,15 @@ export default function ProfilePage() {
           <ChevronRight className="h-4 w-4 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-primary" />
         </Link>
         <Link
+          href="/referrals"
+          className="group flex items-center justify-between rounded-[18px] border border-border bg-background px-4 py-3.5 shadow-[var(--shadow-soft)] transition hover:border-primary/30 hover:bg-muted/40"
+        >
+          <span className="text-sm font-semibold text-foreground">
+            Refer & earn
+          </span>
+          <ChevronRight className="h-4 w-4 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-primary" />
+        </Link>
+        <Link
           href="/settings/security"
           className="group flex items-center justify-between rounded-[18px] border border-border bg-background px-4 py-3.5 shadow-[var(--shadow-soft)] transition hover:border-primary/30 hover:bg-muted/40"
         >

@@ -344,6 +344,10 @@ export async function fundWallet(input: {
       transaction: txRow,
       wallet: updated ?? { ...wallet, balance: nextBalance },
     };
+  }).then(async (result) => {
+    const { scheduleReferralCheck } = await import("@/lib/referrals/service");
+    scheduleReferralCheck(input.userId);
+    return result;
   });
 }
 

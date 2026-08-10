@@ -280,6 +280,9 @@ export async function creditWalletFromDeposit(input: {
     };
   });
 
+  const { scheduleReferralCheck } = await import("@/lib/referrals/service");
+  scheduleReferralCheck(input.userId);
+
   try {
     await createNotification({
       userId: input.userId,

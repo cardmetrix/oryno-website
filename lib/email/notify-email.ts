@@ -26,6 +26,7 @@ const CTA_BY_TYPE: Partial<
     href: "/services/virtual-numbers",
   },
   email: { label: "Open emails", href: "/services/emails" },
+  referral: { label: "View referrals", href: "/referrals" },
 };
 
 async function emailPreferenceEnabled(clerkId: string | null | undefined) {

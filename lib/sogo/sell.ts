@@ -384,7 +384,7 @@ export async function settleGiftCardSellSuccess(input: {
   amount: number;
   providerReference?: string | null;
 }) {
-  return db.transaction(async (tx) => {
+  const result = await db.transaction(async (tx) => {
     const existing = await tx.query.transactions.findFirst({
       where: eq(transactions.id, input.transactionId),
     });
@@ -438,6 +438,13 @@ export async function settleGiftCardSellSuccess(input: {
       alreadySettled: false,
     };
   });
+
+  if (!result.alreadySettled) {
+    const { scheduleReferralCheck } = await import("@/lib/referrals/service");
+    scheduleReferralCheck(input.userId);
+  }
+
+  return result;
 }
 
 export async function settleGiftCardSellFailure(input: {

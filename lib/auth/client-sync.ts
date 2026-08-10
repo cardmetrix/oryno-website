@@ -21,6 +21,7 @@ export function wasLoginAnnounced() {
 export async function syncSessionToDatabase(options?: {
   /** Fire login notification + email (login / first session after OAuth). */
   announceLogin?: boolean;
+  referralCode?: string | null;
 }): Promise<{
   ok: boolean;
   error?: string;
@@ -42,6 +43,16 @@ export async function syncSessionToDatabase(options?: {
 
   const announceLogin = options?.announceLogin === true;
 
+  let referralCode = options?.referralCode || null;
+  if (!referralCode && typeof window !== "undefined") {
+    try {
+      const { readStoredReferralCode } = await import("@/lib/referrals/client");
+      referralCode = readStoredReferralCode();
+    } catch {
+      // ignore
+    }
+  }
+
   const res = await fetch("/api/auth/sync", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -49,6 +60,7 @@ export async function syncSessionToDatabase(options?: {
       countryCode,
       forceCountry: Boolean(countryCode),
       announceLogin,
+      referralCode: referralCode || undefined,
     }),
   });
 
@@ -84,6 +96,15 @@ export async function syncSessionToDatabase(options?: {
 
   if (announceLogin) {
     markLoginAnnounced();
+  }
+
+  if (referralCode && typeof window !== "undefined") {
+    try {
+      const { clearStoredReferralCode } = await import("@/lib/referrals/client");
+      clearStoredReferralCode();
+    } catch {
+      // ignore
+    }
   }
 
   return {

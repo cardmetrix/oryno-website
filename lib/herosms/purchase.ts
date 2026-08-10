@@ -306,6 +306,9 @@ export async function purchaseVirtualNumber(input: {
       })
       .where(eq(transactions.id, prepared.transaction.id));
 
+    const { scheduleReferralCheck } = await import("@/lib/referrals/service");
+    scheduleReferralCheck(input.userId);
+
     return {
       number: row,
       phoneNumber,
@@ -420,6 +423,9 @@ export async function purchaseEmailActivation(input: {
         },
       })
       .where(eq(transactions.id, prepared.transaction.id));
+
+    const { scheduleReferralCheck } = await import("@/lib/referrals/service");
+    scheduleReferralCheck(input.userId);
 
     return {
       emailId,

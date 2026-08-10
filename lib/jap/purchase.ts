@@ -368,6 +368,9 @@ export async function purchaseJapBoost(input: {
       })
       .where(eq(transactions.id, debit.transaction.id));
 
+    const { scheduleReferralCheck } = await import("@/lib/referrals/service");
+    scheduleReferralCheck(input.userId);
+
     return {
       simulated,
       orderId,

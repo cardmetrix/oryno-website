@@ -171,7 +171,7 @@ async function ensureDefaultCountries() {
   await countriesReady;
 }
 
-function referralFromName(fullName: string) {
+export function referralFromName(fullName: string) {
   const stem = fullName
     .replace(/[^a-zA-Z]/g, "")
     .slice(0, 4)
@@ -236,6 +236,8 @@ export async function syncClerkUserToDb(
     countryCode?: string | null;
     /** Overwrite existing country with detected value */
     forceCountry?: boolean;
+    /** Invite / referral code from signup link or form */
+    referralCode?: string | null;
   },
 ): Promise<SyncedUser> {
   const email = pickEmail(clerkUser).toLowerCase().trim();
@@ -417,6 +419,25 @@ export async function syncClerkUserToDb(
       .onConflictDoNothing({ target: referralCodes.userId });
   } catch (referralError) {
     console.error("[sync-user-referral]", referralError);
+  }
+
+  const metaCode =
+    typeof clerkUser.unsafeMetadata?.referralCode === "string"
+      ? clerkUser.unsafeMetadata.referralCode
+      : typeof clerkUser.publicMetadata?.referralCode === "string"
+        ? clerkUser.publicMetadata.referralCode
+        : null;
+  const referralCode = options?.referralCode || metaCode;
+  if (referralCode) {
+    try {
+      const { attachReferral } = await import("@/lib/referrals/service");
+      await attachReferral({
+        referredUserId: dbUser.id,
+        code: referralCode,
+      });
+    } catch (attachError) {
+      console.error("[sync-user-referral-attach]", attachError);
+    }
   }
 
   return dbUser;

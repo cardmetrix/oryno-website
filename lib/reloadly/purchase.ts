@@ -343,6 +343,9 @@ export async function buyGiftCard(input: {
       })
       .where(eq(transactions.id, debit.transaction.id));
 
+    const { scheduleReferralCheck } = await import("@/lib/referrals/service");
+    scheduleReferralCheck(input.userId);
+
     return {
       order,
       transactionId: debit.transaction.id,

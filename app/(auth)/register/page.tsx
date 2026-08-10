@@ -24,6 +24,12 @@ import {
   normalizeUsername,
 } from "@/lib/auth/username";
 import { AUTH_LINKS } from "@/lib/auth-links";
+import {
+  captureReferralFromSearch,
+  persistReferralCode,
+  readStoredReferralCode,
+} from "@/lib/referrals/client";
+import { normalizeReferralCode } from "@/lib/referrals/config";
 
 type Step = "details" | "otp";
 
@@ -52,6 +58,7 @@ function RegisterForm() {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [referralCode, setReferralCode] = useState("");
 
   const normalizedUsername = normalizeUsername(username);
   const passwordsMatch =
@@ -66,6 +73,13 @@ function RegisterForm() {
     phone.trim().length >= 7 &&
     password.length >= 8 &&
     passwordsMatch;
+
+  useEffect(() => {
+    const fromUrl = captureReferralFromSearch(searchParams);
+    const stored = readStoredReferralCode();
+    const code = fromUrl || stored;
+    if (code) setReferralCode(code);
+  }, [searchParams]);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -114,6 +128,9 @@ function RegisterForm() {
     setError(null);
     setLoading(true);
 
+    const referral = normalizeReferralCode(referralCode);
+    if (referral) persistReferralCode(referral);
+
     try {
       const createPayload: Parameters<typeof signUp.create>[0] = {
         emailAddress: email.trim().toLowerCase(),
@@ -125,6 +142,7 @@ function RegisterForm() {
           fullName: fullName.trim(),
           phone: phone.trim(),
           username: normalizedUsername,
+          ...(referral ? { referralCode: referral } : {}),
         },
       };
 
@@ -433,6 +451,22 @@ function RegisterForm() {
             value={confirmPassword}
             onChange={setConfirmPassword}
           />
+
+          <AuthField label="Referral code (optional)">
+            <input
+              type="text"
+              name="referralCode"
+              value={referralCode}
+              onChange={(e) => {
+                const next = e.target.value.toUpperCase();
+                setReferralCode(next);
+                persistReferralCode(next);
+              }}
+              placeholder="e.g. ORYCHID1A2B"
+              autoComplete="off"
+              className={authInputClassName}
+            />
+          </AuthField>
         </div>
 
         {password && confirmPassword && !passwordsMatch ? (

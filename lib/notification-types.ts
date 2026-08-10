@@ -8,7 +8,8 @@ export type NotificationType =
   | "security"
   | "transfer"
   | "service"
-  | "kyc";
+  | "kyc"
+  | "referral";
 
 export type AppNotificationDto = {
   id: string;

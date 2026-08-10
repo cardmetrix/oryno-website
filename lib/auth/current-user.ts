@@ -24,6 +24,7 @@ async function resolveAndSync(options?: {
   touchLogin?: boolean;
   countryCode?: string | null;
   forceCountry?: boolean;
+  referralCode?: string | null;
   request?: Request;
 }): Promise<{ user: SyncedUser | null; debug?: ResolveClerkDebug }> {
   let clerkUser;
@@ -41,7 +42,8 @@ async function resolveAndSync(options?: {
   const needsFullSync =
     Boolean(options?.forceCountry) ||
     Boolean(options?.touchLogin) ||
-    Boolean(options?.countryCode);
+    Boolean(options?.countryCode) ||
+    Boolean(options?.referralCode);
 
   if (!needsFullSync) {
     try {
@@ -58,6 +60,7 @@ async function resolveAndSync(options?: {
     touchLogin: options?.touchLogin,
     countryCode: options?.countryCode,
     forceCountry: options?.forceCountry,
+    referralCode: options?.referralCode,
   });
   return { user: synced, debug };
 }
@@ -67,6 +70,7 @@ export async function ensureAppUser(options?: {
   touchLogin?: boolean;
   countryCode?: string | null;
   forceCountry?: boolean;
+  referralCode?: string | null;
   request?: Request;
 }): Promise<SyncedUser | null> {
   const { user } = await resolveAndSync(options);
@@ -78,6 +82,7 @@ export async function ensureAppUserDetailed(options?: {
   touchLogin?: boolean;
   countryCode?: string | null;
   forceCountry?: boolean;
+  referralCode?: string | null;
   request?: Request;
 }): Promise<{ user: SyncedUser | null; debug?: ResolveClerkDebug }> {
   return resolveAndSync(options);

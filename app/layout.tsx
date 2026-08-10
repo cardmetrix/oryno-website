@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Geist, Geist_Mono } from "next/font/google";
+import { ReferralCapture } from "@/components/auth/referral-capture";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
@@ -65,6 +67,9 @@ export default function RootLayout({
           className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`}
         >
           <ThemeProvider>
+            <Suspense fallback={null}>
+              <ReferralCapture />
+            </Suspense>
             {children}
             <Toaster richColors position="top-right" closeButton />
           </ThemeProvider>

@@ -380,6 +380,10 @@ async function finalizeTx(
     })
     .where(eq(transactions.id, transactionId))
     .returning();
+  if (row && status === "completed") {
+    const { scheduleReferralCheck } = await import("@/lib/referrals/service");
+    scheduleReferralCheck(row.userId);
+  }
   return row;
 }
 
