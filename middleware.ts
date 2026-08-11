@@ -19,6 +19,8 @@ const isPublicRoute = createRouteMatcher([
   "/forgot-password(.*)",
   "/splash(.*)",
   "/sso-callback(.*)",
+  "/terms(.*)",
+  "/privacy(.*)",
   "/api/webhooks(.*)",
   "/api/geo(.*)",
   // Mobile / external clients authenticate inside route handlers via Bearer JWT
@@ -46,10 +48,9 @@ const isPublicRoute = createRouteMatcher([
 
 const isExternalApi = createRouteMatcher(["/api/external(.*)"]);
 
-// Don't auto-bounce /register or /otp — users may finish email OTP
-// after a session cookie appears mid-flow.
 const isAuthScreen = createRouteMatcher([
   "/login(.*)",
+  "/register(.*)",
   "/forgot-password(.*)",
   "/splash(.*)",
 ]);

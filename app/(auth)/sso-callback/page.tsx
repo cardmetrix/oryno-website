@@ -32,7 +32,7 @@ export default function SsoCallbackPage() {
         className="relative w-full max-w-[320px]"
       >
         <div className="flex flex-col items-center">
-          <Skeleton className="h-16 w-16 rounded-2xl" />
+          <Skeleton className="h-16 w-16 rounded-full" />
           <Skeleton className="mt-5 h-5 w-28 rounded-full" />
           <Skeleton className="mt-2.5 h-3.5 w-44 rounded-full" />
         </div>

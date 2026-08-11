@@ -68,7 +68,7 @@ function NetworkCard({
 
       <div className="relative z-10 flex items-center gap-2.5">
         <span
-          className="flex h-10 w-10 items-center justify-center rounded-2xl text-xs font-bold text-oryno-charcoal"
+          className="flex h-10 w-10 items-center justify-center rounded-full text-xs font-bold text-oryno-charcoal"
           style={{ background: network.soft }}
         >
           <span

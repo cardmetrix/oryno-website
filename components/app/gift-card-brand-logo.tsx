@@ -37,7 +37,7 @@ export function GiftCardBrandLogo({
   return (
     <div
       className={cn(
-        "relative shrink-0 overflow-hidden rounded-2xl bg-white ring-1 ring-border",
+        "relative shrink-0 overflow-hidden rounded-full bg-white ring-1 ring-border",
         className,
       )}
       style={{ width: size, height: size }}
@@ -48,7 +48,7 @@ export function GiftCardBrandLogo({
         alt={brand.name}
         fill
         sizes={`${size}px`}
-        className="object-contain p-1.5"
+        className="rounded-full object-contain p-1.5"
         unoptimized={remote || src.endsWith(".svg")}
         onError={() => setIdx((i) => (i + 1 < chain.length ? i + 1 : i))}
       />

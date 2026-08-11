@@ -169,7 +169,7 @@ export default function ForgotPasswordPage() {
             <input
               type="email"
               name="email"
-              placeholder="e.g. chidi@oryno.com"
+              placeholder="e.g. John@oryno.com"
               autoComplete="email"
               required
               className={authInputClassName}

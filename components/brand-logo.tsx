@@ -15,13 +15,21 @@ export function BrandLogo({
   priority = false,
 }: BrandLogoProps) {
   return (
-    <Image
-      src={BRAND_LOGO_SRC}
-      alt="ORYNO"
-      width={size}
-      height={size}
-      priority={priority}
-      className={cn("rounded-[22%] object-cover", className)}
-    />
+    <span
+      className={cn(
+        "relative inline-flex shrink-0 overflow-hidden rounded-full",
+        className,
+      )}
+      style={{ width: size, height: size }}
+    >
+      <Image
+        src={BRAND_LOGO_SRC}
+        alt="ORYNO"
+        width={size}
+        height={size}
+        priority={priority}
+        className="h-full w-full rounded-full object-cover"
+      />
+    </span>
   );
 }

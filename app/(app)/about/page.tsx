@@ -4,6 +4,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   ArrowRight,
+  CreditCard,
   Globe2,
   Megaphone,
   Phone,
@@ -20,6 +21,7 @@ import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
 import { GiftCardIcon } from "@/components/icons/gift-card-icon";
+import { APP_VERSION_LABEL } from "@/lib/app-version";
 
 const pillars = [
   {
@@ -78,7 +80,12 @@ const services = [
   {
     icon: GiftCardIcon,
     title: "Gift Cards",
-    description: "Buy & sell marketplace — coming soon.",
+    description: "Buy and sell gift cards with live rates into your wallet.",
+  },
+  {
+    icon: CreditCard,
+    title: "USD Virtual Card",
+    description: "Spend your USD wallet online worldwide — joining waitlist now.",
     soon: true,
   },
 ];
@@ -143,13 +150,16 @@ export default function AboutPage() {
 
           <p className="mt-5 max-w-2xl text-base leading-relaxed text-white/90 sm:text-lg">
             ORYNO is a premium digital services super app for Africa — airtime,
-            data, bill payments, virtual numbers, social boosting, wallet
-            payouts, and soon gift cards — all in one secure place.
+            data, bill payments, gift cards, virtual numbers, social boosting,
+            and wallet payouts — with USD virtual cards on the way.
           </p>
 
           <p className="mt-4 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1.5 text-sm font-semibold text-white ring-1 ring-white/20 backdrop-blur-sm">
             <Sparkles className="h-4 w-4" strokeWidth={1.75} />
             Slogan: One App. Endless Possibilities.
+          </p>
+          <p className="mt-3 text-xs font-medium tracking-wide text-white/70">
+            App {APP_VERSION_LABEL}
           </p>
         </div>
       </MotionSection>
@@ -212,7 +222,7 @@ export default function AboutPage() {
                     {service.description}
                   </p>
                 </div>
-                {service.soon ? (
+                {"soon" in service && service.soon ? (
                   <span className="badge-soon absolute top-3 right-3">Soon</span>
                 ) : null}
               </motion.div>
@@ -323,6 +333,22 @@ export default function AboutPage() {
               >
                 Contact support
                 <ArrowRight className="h-4 w-4" />
+              </Link>
+            </motion.div>
+            <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }}>
+              <Link
+                href="/terms"
+                className="inline-flex h-11 items-center justify-center rounded-[14px] border border-border bg-background px-5 text-sm font-semibold text-foreground shadow-[var(--shadow-soft)]"
+              >
+                Terms
+              </Link>
+            </motion.div>
+            <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }}>
+              <Link
+                href="/privacy"
+                className="inline-flex h-11 items-center justify-center rounded-[14px] border border-border bg-background px-5 text-sm font-semibold text-foreground shadow-[var(--shadow-soft)]"
+              >
+                Privacy
               </Link>
             </motion.div>
             <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }}>

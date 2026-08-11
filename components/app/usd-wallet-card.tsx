@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -12,6 +13,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
+import { BRAND_LOGO_SRC } from "@/components/brand-logo";
 import type { WalletSummary } from "@/lib/wallet-types";
 import { cn } from "@/lib/utils";
 
@@ -57,10 +59,29 @@ export function UsdWalletCard({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [liveFx, setLiveFx] = useState<FxQuote | null>(fx ?? null);
+  const [waitlistJoined, setWaitlistJoined] = useState(false);
+  const [waitlistBusy, setWaitlistBusy] = useState(false);
 
   useEffect(() => {
     setLiveFx(fx ?? null);
   }, [fx]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/waitlist/usd-card", { cache: "no-store" });
+        if (!res.ok) return;
+        const json = (await res.json()) as { joined?: boolean };
+        if (!cancelled) setWaitlistJoined(Boolean(json.joined));
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -226,11 +247,22 @@ export function UsdWalletCard({
 
         <div className="relative px-5 py-5 text-white sm:px-6 sm:py-6">
           <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="inline-flex items-center gap-1.5 text-[11px] font-bold tracking-[0.16em] text-white/65 uppercase">
-                <DollarSign className="h-3.5 w-3.5 text-oryno-orange" />
-                USD Wallet
-              </p>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2.5">
+                <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full border border-white/25 bg-[#FF6A00]">
+                  <Image
+                    src={BRAND_LOGO_SRC}
+                    alt="ORYNO"
+                    fill
+                    sizes="40px"
+                    className="scale-[1.22] rounded-full object-cover object-center"
+                  />
+                </span>
+                <p className="inline-flex items-center gap-1.5 text-[11px] font-bold tracking-[0.16em] text-white/65 uppercase">
+                  <DollarSign className="h-3.5 w-3.5 text-oryno-orange" />
+                  USD Wallet
+                </p>
+              </div>
               <AnimatePresence mode="wait">
                 <motion.p
                   key={hidden ? "h" : usd?.balanceFormatted ?? "0"}
@@ -253,6 +285,38 @@ export function UsdWalletCard({
           <p className="mt-1.5 text-sm text-white/70">
             {holderName ? `${holderName} · USD wallet` : "USD wallet"}
           </p>
+
+          <button
+            type="button"
+            disabled={waitlistBusy || waitlistJoined}
+            onClick={async () => {
+              if (waitlistJoined) return;
+              setWaitlistBusy(true);
+              try {
+                const res = await fetch("/api/waitlist/usd-card", {
+                  method: "POST",
+                });
+                const json = (await res.json()) as { error?: string };
+                if (!res.ok) throw new Error(json.error || "Could not join");
+                setWaitlistJoined(true);
+                toast.success("You’re on the USD virtual card waitlist");
+              } catch (err) {
+                toast.error(
+                  err instanceof Error ? err.message : "Could not join waitlist",
+                );
+              } finally {
+                setWaitlistBusy(false);
+              }
+            }}
+            className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-bold text-white/90 ring-1 ring-white/15 disabled:opacity-80"
+          >
+            <CreditCard className="h-3.5 w-3.5 text-oryno-orange" />
+            {waitlistJoined
+              ? "USD virtual card · you’re on the waitlist"
+              : waitlistBusy
+                ? "Joining waitlist…"
+                : "USD virtual card launching soon · Notify me"}
+          </button>
 
           <div className="relative mt-5 grid grid-cols-2 gap-2.5">
             <button

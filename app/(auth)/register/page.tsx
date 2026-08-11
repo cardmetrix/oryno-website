@@ -23,6 +23,7 @@ import {
   isValidUsername,
   normalizeUsername,
 } from "@/lib/auth/username";
+import { RedirectIfSignedIn } from "@/components/auth/redirect-if-signed-in";
 import { AUTH_LINKS } from "@/lib/auth-links";
 import {
   captureReferralFromSearch,
@@ -380,7 +381,7 @@ function RegisterForm() {
               name="fullName"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
-              placeholder="e.g. Chidi Benson"
+              placeholder="e.g. John Benson"
               autoComplete="name"
               required
               className={authInputClassName}
@@ -393,7 +394,7 @@ function RegisterForm() {
               name="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="e.g. chidi_b"
+              placeholder="e.g. john_b"
               autoComplete="username"
               required
               minLength={3}
@@ -410,7 +411,7 @@ function RegisterForm() {
               name="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="e.g. chidi@oryno.com"
+              placeholder="e.g. john@oryno.com"
               autoComplete="email"
               required
               className={authInputClassName}
@@ -483,11 +484,11 @@ function RegisterForm() {
           />
           <span>
             I agree to the{" "}
-            <Link href="#" className="font-semibold text-primary">
+            <Link href="/terms" className="font-semibold text-primary">
               Terms of Service
             </Link>{" "}
             &{" "}
-            <Link href="#" className="font-semibold text-primary">
+            <Link href="/privacy" className="font-semibold text-primary">
               Privacy Policy
             </Link>
           </span>
@@ -532,6 +533,7 @@ function RegisterForm() {
 export default function RegisterPage() {
   return (
     <Suspense fallback={null}>
+      <RedirectIfSignedIn />
       <RegisterForm />
     </Suspense>
   );

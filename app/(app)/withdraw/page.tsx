@@ -13,6 +13,10 @@ import {
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
+import {
+  TransactionPinModal,
+  type TransactionPinModalMode,
+} from "@/components/app/transaction-pin-modal";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { BankAccountSummary, WalletSummary } from "@/lib/wallet-types";
 import { cn } from "@/lib/utils";
@@ -21,7 +25,7 @@ const WITHDRAW_INSTRUCTIONS = [
   "Add and verify a payout bank on Wallet if you haven’t already.",
   "Enter the amount you want to withdraw from your ORYNO wallet.",
   "Select the bank account Paystack should pay into.",
-  "Confirm the withdrawal. We debit your wallet and send the transfer via Paystack.",
+  "Confirm with your transaction PIN. We debit your wallet and send the transfer via Paystack.",
   "When Paystack confirms delivery, the withdrawal is marked complete.",
 ];
 
@@ -34,6 +38,10 @@ export default function WithdrawPage() {
   const [bankAccountId, setBankAccountId] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasPin, setHasPin] = useState(false);
+  const [pinModalOpen, setPinModalOpen] = useState(false);
+  const [pinMode, setPinMode] = useState<TransactionPinModalMode>("confirm");
+  const [pinError, setPinError] = useState<string | null>(null);
   const [success, setSuccess] = useState<{
     amountFormatted: string;
     reference?: string | null;
@@ -45,9 +53,12 @@ export default function WithdrawPage() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/wallet", { cache: "no-store" });
-        if (!res.ok) throw new Error("Failed");
-        const json = (await res.json()) as {
+        const [walletRes, settingsRes] = await Promise.all([
+          fetch("/api/wallet", { cache: "no-store" }),
+          fetch("/api/settings", { cache: "no-store" }),
+        ]);
+        if (!walletRes.ok) throw new Error("Failed");
+        const json = (await walletRes.json()) as {
           primary: WalletSummary;
           banks: BankAccountSummary[];
         };
@@ -57,6 +68,13 @@ export default function WithdrawPage() {
         const primary =
           json.banks.find((b) => b.isPrimary) ?? json.banks[0];
         if (primary) setBankAccountId(primary.id);
+
+        if (settingsRes.ok) {
+          const settings = (await settingsRes.json()) as {
+            security?: { hasPin?: boolean };
+          };
+          setHasPin(Boolean(settings.security?.hasPin));
+        }
       } catch {
         if (!cancelled) {
           setWallet(null);
@@ -71,17 +89,35 @@ export default function WithdrawPage() {
     };
   }, []);
 
-  async function onWithdraw() {
+  function openPinModal() {
+    setError(null);
+    setPinError(null);
+    setPinMode(hasPin ? "confirm" : "create");
+    setPinModalOpen(true);
+  }
+
+  async function submitWithdraw(payload: {
+    pin: string;
+    isCreate: boolean;
+  }) {
     setSubmitting(true);
     setError(null);
+    setPinError(null);
     try {
       const res = await fetch("/api/wallet/withdraw", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount, bankAccountId }),
+        body: JSON.stringify({
+          amount,
+          bankAccountId,
+          pin: payload.pin,
+          ...(payload.isCreate ? { newPin: payload.pin } : {}),
+        }),
       });
       const json = (await res.json()) as {
         error?: string;
+        code?: string;
+        hasPin?: boolean;
         amountFormatted?: string;
         reference?: string | null;
         pending?: boolean;
@@ -89,7 +125,17 @@ export default function WithdrawPage() {
         wallet?: WalletSummary;
         bank?: { bankName: string };
       };
-      if (!res.ok) throw new Error(json.error || "Withdrawal failed");
+      if (!res.ok) {
+        if (json.code?.startsWith("pin_") || json.hasPin === false) {
+          if (typeof json.hasPin === "boolean") setHasPin(json.hasPin);
+          setPinError(json.error || "PIN verification failed");
+          return;
+        }
+        throw new Error(json.error || "Withdrawal failed");
+      }
+
+      if (payload.isCreate) setHasPin(true);
+      setPinModalOpen(false);
       if (json.wallet) setWallet(json.wallet);
 
       if (json.transactionId) {
@@ -104,6 +150,7 @@ export default function WithdrawPage() {
         pending: Boolean(json.pending),
       });
     } catch (err) {
+      setPinModalOpen(false);
       setError(err instanceof Error ? err.message : "Withdrawal failed");
     } finally {
       setSubmitting(false);
@@ -203,7 +250,7 @@ export default function WithdrawPage() {
                     inputMode="numeric"
                     value={amount}
                     onChange={(e) =>
-                      setAmount(e.target.value.replace(/[^\d]/g, ""))
+                      setAmount(e.target.value.replace(/[^\d.]/g, ""))
                     }
                     className="mt-2 h-12 w-full rounded-[14px] border border-border bg-muted/40 px-4 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
                   />
@@ -255,7 +302,7 @@ export default function WithdrawPage() {
                                 : "border-border hover:bg-muted/40",
                             )}
                           >
-                            <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-oryno-orange-muted text-primary">
+                            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-oryno-orange-muted text-primary">
                               <Building2 className="h-4 w-4" />
                             </span>
                             <div className="min-w-0 flex-1">
@@ -322,7 +369,7 @@ export default function WithdrawPage() {
                     Number(amount) <= 0 ||
                     banks.length === 0
                   }
-                  onClick={() => void onWithdraw()}
+                  onClick={openPinModal}
                   className="btn-primary mt-6 inline-flex h-12 w-full items-center justify-center gap-2 text-base disabled:opacity-50 md:max-w-sm"
                 >
                   {submitting ? (
@@ -339,6 +386,23 @@ export default function WithdrawPage() {
           )}
         </AnimatePresence>
       )}
+
+      <TransactionPinModal
+        open={pinModalOpen}
+        mode={pinMode}
+        loading={submitting}
+        error={pinError}
+        confirmLabel={
+          pinMode === "create" ? "Set PIN & withdraw" : "Confirm withdrawal"
+        }
+        onOpenChange={(open) => {
+          if (!submitting) {
+            setPinModalOpen(open);
+            if (!open) setPinError(null);
+          }
+        }}
+        onConfirm={(payload) => void submitWithdraw(payload)}
+      />
     </AppShell>
   );
 }

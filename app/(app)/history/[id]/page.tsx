@@ -1,9 +1,8 @@
 "use client";
 
 import { use, useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import {
-  ArrowDownLeft,
-  ArrowUpRight,
   CheckCircle2,
   Clock3,
   Download,
@@ -15,7 +14,7 @@ import { toast } from "sonner";
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
-import { BrandLogo } from "@/components/brand-logo";
+import { BRAND_LOGO_SRC, BrandLogo } from "@/components/brand-logo";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { TransactionReceipt } from "@/lib/transactions";
 import { cn } from "@/lib/utils";
@@ -164,7 +163,7 @@ export default function TransactionReceiptPage({
       {loading ? (
         <MotionSection className="rounded-[28px] border border-border bg-background p-6 shadow-[var(--shadow-soft)]">
           <div className="flex flex-col items-center">
-            <Skeleton className="h-14 w-14 rounded-2xl" />
+            <Skeleton className="h-14 w-14 rounded-full" />
             <Skeleton className="mt-4 h-5 w-36 rounded-full" />
             <Skeleton className="mt-2 h-8 w-40 rounded-full" />
           </div>
@@ -202,17 +201,7 @@ export default function TransactionReceiptPage({
                 </div>
 
                 <div className="mt-6 text-center">
-                  <span
-                    className={cn(
-                      "mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/25",
-                    )}
-                  >
-                    {credit ? (
-                      <ArrowDownLeft className="h-6 w-6" />
-                    ) : (
-                      <ArrowUpRight className="h-6 w-6" />
-                    )}
-                  </span>
+                  <StatusHeroIcon status={tx.status} />
                   <p className="mt-3 text-sm text-white/80">{tx.title}</p>
                   <p className="mt-1 text-3xl font-bold tracking-tight">
                     {tx.amount}
@@ -221,13 +210,16 @@ export default function TransactionReceiptPage({
                 </div>
               </div>
 
-              <div className="space-y-0 divide-y divide-border px-5 py-2">
-                <DetailRow label="Category" value={tx.categoryLabel} />
-                <DetailRow label="Details" value={tx.subtitle} />
-                <DetailRow label="Type" value={credit ? "Credit" : "Debit"} />
-                <DetailRow label="Date" value={tx.createdAtFormatted} />
-                <DetailRow label="Reference" value={tx.reference} mono />
-                <DetailRow label="Currency" value={tx.currency ?? "NGN"} />
+              <div className="relative overflow-hidden px-5 py-2">
+                <ReceiptWatermark />
+                <div className="relative z-10 space-y-0 divide-y divide-border">
+                  <DetailRow label="Category" value={tx.categoryLabel} />
+                  <DetailRow label="Details" value={tx.subtitle} />
+                  <DetailRow label="Type" value={credit ? "Credit" : "Debit"} />
+                  <DetailRow label="Date" value={tx.createdAtFormatted} />
+                  <DetailRow label="Reference" value={tx.reference} mono />
+                  <DetailRow label="Currency" value={tx.currency ?? "NGN"} />
+                </div>
               </div>
 
               <p className="px-5 pb-5 pt-2 text-center text-[11px] text-muted-foreground">
@@ -270,35 +262,74 @@ export default function TransactionReceiptPage({
   );
 }
 
-function StatusPill({ status }: { status: string }) {
-  const meta =
-    status === "Failed"
-      ? {
-          label: "Failed",
-          className: "bg-white/15 text-white",
-          Icon: XCircle,
-        }
-      : status === "Pending"
-        ? {
-            label: "Pending",
-            className: "bg-white/15 text-white",
-            Icon: Clock3,
-          }
-        : {
-            label: "Completed",
-            className: "bg-white/15 text-white",
-            Icon: CheckCircle2,
-          };
-  const Icon = meta.Icon;
+function normalizeStatus(status: string): "Completed" | "Pending" | "Failed" {
+  const s = status.toLowerCase();
+  if (s === "failed") return "Failed";
+  if (s === "pending") return "Pending";
+  return "Completed";
+}
+
+function StatusHeroIcon({ status }: { status: string }) {
+  const label = normalizeStatus(status);
+  const Icon =
+    label === "Failed"
+      ? XCircle
+      : label === "Pending"
+        ? Clock3
+        : CheckCircle2;
+
   return (
-    <span
-      className={cn(
-        "mt-3 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold",
-        meta.className,
-      )}
+    <span className="mx-auto flex h-14 w-14 items-center justify-center">
+      <Icon className="h-full w-full text-white" strokeWidth={1.75} />
+    </span>
+  );
+}
+
+function ReceiptWatermark() {
+  const marks = Array.from({ length: 36 }, (_, i) => i);
+
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-0 overflow-hidden"
     >
+      <div className="absolute -inset-16 grid rotate-[-32deg] grid-cols-4 gap-x-10 gap-y-9 opacity-[0.055] dark:opacity-[0.08] sm:grid-cols-5">
+        {marks.map((i) => (
+          <span
+            key={i}
+            className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap"
+          >
+            <span className="relative h-5 w-5 shrink-0 overflow-hidden rounded-full opacity-[0.22] grayscale contrast-50 brightness-110">
+              <Image
+                src={BRAND_LOGO_SRC}
+                alt=""
+                fill
+                sizes="20px"
+                className="object-cover"
+              />
+            </span>
+            <span className="text-[13px] font-bold tracking-[0.04em] text-foreground dark:text-white">
+              ORYNO
+            </span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function StatusPill({ status }: { status: string }) {
+  const label = normalizeStatus(status);
+  const Icon =
+    label === "Failed"
+      ? XCircle
+      : label === "Pending"
+        ? Clock3
+        : CheckCircle2;
+  return (
+    <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white">
       <Icon className="h-3.5 w-3.5" />
-      {meta.label}
+      {label}
     </span>
   );
 }
@@ -329,7 +360,7 @@ function DetailRow({
   );
 }
 
-function renderReceiptCanvas(tx: TransactionReceipt) {
+async function renderReceiptCanvas(tx: TransactionReceipt) {
   const width = 720;
   const rowH = 44;
   const rows = [
@@ -340,7 +371,11 @@ function renderReceiptCanvas(tx: TransactionReceipt) {
     ["Reference", tx.reference],
     ["Currency", tx.currency ?? "NGN"],
   ];
-  const height = 280 + rows.length * rowH + 60;
+  const detailsTop = 268;
+  const height = detailsTop + rows.length * rowH + 70;
+  const isDark =
+    typeof document !== "undefined" &&
+    document.documentElement.classList.contains("dark");
 
   const canvas = document.createElement("canvas");
   canvas.width = width;
@@ -348,50 +383,105 @@ function renderReceiptCanvas(tx: TransactionReceipt) {
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Canvas unsupported");
 
-  // Background
-  ctx.fillStyle = "#FFFFFF";
+  // Background (theme-aware)
+  ctx.fillStyle = isDark ? "#1C1C1E" : "#FFFFFF";
   ctx.fillRect(0, 0, width, height);
 
   // Orange header
-  const grad = ctx.createLinearGradient(0, 0, width, 220);
+  const headerH = 248;
+  const grad = ctx.createLinearGradient(0, 0, width, headerH);
   grad.addColorStop(0, "#ff8124");
   grad.addColorStop(0.5, "#FF6A00");
   grad.addColorStop(1, "#e85d00");
   ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, width, 230);
+  ctx.fillRect(0, 0, width, headerH);
 
+  const logo = await loadReceiptLogo();
+  if (logo) {
+    const size = 44;
+    const x = 40;
+    const y = 28;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2);
+    ctx.closePath();
+    ctx.clip();
+    ctx.drawImage(logo, x, y, size, size);
+    ctx.restore();
+  }
+
+  ctx.textAlign = "left";
   ctx.fillStyle = "rgba(255,255,255,0.9)";
   ctx.font = "bold 14px system-ui, sans-serif";
-  ctx.fillText("ORYNO", 40, 48);
+  ctx.fillText("ORYNO", logo ? 96 : 40, 48);
   ctx.font = "600 18px system-ui, sans-serif";
   ctx.fillStyle = "#FFFFFF";
-  ctx.fillText("Transaction receipt", 40, 74);
+  ctx.fillText("Transaction receipt", logo ? 96 : 40, 74);
+
+  // Status icon fills circle (no tinted ring)
+  const status = normalizeStatus(tx.status);
+  const iconCx = width / 2;
+  const iconCy = 118;
+  drawStatusGlyph(ctx, status, iconCx, iconCy, 28);
 
   ctx.textAlign = "center";
   ctx.font = "500 16px system-ui, sans-serif";
   ctx.fillStyle = "rgba(255,255,255,0.85)";
-  ctx.fillText(tx.title, width / 2, 130);
+  ctx.fillText(tx.title, width / 2, 168);
   ctx.font = "bold 42px system-ui, sans-serif";
   ctx.fillStyle = "#FFFFFF";
-  ctx.fillText(tx.amount, width / 2, 180);
+  ctx.fillText(tx.amount, width / 2, 212);
   ctx.font = "600 14px system-ui, sans-serif";
   ctx.fillStyle = "rgba(255,255,255,0.9)";
-  ctx.fillText(tx.status, width / 2, 210);
+  ctx.fillText(status, width / 2, 236);
+
+  // Repeating slanted ORYNO watermark (OPay-style)
+  const detailsH = rows.length * rowH + 24;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, detailsTop - 8, width, detailsH);
+  ctx.clip();
+  ctx.translate(width / 2, detailsTop + detailsH / 2);
+  ctx.rotate((-32 * Math.PI) / 180);
+  const markW = 150;
+  const markH = 52;
+  for (let row = -4; row <= 4; row += 1) {
+    for (let col = -4; col <= 4; col += 1) {
+      const x = col * markW + (row % 2 === 0 ? 0 : markW / 2);
+      const y = row * markH;
+      if (logo) {
+        ctx.save();
+        ctx.globalAlpha = isDark ? 0.022 : 0.016;
+        ctx.beginPath();
+        ctx.arc(x - 42, y, 9, 0, Math.PI * 2);
+        ctx.closePath();
+        ctx.clip();
+        ctx.drawImage(logo, x - 51, y - 9, 18, 18);
+        ctx.restore();
+      }
+      ctx.globalAlpha = isDark ? 0.08 : 0.055;
+      ctx.fillStyle = isDark ? "#FFFFFF" : "#1C1C1E";
+      ctx.font = "bold 15px system-ui, sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillText("ORYNO", x - 28, y + 5);
+    }
+  }
+  ctx.restore();
 
   ctx.textAlign = "left";
-  let y = 270;
+  let y = detailsTop + 18;
   for (const [label, value] of rows) {
-    ctx.fillStyle = "#8A8A8E";
+    ctx.fillStyle = isDark ? "#A1A1A6" : "#8A8A8E";
     ctx.font = "600 12px system-ui, sans-serif";
     ctx.fillText(label.toUpperCase(), 40, y);
-    ctx.fillStyle = "#1C1C1E";
+    ctx.fillStyle = isDark ? "#F5F5F7" : "#1C1C1E";
     ctx.font = "600 16px system-ui, sans-serif";
     ctx.textAlign = "right";
     const display = value.length > 36 ? `${value.slice(0, 36)}…` : value;
     ctx.fillText(display, width - 40, y);
     ctx.textAlign = "left";
     y += rowH;
-    ctx.strokeStyle = "#EFEFEF";
+    ctx.strokeStyle = isDark ? "rgba(255,255,255,0.08)" : "#EFEFEF";
     ctx.beginPath();
     ctx.moveTo(40, y - 24);
     ctx.lineTo(width - 40, y - 24);
@@ -399,7 +489,7 @@ function renderReceiptCanvas(tx: TransactionReceipt) {
   }
 
   ctx.textAlign = "center";
-  ctx.fillStyle = "#8A8A8E";
+  ctx.fillStyle = isDark ? "#A1A1A6" : "#8A8A8E";
   ctx.font = "12px system-ui, sans-serif";
   ctx.fillText(
     "Powered by ORYNO · Keep this receipt for your records",
@@ -408,4 +498,56 @@ function renderReceiptCanvas(tx: TransactionReceipt) {
   );
 
   return canvas;
+}
+
+function drawStatusGlyph(
+  ctx: CanvasRenderingContext2D,
+  status: "Completed" | "Pending" | "Failed" | string,
+  cx: number,
+  cy: number,
+  radius = 28,
+) {
+  ctx.save();
+  ctx.strokeStyle = "#FFFFFF";
+  ctx.fillStyle = "#FFFFFF";
+  ctx.lineWidth = Math.max(2.5, radius * 0.1);
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  // Outer circle fills the whole icon area
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  ctx.stroke();
+
+  if (status === "Failed") {
+    const s = radius * 0.38;
+    ctx.beginPath();
+    ctx.moveTo(cx - s, cy - s);
+    ctx.lineTo(cx + s, cy + s);
+    ctx.moveTo(cx + s, cy - s);
+    ctx.lineTo(cx - s, cy + s);
+    ctx.stroke();
+  } else if (status === "Pending") {
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - radius * 0.35);
+    ctx.lineTo(cx, cy + radius * 0.08);
+    ctx.lineTo(cx + radius * 0.28, cy + radius * 0.22);
+    ctx.stroke();
+  } else {
+    ctx.beginPath();
+    ctx.moveTo(cx - radius * 0.38, cy + radius * 0.02);
+    ctx.lineTo(cx - radius * 0.08, cy + radius * 0.34);
+    ctx.lineTo(cx + radius * 0.42, cy - radius * 0.3);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function loadReceiptLogo(): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
+    const img = new window.Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = BRAND_LOGO_SRC;
+  });
 }

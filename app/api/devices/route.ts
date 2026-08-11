@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
+import { APP_VERSION } from "@/lib/app-version";
 import {
   isExpoPushToken,
   removePushToken,
@@ -42,6 +43,8 @@ export async function POST(req: Request) {
       ok: true,
       id: row.id,
       token: row.token,
+      appVersion: APP_VERSION,
+      serverAppVersion: APP_VERSION,
     });
   } catch (error) {
     console.error("[devices-post]", error);

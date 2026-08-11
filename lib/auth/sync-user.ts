@@ -379,14 +379,6 @@ export async function syncClerkUserToDb(
         metadata: { href: "/fund", kind: "welcome" },
         forceEmail: true,
       });
-      await createNotification({
-        userId: dbUser.id,
-        title: "Your ORYNO card is ready",
-        body: "A personal virtual card was issued for your wallet. Open Home to view your card number.",
-        type: "success",
-        metadata: { href: "/dashboard", kind: "card_issued" },
-        forceEmail: true,
-      });
     } catch {
       // non-blocking
     }

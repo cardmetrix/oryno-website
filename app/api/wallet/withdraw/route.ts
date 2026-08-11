@@ -1,6 +1,14 @@
 import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
+import { ensureWalletSchema } from "@/lib/db/ensure-schema";
 import { createNotification } from "@/lib/notifications-service";
+import { notifyTransactionPinChanged } from "@/lib/notify/pin-events";
+import {
+  getTransactionPinStatus,
+  requireTransactionPin,
+  setTransactionPin,
+  TransactionPinError,
+} from "@/lib/security/transaction-pin";
 import { formatMoney } from "@/lib/transactions";
 import {
   currencyForCountry,
@@ -15,6 +23,7 @@ const WITHDRAW_FEE = 0;
 
 export async function POST(req: Request) {
   try {
+    await ensureWalletSchema();
     const user = await ensureAppUser();
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -23,6 +32,9 @@ export async function POST(req: Request) {
     const body = (await req.json()) as {
       amount?: string | number;
       bankAccountId?: string;
+      pin?: string;
+      /** When user has no PIN yet, set it in the same request before withdraw. */
+      newPin?: string;
     };
 
     if (!body.bankAccountId) {
@@ -30,6 +42,60 @@ export async function POST(req: Request) {
         { error: "Select a bank account" },
         { status: 400 },
       );
+    }
+
+    const status = await getTransactionPinStatus(user.id);
+
+    if (!status.hasPin) {
+      if (!body.newPin) {
+        return NextResponse.json(
+          {
+            error: "Create a transaction PIN to withdraw.",
+            code: "pin_required",
+            hasPin: false,
+          },
+          { status: 400 },
+        );
+      }
+      try {
+        const result = await setTransactionPin({
+          userId: user.id,
+          pin: body.newPin,
+        });
+        try {
+          await notifyTransactionPinChanged({
+            userId: user.id,
+            fullName: user.fullName,
+            created: result.created,
+          });
+        } catch (notifyError) {
+          console.error("[wallet-withdraw-pin-notify]", notifyError);
+        }
+      } catch (error) {
+        if (error instanceof TransactionPinError) {
+          return NextResponse.json(
+            { error: error.message, code: error.code, hasPin: false },
+            { status: error.status },
+          );
+        }
+        throw error;
+      }
+    }
+
+    try {
+      await requireTransactionPin(user.id, body.pin || body.newPin);
+    } catch (error) {
+      if (error instanceof TransactionPinError) {
+        return NextResponse.json(
+          {
+            error: error.message,
+            code: error.code,
+            hasPin: true,
+          },
+          { status: error.status },
+        );
+      }
+      throw error;
     }
 
     const result = await withdrawWallet({

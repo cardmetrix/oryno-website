@@ -45,7 +45,7 @@ export function PhoneFrame({
                 alt="ORYNO"
                 width={48}
                 height={48}
-                className="rounded-[22%] shadow-[var(--shadow-soft)]"
+                className="rounded-full shadow-[var(--shadow-soft)]"
               />
               <p className="text-sm font-medium text-foreground">{label}</p>
               <p className="text-xs leading-relaxed text-muted-foreground">

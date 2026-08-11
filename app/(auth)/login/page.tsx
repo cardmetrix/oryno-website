@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/input-otp";
 import { clerkErrorMessage } from "@/lib/auth/clerk-errors";
 import { syncSessionToDatabase } from "@/lib/auth/client-sync";
+import { RedirectIfSignedIn } from "@/components/auth/redirect-if-signed-in";
 import { AUTH_LINKS } from "@/lib/auth-links";
 
 type LoginStep = "credentials" | "otp";
@@ -326,7 +327,7 @@ function LoginForm() {
               name="identifier"
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
-              placeholder="e.g. chidi@oryno.com"
+              placeholder="e.g. c@oryno.com"
               autoComplete="username"
               required
               className={authInputClassName}
@@ -388,6 +389,7 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <Suspense fallback={null}>
+      <RedirectIfSignedIn />
       <LoginForm />
     </Suspense>
   );

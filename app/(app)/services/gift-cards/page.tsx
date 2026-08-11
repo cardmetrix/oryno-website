@@ -129,7 +129,7 @@ function FormSkeleton() {
     <MotionSection className="space-y-4">
       <div className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6">
         <div className="flex items-center gap-3">
-          <div className="h-14 w-14 animate-pulse rounded-2xl bg-muted" />
+          <div className="h-14 w-14 animate-pulse rounded-full bg-muted" />
           <div className="min-w-0 flex-1 space-y-2">
             <div className="h-4 w-40 animate-pulse rounded bg-muted" />
             <div className="h-3 w-24 animate-pulse rounded bg-muted" />

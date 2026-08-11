@@ -213,8 +213,13 @@ export default function ContinuePage() {
           />
           <span>
             I agree to the{" "}
-            <span className="font-semibold text-primary">Terms</span> &{" "}
-            <span className="font-semibold text-primary">Privacy Policy</span>
+            <Link href="/terms" className="font-semibold text-primary">
+              Terms of Service
+            </Link>{" "}
+            &{" "}
+            <Link href="/privacy" className="font-semibold text-primary">
+              Privacy Policy
+            </Link>
           </span>
         </label>
 

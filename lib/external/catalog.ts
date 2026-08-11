@@ -41,7 +41,11 @@ export const EXTERNAL_API_CATALOG = {
     devices: ["POST|DELETE /devices"],
     ads: ["GET /ads"],
     profile: ["GET|PATCH /profile", "GET|PATCH /me/country", "GET|PATCH /settings", "GET|POST /settings/kyc"],
-    support: ["POST /support/error-report"],
+    support: [
+      "POST /support/error-report",
+      "GET|POST /support/tickets",
+    ],
+    waitlist: ["GET|POST /waitlist/usd-card"],
     services: [
       "GET /services",
       "POST /services/airtime/purchase",

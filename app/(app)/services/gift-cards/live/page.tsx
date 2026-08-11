@@ -279,7 +279,7 @@ export default function GiftCardsLivePage() {
                       key={i}
                       className="flex h-[72px] items-center gap-3 px-4"
                     >
-                      <div className="h-11 w-11 animate-pulse rounded-2xl bg-muted" />
+                      <div className="h-11 w-11 animate-pulse rounded-full bg-muted" />
                       <div className="h-4 flex-1 animate-pulse rounded bg-muted" />
                     </div>
                   ))
@@ -416,7 +416,7 @@ export default function GiftCardsLivePage() {
                       key={i}
                       className="flex h-[72px] items-center gap-3 px-4"
                     >
-                      <div className="h-11 w-11 animate-pulse rounded-2xl bg-muted" />
+                      <div className="h-11 w-11 animate-pulse rounded-full bg-muted" />
                       <div className="h-4 flex-1 animate-pulse rounded bg-muted" />
                     </div>
                   ))

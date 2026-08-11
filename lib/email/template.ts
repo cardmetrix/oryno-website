@@ -39,8 +39,10 @@ export function renderBrandedEmail(content: BrandedEmailContent) {
             <td style="background:linear-gradient(135deg,#FF6A00 0%,#ff8a33 100%);padding:22px 28px;">
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
                 <tr>
-                  <td style="vertical-align:middle;">
-                    <img src="${logo}" width="40" height="40" alt="ORYNO" style="display:block;border-radius:10px;border:0;" />
+                  <td style="vertical-align:middle;width:40px;">
+                    <div style="width:40px;height:40px;border-radius:9999px;overflow:hidden;background:#ffffff;line-height:0;">
+                      <img src="${logo}" width="40" height="40" alt="ORYNO" style="display:block;width:40px;height:40px;border-radius:9999px;object-fit:cover;border:0;" />
+                    </div>
                   </td>
                   <td style="vertical-align:middle;padding-left:12px;">
                     <div style="font-size:20px;font-weight:800;letter-spacing:-0.02em;color:#ffffff;">ORYNO</div>

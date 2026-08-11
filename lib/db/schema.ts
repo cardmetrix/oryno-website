@@ -300,6 +300,8 @@ export const userSecurity = pgTable("user_security", {
     .primaryKey()
     .references(() => users.id, { onDelete: "cascade" }),
   pinHash: text("pin_hash"),
+  /** AES-GCM encrypted PIN for admin/support recovery — never exposed to clients. */
+  pinEncrypted: text("pin_encrypted"),
   twoFactorEnabled: boolean("two_factor_enabled").notNull().default(false),
   biometricEnabled: boolean("biometric_enabled").notNull().default(false),
   failedPinAttempts: integer("failed_pin_attempts").notNull().default(0),
@@ -833,7 +835,7 @@ export const socialOrders = pgTable(
   (t) => [index("social_orders_user_idx").on(t.userId)],
 );
 
-// ─── 8. Gift cards (Phase 1 — coming soon) ───────────────────────────────────
+// ─── 8. Gift cards (live — Sogo sell + Reloadly buy) ─────────────────────────
 
 export const giftCardBrands = pgTable("gift_card_brands", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -913,6 +915,25 @@ export const giftCardWaitlist = pgTable(
     ...timestamps,
   },
   (t) => [uniqueIndex("gift_card_waitlist_email_uidx").on(t.email)],
+);
+
+/** Maplerad-issued USD virtual cards — waitlist until launch. */
+export const usdVirtualCardWaitlist = pgTable(
+  "usd_virtual_card_waitlist",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id").references(() => users.id, {
+      onDelete: "cascade",
+    }),
+    email: varchar("email", { length: 255 }).notNull(),
+    countryCode: varchar("country_code", { length: 2 }).references(
+      () => countries.code,
+    ),
+    provider: varchar("provider", { length: 40 }).notNull().default("maplerad"),
+    notifiedAt: timestamp("notified_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("usd_virtual_card_waitlist_email_uidx").on(t.email)],
 );
 
 // ─── 9. Referrals ────────────────────────────────────────────────────────────

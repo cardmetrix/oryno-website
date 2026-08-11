@@ -13,19 +13,19 @@ const footerLinks = [
   {
     title: "Support",
     links: [
-      { href: "#", label: "Help Center" },
-      { href: "#", label: "Live Chat" },
-      { href: "#", label: "Contact" },
-      { href: "#", label: "FAQ" },
+      { href: "/support", label: "Help Center" },
+      { href: "/support", label: "Live Chat" },
+      { href: "mailto:support@orynoafrica.com", label: "Contact" },
+      { href: "/support", label: "FAQ" },
     ],
   },
   {
     title: "Company",
     links: [
-      { href: "#", label: "About" },
-      { href: "#", label: "Privacy" },
-      { href: "#", label: "Terms" },
-      { href: "#", label: "Security" },
+      { href: "/about", label: "About" },
+      { href: "/terms", label: "Terms of Service" },
+      { href: "/privacy", label: "Privacy Policy" },
+      { href: "/support", label: "Help" },
     ],
   },
 ];
@@ -73,9 +73,20 @@ export function SiteFooter() {
           <p className="text-sm text-muted-foreground">
             © {new Date().getFullYear()} ORYNO. All rights reserved.
           </p>
-          <p className="text-sm text-muted-foreground">
-            Built for multi-country expansion.
-          </p>
+          <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
+            <a
+              href="/terms"
+              className="text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Terms
+            </a>
+            <a
+              href="/privacy"
+              className="text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Privacy
+            </a>
+          </div>
         </div>
       </div>
     </footer>

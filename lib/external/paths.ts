@@ -18,6 +18,7 @@ export const EXTERNAL_ALLOWED_ROOTS = new Set([
   "me",
   "services",
   "support",
+  "waitlist",
   "geo",
   "vtpass",
   "herosms",

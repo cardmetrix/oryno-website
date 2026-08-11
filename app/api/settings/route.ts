@@ -1,15 +1,22 @@
 import { NextResponse } from "next/server";
 import { currentUser } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
-import bcrypt from "bcryptjs";
 import { ensureAppUser } from "@/lib/auth/current-user";
 import {
   isLanguageAllowedForCountry,
   resolveLanguageForCountry,
 } from "@/lib/country";
 import { db } from "@/lib/db";
+import { ensureWalletSchema } from "@/lib/db/ensure-schema";
 import { userSecurity, users } from "@/lib/db/schema";
+import { notifyTransactionPinChanged } from "@/lib/notify/pin-events";
 import { toProfileDto } from "@/lib/profile";
+import { APP_VERSION } from "@/lib/app-version";
+import {
+  getTransactionPinStatus,
+  setTransactionPin,
+  TransactionPinError,
+} from "@/lib/security/transaction-pin";
 
 export const runtime = "nodejs";
 
@@ -26,8 +33,22 @@ async function getOrCreateSecurity(userId: string) {
   return created;
 }
 
+async function securityPayload(userId: string) {
+  const security = await getOrCreateSecurity(userId);
+  const status = await getTransactionPinStatus(userId);
+  return {
+    twoFactorEnabled: security.twoFactorEnabled,
+    biometricEnabled: security.biometricEnabled,
+    hasPin: status.hasPin,
+    lockedUntil: status.lockedUntil,
+    isLocked: status.isLocked,
+    failedPinAttempts: status.failedPinAttempts,
+  };
+}
+
 export async function GET() {
   try {
+    await ensureWalletSchema();
     const clerkUser = await currentUser();
     if (!clerkUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -38,7 +59,6 @@ export async function GET() {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const security = await getOrCreateSecurity(dbUser.id);
     const notificationsEnabled =
       typeof clerkUser.publicMetadata?.notificationsEnabled === "boolean"
         ? clerkUser.publicMetadata.notificationsEnabled
@@ -51,12 +71,8 @@ export async function GET() {
         language: dbUser.language,
         notificationsEnabled,
       },
-      security: {
-        twoFactorEnabled: security.twoFactorEnabled,
-        biometricEnabled: security.biometricEnabled,
-        hasPin: Boolean(security.pinHash),
-        lockedUntil: security.lockedUntil,
-      },
+      security: await securityPayload(dbUser.id),
+      appVersion: APP_VERSION,
     });
   } catch (error) {
     console.error("[settings-get]", error);
@@ -69,6 +85,7 @@ export async function GET() {
 
 export async function PATCH(req: Request) {
   try {
+    await ensureWalletSchema();
     const clerkUser = await currentUser();
     if (!clerkUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -88,8 +105,6 @@ export async function PATCH(req: Request) {
       pin?: string;
       currentPin?: string;
     };
-
-    const security = await getOrCreateSecurity(dbUser.id);
 
     if (typeof body.language === "string") {
       const nextLanguage = body.language.trim().toLowerCase();
@@ -131,59 +146,55 @@ export async function PATCH(req: Request) {
     const securityPatch: Partial<typeof userSecurity.$inferInsert> = {
       updatedAt: new Date(),
     };
+    let touchedSecurityFlags = false;
 
     if (typeof body.twoFactorEnabled === "boolean") {
       securityPatch.twoFactorEnabled = body.twoFactorEnabled;
+      touchedSecurityFlags = true;
     }
     if (typeof body.biometricEnabled === "boolean") {
       securityPatch.biometricEnabled = body.biometricEnabled;
+      touchedSecurityFlags = true;
     }
 
-    if (typeof body.pin === "string") {
-      const pin = body.pin.trim();
-      if (!/^\d{4,6}$/.test(pin)) {
-        return NextResponse.json(
-          { error: "PIN must be 4–6 digits." },
-          { status: 400 },
-        );
-      }
-
-      if (security.pinHash) {
-        if (!body.currentPin) {
-          return NextResponse.json(
-            { error: "Current PIN is required to change it." },
-            { status: 400 },
-          );
-        }
-        const ok = await bcrypt.compare(body.currentPin, security.pinHash);
-        if (!ok) {
-          return NextResponse.json(
-            { error: "Current PIN is incorrect." },
-            { status: 400 },
-          );
-        }
-      }
-
-      securityPatch.pinHash = await bcrypt.hash(pin, 10);
-      securityPatch.failedPinAttempts = 0;
-      securityPatch.lockedUntil = null;
-    }
-
-    if (
-      typeof body.twoFactorEnabled === "boolean" ||
-      typeof body.biometricEnabled === "boolean" ||
-      typeof body.pin === "string"
-    ) {
+    if (touchedSecurityFlags) {
+      await getOrCreateSecurity(dbUser.id);
       await db
         .update(userSecurity)
         .set(securityPatch)
         .where(eq(userSecurity.userId, dbUser.id));
     }
 
+    if (typeof body.pin === "string") {
+      try {
+        const result = await setTransactionPin({
+          userId: dbUser.id,
+          pin: body.pin,
+          currentPin: body.currentPin,
+        });
+        try {
+          await notifyTransactionPinChanged({
+            userId: dbUser.id,
+            fullName: dbUser.fullName,
+            created: result.created,
+          });
+        } catch (notifyError) {
+          console.error("[settings-pin-notify]", notifyError);
+        }
+      } catch (error) {
+        if (error instanceof TransactionPinError) {
+          return NextResponse.json(
+            { error: error.message, code: error.code },
+            { status: error.status },
+          );
+        }
+        throw error;
+      }
+    }
+
     const refreshedUser = await db.query.users.findFirst({
       where: eq(users.id, dbUser.id),
     });
-    const refreshedSecurity = await getOrCreateSecurity(dbUser.id);
     const refreshedClerk = await currentUser();
 
     return NextResponse.json({
@@ -202,12 +213,8 @@ export async function PATCH(req: Request) {
             ? refreshedClerk.publicMetadata.notificationsEnabled
             : true,
       },
-      security: {
-        twoFactorEnabled: refreshedSecurity.twoFactorEnabled,
-        biometricEnabled: refreshedSecurity.biometricEnabled,
-        hasPin: Boolean(refreshedSecurity.pinHash),
-        lockedUntil: refreshedSecurity.lockedUntil,
-      },
+      security: await securityPayload(dbUser.id),
+      appVersion: APP_VERSION,
     });
   } catch (error) {
     console.error("[settings-patch]", error);

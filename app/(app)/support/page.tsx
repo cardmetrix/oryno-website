@@ -1,12 +1,14 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
+import { useUser } from "@clerk/nextjs";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   CheckCircle2,
   ChevronDown,
   Clock3,
   Headphones,
+  Loader2,
   Mail,
   MessageCircle,
   Phone,
@@ -15,71 +17,112 @@ import {
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
+import { startLiveSupport } from "@/components/app/crisp-chat";
+import {
+  SUPPORT_EMAIL,
+  SUPPORT_FAQS,
+  SUPPORT_PHONE,
+  SUPPORT_TOPICS,
+} from "@/lib/support/config";
+import { isCrispConfigured } from "@/lib/support/crisp";
 import { cn } from "@/lib/utils";
 
-const faqs = [
-  {
-    q: "How do I fund my ORYNO wallet?",
-    a: "Go to Wallet → Fund, choose card, bank transfer, or USSD, enter an amount, and confirm. Funds usually appear within seconds after a successful payment.",
-  },
-  {
-    q: "Why is my airtime or data purchase delayed?",
-    a: "Most top-ups are instant. If a network is slow, your order stays in Processing and you’ll get a notification when it completes or fails with an automatic wallet refund.",
-  },
-  {
-    q: "How do withdrawals work?",
-    a: "Withdraw from Wallet → Withdraw. ORYNO detects your country and routes payouts through the correct local bank or mobile money provider. Typical timing is 5–30 minutes.",
-  },
-  {
-    q: "When will gift cards launch?",
-    a: "Gift card buy & sell is coming soon. Tap Notify me on the Gift Cards screen to get an alert when it goes live in your country.",
-  },
-  {
-    q: "How do I verify my account (KYC)?",
-    a: "Open Settings → KYC Verification and follow the steps. Some features may require KYC depending on your country configuration and transaction limits.",
-  },
-];
+type TicketRow = {
+  id: string;
+  reference: string;
+  topic: string;
+  subject: string;
+  status: string;
+  updatedAt: string;
+};
 
-const tickets = [
-  {
-    id: "ORY-1042",
-    subject: "Data bundle not activated",
-    status: "In progress",
-    updated: "2 hrs ago",
-  },
-  {
-    id: "ORY-0988",
-    subject: "Wallet funding confirmation",
-    status: "Resolved",
-    updated: "Yesterday",
-  },
-];
+function statusLabel(status: string) {
+  return status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
-const topics = [
-  "Wallet & Funding",
-  "Airtime / Data",
-  "Bill Payments",
-  "Virtual Numbers",
-  "Rent Email",
-  "Account & Security",
-  "Other",
-];
+function timeAgo(iso: string) {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.max(0, Math.floor(diff / 60_000));
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return "Yesterday";
+  return `${days}d ago`;
+}
 
 export default function SupportPage() {
+  const { user } = useUser();
   const [openFaq, setOpenFaq] = useState<number | null>(0);
-  const [chatOpen, setChatOpen] = useState(false);
   const [ticketOpen, setTicketOpen] = useState(false);
-  const [ticketSent, setTicketSent] = useState(false);
-  const [topic, setTopic] = useState(topics[0]);
+  const [ticketSent, setTicketSent] = useState<string | null>(null);
+  const [topic, setTopic] = useState<(typeof SUPPORT_TOPICS)[number]>(
+    SUPPORT_TOPICS[0],
+  );
   const [message, setMessage] = useState("");
-  const [email, setEmail] = useState("chidi@oryno.com");
+  const [email, setEmail] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [tickets, setTickets] = useState<TicketRow[]>([]);
+  const [loadingTickets, setLoadingTickets] = useState(true);
 
-  function submitTicket(e: FormEvent) {
+  useEffect(() => {
+    const fromClerk = user?.primaryEmailAddress?.emailAddress;
+    if (fromClerk) setEmail(fromClerk);
+  }, [user?.primaryEmailAddress?.emailAddress]);
+
+  const loadTickets = useCallback(async () => {
+    try {
+      const res = await fetch("/api/support/tickets", { cache: "no-store" });
+      if (!res.ok) throw new Error("Failed");
+      const json = (await res.json()) as { tickets?: TicketRow[] };
+      setTickets(json.tickets ?? []);
+    } catch {
+      setTickets([]);
+    } finally {
+      setLoadingTickets(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadTickets();
+  }, [loadTickets]);
+
+  function openChat() {
+    if (isCrispConfigured()) {
+      startLiveSupport();
+      return;
+    }
+    setTicketOpen(true);
+    setTopic("Other");
+  }
+
+  async function submitTicket(e: FormEvent) {
     e.preventDefault();
     if (!message.trim()) return;
-    setTicketSent(true);
-    setTicketOpen(false);
-    setMessage("");
+    setSubmitting(true);
+    setFormError(null);
+    try {
+      const res = await fetch("/api/support/tickets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic, email, message }),
+      });
+      const json = (await res.json()) as {
+        error?: string;
+        ticket?: { reference: string };
+      };
+      if (!res.ok) throw new Error(json.error || "Could not submit ticket");
+      setTicketSent(json.ticket?.reference || "ORY");
+      setTicketOpen(false);
+      setMessage("");
+      await loadTickets();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "Could not submit ticket");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -97,7 +140,7 @@ export default function SupportPage() {
         />
         <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">
-            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/18 ring-1 ring-white/25 backdrop-blur-md">
+            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white/18 ring-1 ring-white/25 backdrop-blur-md">
               <Headphones className="h-6 w-6" strokeWidth={1.75} />
             </span>
             <div>
@@ -108,7 +151,7 @@ export default function SupportPage() {
                 We’re here to help
               </h2>
               <p className="mt-1 text-sm text-white/80">
-                Average reply under 10 minutes · 24/7 for urgent wallet issues
+                Live chat with an agent, or open a ticket and we’ll email you.
               </p>
             </div>
           </div>
@@ -116,10 +159,7 @@ export default function SupportPage() {
             type="button"
             whileHover={{ y: -2 }}
             whileTap={{ scale: 0.98 }}
-            onClick={() => {
-              setChatOpen(true);
-              setTicketOpen(false);
-            }}
+            onClick={openChat}
             className="inline-flex h-12 items-center justify-center gap-2 rounded-[14px] bg-oryno-charcoal px-5 text-sm font-bold text-white shadow-[0_12px_28px_rgba(28,28,30,0.28)]"
           >
             <MessageCircle className="h-4 w-4" strokeWidth={2} />
@@ -132,11 +172,8 @@ export default function SupportPage() {
         <ActionCard
           icon={MessageCircle}
           title="Live Chat"
-          subtitle="Chat with an agent"
-          onClick={() => {
-            setChatOpen(true);
-            setTicketOpen(false);
-          }}
+          subtitle={isCrispConfigured() ? "Chat with an agent" : "Opens a ticket"}
+          onClick={openChat}
         />
         <ActionCard
           icon={Ticket}
@@ -144,76 +181,16 @@ export default function SupportPage() {
           subtitle="Trackable support request"
           onClick={() => {
             setTicketOpen(true);
-            setChatOpen(false);
-            setTicketSent(false);
+            setTicketSent(null);
           }}
         />
         <ActionCard
           icon={Mail}
           title="Email us"
-          subtitle="support@oryno.com"
-          href="mailto:support@oryno.com"
+          subtitle={SUPPORT_EMAIL}
+          href={`mailto:${SUPPORT_EMAIL}`}
         />
       </MotionSection>
-
-      <AnimatePresence>
-        {chatOpen ? (
-          <MotionSection delay={0.02} className="mt-5">
-            <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 8 }}
-              className="rounded-[28px] border border-border bg-background p-5 shadow-[var(--shadow-soft)] sm:p-6"
-            >
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-base font-semibold text-foreground">
-                    Live chat
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    Agent typically joins in under a minute
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setChatOpen(false)}
-                  className="text-sm font-semibold text-primary"
-                >
-                  Close
-                </button>
-              </div>
-              <div className="space-y-3 rounded-[18px] bg-muted/50 p-4">
-                <ChatBubble
-                  from="agent"
-                  text="Hi Chidi 👋 Welcome to ORYNO Support. How can we help today?"
-                />
-                <ChatBubble
-                  from="user"
-                  text="I need help confirming a wallet funding."
-                />
-                <ChatBubble
-                  from="agent"
-                  text="Sure — share the amount and approximate time, and we’ll check it right away."
-                />
-              </div>
-              <div className="mt-4 flex gap-2">
-                <input
-                  placeholder="Type your message…"
-                  className="h-12 flex-1 rounded-[14px] border border-border bg-muted/40 px-4 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
-                />
-                <motion.button
-                  type="button"
-                  whileHover={{ y: -1 }}
-                  whileTap={{ scale: 0.97 }}
-                  className="btn-primary h-12 px-5"
-                >
-                  Send
-                </motion.button>
-              </div>
-            </motion.div>
-          </MotionSection>
-        ) : null}
-      </AnimatePresence>
 
       <AnimatePresence>
         {ticketOpen ? (
@@ -244,15 +221,15 @@ export default function SupportPage() {
               </div>
 
               <label className="block">
-                <span className="text-sm font-semibold text-foreground">
-                  Topic
-                </span>
+                <span className="text-sm font-semibold text-foreground">Topic</span>
                 <select
                   value={topic}
-                  onChange={(e) => setTopic(e.target.value)}
+                  onChange={(e) =>
+                    setTopic(e.target.value as (typeof SUPPORT_TOPICS)[number])
+                  }
                   className="mt-2 h-12 w-full rounded-[14px] border border-border bg-muted/40 px-4 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
                 >
-                  {topics.map((item) => (
+                  {SUPPORT_TOPICS.map((item) => (
                     <option key={item} value={item}>
                       {item}
                     </option>
@@ -261,9 +238,7 @@ export default function SupportPage() {
               </label>
 
               <label className="mt-4 block">
-                <span className="text-sm font-semibold text-foreground">
-                  Email
-                </span>
+                <span className="text-sm font-semibold text-foreground">Email</span>
                 <input
                   type="email"
                   value={email}
@@ -287,12 +262,18 @@ export default function SupportPage() {
                 />
               </label>
 
+              {formError ? (
+                <p className="mt-3 text-sm font-medium text-destructive">{formError}</p>
+              ) : null}
+
               <motion.button
                 type="submit"
+                disabled={submitting}
                 whileHover={{ y: -2 }}
                 whileTap={{ scale: 0.985 }}
-                className="btn-primary mt-5 h-12 w-full text-base sm:max-w-xs"
+                className="btn-primary mt-5 inline-flex h-12 w-full items-center justify-center gap-2 text-base disabled:opacity-60 sm:max-w-xs"
               >
+                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                 Submit ticket
               </motion.button>
             </motion.form>
@@ -316,7 +297,8 @@ export default function SupportPage() {
                   Ticket submitted
                 </p>
                 <p className="mt-0.5 text-sm text-muted-foreground">
-                  Reference <span className="font-semibold text-primary">ORY-1107</span>{" "}
+                  Reference{" "}
+                  <span className="font-semibold text-primary">{ticketSent}</span>{" "}
                   — we’ll update you by email.
                 </p>
               </div>
@@ -330,44 +312,50 @@ export default function SupportPage() {
         className="mt-5 rounded-[28px] border border-border bg-background p-5 shadow-[var(--shadow-soft)] sm:p-6"
       >
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-base font-semibold text-foreground">
-            Your tickets
-          </h3>
+          <h3 className="text-base font-semibold text-foreground">Your tickets</h3>
           <span className="text-xs font-medium text-muted-foreground">
-            Last 30 days
+            Latest
           </span>
         </div>
-        <div className="space-y-3">
-          {tickets.map((ticket, index) => (
-            <motion.div
-              key={ticket.id}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.12 + index * 0.04 }}
-              className="flex items-center justify-between gap-3 rounded-[16px] border border-border/80 px-4 py-3.5"
-            >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-foreground">
-                  {ticket.subject}
-                </p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {ticket.id} · Updated {ticket.updated}
-                </p>
-              </div>
-              <span
-                className={cn(
-                  "inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold",
-                  ticket.status === "Resolved"
-                    ? "bg-muted text-[var(--oryno-success)]"
-                    : "bg-oryno-orange-muted text-primary",
-                )}
+        {loadingTickets ? (
+          <p className="text-sm text-muted-foreground">Loading tickets…</p>
+        ) : tickets.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No tickets yet. Open one above or start live chat.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {tickets.map((ticket, index) => (
+              <motion.div
+                key={ticket.id}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.04 + index * 0.03 }}
+                className="flex items-center justify-between gap-3 rounded-[16px] border border-border/80 px-4 py-3.5"
               >
-                <Clock3 className="h-3 w-3" />
-                {ticket.status}
-              </span>
-            </motion.div>
-          ))}
-        </div>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-foreground">
+                    {ticket.subject}
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {ticket.reference} · {timeAgo(ticket.updatedAt)}
+                  </p>
+                </div>
+                <span
+                  className={cn(
+                    "inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold",
+                    ticket.status === "resolved" || ticket.status === "closed"
+                      ? "bg-muted text-[var(--oryno-success)]"
+                      : "bg-oryno-orange-muted text-primary",
+                  )}
+                >
+                  <Clock3 className="h-3 w-3" />
+                  {statusLabel(ticket.status)}
+                </span>
+              </motion.div>
+            ))}
+          </div>
+        )}
       </MotionSection>
 
       <MotionSection
@@ -381,7 +369,7 @@ export default function SupportPage() {
           Quick answers for common ORYNO questions
         </p>
         <div className="divide-y divide-border rounded-[18px] border border-border">
-          {faqs.map((faq, index) => {
+          {SUPPORT_FAQS.map((faq, index) => {
             const open = openFaq === index;
             return (
               <div key={faq.q} className="px-4">
@@ -427,25 +415,31 @@ export default function SupportPage() {
       >
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">
-            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-background text-primary shadow-[var(--shadow-soft)]">
-              <Phone className="h-5 w-5" strokeWidth={1.75} />
+            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-background text-primary shadow-[var(--shadow-soft)]">
+              {SUPPORT_PHONE ? (
+                <Phone className="h-5 w-5" strokeWidth={1.75} />
+              ) : (
+                <Mail className="h-5 w-5" strokeWidth={1.75} />
+              )}
             </span>
             <div>
               <p className="text-sm font-semibold text-foreground">
                 Still need help?
               </p>
               <p className="mt-0.5 text-sm text-muted-foreground">
-                Call +234 800 000 ORYNO · Mon–Sun, 8am–10pm
+                {SUPPORT_PHONE
+                  ? `Call ${SUPPORT_PHONE} · or email ${SUPPORT_EMAIL}`
+                  : `Email ${SUPPORT_EMAIL} and we’ll get back to you.`}
               </p>
             </div>
           </div>
           <motion.a
-            href="tel:+2348000000000"
+            href={SUPPORT_PHONE ? `tel:${SUPPORT_PHONE}` : `mailto:${SUPPORT_EMAIL}`}
             whileHover={{ y: -2 }}
             whileTap={{ scale: 0.98 }}
             className="btn-secondary inline-flex h-11 items-center justify-center px-5 text-sm"
           >
-            Call support
+            {SUPPORT_PHONE ? "Call support" : "Email support"}
           </motion.a>
         </div>
       </MotionSection>
@@ -471,7 +465,7 @@ function ActionCard({
 
   const body = (
     <>
-      <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-oryno-orange-muted text-primary">
+      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-oryno-orange-muted text-primary">
         <Icon className="h-5 w-5" strokeWidth={1.75} />
       </span>
       <div>
@@ -499,29 +493,5 @@ function ActionCard({
     >
       {body}
     </motion.button>
-  );
-}
-
-function ChatBubble({
-  from,
-  text,
-}: {
-  from: "agent" | "user";
-  text: string;
-}) {
-  const isUser = from === "user";
-  return (
-    <div className={cn("flex", isUser ? "justify-end" : "justify-start")}>
-      <div
-        className={cn(
-          "max-w-[85%] rounded-[16px] px-3.5 py-2.5 text-sm leading-relaxed",
-          isUser
-            ? "rounded-br-[6px] bg-primary text-white"
-            : "rounded-bl-[6px] bg-background text-foreground shadow-[var(--shadow-soft)]",
-        )}
-      >
-        {text}
-      </div>
-    </div>
   );
 }

@@ -10,8 +10,6 @@ import {
 } from "@/lib/auth/client-sync";
 import { getCountryInfo } from "@/lib/country";
 
-const TOAST_KEY = "oryno_country_toast";
-
 /** Keeps Postgres in sync after Clerk session is established (login / OAuth). */
 export function AuthSessionSync() {
   const { isSignedIn, isLoaded } = useAuth();
@@ -47,16 +45,6 @@ export function AuthSessionSync() {
             },
           }),
         );
-
-        // One toast per browser session when country is resolved
-        const toastToken = `${info.code}:${info.currency}`;
-        const already = sessionStorage.getItem(TOAST_KEY);
-        if (already !== toastToken) {
-          sessionStorage.setItem(TOAST_KEY, toastToken);
-          toast.success(`Country detected: ${info.name}`, {
-            description: `Your wallet currency is ${info.currency} (${info.currencySymbol})`,
-          });
-        }
       }
     })();
   }, [isLoaded, isSignedIn, router]);

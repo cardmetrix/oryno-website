@@ -26,7 +26,7 @@ export function ServiceLogo({
     return (
       <span
         className={cn(
-          "flex h-10 w-10 items-center justify-center rounded-2xl bg-oryno-orange-muted text-sm font-bold text-primary",
+          "flex h-10 w-10 items-center justify-center rounded-full bg-oryno-orange-muted text-sm font-bold text-primary",
           className,
         )}
       >
@@ -38,7 +38,7 @@ export function ServiceLogo({
   return (
     <span
       className={cn(
-        "relative flex h-10 w-10 shrink-0 overflow-hidden rounded-2xl bg-muted",
+        "relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full bg-muted",
         className,
       )}
     >
@@ -46,7 +46,7 @@ export function ServiceLogo({
       <img
         src={src}
         alt={alt}
-        className={cn("h-full w-full object-contain p-1", imgClassName)}
+        className={cn("h-full w-full rounded-full object-contain p-1", imgClassName)}
         onError={() => setFailed(true)}
         loading="lazy"
       />

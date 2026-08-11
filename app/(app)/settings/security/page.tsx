@@ -54,7 +54,9 @@ export default function SecurityPage() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Update failed");
       setSecurity(json.security);
-      toast.success("Security updated");
+      if (!("pin" in body)) {
+        toast.success("Security updated");
+      }
       return true;
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Update failed");
@@ -74,6 +76,11 @@ export default function SecurityPage() {
       currentPin: security?.hasPin ? currentPin : undefined,
     });
     if (ok) {
+      toast.success(
+        security?.hasPin
+          ? "Transaction PIN changed"
+          : "Transaction PIN created",
+      );
       setShowPinForm(false);
       setCurrentPin("");
       setPin("");
