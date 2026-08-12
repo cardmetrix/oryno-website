@@ -1,10 +1,13 @@
 "use client";
 
 import Image from "next/image";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { BrandLogo } from "@/components/brand-logo";
 import { fadeUp, stagger } from "@/components/landing/motion";
 import { cn } from "@/lib/utils";
+
+const DEFAULT_AUTH_PANEL = "/brand/auth-panel.jpg";
 
 type AuthSplitLayoutProps = {
   children: React.ReactNode;
@@ -15,6 +18,8 @@ type AuthSplitLayoutProps = {
   /** Optional content above the title (e.g. back link) */
   top?: React.ReactNode;
   className?: string;
+  /** Override auth panel image (defaults to admin-managed / bundled path). */
+  panelImageSrc?: string;
 };
 
 export function AuthSplitLayout({
@@ -25,11 +30,39 @@ export function AuthSplitLayout({
   panelSubtitle = "Airtime, data, bills, wallet payouts — all in one premium experience.",
   top,
   className,
+  panelImageSrc,
 }: AuthSplitLayoutProps) {
+  const [panelSrc, setPanelSrc] = useState(
+    panelImageSrc || DEFAULT_AUTH_PANEL,
+  );
+
+  useEffect(() => {
+    if (panelImageSrc) {
+      setPanelSrc(panelImageSrc);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/landing-assets", { cache: "no-store" });
+        if (!res.ok) return;
+        const json = (await res.json()) as {
+          assets?: { auth_panel?: string };
+        };
+        const next = json.assets?.auth_panel?.trim();
+        if (!cancelled && next) setPanelSrc(next);
+      } catch {
+        // keep default
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [panelImageSrc]);
+
   return (
     <div className="min-h-[100svh] bg-background text-foreground">
       <div className="mx-auto grid min-h-[100svh] w-full md:grid-cols-2">
-        {/* Left visual panel — md+ */}
         <motion.aside
           initial={{ opacity: 0, x: -24 }}
           animate={{ opacity: 1, x: 0 }}
@@ -37,10 +70,12 @@ export function AuthSplitLayout({
           className="relative hidden min-h-[100svh] overflow-hidden md:flex"
         >
           <Image
-            src="/brand/auth-panel.jpg"
+            key={panelSrc}
+            src={panelSrc}
             alt="African woman celebrating with ORYNO digital services"
             fill
             priority
+            unoptimized={/^https?:\/\//i.test(panelSrc)}
             className="object-cover object-center"
             sizes="(max-width: 1024px) 100vw, 50vw"
           />
@@ -62,7 +97,11 @@ export function AuthSplitLayout({
               transition={{ delay: 0.15, duration: 0.5 }}
               className="flex items-center gap-3"
             >
-              <BrandLogo size={44} priority className="shadow-[var(--shadow-orange)]" />
+              <BrandLogo
+                size={44}
+                priority
+                className="shadow-[var(--shadow-orange)]"
+              />
               <span className="text-xl font-bold tracking-tight text-white">
                 ORYNO
               </span>
@@ -106,7 +145,6 @@ export function AuthSplitLayout({
           </div>
         </motion.aside>
 
-        {/* Right form panel */}
         <div className="relative flex min-h-[100svh] items-start justify-center overflow-y-auto px-5 py-8 sm:px-8 lg:items-center lg:px-12 lg:py-12">
           <div
             aria-hidden="true"
@@ -117,10 +155,7 @@ export function AuthSplitLayout({
             variants={stagger}
             initial="hidden"
             animate="show"
-            className={cn(
-              "relative z-10 w-full max-w-md",
-              className,
-            )}
+            className={cn("relative z-10 w-full max-w-md", className)}
           >
             <motion.div variants={fadeUp} className="mb-8 md:hidden">
               <BrandLogo

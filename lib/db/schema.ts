@@ -1149,6 +1149,30 @@ export const onboardingSlides = pgTable(
   ],
 );
 
+/** Website landing + auth panel images (admin-managed fixed slots). */
+export const landingAssets = pgTable(
+  "landing_assets",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    slot: varchar("slot", { length: 64 }).notNull(),
+    label: varchar("label", { length: 120 }).notNull(),
+    description: varchar("description", { length: 280 }),
+    imageUrl: text("image_url").notNull(),
+    /** Original bundled path used when resetting (e.g. /screenshots/home.png). */
+    defaultPath: varchar("default_path", { length: 255 }).notNull(),
+    group: varchar("group", { length: 40 }).notNull().default("landing"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    updatedByAdminId: uuid("updated_by_admin_id"),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex("landing_assets_slot_uidx").on(t.slot),
+    index("landing_assets_group_idx").on(t.group),
+    index("landing_assets_sort_idx").on(t.sortOrder),
+  ],
+);
+
 // ─── 12. Admin ───────────────────────────────────────────────────────────────
 
 export const admins = pgTable("admins", {

@@ -113,6 +113,13 @@
       "when": 1786476091019,
       "tag": "0015_nebulous_big_bertha",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1786536423035,
+      "tag": "0016_fair_scorpion",
+      "breakpoints": true
     }
   ]
 }
