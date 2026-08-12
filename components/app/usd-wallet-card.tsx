@@ -249,13 +249,13 @@ export function UsdWalletCard({
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex items-center gap-2.5">
-                <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full border border-white/25 bg-[#FF6A00]">
+                <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full border border-white/25">
                   <Image
                     src={BRAND_LOGO_SRC}
                     alt="ORYNO"
                     fill
                     sizes="40px"
-                    className="scale-[1.22] rounded-full object-cover object-center"
+                    className="rounded-full object-cover object-center"
                   />
                 </span>
                 <p className="inline-flex items-center gap-1.5 text-[11px] font-bold tracking-[0.16em] text-white/65 uppercase">
