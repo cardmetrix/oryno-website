@@ -7,20 +7,20 @@ import { StoreButtons } from "./store-buttons";
 export function Download() {
   return (
     <section id="download" className="relative overflow-hidden py-24 sm:py-28">
-      {/* Lighter peach → soft orange wash (not flat solid orange) */}
+      {/* Light: peach wash · Dark: deep charcoal with soft orange glow */}
       <div
         aria-hidden="true"
-        className="absolute inset-0 bg-[linear-gradient(145deg,#fff4eb_0%,#ffe0c8_28%,#ffb478_62%,#ff8f3d_100%)]"
+        className="absolute inset-0 bg-[linear-gradient(145deg,#fff4eb_0%,#ffe0c8_28%,#ffb478_62%,#ff8f3d_100%)] dark:bg-[linear-gradient(145deg,#1a1210_0%,#241812_32%,#3a2214_68%,#4a2818_100%)]"
       />
       <div
         aria-hidden="true"
-        className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(255,255,255,0.55),transparent_48%),radial-gradient(ellipse_at_bottom_right,rgba(255,106,0,0.22),transparent_52%)]"
+        className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(255,255,255,0.55),transparent_48%),radial-gradient(ellipse_at_bottom_right,rgba(255,106,0,0.22),transparent_52%)] dark:bg-[radial-gradient(ellipse_at_top_left,rgba(255,140,66,0.18),transparent_48%),radial-gradient(ellipse_at_bottom_right,rgba(255,106,0,0.28),transparent_55%)]"
       />
 
       {/* Soft diagonal line pattern */}
       <div
         aria-hidden="true"
-        className="absolute inset-0 opacity-[0.28]"
+        className="absolute inset-0 opacity-[0.28] dark:opacity-[0.14]"
         style={{
           backgroundImage:
             "repeating-linear-gradient(-28deg, transparent 0 18px, rgba(255,255,255,0.45) 18px 19px)",
@@ -30,7 +30,7 @@ export function Download() {
       {/* Dot grid overlay */}
       <div
         aria-hidden="true"
-        className="absolute inset-0 opacity-40"
+        className="absolute inset-0 opacity-40 dark:opacity-25"
         style={{
           backgroundImage:
             "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.55) 1px, transparent 0)",
@@ -41,7 +41,7 @@ export function Download() {
       {/* Geometric line accents */}
       <svg
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 h-full w-full opacity-40"
+        className="pointer-events-none absolute inset-0 h-full w-full opacity-40 dark:opacity-30"
         xmlns="http://www.w3.org/2000/svg"
       >
         <defs>
@@ -112,19 +112,19 @@ export function Download() {
       {/* Floating soft orbs */}
       <motion.div
         aria-hidden="true"
-        className="pointer-events-none absolute -left-16 top-1/2 h-72 w-72 -translate-y-1/2 rounded-full bg-white/45 blur-3xl"
+        className="pointer-events-none absolute -left-16 top-1/2 h-72 w-72 -translate-y-1/2 rounded-full bg-white/45 blur-3xl dark:bg-[#ff6a00]/20"
         animate={{ opacity: [0.35, 0.6, 0.35], scale: [1, 1.12, 1] }}
         transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
       />
       <motion.div
         aria-hidden="true"
-        className="pointer-events-none absolute -right-12 top-6 h-64 w-64 rounded-full bg-[#ff6a00]/25 blur-3xl"
+        className="pointer-events-none absolute -right-12 top-6 h-64 w-64 rounded-full bg-[#ff6a00]/25 blur-3xl dark:bg-[#ff8c42]/20"
         animate={{ opacity: [0.25, 0.5, 0.25], y: [0, 18, 0] }}
         transition={{ duration: 9, repeat: Infinity, ease: "easeInOut" }}
       />
       <motion.div
         aria-hidden="true"
-        className="pointer-events-none absolute bottom-0 left-1/3 h-40 w-40 rounded-full bg-white/35 blur-2xl"
+        className="pointer-events-none absolute bottom-0 left-1/3 h-40 w-40 rounded-full bg-white/35 blur-2xl dark:bg-white/10"
         animate={{ opacity: [0.2, 0.45, 0.2], x: [0, 24, 0] }}
         transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
       />
@@ -139,22 +139,22 @@ export function Download() {
         >
           <motion.div
             variants={fadeUp}
-            className="mx-auto inline-flex items-center gap-2 rounded-full border border-white/45 bg-white/25 px-3.5 py-1.5 text-xs font-semibold tracking-[0.16em] text-[#5c3310]/80 uppercase backdrop-blur-md"
+            className="mx-auto inline-flex items-center gap-2 rounded-full border border-white/45 bg-white/25 px-3.5 py-1.5 text-xs font-semibold tracking-[0.16em] text-[#5c3310]/80 uppercase backdrop-blur-md dark:border-white/15 dark:bg-white/10 dark:text-white/80"
           >
-            <span className="h-1.5 w-1.5 rounded-full bg-[#ff6a00] shadow-[0_0_0_4px_rgba(255,106,0,0.18)]" />
+            <span className="h-1.5 w-1.5 rounded-full bg-[#ff6a00] shadow-[0_0_0_4px_rgba(255,106,0,0.18)] dark:shadow-[0_0_0_4px_rgba(255,106,0,0.28)]" />
             Get ORYNO
           </motion.div>
 
           <motion.h2
             variants={fadeUp}
-            className="mt-5 text-3xl font-bold tracking-tight text-[#2a1708] sm:text-4xl lg:text-[2.75rem]"
+            className="mt-5 text-3xl font-bold tracking-tight text-[#2a1708] sm:text-4xl lg:text-[2.75rem] dark:text-white"
           >
             Available on iOS and Android.
           </motion.h2>
 
           <motion.p
             variants={fadeUp}
-            className="mx-auto mt-4 max-w-lg text-base leading-relaxed text-[#5c3310]/80 sm:text-lg"
+            className="mx-auto mt-4 max-w-lg text-base leading-relaxed text-[#5c3310]/80 sm:text-lg dark:text-white/70"
           >
             Download ORYNO and manage airtime, data, bills, virtual numbers, and
             more — all from one premium app.
@@ -162,18 +162,18 @@ export function Download() {
 
           <motion.div
             variants={fadeUp}
-            className="mx-auto mt-9 max-w-xl rounded-[28px] border border-white/50 bg-white/35 p-4 shadow-[0_20px_60px_rgba(92,51,16,0.12)] backdrop-blur-xl sm:p-5"
+            className="mx-auto mt-9 max-w-xl rounded-[28px] border border-white/50 bg-white/35 p-4 shadow-[0_20px_60px_rgba(92,51,16,0.12)] backdrop-blur-xl sm:p-5 dark:border-white/12 dark:bg-white/8 dark:shadow-[0_20px_60px_rgba(0,0,0,0.35)]"
           >
             <StoreButtons
               size="large"
               variant="default"
-              className="w-full justify-center"
+              className="w-full justify-center dark:[&_.store-badge]:border-white/15 dark:[&_.store-badge]:bg-white/10 dark:[&_.store-badge]:text-white dark:[&_.store-badge:hover]:bg-white/16 dark:[&_h4]:text-white dark:[&_p]:text-white/70 dark:[&_svg.fill-foreground]:fill-white"
             />
           </motion.div>
 
           <motion.p
             variants={fadeUp}
-            className="mt-5 text-sm font-medium text-[#5c3310]/65"
+            className="mt-5 text-sm font-medium text-[#5c3310]/65 dark:text-white/55"
           >
             Free to download · Secure wallet · Built for Africa
           </motion.p>
