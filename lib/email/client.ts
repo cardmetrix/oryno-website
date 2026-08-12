@@ -34,3 +34,14 @@ export function appBaseUrl() {
 export function brandLogoUrl() {
   return `${appBaseUrl()}/brand/oryno-logo.png`;
 }
+
+/** Sidebar-style logo for HTML emails: orange circle + scaled cover (hides white PNG padding). */
+export function emailBrandLogoHtml(size = 36) {
+  const logo = brandLogoUrl();
+  const scaled = Math.round(size * 1.22);
+  const offset = Math.round((size - scaled) / 2);
+
+  return `<div style="width:${size}px;height:${size}px;border-radius:9999px;overflow:hidden;background-color:#FF6A00;line-height:0;font-size:0;">
+    <img src="${logo}" width="${scaled}" height="${scaled}" alt="ORYNO" style="display:block;width:${scaled}px;height:${scaled}px;border:0;outline:none;text-decoration:none;margin:${offset}px 0 0 ${offset}px;-ms-interpolation-mode:bicubic;" />
+  </div>`;
+}
