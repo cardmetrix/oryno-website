@@ -1,11 +1,19 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { Star } from "lucide-react";
+import { PenLine, Star } from "lucide-react";
 import { TestimonialMarquee } from "@/components/landing/testimonial-marquee";
 import { WriteReviewForm } from "@/components/landing/write-review-form";
 import { fadeUp, stagger } from "@/components/landing/motion";
 import type { PublicTestimonial } from "@/lib/testimonials";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 type TestimonialsProps = {
   reviews: PublicTestimonial[];
@@ -16,6 +24,8 @@ type TestimonialsProps = {
 };
 
 export function Testimonials({ reviews, stats }: TestimonialsProps) {
+  const [open, setOpen] = useState(false);
+
   return (
     <section id="testimonials" className="relative overflow-hidden py-24 sm:py-28">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,106,0,0.08),transparent_42%),radial-gradient(circle_at_bottom,rgba(255,106,0,0.05),transparent_35%)]" />
@@ -77,15 +87,43 @@ export function Testimonials({ reviews, stats }: TestimonialsProps) {
         </motion.div>
 
         <motion.div
-          initial={{ opacity: 0, y: 28 }}
+          initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-40px" }}
-          transition={{ duration: 0.6, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
-          className="mx-auto mt-16 max-w-3xl"
+          transition={{ duration: 0.55, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
+          className="mt-12 flex justify-center"
         >
-          <WriteReviewForm />
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-primary px-6 text-sm font-semibold text-primary-foreground shadow-[0_14px_36px_rgba(255,106,0,0.28)] transition hover:brightness-105"
+          >
+            <PenLine className="h-4 w-4" />
+            Write a review
+          </button>
         </motion.div>
       </div>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto border-border/80 p-0 sm:max-w-lg sm:rounded-[28px]">
+          <DialogHeader className="border-b border-border/70 px-6 pt-6 pb-4 text-left">
+            <DialogTitle className="text-xl font-bold tracking-tight">
+              Write a review
+            </DialogTitle>
+            <DialogDescription>
+              Share your ORYNO experience. Reviews appear after admin approval.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="px-6 py-5">
+            <WriteReviewForm
+              embedded
+              onSubmitted={() => {
+                window.setTimeout(() => setOpen(false), 1800);
+              }}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

@@ -402,14 +402,14 @@ img {
   font-weight: 700;
   letter-spacing: -0.025em;
   line-height: 1.15;
-  color: var(--oryno-charcoal);
+  color: var(--foreground);
 }
 
 .section-copy {
   margin-top: 1rem;
   font-size: 1.0625rem;
   line-height: 1.65;
-  color: var(--oryno-gray-medium);
+  color: var(--muted-foreground);
 }
 
 /* ─── Buttons ─── */

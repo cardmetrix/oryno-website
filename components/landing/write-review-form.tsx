@@ -5,16 +5,18 @@ import { motion } from "framer-motion";
 import { Loader2, Send, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { StarRating } from "@/components/landing/star-rating";
-import { fadeUp } from "@/components/landing/motion";
 import { cn } from "@/lib/utils";
 
 type WriteReviewFormProps = {
   className?: string;
+  /** Flat layout for dialogs / modals (no outer card chrome). */
+  embedded?: boolean;
   onSubmitted?: () => void;
 };
 
 export function WriteReviewForm({
   className,
+  embedded = false,
   onSubmitted,
 }: WriteReviewFormProps) {
   const [authorName, setAuthorName] = useState("");
@@ -73,12 +75,9 @@ export function WriteReviewForm({
   if (submitted) {
     return (
       <motion.div
-        initial={{ opacity: 0, y: 16 }}
+        initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        className={cn(
-          "rounded-[28px] border border-primary/20 bg-gradient-to-br from-oryno-orange-muted/50 via-background to-background p-8 text-center shadow-[0_20px_60px_rgba(255,106,0,0.08)]",
-          className,
-        )}
+        className={cn("py-6 text-center", className)}
       >
         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
           <Sparkles className="h-7 w-7" />
@@ -102,27 +101,36 @@ export function WriteReviewForm({
   }
 
   return (
-    <motion.form
-      variants={fadeUp}
+    <form
       onSubmit={onSubmit}
       className={cn(
-        "rounded-[28px] border border-border/80 bg-background/90 p-6 shadow-[0_20px_60px_rgba(28,28,30,0.06)] backdrop-blur-sm sm:p-8",
+        !embedded &&
+          "rounded-[28px] border border-border/80 bg-background/90 p-6 shadow-[0_20px_60px_rgba(28,28,30,0.06)] backdrop-blur-sm sm:p-8",
         className,
       )}
     >
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="eyebrow">Write a review</p>
-          <h3 className="mt-1 text-2xl font-bold tracking-tight text-foreground">
-            Share your ORYNO experience
-          </h3>
+      {!embedded ? (
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="eyebrow">Write a review</p>
+            <h3 className="mt-1 text-2xl font-bold tracking-tight text-foreground">
+              Share your ORYNO experience
+            </h3>
+          </div>
+          <div className="rounded-full bg-muted/60 px-4 py-2">
+            <StarRating value={rating} onChange={setRating} size="lg" />
+          </div>
         </div>
-        <div className="rounded-full bg-muted/60 px-4 py-2">
-          <StarRating value={rating} onChange={setRating} size="lg" />
+      ) : (
+        <div className="mb-5 flex flex-col items-start gap-2">
+          <span className="text-sm font-medium text-foreground">Your rating</span>
+          <div className="rounded-full bg-muted/60 px-4 py-2">
+            <StarRating value={rating} onChange={setRating} size="lg" />
+          </div>
         </div>
-      </div>
+      )}
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-2">
+      <div className={cn("grid gap-4 sm:grid-cols-2", !embedded && "mt-6")}>
         <label className="block space-y-2">
           <span className="text-sm font-medium text-foreground">Your name</span>
           <input
@@ -193,6 +201,6 @@ export function WriteReviewForm({
           Submit review
         </button>
       </div>
-    </motion.form>
+    </form>
   );
 }
