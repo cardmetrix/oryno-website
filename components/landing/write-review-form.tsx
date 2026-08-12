@@ -21,7 +21,7 @@ export function WriteReviewForm({
 }: WriteReviewFormProps) {
   const [authorName, setAuthorName] = useState("");
   const [authorRole, setAuthorRole] = useState("");
-  const [rating, setRating] = useState(5);
+  const [rating, setRating] = useState(0);
   const [body, setBody] = useState("");
   const [website, setWebsite] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -30,6 +30,11 @@ export function WriteReviewForm({
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     if (submitting) return;
+
+    if (rating < 1) {
+      toast.error("Please select a star rating");
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -56,7 +61,7 @@ export function WriteReviewForm({
       setSubmitted(true);
       setAuthorName("");
       setAuthorRole("");
-      setRating(5);
+      setRating(0);
       setBody("");
       toast.success(
         data.message ||
@@ -117,8 +122,15 @@ export function WriteReviewForm({
               Share your ORYNO experience
             </h3>
           </div>
-          <div className="rounded-full bg-muted/60 px-4 py-2">
-            <StarRating value={rating} onChange={setRating} size="lg" />
+          <div className="flex flex-col items-end gap-2">
+            <div className="rounded-full bg-muted/60 px-4 py-2">
+              <StarRating value={rating} onChange={setRating} size="lg" />
+            </div>
+            {rating === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                Tap a star to rate your experience
+              </p>
+            ) : null}
           </div>
         </div>
       ) : (
@@ -127,6 +139,11 @@ export function WriteReviewForm({
           <div className="rounded-full bg-muted/60 px-4 py-2">
             <StarRating value={rating} onChange={setRating} size="lg" />
           </div>
+          {rating === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              Tap a star to rate your experience
+            </p>
+          ) : null}
         </div>
       )}
 

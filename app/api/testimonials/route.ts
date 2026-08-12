@@ -71,7 +71,14 @@ export async function POST(req: Request) {
     const authorName = String(body.authorName || "").trim();
     const authorRole = String(body.authorRole || "").trim() || null;
     const reviewBody = String(body.body || "").trim();
-    const rating = clampRating(body.rating);
+    const rawRating = Number(body.rating);
+    if (!Number.isFinite(rawRating) || rawRating < 1 || rawRating > 5) {
+      return NextResponse.json(
+        { error: "Please select a star rating from 1 to 5" },
+        { status: 400 },
+      );
+    }
+    const rating = clampRating(rawRating);
 
     if (!authorName || authorName.length < 2) {
       return NextResponse.json(

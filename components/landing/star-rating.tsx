@@ -24,15 +24,18 @@ export function StarRating({
 }: StarRatingProps) {
   const interactive = typeof onChange === "function";
   const stars = [1, 2, 3, 4, 5];
+  const selected = Math.max(0, Math.min(5, Math.round(value)));
 
   return (
     <div
       className={cn("inline-flex items-center gap-0.5", className)}
       role={interactive ? "radiogroup" : undefined}
-      aria-label={`${value} out of 5 stars`}
+      aria-label={
+        selected > 0 ? `${selected} out of 5 stars` : "Rate from 1 to 5 stars"
+      }
     >
       {stars.map((star) => {
-        const active = star <= value;
+        const active = selected > 0 && star <= selected;
         const starNode = (
           <Star
             data-star={star}
@@ -75,9 +78,9 @@ export function StarRating({
               if (!group) return;
               group.querySelectorAll("[data-star]").forEach((node) => {
                 const index = Number((node as HTMLElement).dataset.star || "0");
-                node.classList.toggle("text-oryno-orange", index <= value);
-                node.classList.toggle("fill-oryno-orange", index <= value);
-                node.classList.toggle("text-muted-foreground/35", index > value);
+                node.classList.toggle("text-oryno-orange", index <= selected);
+                node.classList.toggle("fill-oryno-orange", index <= selected);
+                node.classList.toggle("text-muted-foreground/35", index > selected);
               });
             }}
             className="rounded-md transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
