@@ -12,12 +12,18 @@ import {
   shapeTestimonialReview,
   type TestimonialStatus,
 } from "@/lib/testimonials";
+import { ensureDefaultTestimonials } from "@/lib/testimonials/seed";
 
 export const runtime = "nodejs";
 
 export async function GET(req: Request) {
   return withAdminApi(async () => {
     await ensureWalletSchema();
+    try {
+      await ensureDefaultTestimonials();
+    } catch {
+      // continue even if seed races
+    }
 
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");

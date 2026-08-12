@@ -6,9 +6,15 @@ import {
   averageRating,
   shapePublicTestimonial,
 } from "@/lib/testimonials";
+import { ensureDefaultTestimonials } from "@/lib/testimonials/seed";
 
 export async function getApprovedTestimonials() {
   await ensureWalletSchema();
+  try {
+    await ensureDefaultTestimonials();
+  } catch {
+    // continue even if seed races
+  }
 
   const rows = await db
     .select()

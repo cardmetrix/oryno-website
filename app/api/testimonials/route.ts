@@ -8,6 +8,7 @@ import {
   clampRating,
   shapePublicTestimonial,
 } from "@/lib/testimonials";
+import { ensureDefaultTestimonials } from "@/lib/testimonials/seed";
 
 export const runtime = "nodejs";
 
@@ -15,6 +16,11 @@ export const runtime = "nodejs";
 export async function GET() {
   try {
     await ensureWalletSchema();
+    try {
+      await ensureDefaultTestimonials();
+    } catch {
+      // continue even if seed races
+    }
 
     const rows = await db
       .select()
