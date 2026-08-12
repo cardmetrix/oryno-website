@@ -29,6 +29,7 @@ const tones: Record<string, string> = {
   Sandbox: "bg-muted text-[var(--oryno-warning)]",
   Test: "bg-muted text-[var(--oryno-warning)]",
   Disabled: "bg-muted text-muted-foreground",
+  Approved: "bg-oryno-orange-muted text-primary",
   Rejected: "bg-muted text-[var(--oryno-error)]",
 };
 

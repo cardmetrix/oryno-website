@@ -1097,6 +1097,12 @@ export const adPlacementEnum = pgEnum("ad_placement", [
   "promo_banner",
 ]);
 
+export const testimonialStatusEnum = pgEnum("testimonial_status", [
+  "pending",
+  "approved",
+  "rejected",
+]);
+
 export const ads = pgTable(
   "ads",
   {
@@ -1170,6 +1176,31 @@ export const landingAssets = pgTable(
     uniqueIndex("landing_assets_slot_uidx").on(t.slot),
     index("landing_assets_group_idx").on(t.group),
     index("landing_assets_sort_idx").on(t.sortOrder),
+  ],
+);
+
+/** User-submitted landing page reviews (admin-approved before display). */
+export const testimonialReviews = pgTable(
+  "testimonial_reviews",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    authorName: varchar("author_name", { length: 120 }).notNull(),
+    authorRole: varchar("author_role", { length: 120 }),
+    rating: integer("rating").notNull().default(5),
+    body: text("body").notNull(),
+    status: testimonialStatusEnum("status").notNull().default("pending"),
+    featured: boolean("featured").notNull().default(false),
+    sortOrder: integer("sort_order").notNull().default(0),
+    userId: uuid("user_id"),
+    approvedByAdminId: uuid("approved_by_admin_id"),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+    ...timestamps,
+  },
+  (t) => [
+    index("testimonial_reviews_status_idx").on(t.status),
+    index("testimonial_reviews_sort_idx").on(t.sortOrder),
+    index("testimonial_reviews_featured_idx").on(t.featured),
   ],
 );
 

@@ -12,7 +12,7 @@ import { StoreButtons } from "./store-buttons";
 const links = [
   { href: "#features", label: "Features" },
   { href: "#wallet", label: "Wallet" },
-  { href: "#screenshots", label: "App" },
+  { href: "#testimonials", label: "Reviews" },
   { href: "#download", label: "Download" },
 ];
 

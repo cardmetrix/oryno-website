@@ -283,6 +283,37 @@ img {
   }
 }
 
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes marquee-reverse {
+  from {
+    transform: translateX(-50%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.animate-marquee {
+  animation: marquee linear infinite;
+}
+
+.animate-marquee-reverse {
+  animation: marquee-reverse linear infinite;
+}
+
+.group\/marquee:hover .animate-marquee,
+.group\/marquee:hover .animate-marquee-reverse {
+  animation-play-state: paused;
+}
+
 .animate-float-soft {
   animation: float-soft 6s ease-in-out infinite;
 }
@@ -302,7 +333,9 @@ img {
 
   .animate-float-soft,
   .animate-fade-up,
-  .animate-pulse-soft {
+  .animate-pulse-soft,
+  .animate-marquee,
+  .animate-marquee-reverse {
     animation: none !important;
   }
 
