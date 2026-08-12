@@ -175,6 +175,8 @@ export default function FundPage() {
       return;
     }
 
+
+    
     setSubmitting(true);
     setError(null);
     try {
