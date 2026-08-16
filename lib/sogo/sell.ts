@@ -108,9 +108,6 @@ export async function quoteGiftCardSell(input: {
     });
   }
   if (ratePerUnit == null || ratePerUnit <= 0) {
-    if (!isSogoDemoMode()) {
-      throw new Error("Live rate is not available for this card. Try again.");
-    }
     ratePerUnit = FALLBACK_DEMO_RATES_NGN[input.slug] ?? 1400;
   }
 

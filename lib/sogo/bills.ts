@@ -276,13 +276,29 @@ function normalizeProvider(raw: unknown): SogoBillProvider | null {
 }
 
 function catalogGroup(
-  catalog: SogoBillCatalog,
+  catalog: unknown,
   keys: string[],
 ): SogoBillProvider[] {
+  if (Array.isArray(catalog)) {
+    const match = catalog.find((row) => {
+      const rec = asRecord(row);
+      const type = String(rec?.type || rec?.slug || rec?.id || "").toLowerCase();
+      return keys.includes(type);
+    });
+    const rec = asRecord(match);
+    return asArray(rec?.providers)
+      .map(normalizeProvider)
+      .filter(Boolean) as SogoBillProvider[];
+  }
+
+  const root = asRecord(catalog);
+  if (!root) return [];
   for (const key of keys) {
-    const group = asRecord(catalog[key]);
+    const group = asRecord(root[key]);
     if (!group) continue;
-    const providers = asArray(group.providers ?? group).map(normalizeProvider).filter(Boolean) as SogoBillProvider[];
+    const providers = asArray(group.providers ?? group)
+      .map(normalizeProvider)
+      .filter(Boolean) as SogoBillProvider[];
     if (providers.length) return providers;
   }
   return [];
@@ -299,7 +315,7 @@ function decorate(
   }));
 }
 
-export async function fetchSogoBillsCatalog(): Promise<SogoBillCatalog> {
+export async function fetchSogoBillsCatalog(): Promise<unknown> {
   if (isSogoDemoMode()) {
     return {
       airtime: { label: "Airtime", providers: FALLBACK_AIRTIME },
@@ -312,10 +328,11 @@ export async function fetchSogoBillsCatalog(): Promise<SogoBillCatalog> {
   const json = await sogoRequest<{ data?: SogoBillCatalog } | SogoBillCatalog>(
     "/bills/catalog",
   );
-  const data = (asRecord(json) && "data" in (json as object)
-    ? (json as { data?: SogoBillCatalog }).data
-    : json) as SogoBillCatalog | undefined;
-  return data && typeof data === "object" ? data : {};
+  const data = asRecord(json)?.data ?? json;
+  if (Array.isArray(data) || (data && typeof data === "object")) {
+    return data;
+  }
+  return {};
 }
 
 export async function listSogoBillServices(
@@ -369,11 +386,13 @@ function normalizePlan(raw: unknown): SogoBillPlan | null {
     "charged_amount",
     "monthly_price",
   ]);
-  const fixedRaw = pickString(row, ["fixedPrice", "fixed_price", "fixed"]);
+  const fixedVal = row.fixedPrice ?? row.fixed_price ?? row.fixed;
   const fixedPrice =
-    fixedRaw
-      ? ["yes", "true", "1"].includes(fixedRaw.toLowerCase())
-      : amount > 0;
+    typeof fixedVal === "boolean"
+      ? fixedVal
+      : typeof fixedVal === "string"
+        ? ["yes", "true", "1"].includes(fixedVal.toLowerCase())
+        : amount > 0;
   return {
     variationCode,
     name,

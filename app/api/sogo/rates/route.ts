@@ -5,6 +5,7 @@ import {
   extractNgnRate,
   fetchSogoSellRates,
   isSogoDemoMode,
+  isSogoGiftCardsPartnerLive,
   quoteGiftCardSell,
   sogoErrorToEnglish,
 } from "@/lib/sogo";
@@ -33,6 +34,12 @@ export async function GET(req: Request) {
     const payoutShare = await getSogoPayoutShare();
 
     const rates = await fetchSogoSellRates(slug);
+    const unavailable = !isSogoDemoMode() && !isSogoGiftCardsPartnerLive();
+    const source = isSogoDemoMode()
+      ? "demo"
+      : unavailable
+        ? "fallback"
+        : "provider";
 
     if (slug && amount > 0) {
       const quote = await quoteGiftCardSell({
@@ -47,7 +54,8 @@ export async function GET(req: Request) {
         quote,
         payoutShare,
         demo: isSogoDemoMode(),
-        source: isSogoDemoMode() ? "demo" : "provider",
+        unavailable,
+        source,
       });
     }
 
@@ -77,7 +85,8 @@ export async function GET(req: Request) {
       simplified,
       payoutShare,
       demo: isSogoDemoMode(),
-      source: isSogoDemoMode() ? "demo" : "provider",
+      unavailable,
+      source,
     });
   } catch (error) {
     console.error("[sogo-rates]", error);

@@ -63,6 +63,7 @@ export default function GiftCardsLivePage() {
   const [rateMap, setRateMap] = useState<Record<string, number | null>>({});
   const [sellLoading, setSellLoading] = useState(true);
   const [sellDemo, setSellDemo] = useState(false);
+  const [sellUnavailable, setSellUnavailable] = useState(false);
   const [sellQuery, setSellQuery] = useState("");
   const [sellCategory, setSellCategory] = useState("All");
 
@@ -115,6 +116,7 @@ export default function GiftCardsLivePage() {
       if (!catalogRes.ok) throw new Error(catalog.error || "Failed to load");
       setSellBrands(catalog.brands ?? []);
       setSellDemo(Boolean(catalog.demo || ratesJson.demo));
+      setSellUnavailable(Boolean(catalog.unavailable || ratesJson.unavailable));
 
       // API exposes NGN-per-$1 on `simplified` (raw `rates` has nested provider shape).
       const map: Record<string, number | null> = {};
@@ -267,7 +269,7 @@ export default function GiftCardsLivePage() {
                   {sellLoading
                     ? "Loading…"
                     : `${filteredSell.length} brands · tap to sell`}
-                  {sellDemo ? " · demo rates" : ""}
+                  {sellDemo ? " · demo rates" : sellUnavailable ? " · indicative rates" : ""}
                 </p>
               </div>
               <TrendingUp className="h-5 w-5 text-primary" />

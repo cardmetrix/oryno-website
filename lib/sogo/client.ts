@@ -118,10 +118,29 @@ export async function sogoRequest<T>(
       err?.message ||
       text ||
       `Sogo request failed (${res.status})`;
-    throw new Error(sogoErrorToEnglish(message, err?.error?.code));
+    const wrapped = new Error(
+      sogoErrorToEnglish(message, err?.error?.code),
+    ) as Error & { code?: string; status?: number };
+    wrapped.code = err?.error?.code;
+    wrapped.status = res.status;
+    throw wrapped;
   }
 
   return json as T;
+}
+
+export function isSogoUnavailableError(error: unknown) {
+  if (!error || typeof error !== "object") return false;
+  const err = error as { code?: string; status?: number; message?: string };
+  if (err.code === "service_unavailable" || err.status === 503) return true;
+  return /temporarily unavailable|not currently available/i.test(err.message || "");
+}
+
+/** True after a successful live catalog or rates response in this process. */
+let giftCardsPartnerLive = false;
+
+export function isSogoGiftCardsPartnerLive() {
+  return giftCardsPartnerLive;
 }
 
 export async function fetchSogoSellCatalog(): Promise<GiftCardBrandView[]> {
@@ -133,15 +152,23 @@ export async function fetchSogoSellCatalog(): Promise<GiftCardBrandView[]> {
     const json = await sogoRequest<{ data: SogoCatalogBrand[] }>(
       "/gift-cards/sell/catalog",
     );
-    const rows = Array.isArray(json?.data) ? json.data : [];
+    const rows = Array.isArray(json?.data)
+      ? json.data
+      : Array.isArray((json as { brands?: SogoCatalogBrand[] })?.brands)
+        ? ((json as { brands: SogoCatalogBrand[] }).brands)
+        : [];
+    if (!rows.length) {
+      giftCardsPartnerLive = false;
+      return FALLBACK_GIFT_CARD_CATALOG.map(toBrandView);
+    }
+    giftCardsPartnerLive = true;
     return rows
       .map((row) => toBrandView(normalizeCatalogBrand(row)))
-      .filter((b) => b.active);
+      .filter((b) => b.active && b.slug);
   } catch (error) {
+    giftCardsPartnerLive = false;
     console.error("[sogo-catalog]", error);
-    throw error instanceof Error
-      ? error
-      : new Error("Failed to load gift card catalogue");
+    return FALLBACK_GIFT_CARD_CATALOG.map(toBrandView);
   }
 }
 
@@ -178,12 +205,16 @@ export async function fetchSogoSellRates(slug?: string): Promise<SogoRateEntry[]
       `/gift-cards/sell/rates${qs}`,
     );
     const rows = Array.isArray(json?.data) ? json.data : [];
+    if (!rows.length) {
+      giftCardsPartnerLive = false;
+      return demoRates();
+    }
+    giftCardsPartnerLive = true;
     return rows;
   } catch (error) {
+    giftCardsPartnerLive = false;
     console.error("[sogo-rates]", error);
-    throw error instanceof Error
-      ? error
-      : new Error("Failed to load gift card rates");
+    return demoRates();
   }
 }
 

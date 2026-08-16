@@ -184,6 +184,7 @@ function GiftCardsPageContent() {
   const [rateMap, setRateMap] = useState<Record<string, number | null>>({});
   const [sellLoading, setSellLoading] = useState(true);
   const [sellDemo, setSellDemo] = useState(false);
+  const [sellUnavailable, setSellUnavailable] = useState(false);
   const [selectedSell, setSelectedSell] = useState<SellBrand | null>(null);
   const [cardType, setCardType] = useState<"ecode" | "physical">("physical");
   const [cardCountry, setCardCountry] = useState("US");
@@ -267,6 +268,9 @@ function GiftCardsPageContent() {
         if (cancelled) return;
         setSellBrands(catalog.brands ?? []);
         setSellDemo(Boolean(catalog.demo || ratesJson.demo));
+        setSellUnavailable(
+          Boolean(catalog.unavailable || ratesJson.unavailable),
+        );
         const next: Record<string, number | null> = {};
         for (const row of ratesJson.simplified ?? []) {
           next[row.slug] = row.ratePerUnit;
@@ -720,7 +724,11 @@ function GiftCardsPageContent() {
                       </h2>
                       <p className="text-sm text-muted-foreground">
                         {selectedSell.category}
-                        {sellDemo ? " · demo rates" : " · live rates"}
+                        {sellDemo
+                          ? " · demo rates"
+                          : sellUnavailable
+                            ? " · indicative rates"
+                            : " · live rates"}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
-import { fetchSogoSellCatalog, isSogoDemoMode } from "@/lib/sogo";
+import { fetchSogoSellCatalog, isSogoDemoMode, isSogoGiftCardsPartnerLive } from "@/lib/sogo";
 
 export const runtime = "nodejs";
 
@@ -12,9 +12,12 @@ export async function GET() {
     }
 
     const brands = await fetchSogoSellCatalog();
+    const unavailable = !isSogoDemoMode() && !isSogoGiftCardsPartnerLive();
     return NextResponse.json({
       brands,
       demo: isSogoDemoMode(),
+      unavailable,
+      source: unavailable ? "fallback" : isSogoDemoMode() ? "demo" : "provider",
     });
   } catch (error) {
     console.error("[sogo-catalog]", error);
