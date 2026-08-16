@@ -223,7 +223,6 @@ export default function BillsPage() {
             Buy airtime instead
           </a>
         </MotionSection>
-        <ServiceInstructions service="bills" className="mt-5" />
       </AppShell>
     );
   }
@@ -449,8 +448,6 @@ export default function BillsPage() {
                 </div>
               </div>
             </MotionSection>
-
-            <ServiceInstructions service="bills" delay={0.12} />
 
             <motion.button
               type="submit"

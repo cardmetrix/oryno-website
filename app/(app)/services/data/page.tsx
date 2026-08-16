@@ -372,8 +372,6 @@ export default function DataPage() {
               </div>
             </MotionSection>
 
-            <ServiceInstructions service="data" delay={0.12} />
-
             <motion.button
               type="submit"
               disabled={!canSubmit}

@@ -423,8 +423,6 @@ export default function AirtimePage() {
               </div>
             </MotionSection>
 
-            <ServiceInstructions service="airtime" delay={0.12} />
-
             <motion.button
               type="submit"
               disabled={!canSubmit}

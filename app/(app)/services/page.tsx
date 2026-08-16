@@ -198,8 +198,6 @@ export default function ServicesPage() {
               )}
             </AnimatePresence>
           </div>
-
-          <ServiceInstructions service="catalog" className="mt-6" delay={0.1} />
         </>
       )}
     </AppShell>
@@ -249,11 +247,6 @@ function ServiceCard({
           transition={{ duration: 0.45 }}
         >
           <Icon className="h-6 w-6 sm:h-7 sm:w-7" strokeWidth={1.75} />
-          {item.soon ? (
-            <span className="absolute -top-1.5 -right-1.5 rounded-full bg-oryno-charcoal px-1.5 py-0.5 text-[8px] font-bold tracking-wide text-white uppercase">
-              Soon
-            </span>
-          ) : null}
         </motion.span>
 
         <p className="relative text-[13px] leading-tight font-bold tracking-tight text-foreground sm:text-sm">
