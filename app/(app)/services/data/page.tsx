@@ -13,6 +13,7 @@ import {
   VtpassServicePicker,
   type VtpassServiceOption,
 } from "@/components/app/vtpass-service-picker";
+import { SelectSheet } from "@/components/app/select-sheet";
 import { useCountry } from "@/components/providers/country-provider";
 import { formatCountryMoney } from "@/lib/country";
 import { cleanNetworkName, inferDataPlanCategory } from "@/lib/vtpass/catalog";
@@ -261,13 +262,35 @@ export default function DataPage() {
                   </p>
                 </div>
               </div>
-              <VtpassServicePicker
-                services={networks}
-                value={networkId}
-                onChange={setNetworkId}
-                loading={loadingNetworks || countryLoading}
-                columns="grid-cols-2 sm:grid-cols-3 lg:grid-cols-4"
-              />
+              <div className="md:hidden">
+                <SelectSheet
+                  label="Network"
+                  title="Select network"
+                  subtitle={`Networks for ${country?.name || "your country"}`}
+                  hint="Tap to choose a network"
+                  value={networkId}
+                  valueLabel={selectedNetwork?.name}
+                  valueImage={selectedNetwork?.image}
+                  onChange={setNetworkId}
+                  loading={loadingNetworks || countryLoading}
+                  emptyText="No networks available"
+                  options={networks.map((n) => ({
+                    id: n.serviceID,
+                    title: n.name,
+                    image: n.image ?? null,
+                    subtitle: "Tap to select",
+                  }))}
+                />
+              </div>
+              <div className="hidden md:block">
+                <VtpassServicePicker
+                  services={networks}
+                  value={networkId}
+                  onChange={setNetworkId}
+                  loading={loadingNetworks || countryLoading}
+                  columns="grid-cols-2 sm:grid-cols-3 lg:grid-cols-4"
+                />
+              </div>
             </MotionSection>
 
             <MotionSection
@@ -290,65 +313,42 @@ export default function DataPage() {
               delay={0.08}
               className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6"
             >
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <h2 className="text-base font-semibold">Data plans</h2>
-                <div className="flex gap-1 overflow-x-auto">
-                  {FILTERS.map((f) => (
-                    <button
-                      key={f}
-                      type="button"
-                      onClick={() => setFilter(f)}
-                      className={cn(
-                        "shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold",
-                        filter === f
-                          ? "bg-primary text-white"
-                          : "bg-muted text-foreground",
-                      )}
-                    >
-                      {f}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="grid max-h-[420px] gap-2 overflow-y-auto pr-1">
-                {loadingPlans ? (
-                  Array.from({ length: 4 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="h-16 animate-pulse rounded-[16px] bg-muted"
-                    />
-                  ))
-                ) : filtered.length ? (
-                  filtered.map((v) => (
-                    <button
-                      key={v.variationCode}
-                      type="button"
-                      onClick={() => setVariationCode(v.variationCode)}
-                      className={cn(
-                        "flex items-start justify-between gap-3 rounded-[16px] border px-4 py-3 text-left",
-                        variationCode === v.variationCode
-                          ? "border-primary bg-oryno-orange-muted"
-                          : "border-border hover:bg-muted/50",
-                      )}
-                    >
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold">{v.name}</p>
-                        <p className="mt-0.5 text-[11px] capitalize text-muted-foreground">
-                          {inferDataPlanCategory(v.name)}
-                        </p>
-                      </div>
-                      <p className="shrink-0 text-sm font-bold text-primary">
-                        {money(v.amount)}
-                      </p>
-                    </button>
-                  ))
-                ) : (
-                  <p className="py-6 text-center text-sm text-muted-foreground">
-                    No plans match this filter
-                  </p>
-                )}
-              </div>
+              <SelectSheet
+                label="Data plan"
+                title="Select data plan"
+                subtitle="Daily, weekly & monthly bundles"
+                hint="Tap to choose a plan"
+                value={variationCode}
+                valueLabel={selected?.name}
+                onChange={setVariationCode}
+                loading={loadingPlans}
+                emptyText="No plans match this filter"
+                options={filtered.map((v) => ({
+                  id: v.variationCode,
+                  title: v.name,
+                  subtitle: inferDataPlanCategory(v.name),
+                  trailing: money(v.amount),
+                }))}
+                headerExtra={
+                  <div className="flex flex-wrap gap-1.5">
+                    {FILTERS.map((f) => (
+                      <button
+                        key={f}
+                        type="button"
+                        onClick={() => setFilter(f)}
+                        className={cn(
+                          "shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold",
+                          filter === f
+                            ? "bg-primary text-white"
+                            : "bg-muted text-foreground",
+                        )}
+                      >
+                        {f}
+                      </button>
+                    ))}
+                  </div>
+                }
+              />
             </MotionSection>
 
             <MotionSection

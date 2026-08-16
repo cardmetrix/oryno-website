@@ -13,6 +13,7 @@ import {
   VtpassServicePicker,
   type VtpassServiceOption,
 } from "@/components/app/vtpass-service-picker";
+import { SelectSheet } from "@/components/app/select-sheet";
 import { useCountry } from "@/components/providers/country-provider";
 import { airtimePresets, estimateAirtimeCashback } from "@/lib/telecom";
 import { formatCountryMoney } from "@/lib/country";
@@ -291,12 +292,34 @@ export default function AirtimePage() {
                   </p>
                 </div>
               </div>
-              <VtpassServicePicker
-                services={networks}
-                value={networkId}
-                onChange={setNetworkId}
-                loading={loadingNetworks || countryLoading}
-              />
+              <div className="md:hidden">
+                <SelectSheet
+                  label="Network"
+                  title="Select network"
+                  subtitle={`Networks for ${country?.name || "your country"}`}
+                  hint="Tap to choose a network"
+                  value={networkId}
+                  valueLabel={selectedNetwork?.name}
+                  valueImage={selectedNetwork?.image}
+                  onChange={setNetworkId}
+                  loading={loadingNetworks || countryLoading}
+                  emptyText="No networks available"
+                  options={networks.map((n) => ({
+                    id: n.serviceID,
+                    title: n.name,
+                    image: n.image ?? null,
+                    subtitle: "Tap to select",
+                  }))}
+                />
+              </div>
+              <div className="hidden md:block">
+                <VtpassServicePicker
+                  services={networks}
+                  value={networkId}
+                  onChange={setNetworkId}
+                  loading={loadingNetworks || countryLoading}
+                />
+              </div>
             </MotionSection>
 
             <MotionSection
@@ -369,39 +392,22 @@ export default function AirtimePage() {
                 delay={0.08}
                 className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6"
               >
-                <h2 className="mb-3 text-base font-semibold">Select package</h2>
-                <div className="grid gap-2">
-                  {loadingPackages
-                    ? Array.from({ length: 3 }).map((_, i) => (
-                        <div
-                          key={i}
-                          className="h-14 animate-pulse rounded-[16px] bg-muted"
-                        />
-                      ))
-                    : variations.map((v) => (
-                        <button
-                          key={v.variationCode}
-                          type="button"
-                          onClick={() => setVariationCode(v.variationCode)}
-                          className={cn(
-                            "flex items-center justify-between rounded-[16px] border px-4 py-3 text-left",
-                            variationCode === v.variationCode
-                              ? "border-primary bg-oryno-orange-muted"
-                              : "border-border",
-                          )}
-                        >
-                          <span className="text-sm font-semibold">{v.name}</span>
-                          <span className="text-sm font-bold text-primary">
-                            {money(v.amount)}
-                          </span>
-                        </button>
-                      ))}
-                  {!loadingPackages && !variations.length ? (
-                    <p className="py-4 text-center text-sm text-muted-foreground">
-                      No packages for this network
-                    </p>
-                  ) : null}
-                </div>
+                <SelectSheet
+                  label="Package"
+                  title="Select package"
+                  subtitle="Airtime top-up packages"
+                  hint="Tap to choose a package"
+                  value={variationCode}
+                  valueLabel={selectedVariation?.name}
+                  onChange={setVariationCode}
+                  loading={loadingPackages}
+                  emptyText="No packages for this network"
+                  options={variations.map((v) => ({
+                    id: v.variationCode,
+                    title: v.name,
+                    trailing: money(v.amount),
+                  }))}
+                />
               </MotionSection>
             )}
 

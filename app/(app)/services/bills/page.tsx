@@ -19,6 +19,7 @@ import {
   VtpassServicePicker,
   type VtpassServiceOption,
 } from "@/components/app/vtpass-service-picker";
+import { SelectSheet } from "@/components/app/select-sheet";
 import { useCountry } from "@/components/providers/country-provider";
 import { formatCountryMoney } from "@/lib/country";
 import { cn } from "@/lib/utils";
@@ -311,13 +312,43 @@ export default function BillsPage() {
               <h2 className="mb-3 text-base font-semibold">
                 {category === "tv" ? "TV providers" : "Electricity discos"}
               </h2>
-              <VtpassServicePicker
-                services={services}
-                value={serviceID}
-                onChange={setServiceID}
-                loading={loadingServices}
-                columns="grid-cols-2 sm:grid-cols-3 lg:grid-cols-4"
-              />
+              <div className="md:hidden">
+                <SelectSheet
+                  label="Provider"
+                  title={
+                    category === "tv"
+                      ? "Select TV provider"
+                      : "Select electricity disco"
+                  }
+                  subtitle={
+                    category === "tv"
+                      ? "DSTV, GOtv, Startimes & more"
+                      : "Prepaid & postpaid discos"
+                  }
+                  hint="Tap to choose a provider"
+                  value={serviceID}
+                  valueLabel={selectedService?.name}
+                  valueImage={selectedService?.image}
+                  onChange={setServiceID}
+                  loading={loadingServices}
+                  emptyText="No providers available"
+                  options={services.map((s) => ({
+                    id: s.serviceID,
+                    title: s.name,
+                    image: s.image ?? null,
+                    subtitle: "Tap to select",
+                  }))}
+                />
+              </div>
+              <div className="hidden md:block">
+                <VtpassServicePicker
+                  services={services}
+                  value={serviceID}
+                  onChange={setServiceID}
+                  loading={loadingServices}
+                  columns="grid-cols-2 sm:grid-cols-3 lg:grid-cols-4"
+                />
+              </div>
             </MotionSection>
 
             <MotionSection
@@ -362,40 +393,29 @@ export default function BillsPage() {
               delay={0.08}
               className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6"
             >
-              <h2 className="mb-3 text-base font-semibold">
-                {category === "tv" ? "Bouquets / plans" : "Meter type"}
-              </h2>
-              <div className="grid max-h-[320px] gap-2 overflow-y-auto">
-                {loadingPlans ? (
-                  Array.from({ length: 3 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="h-14 animate-pulse rounded-[16px] bg-muted"
-                    />
-                  ))
-                ) : (
-                  variations.map((v) => (
-                    <button
-                      key={v.variationCode}
-                      type="button"
-                      onClick={() => setVariationCode(v.variationCode)}
-                      className={cn(
-                        "flex items-center justify-between rounded-[16px] border px-4 py-3 text-left",
-                        variationCode === v.variationCode
-                          ? "border-primary bg-oryno-orange-muted"
-                          : "border-border",
-                      )}
-                    >
-                      <span className="text-sm font-semibold">{v.name}</span>
-                      {v.fixedPrice && v.amount > 0 ? (
-                        <span className="text-sm font-bold text-primary">
-                          {money(v.amount)}
-                        </span>
-                      ) : null}
-                    </button>
-                  ))
-                )}
-              </div>
+              <SelectSheet
+                label={category === "tv" ? "Bouquet / plan" : "Meter type"}
+                title={
+                  category === "tv" ? "Select bouquet" : "Select meter type"
+                }
+                subtitle={
+                  category === "tv"
+                    ? "Available subscription plans"
+                    : "Prepaid or postpaid"
+                }
+                hint="Tap to choose"
+                value={variationCode}
+                valueLabel={selectedVariation?.name}
+                onChange={setVariationCode}
+                loading={loadingPlans}
+                emptyText="No plans available"
+                options={variations.map((v) => ({
+                  id: v.variationCode,
+                  title: v.name,
+                  trailing:
+                    v.fixedPrice && v.amount > 0 ? money(v.amount) : undefined,
+                }))}
+              />
 
               {(category === "electricity" ||
                 (selectedVariation && !selectedVariation.fixedPrice)) && (
