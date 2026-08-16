@@ -2,8 +2,6 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   airtimeOrders,
-  billPayments,
-  billProviders,
   dataOrders,
   dataPlans,
   telecomNetworks,
@@ -18,6 +16,11 @@ import {
   toWalletSummary,
 } from "@/lib/wallet";
 import { priceLocalAmount } from "@/lib/pricing/service-pricing";
+import {
+  purchaseSogoAirtime,
+  purchaseSogoBill,
+  purchaseSogoData,
+} from "@/lib/sogo/purchase";
 import {
   generateVtpassRequestId,
   getVtpassVariations,
@@ -201,47 +204,6 @@ async function ensureDataPlan(input: {
     .returning();
 
   return created;
-}
-
-async function ensureBillProvider(input: {
-  countryCode: string;
-  serviceID: string;
-  name: string;
-  category: "electricity" | "tv";
-}) {
-  const slug = input.serviceID.slice(0, 80);
-  const existing = await db.query.billProviders.findFirst({
-    where: and(
-      eq(billProviders.countryCode, input.countryCode),
-      eq(billProviders.slug, slug),
-    ),
-  });
-  if (existing) return existing;
-
-  const [created] = await db
-    .insert(billProviders)
-    .values({
-      countryCode: input.countryCode,
-      name: input.name.slice(0, 120),
-      slug,
-      category: input.category,
-      description: input.name,
-      accent: "#FF6A00",
-      status: "active",
-    })
-    .onConflictDoNothing()
-    .returning();
-
-  if (created) return created;
-
-  const again = await db.query.billProviders.findFirst({
-    where: and(
-      eq(billProviders.countryCode, input.countryCode),
-      eq(billProviders.slug, slug),
-    ),
-  });
-  if (!again) throw new Error("Unable to resolve bill provider");
-  return again;
 }
 
 type DebitPrepared = {
@@ -438,6 +400,17 @@ export async function purchaseAirtime(input: {
   productTypeId?: string | number;
   variationCode?: string;
 }) {
+  if (input.mode !== "international") {
+    return purchaseSogoAirtime({
+      userId: input.userId,
+      countryCode: input.countryCode,
+      serviceID: input.serviceID,
+      phone: input.phone,
+      amount: input.amount,
+      saveBeneficiary: input.saveBeneficiary,
+    });
+  }
+
   const phone = normalizePhone(input.phone);
   if (phone.length < 10) throw new Error("Enter a valid phone number");
   if (!Number.isFinite(input.amount) || input.amount <= 0) {
@@ -601,6 +574,18 @@ export async function purchaseData(input: {
   countryIso?: string;
   productTypeId?: string | number;
 }) {
+  if (input.mode !== "international") {
+    return purchaseSogoData({
+      userId: input.userId,
+      countryCode: input.countryCode,
+      serviceID: input.serviceID,
+      phone: input.phone,
+      variationCode: input.variationCode,
+      variationName: input.variationName,
+      amount: input.amount,
+    });
+  }
+
   const phone = normalizePhone(input.phone);
   if (phone.length < 10) throw new Error("Enter a valid phone number");
   if (!input.variationCode) throw new Error("Select a data plan");
@@ -756,148 +741,18 @@ export async function purchaseBill(input: {
   subscriptionType?: string;
   quantity?: number;
 }) {
-  const phone = normalizePhone(input.phone);
-  const customerRef = input.customerRef.trim();
-  if (customerRef.length < 6) {
-    throw new Error(
-      input.category === "tv"
-        ? "Enter a valid smartcard number"
-        : "Enter a valid meter number",
-    );
-  }
-  if (!input.variationCode) throw new Error("Select a plan or meter type");
-  if (input.amount < 100) throw new Error("Minimum bill amount is ₦100");
-
-  // Fixed-price TV/plans use provider face; open amounts (electricity) use user amount.
-  const faceAmount = await lookupVariationFace({
-    serviceID: input.serviceID,
-    variationCode: input.variationCode,
-    fallbackAmount: input.amount,
-    fixedOnly: true,
-  });
-  const priced = await resolveVtpassRetail({
-    serviceID: input.serviceID,
-    variationCode: input.variationCode,
-    faceAmount,
-  });
-
-  const country = (input.countryCode || "NG").toUpperCase().slice(0, 2);
-  const provider = await ensureBillProvider({
-    countryCode: country,
-    serviceID: input.serviceID,
-    name: input.serviceName,
-    category: input.category,
-  });
-
-  const prepared = await debitForPurchase({
+  return purchaseSogoBill({
     userId: input.userId,
     countryCode: input.countryCode,
-    amount: priced.retail,
-    category: "bill",
-    title: input.serviceName,
-    subtitle: customerRef,
-    metadata: {
-      serviceID: input.serviceID,
-      variationCode: input.variationCode,
-      billCategory: input.category,
-      faceAmount: priced.face,
-      serviceKey: priced.serviceKey,
-    },
+    serviceID: input.serviceID,
+    serviceName: input.serviceName,
+    category: input.category,
+    customerRef: input.customerRef,
+    phone: input.phone,
+    amount: input.amount,
+    variationCode: input.variationCode,
+    subscriptionType: input.subscriptionType,
   });
-
-  const [payment] = await db
-    .insert(billPayments)
-    .values({
-      userId: input.userId,
-      providerId: provider.id,
-      customerRef,
-      amount: priced.retail.toFixed(2),
-      status: "processing",
-      transactionId: prepared.transaction.id,
-      providerRef: prepared.requestId,
-    })
-    .returning();
-
-  try {
-    const payload = {
-      request_id: prepared.requestId,
-      serviceID: input.serviceID,
-      billersCode: customerRef,
-      variation_code: input.variationCode,
-      amount: priced.face,
-      phone: phone || "08011111111",
-      ...(input.category === "electricity"
-        ? { type: input.variationCode }
-        : {}),
-      ...(input.subscriptionType
-        ? { subscription_type: input.subscriptionType }
-        : {}),
-      ...(input.quantity ? { quantity: input.quantity } : {}),
-    };
-
-    const { response, simulated } = await callProviderOrSimulate(payload);
-    const outcome = mapVtpassOutcome(response);
-    if (outcome === "failed") {
-      throw new Error(response.response_description || "Bill payment failed");
-    }
-
-    const token =
-      response.purchased_code ||
-      (typeof response.content?.transactions === "object"
-        ? undefined
-        : undefined);
-
-    await db
-      .update(billPayments)
-      .set({
-        status: outcome === "completed" ? "completed" : "processing",
-        providerRef:
-          response.content?.transactions?.transactionId || prepared.requestId,
-        tokenOrReceipt: token || null,
-        updatedAt: new Date(),
-      })
-      .where(eq(billPayments.id, payment.id));
-
-    await finalizeTx(
-      prepared.transaction.id,
-      outcome === "completed" ? "completed" : "processing",
-      {
-        provider: "vtpass",
-        requestId: prepared.requestId,
-        vtpass: response,
-        simulated,
-        orderId: payment.id,
-      },
-    );
-
-    return {
-      payment,
-      transactionId: prepared.transaction.id,
-      wallet: toWalletSummary(prepared.wallet),
-      requestId: prepared.requestId,
-      status: outcome,
-      simulated,
-      response,
-      token: token || null,
-    };
-  } catch (error) {
-    const reason = error instanceof Error ? error.message : "Payment failed";
-    await refundDebit({
-      walletId: prepared.wallet.id,
-      transactionId: prepared.transaction.id,
-      amount: prepared.amount,
-      reason,
-    });
-    await db
-      .update(billPayments)
-      .set({
-        status: "failed",
-        failureReason: reason,
-        updatedAt: new Date(),
-      })
-      .where(eq(billPayments.id, payment.id));
-    throw error instanceof Error ? error : new Error(reason);
-  }
 }
 
 export async function requeryPurchase(requestId: string) {

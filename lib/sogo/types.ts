@@ -81,6 +81,8 @@ export type SogoWebhookEvent = {
     completed_at?: string | null;
     created_at?: string;
     payout_amount?: SogoMoney | number;
+    token?: string | null;
+    prepaid_token?: string | null;
   };
 };
 
@@ -94,4 +96,72 @@ export type GiftCardBrandView = {
   cardTypes: SogoCardType[];
   requiresPin: boolean;
   active: boolean;
+};
+
+export type SogoBillCategory =
+  | "airtime"
+  | "data"
+  | "electricity"
+  | "cable_tv"
+  | "tv-subscription"
+  | "electricity-bill";
+
+export type SogoBillProvider = {
+  slug: string;
+  name: string;
+  image?: string | null;
+};
+
+export type SogoBillCatalog = {
+  airtime?: { label?: string; providers?: SogoBillProvider[] };
+  data?: { label?: string; providers?: SogoBillProvider[] };
+  electricity?: { label?: string; providers?: SogoBillProvider[] };
+  cable_tv?: { label?: string; providers?: SogoBillProvider[] };
+  [key: string]: unknown;
+};
+
+export type SogoBillPlan = {
+  variationCode: string;
+  name: string;
+  amount: number;
+  fixedPrice: boolean;
+  validity?: string | null;
+  size?: string | null;
+};
+
+export type SogoBillPurchaseData = {
+  reference?: string;
+  status?: string;
+  type?: string;
+  network?: string;
+  phone?: string;
+  amount?: number;
+  fee?: number;
+  total?: number;
+  token?: string | null;
+  prepaid_token?: string | null;
+  token_code?: string | null;
+  created_at?: string;
+  [key: string]: unknown;
+};
+
+export type SogoBillPurchaseResponse = {
+  message?: string;
+  data?: SogoBillPurchaseData;
+};
+
+export type SogoVerifyResult = {
+  message?: string;
+  verification?: {
+    customer_name?: string;
+    address?: string;
+    meter_number?: string;
+    meter_type?: string;
+    smartcard_number?: string;
+    current_bouquet?: string;
+    renewal_amount?: number | string;
+    [key: string]: unknown;
+  };
+  customer_name?: string;
+  [key: string]: unknown;
 };

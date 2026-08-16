@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { handleSogoBillsWebhook } from "@/lib/sogo/purchase";
 import { handleSogoWebhookEvent } from "@/lib/sogo/sell";
 import type { SogoWebhookEvent } from "@/lib/sogo/types";
 import { verifySogoWebhookSignature } from "@/lib/sogo/webhook";
@@ -23,8 +24,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, pong: true });
     }
 
-    const result = await handleSogoWebhookEvent(body);
-    return NextResponse.json(result);
+    const gift = await handleSogoWebhookEvent(body);
+    if (!gift.ignored) return NextResponse.json(gift);
+
+    const bills = await handleSogoBillsWebhook(body);
+    return NextResponse.json(bills.ignored ? gift : bills);
   } catch (error) {
     console.error("[sogo-webhook]", error);
     return NextResponse.json(

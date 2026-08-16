@@ -1,19 +1,21 @@
 const CODE_HINTS: Record<string, string> = {
-  authentication_failed: "Gift card service is temporarily unavailable.",
-  authentication_required: "Gift card service is temporarily unavailable.",
-  invalid_scope: "Gift card service is temporarily unavailable.",
-  secret_key_required: "Gift card service is temporarily unavailable.",
-  environment_mismatch: "Gift card service is temporarily unavailable.",
+  authentication_failed: "This service is temporarily unavailable.",
+  authentication_required: "This service is temporarily unavailable.",
+  invalid_scope: "This service is temporarily unavailable.",
+  secret_key_required: "This service is temporarily unavailable.",
+  environment_mismatch: "This service is temporarily unavailable.",
   insufficient_funds:
-    "Unable to process this trade right now. Please try again shortly.",
-  validation_failed: "Check your card details and try again.",
+    "Unable to process this request right now. Please try again shortly.",
+  validation_failed: "Check the details and try again.",
+  verification_failed:
+    "We could not verify that meter, smartcard, or account number.",
   rate_limit_exceeded: "Too many requests. Please wait a moment and try again.",
   service_unavailable:
-    "Gift card trading is temporarily unavailable. Please try again soon.",
+    "This service is temporarily unavailable. Please try again soon.",
   kyc_tier_insufficient:
-    "Gift card trading is not fully set up yet. Please try again later.",
+    "This service is not fully set up yet. Please try again later.",
   kyb_verification_required:
-    "Gift card trading is not fully set up yet. Please try again later.",
+    "This service is not fully set up yet. Please try again later.",
 };
 
 export function sogoErrorToEnglish(message: string, code?: string) {
@@ -23,13 +25,16 @@ export function sogoErrorToEnglish(message: string, code?: string) {
   if (!m) return "Something went wrong. Please try again.";
 
   if (m.includes("sogo") || m.includes("partner api")) {
-    return "Gift card trading is temporarily unavailable. Please try again.";
+    return "This service is temporarily unavailable. Please try again.";
   }
   if (m.includes("insufficient")) {
-    return "Unable to process this trade right now. Please try again shortly.";
+    return "Unable to process this request right now. Please try again shortly.";
+  }
+  if (m.includes("verif")) {
+    return "We could not verify that meter, smartcard, or account number.";
   }
   if (m.includes("validation") || m.includes("invalid")) {
-    return "Check your card details and try again.";
+    return "Check the details and try again.";
   }
   if (m.includes("rate limit") || m.includes("too many")) {
     return "Too many requests. Please wait a moment and try again.";
@@ -40,7 +45,7 @@ export function sogoErrorToEnglish(message: string, code?: string) {
 
   // Strip provider branding from user-facing copy
   return message
-    .replace(/\bSogo\b/gi, "gift card service")
+    .replace(/\bSogo\b/gi, "this service")
     .replace(/\bsogo\.africa\b/gi, "provider")
     .slice(0, 220);
 }

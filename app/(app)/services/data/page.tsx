@@ -147,7 +147,7 @@ export default function DataPage() {
       setVariationCode("");
       try {
         const url = isNigeria
-          ? `/api/vtpass/variations?serviceID=${encodeURIComponent(networkId)}`
+          ? `/api/vtpass/variations?serviceID=${encodeURIComponent(networkId)}&identifier=data`
           : `/api/vtpass/variations?serviceID=foreign-airtime&operator_id=${encodeURIComponent(networkId)}&product_type_id=${productTypeId}`;
         const res = await fetch(url);
         const data = await res.json();

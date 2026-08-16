@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
 import {
-  isVtpassDemoMode,
-  verifyVtpassCustomer,
-} from "@/lib/vtpass";
+  isSogoDemoMode,
+  sogoErrorToEnglish,
+  verifySogoMeter,
+  verifySogoSmartcard,
+} from "@/lib/sogo";
 
 export const runtime = "nodejs";
 
@@ -18,6 +20,7 @@ export async function POST(req: Request) {
       billersCode?: string;
       serviceID?: string;
       type?: string;
+      category?: "electricity" | "tv";
     };
 
     if (!body.billersCode?.trim() || !body.serviceID) {
@@ -27,66 +30,76 @@ export async function POST(req: Request) {
       );
     }
 
-    if (isVtpassDemoMode()) {
+    const category =
+      body.category ||
+      (body.type === "prepaid" || body.type === "postpaid"
+        ? "electricity"
+        : "tv");
+
+    if (isSogoDemoMode()) {
       return NextResponse.json({
         ok: true,
         demo: true,
         customerName: "ORYNO Demo Customer",
         customerAddress: "Lagos, Nigeria",
         meterNumber: body.billersCode,
-        currentBouquet: body.serviceID.includes("dstv")
-          ? "DStv Compact"
-          : undefined,
+        currentBouquet:
+          category === "tv" ? "DStv Compact" : undefined,
         renewalAmount: undefined,
-        raw: { code: "000" },
       });
     }
 
-    const result = await verifyVtpassCustomer({
-      billersCode: body.billersCode.trim(),
-      serviceID: body.serviceID,
-      type: body.type,
-    });
+    if (category === "electricity") {
+      const meterType =
+        body.type === "postpaid" ? "postpaid" : "prepaid";
+      const result = await verifySogoMeter({
+        discoSlug: body.serviceID,
+        meterNumber: body.billersCode.trim(),
+        meterType,
+      });
+      if (!result.customerName) {
+        return NextResponse.json(
+          { error: "Invalid customer / meter / smartcard number" },
+          { status: 400 },
+        );
+      }
+      return NextResponse.json({
+        ok: true,
+        demo: false,
+        customerName: result.customerName,
+        customerAddress: result.customerAddress,
+        meterNumber: result.meterNumber,
+        currentBouquet: undefined,
+        renewalAmount: undefined,
+      });
+    }
 
-    if (result.WrongBillersCode) {
+    const result = await verifySogoSmartcard({
+      provider: body.serviceID,
+      smartcardNumber: body.billersCode.trim(),
+    });
+    if (!result.customerName) {
       return NextResponse.json(
         { error: "Invalid customer / meter / smartcard number" },
         { status: 400 },
       );
     }
-
-    const content = (result.content ?? {}) as Record<string, unknown>;
-    const customerName =
-      (result.Customer_Name as string | undefined) ||
-      (content.Customer_Name as string | undefined) ||
-      (content.customer_name as string | undefined);
-    const address =
-      (result.Address as string | undefined) ||
-      (content.Address as string | undefined);
-    const meter =
-      (result.Meter_Number as string | undefined) ||
-      (result.MeterNumber as string | undefined) ||
-      (content.Meter_Number as string | undefined);
-
     return NextResponse.json({
       ok: true,
       demo: false,
-      customerName,
-      customerAddress: address,
-      meterNumber: meter || body.billersCode,
-      currentBouquet:
-        (result.Current_Bouquet as string | undefined) ||
-        (content.Current_Bouquet as string | undefined),
-      renewalAmount:
-        Number(result.Renewal_Amount ?? content.Renewal_Amount) || undefined,
-      raw: result,
+      customerName: result.customerName,
+      customerAddress: undefined,
+      meterNumber: body.billersCode,
+      currentBouquet: result.currentBouquet,
+      renewalAmount: result.renewalAmount,
     });
   } catch (error) {
-    console.error("[vtpass-verify]", error);
+    console.error("[sogo-verify]", error);
     return NextResponse.json(
       {
-        error:
+        error: sogoErrorToEnglish(
           error instanceof Error ? error.message : "Verification failed",
+        ),
       },
       { status: 400 },
     );

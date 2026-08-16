@@ -1,13 +1,7 @@
 import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
-import {
-  cleanNetworkName,
-  fallbackServicesFor,
-  getVtpassServices,
-  isVtpassDemoMode,
-  resolveServiceImage,
-  type VtpassServiceCategory,
-} from "@/lib/vtpass";
+import { isSogoDemoMode, listSogoBillServices } from "@/lib/sogo";
+import type { VtpassServiceCategory } from "@/lib/vtpass";
 
 export const runtime = "nodejs";
 
@@ -36,35 +30,21 @@ export async function GET(req: Request) {
       );
     }
 
-    let services = isVtpassDemoMode()
-      ? fallbackServicesFor(identifier)
-      : await getVtpassServices(identifier);
-
-    if (!services.length) {
-      services = fallbackServicesFor(identifier);
-    }
-
-    // Local airtime/data lists should not include foreign-airtime product
-    const filtered = services.filter(
-      (s) => s.serviceID !== "foreign-airtime",
-    );
+    const services = await listSogoBillServices(identifier);
 
     return NextResponse.json({
       ok: true,
-      demo: isVtpassDemoMode(),
+      demo: isSogoDemoMode(),
+      provider: "sogo",
       identifier,
-      services: filtered.map((s) => ({
-        serviceID: s.serviceID,
-        name: cleanNetworkName(s.name),
-        rawName: s.name,
-        minAmount: Number(s.minimium_amount) || undefined,
-        maxAmount: Number(s.maximum_amount) || undefined,
-        convenienceFee: s.convinience_fee,
-        image: resolveServiceImage(s.image, s.serviceID),
+      services: services.map((s) => ({
+        serviceID: s.slug,
+        name: s.name,
+        image: s.image ?? null,
       })),
     });
   } catch (error) {
-    console.error("[vtpass-services]", error);
+    console.error("[sogo-bills-services]", error);
     return NextResponse.json(
       {
         error:

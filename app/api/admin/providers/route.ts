@@ -30,10 +30,21 @@ export async function GET() {
   return withAdminApi(async () => {
     const providers = [
       {
+        id: "sogo",
+        name: "Sogo",
+        type: "Gift card sell + Airtime / Data / Bills",
+        country: "Nigeria",
+        status: modeLabel({
+          configured: !isSogoDemoMode(),
+          demo: isSogoDemoMode(),
+          sandbox: isSogoSandbox(),
+        }),
+      },
+      {
         id: "vtpass",
         name: "VTpass",
-        type: "Airtime / Data / Bills",
-        country: "Nigeria",
+        type: "International airtime / data",
+        country: "Global",
         status: modeLabel({
           configured: !isVtpassDemoMode() || Boolean(process.env.VTPASS_API_KEY),
           demo: isVtpassDemoMode(),
@@ -58,17 +69,6 @@ export async function GET() {
         status: modeLabel({
           configured: isJapLive() || !isJapDemoMode(),
           demo: isJapDemoMode(),
-        }),
-      },
-      {
-        id: "sogo",
-        name: "Sogo",
-        type: "Gift card sell",
-        country: "Global",
-        status: modeLabel({
-          configured: !isSogoDemoMode(),
-          demo: isSogoDemoMode(),
-          sandbox: isSogoSandbox(),
         }),
       },
       {

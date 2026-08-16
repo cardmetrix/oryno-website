@@ -122,7 +122,9 @@ export default function BillsPage() {
       setVariationCode("");
       try {
         const res = await fetch(
-          `/api/vtpass/variations?serviceID=${encodeURIComponent(serviceID)}`,
+          `/api/vtpass/variations?serviceID=${encodeURIComponent(serviceID)}&identifier=${
+            category === "tv" ? "tv-subscription" : "electricity-bill"
+          }`,
         );
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Failed to load plans");
@@ -142,7 +144,7 @@ export default function BillsPage() {
     return () => {
       cancelled = true;
     };
-  }, [serviceID]);
+  }, [serviceID, category]);
 
   async function verifyCustomer() {
     if (!serviceID || customerRef.trim().length < 6) return;
@@ -155,6 +157,7 @@ export default function BillsPage() {
         body: JSON.stringify({
           billersCode: customerRef.trim(),
           serviceID,
+          category,
           type: category === "electricity" ? variationCode : undefined,
         }),
       });

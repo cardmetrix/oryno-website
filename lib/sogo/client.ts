@@ -57,6 +57,9 @@ export function hasSogoKeys() {
 }
 
 export function isSogoDemoMode() {
+  const flag = (process.env.SOGO_DEMO || "").trim().toLowerCase();
+  if (flag === "true" || flag === "1") return true;
+  if (flag === "false" || flag === "0") return false;
   return !hasSogoKeys();
 }
 
@@ -72,7 +75,7 @@ export function sogoSellPayoutShare() {
   return raw;
 }
 
-async function sogoFetch<T>(
+export async function sogoRequest<T>(
   path: string,
   init?: RequestInit & { idempotencyKey?: string },
 ): Promise<T> {
@@ -127,17 +130,18 @@ export async function fetchSogoSellCatalog(): Promise<GiftCardBrandView[]> {
   }
 
   try {
-    const json = await sogoFetch<{ data: SogoCatalogBrand[] }>(
+    const json = await sogoRequest<{ data: SogoCatalogBrand[] }>(
       "/gift-cards/sell/catalog",
     );
     const rows = Array.isArray(json?.data) ? json.data : [];
-    if (!rows.length) return FALLBACK_GIFT_CARD_CATALOG.map(toBrandView);
     return rows
       .map((row) => toBrandView(normalizeCatalogBrand(row)))
       .filter((b) => b.active);
   } catch (error) {
     console.error("[sogo-catalog]", error);
-    return FALLBACK_GIFT_CARD_CATALOG.map(toBrandView);
+    throw error instanceof Error
+      ? error
+      : new Error("Failed to load gift card catalogue");
   }
 }
 
@@ -170,15 +174,16 @@ export async function fetchSogoSellRates(slug?: string): Promise<SogoRateEntry[]
 
   try {
     const qs = slug ? `?slug=${encodeURIComponent(slug)}` : "";
-    const json = await sogoFetch<{ data: SogoRateEntry[] }>(
+    const json = await sogoRequest<{ data: SogoRateEntry[] }>(
       `/gift-cards/sell/rates${qs}`,
     );
     const rows = Array.isArray(json?.data) ? json.data : [];
-    if (!rows.length) return demoRates();
     return rows;
   } catch (error) {
     console.error("[sogo-rates]", error);
-    return demoRates();
+    throw error instanceof Error
+      ? error
+      : new Error("Failed to load gift card rates");
   }
 }
 
@@ -327,7 +332,7 @@ export async function submitSogoGiftCardSell(input: {
       form.append("images[]", blob, img.filename || "card.jpg");
     }
 
-    const json = await sogoFetch<{ data: SogoSellResponse }>(
+    const json = await sogoRequest<{ data: SogoSellResponse }>(
       "/gift-cards/sell",
       {
         method: "POST",
@@ -338,7 +343,7 @@ export async function submitSogoGiftCardSell(input: {
     return { data: json.data, simulated: false };
   }
 
-  const json = await sogoFetch<{ data: SogoSellResponse }>("/gift-cards/sell", {
+  const json = await sogoRequest<{ data: SogoSellResponse }>("/gift-cards/sell", {
     method: "POST",
     idempotencyKey: input.idempotencyKey,
     body: JSON.stringify({

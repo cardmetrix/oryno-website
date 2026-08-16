@@ -28,16 +28,10 @@ import {
   fetchSogoSellCatalog,
   fetchSogoSellRates,
   isSogoDemoMode,
+  listSogoBillServices,
+  listSogoVariations,
 } from "@/lib/sogo";
-import {
-  cleanNetworkName,
-  fallbackServicesFor,
-  fallbackVariationsFor,
-  getVtpassServices,
-  getVtpassVariations,
-  isVtpassDemoMode,
-  type VtpassServiceCategory,
-} from "@/lib/vtpass";
+import type { VtpassServiceCategory } from "@/lib/vtpass";
 import {
   createUsdPricer,
   getOverrideFor,
@@ -565,24 +559,19 @@ export async function loadAdminPricingCatalog(input: {
     };
   }
 
-  // vtpass
+  // Airtime / data / bills — live Sogo catalogue, priced with the vtpass markup bucket
   const identifier = (input.params.identifier ||
     "data") as VtpassServiceCategory;
   applied.identifier = identifier;
 
-  let services = isVtpassDemoMode()
-    ? fallbackServicesFor(identifier)
-    : await getVtpassServices(identifier);
-  if (!services.length) services = fallbackServicesFor(identifier);
-  services = services.filter((s) => s.serviceID !== "foreign-airtime");
-
+  const services = await listSogoBillServices(identifier);
   const serviceOptions = services.map((s) => ({
-    id: s.serviceID,
-    label: cleanNetworkName(s.name),
+    id: s.slug,
+    label: s.name,
   }));
 
   const serviceID =
-    input.params.serviceID || serviceOptions[0]?.id || services[0]?.serviceID;
+    input.params.serviceID || serviceOptions[0]?.id || services[0]?.slug;
   if (serviceID) applied.serviceID = serviceID;
 
   if (!serviceID) {
@@ -605,37 +594,25 @@ export async function loadAdminPricingCatalog(input: {
         applied,
       },
       items: [],
-      demo: isVtpassDemoMode(),
+      demo: isSogoDemoMode(),
       hint: "Select a category to load networks/providers.",
     };
   }
 
-  let variations;
-  let serviceName = serviceID;
-  if (isVtpassDemoMode() && serviceID !== "foreign-airtime") {
-    variations = fallbackVariationsFor(serviceID);
-  } else {
-    try {
-      const live = await getVtpassVariations(serviceID);
-      variations = live.variations;
-      serviceName = live.serviceName || serviceID;
-    } catch {
-      variations = fallbackVariationsFor(serviceID);
-    }
-  }
-  if (!variations.length) variations = fallbackVariationsFor(serviceID);
+  const live = await listSogoVariations({ identifier, serviceID });
+  const variations = live.variations;
+  const serviceName = live.serviceName || serviceID;
 
   const items: AdminCatalogItem[] = [];
   for (const v of variations) {
-    const code = v.variation_code || v.name;
-    const face = Number(v.charged_amount ?? v.variation_amount) || 0;
+    const code = v.variationCode || v.name;
+    const face = v.amount || 0;
     const serviceKey = `${serviceID}:${code}`;
     const priced = await priceLocalAmount({
       provider: "vtpass",
       serviceKey,
       amount: face > 0 ? face : 0,
     });
-    // For open-amount plans (face 0), show group markup effect on ₦1000 sample
     const display =
       face > 0
         ? priced
@@ -649,10 +626,10 @@ export async function loadAdminPricingCatalog(input: {
     items.push({
       serviceKey: keyForOverride,
       title: v.name || code,
-      subtitle: `${cleanNetworkName(serviceName)} · ${identifier}`,
+      subtitle: `${serviceName} · ${identifier}`,
       details:
         face > 0
-          ? `Code ${code} · provider ₦${face} · ${String(v.fixedPrice || "").toLowerCase() === "yes" ? "fixed" : "variable"}`
+          ? `Code ${code} · provider ₦${face} · ${v.fixedPrice ? "fixed" : "variable"}`
           : `Code ${code} · open amount (sample ₦1,000 shown) · override key ${keyForOverride}`,
       currency,
       costUsd: null,
@@ -661,7 +638,7 @@ export async function loadAdminPricingCatalog(input: {
       meta: {
         serviceID,
         variationCode: code,
-        fixedPrice: String(v.fixedPrice || "").toLowerCase() === "yes",
+        fixedPrice: v.fixedPrice,
         faceAmount: face,
       },
     });
@@ -692,6 +669,7 @@ export async function loadAdminPricingCatalog(input: {
       applied,
     },
     items,
-    demo: isVtpassDemoMode(),
+    demo: isSogoDemoMode(),
+    hint: "Nigeria airtime, data, and bills are fulfilled by Sogo live.",
   };
 }
