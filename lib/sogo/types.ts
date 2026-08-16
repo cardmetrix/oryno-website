@@ -58,7 +58,9 @@ export type SogoApiError = {
     code?: string;
     message?: string;
     doc_url?: string;
+    errors?: Record<string, string[] | string>;
   };
+  errors?: Record<string, string[] | string>;
   message?: string;
 };
 

@@ -2,10 +2,11 @@ import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
 import { createNotification } from "@/lib/notifications-service";
-import { sellGiftCard, sogoErrorToEnglish } from "@/lib/sogo";
+import { sellGiftCard } from "@/lib/sogo";
 import { formatMoney } from "@/lib/transactions";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 type SellBody = {
   slug?: string;
@@ -21,6 +22,15 @@ type SellBody = {
   idempotencyKey?: string;
 };
 
+function httpStatusFor(error: unknown) {
+  const status =
+    error && typeof error === "object" && "status" in error
+      ? Number((error as { status?: number }).status)
+      : 400;
+  if ([400, 401, 403, 409, 422, 429, 503].includes(status)) return status;
+  return 400;
+}
+
 export async function POST(req: Request) {
   try {
     const user = await ensureAppUser();
@@ -35,6 +45,15 @@ export async function POST(req: Request) {
     }
     if (!body.cardCountry?.trim()) {
       return NextResponse.json({ error: "Select the card country" }, { status: 400 });
+    }
+    if (
+      body.cardCountry.trim().toUpperCase() === "EU" &&
+      !body.specificCountry?.trim()
+    ) {
+      return NextResponse.json(
+        { error: "Select the European country for this card" },
+        { status: 400 },
+      );
     }
     if (!body.cardType) {
       return NextResponse.json({ error: "Select card type" }, { status: 400 });
@@ -112,13 +131,15 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     console.error("[sogo-sell]", error);
+    const status = httpStatusFor(error);
     return NextResponse.json(
       {
-        error: sogoErrorToEnglish(
-          error instanceof Error ? error.message : "Failed to sell gift card",
-        ),
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to sell gift card",
       },
-      { status: 400 },
+      { status },
     );
   }
 }

@@ -162,6 +162,12 @@ export async function sellGiftCard(input: {
       throw new Error("Upload at least one clear photo of the card");
     }
   }
+  if (
+    input.cardCountry.toUpperCase() === "EU" &&
+    !input.specificCountry?.trim()
+  ) {
+    throw new Error("Select the European country for this card");
+  }
 
   const quote = await quoteGiftCardSell({
     slug: input.slug,
@@ -372,7 +378,7 @@ export async function sellGiftCard(input: {
       transactionId: txRow.id,
       reason,
     });
-    throw new Error(sogoErrorToEnglish(reason));
+    throw error instanceof Error ? error : new Error(sogoErrorToEnglish(reason));
   }
 }
 

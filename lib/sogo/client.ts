@@ -39,11 +39,17 @@ export function sogoWebhookSecret() {
 
 export function isSogoSandbox() {
   const key = sogoSecretKey();
-  if (key.startsWith("sogo_sk_test_")) return true;
   if (key.startsWith("sogo_sk_live_")) return false;
+  // Dashboard keys use sogo_sk_sandbox_; docs also mention sogo_sk_test_.
+  if (
+    key.startsWith("sogo_sk_test_") ||
+    key.startsWith("sogo_sk_sandbox_")
+  ) {
+    return true;
+  }
   const flag = (process.env.SOGO_SANDBOX || "").trim().toLowerCase();
-  if (flag === "false" || flag === "0") return false;
-  return true;
+  if (flag === "true" || flag === "1") return true;
+  return false;
 }
 
 export function sogoBaseUrl() {
@@ -57,10 +63,10 @@ export function hasSogoKeys() {
 }
 
 export function isSogoDemoMode() {
+  if (!hasSogoKeys()) return true;
   const flag = (process.env.SOGO_DEMO || "").trim().toLowerCase();
   if (flag === "true" || flag === "1") return true;
-  if (flag === "false" || flag === "0") return false;
-  return !hasSogoKeys();
+  return false;
 }
 
 /**
@@ -75,30 +81,49 @@ export function sogoSellPayoutShare() {
   return raw;
 }
 
+type SogoRequestInit = Omit<RequestInit, "headers"> & {
+  idempotencyKey?: string;
+  headers?: HeadersInit;
+};
+
+function mergeHeaders(initHeaders?: HeadersInit) {
+  const headers: Record<string, string> = {};
+  if (!initHeaders) return headers;
+  new Headers(initHeaders).forEach((value, name) => {
+    headers[name] = value;
+  });
+  return headers;
+}
+
 export async function sogoRequest<T>(
   path: string,
-  init?: RequestInit & { idempotencyKey?: string },
+  init?: SogoRequestInit,
 ): Promise<T> {
   const key = sogoSecretKey();
   if (!key) throw new Error("SOGO_SECRET_KEY is not configured");
 
+  const { idempotencyKey, headers: initHeaders, ...rest } = init || {};
   const headers: Record<string, string> = {
     Authorization: `Bearer ${key}`,
+    "X-API-Key": key,
     Accept: "application/json",
-    ...(init?.headers as Record<string, string> | undefined),
+    ...mergeHeaders(initHeaders),
   };
 
-  if (init?.idempotencyKey) {
-    headers["Idempotency-Key"] = init.idempotencyKey;
+  if (idempotencyKey) {
+    headers["Idempotency-Key"] = idempotencyKey;
   }
 
-  const body = init?.body;
-  if (body && !(body instanceof FormData) && !headers["Content-Type"]) {
+  const body = rest.body;
+  const hasContentType = Object.keys(headers).some(
+    (name) => name.toLowerCase() === "content-type",
+  );
+  if (body && !(body instanceof FormData) && !hasContentType) {
     headers["Content-Type"] = "application/json";
   }
 
   const res = await fetch(`${sogoBaseUrl()}${path}`, {
-    ...init,
+    ...rest,
     headers,
     cache: "no-store",
   });
@@ -113,19 +138,73 @@ export async function sogoRequest<T>(
 
   if (!res.ok) {
     const err = json as SogoApiError | null;
+    const fieldErrors = err?.error?.errors || err?.errors;
     const message =
       err?.error?.message ||
       err?.message ||
       text ||
       `Sogo request failed (${res.status})`;
     const wrapped = new Error(
-      sogoErrorToEnglish(message, err?.error?.code),
-    ) as Error & { code?: string; status?: number };
+      sogoErrorToEnglish(message, err?.error?.code, fieldErrors),
+    ) as Error & {
+      code?: string;
+      status?: number;
+      errors?: Record<string, string[] | string>;
+    };
     wrapped.code = err?.error?.code;
     wrapped.status = res.status;
+    wrapped.errors = fieldErrors;
     throw wrapped;
   }
 
+  return json as T;
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Docs: 503 service_unavailable is transient — retry; no charge was made. */
+async function sogoRequestWithRetry<T>(
+  path: string,
+  init?: SogoRequestInit,
+  attempts = 3,
+): Promise<T> {
+  let last: unknown;
+  for (let i = 0; i < attempts; i += 1) {
+    try {
+      return await sogoRequest<T>(path, init);
+    } catch (error) {
+      last = error;
+      const err = error as { status?: number; code?: string; message?: string };
+      const msg = (err.message || "").toLowerCase();
+      // Product flag from Sogo, not a blip — don't wait out retries.
+      if (
+        /not currently available via the partner api|could not accept this gift card/.test(
+          msg,
+        )
+      ) {
+        throw error;
+      }
+      const retryable =
+        err.status === 503 ||
+        err.status === 429 ||
+        err.code === "service_unavailable" ||
+        err.code === "rate_limit_exceeded" ||
+        err.code === "idempotency_request_in_progress";
+      if (!retryable || i === attempts - 1) throw error;
+      await sleep(err.status === 429 ? 1500 * (i + 1) : 700 * (i + 1));
+    }
+  }
+  throw last;
+}
+
+export function unwrapSogoData<T>(json: unknown): T {
+  if (!json || typeof json !== "object") {
+    throw new Error("Empty response from provider");
+  }
+  const obj = json as { data?: T };
+  if (obj.data != null) return obj.data;
   return json as T;
 }
 
@@ -345,54 +424,66 @@ export async function submitSogoGiftCardSell(input: {
     return { data, simulated: true };
   }
 
+  const cardAmount = Number.parseFloat(String(input.cardAmount));
+  const payoutCurrency = (input.payoutCurrency || "NGN").toUpperCase();
+  const specificCountry = input.specificCountry?.trim() || undefined;
+
+  function readSellData(json: unknown): SogoSellResponse {
+    const data = unwrapSogoData<SogoSellResponse>(json);
+    if (!data?.reference && !data?.id) {
+      throw new Error("Empty response from provider");
+    }
+    return data;
+  }
+
   if (input.cardType === "physical" && input.images?.length) {
     const form = new FormData();
     form.set("slug", input.slug);
-    form.set("card_country", input.cardCountry);
-    form.set("card_type", input.cardType);
+    form.set("card_country", input.cardCountry.toUpperCase());
+    form.set("card_type", "physical");
     if (input.subType) form.set("sub_type", input.subType);
-    form.set("card_currency", input.cardCurrency);
-    form.set("card_amount", String(input.cardAmount));
-    form.set("payout_currency", input.payoutCurrency || "NGN");
-    if (input.specificCountry) form.set("specific_country", input.specificCountry);
+    form.set("card_currency", input.cardCurrency.toUpperCase());
+    form.set("card_amount", String(cardAmount));
+    if (payoutCurrency !== "NGN") form.set("payout_currency", payoutCurrency);
+    if (specificCountry) form.set("specific_country", specificCountry);
     if (input.additionalInfo) form.set("additional_info", input.additionalInfo);
 
     for (const img of input.images.slice(0, 5)) {
       const bytes = Buffer.from(img.base64, "base64");
       const blob = new Blob([bytes], { type: img.mime || "image/jpeg" });
-      form.append("images[]", blob, img.filename || "card.jpg");
+      const filename = img.filename || "card.jpg";
+      // Docs field is `images`. Laravel also accepts `images[]`.
+      form.append("images", blob, filename);
     }
 
-    const json = await sogoRequest<{ data: SogoSellResponse }>(
-      "/gift-cards/sell",
-      {
-        method: "POST",
-        body: form,
-        idempotencyKey: input.idempotencyKey,
-      },
-    );
-    return { data: json.data, simulated: false };
+    const json = await sogoRequestWithRetry<unknown>("/gift-cards/sell", {
+      method: "POST",
+      body: form,
+      idempotencyKey: input.idempotencyKey,
+    });
+    return { data: readSellData(json), simulated: false };
   }
 
-  const json = await sogoRequest<{ data: SogoSellResponse }>("/gift-cards/sell", {
+  // Exact e-code contract from https://developer.sogo.africa/products/gift-cards
+  const payload: Record<string, unknown> = {
+    slug: input.slug,
+    card_country: input.cardCountry.toUpperCase(),
+    card_type: input.cardType,
+    card_currency: input.cardCurrency.toUpperCase(),
+    card_amount: cardAmount,
+  };
+  if (input.cardType === "physical" && input.subType) {
+    payload.sub_type = input.subType;
+  }
+  if (input.additionalInfo) payload.additional_info = input.additionalInfo;
+  if (payoutCurrency !== "NGN") payload.payout_currency = payoutCurrency;
+  if (specificCountry) payload.specific_country = specificCountry;
+
+  const json = await sogoRequestWithRetry<unknown>("/gift-cards/sell", {
     method: "POST",
     idempotencyKey: input.idempotencyKey,
-    body: JSON.stringify({
-      slug: input.slug,
-      card_country: input.cardCountry,
-      card_type: input.cardType,
-      ...(input.subType ? { sub_type: input.subType } : {}),
-      card_currency: input.cardCurrency,
-      card_amount: input.cardAmount,
-      ...(input.additionalInfo
-        ? { additional_info: input.additionalInfo }
-        : {}),
-      payout_currency: input.payoutCurrency || "NGN",
-      ...(input.specificCountry
-        ? { specific_country: input.specificCountry }
-        : {}),
-    }),
+    body: JSON.stringify(payload),
   });
 
-  return { data: json.data, simulated: false };
+  return { data: readSellData(json), simulated: false };
 }

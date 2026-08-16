@@ -50,6 +50,7 @@ import { cn } from "@/lib/utils";
 
 const MAX_CARD_IMAGE_BYTES = 2_500_000;
 const MAX_CARD_IMAGES = 5;
+const COMPRESSED_CARD_IMAGE_BYTES = 400_000;
 
 type Mode = "sell" | "buy";
 
@@ -102,6 +103,19 @@ const CARD_COUNTRIES = [
   { code: "AU", label: "Australia", currency: "AUD" },
 ];
 
+const EU_COUNTRIES = [
+  "Germany",
+  "France",
+  "Italy",
+  "Spain",
+  "Netherlands",
+  "Ireland",
+  "Belgium",
+  "Austria",
+  "Portugal",
+  "Sweden",
+];
+
 const FALLBACK_BUY_COUNTRIES = [
   { code: "US", label: "United States" },
   { code: "GB", label: "United Kingdom" },
@@ -123,6 +137,44 @@ function currencyForCardCountry(
 
 /** Physical sell trades always use cash receipt (no UI choice). */
 const PHYSICAL_SUB_TYPE = "cash_receipt" as const;
+
+async function compressCardImage(file: File) {
+  const bitmap = await createImageBitmap(file);
+  const maxEdge = 1280;
+  const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Failed to read image");
+  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+
+  let quality = 0.72;
+  let blob: Blob | null = null;
+  for (let i = 0; i < 5; i += 1) {
+    blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob((next) => resolve(next), "image/jpeg", quality);
+    });
+    if (!blob || blob.size <= COMPRESSED_CARD_IMAGE_BYTES) break;
+    quality -= 0.12;
+  }
+  if (!blob) throw new Error("Failed to read image");
+
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("Failed to read image"));
+    reader.readAsDataURL(blob);
+  });
+
+  return {
+    filename: (file.name || "card.jpg").replace(/\.[^.]+$/, ".jpg"),
+    mime: "image/jpeg",
+    base64: dataUrl.split(",")[1] || "",
+    preview: dataUrl,
+  };
+}
 
 function FormSkeleton() {
   return (
@@ -186,8 +238,9 @@ function GiftCardsPageContent() {
   const [sellDemo, setSellDemo] = useState(false);
   const [sellUnavailable, setSellUnavailable] = useState(false);
   const [selectedSell, setSelectedSell] = useState<SellBrand | null>(null);
-  const [cardType, setCardType] = useState<"ecode" | "physical">("physical");
+  const [cardType, setCardType] = useState<"ecode" | "physical">("ecode");
   const [cardCountry, setCardCountry] = useState("US");
+  const [specificCountry, setSpecificCountry] = useState("Germany");
   const [cardCurrency, setCardCurrency] = useState("USD");
   const [sellAmount, setSellAmount] = useState("100");
   const [code, setCode] = useState("");
@@ -390,7 +443,7 @@ function GiftCardsPageContent() {
       currencyForCardCountry(cardCountry, selectedSell.currencies),
     );
     setCardType(
-      selectedSell.cardTypes.includes("physical") ? "physical" : "ecode",
+      selectedSell.cardTypes.includes("ecode") ? "ecode" : "physical",
     );
     setSellAmount(String(selectedSell.denominations[0] || 100));
     setCode("");
@@ -499,18 +552,11 @@ function GiftCardsPageContent() {
         setError(`You can upload up to ${MAX_CARD_IMAGES} images`);
         break;
       }
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result));
-        reader.onerror = () => reject(new Error("Failed to read image"));
-        reader.readAsDataURL(file);
-      });
-      next.push({
-        filename: file.name || `card-${Date.now()}-${next.length}.img`,
-        mime: file.type || "image/jpeg",
-        base64: dataUrl.split(",")[1] || "",
-        preview: dataUrl,
-      });
+      try {
+        next.push(await compressCardImage(file));
+      } catch {
+        setError("Failed to read image");
+      }
     }
     setImages(next);
     e.target.value = "";
@@ -523,6 +569,18 @@ function GiftCardsPageContent() {
   async function onSellSubmit(e: FormEvent) {
     e.preventDefault();
     if (!selectedSell) return;
+    if (cardType === "ecode" && !code.trim()) {
+      setError("Enter the gift card code");
+      return;
+    }
+    if (cardType === "physical" && images.length === 0) {
+      setError("Upload at least one clear photo of the card");
+      return;
+    }
+    if (cardCountry === "EU" && !specificCountry.trim()) {
+      setError("Select the European country for this card");
+      return;
+    }
     setSellSubmitting(true);
     setError(null);
     try {
@@ -533,10 +591,11 @@ function GiftCardsPageContent() {
           slug: selectedSell.slug,
           brandName: selectedSell.name,
           cardCountry,
+          specificCountry: cardCountry === "EU" ? specificCountry : null,
           cardType,
           subType: cardType === "physical" ? PHYSICAL_SUB_TYPE : null,
           cardCurrency,
-          cardAmount: Number(sellAmount),
+          cardAmount: Number.parseFloat(sellAmount),
           additionalInfo: cardType === "ecode" ? code.trim() : null,
           images:
             cardType === "physical"
@@ -546,9 +605,10 @@ function GiftCardsPageContent() {
                   base64,
                 }))
               : [],
+          idempotencyKey: crypto.randomUUID(),
         }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Failed to sell card");
       setSellSuccess(true);
       setSellSuccessStatus(data.status === "completed" ? "completed" : "pending");
@@ -768,7 +828,7 @@ function GiftCardsPageContent() {
                   >
                     <div className="grid grid-cols-2 gap-2">
                       {(
-                        ["physical", "ecode"] as const
+                        ["ecode", "physical"] as const
                       )
                         .filter((t) => selectedSell.cardTypes.includes(t))
                         .map((t) => (
@@ -816,6 +876,26 @@ function GiftCardsPageContent() {
                         Currency set to {cardCurrency}
                       </p>
                     </div>
+
+                    {cardCountry === "EU" ? (
+                      <div className="mt-4">
+                        <label className="block text-xs font-semibold text-muted-foreground">
+                          European country
+                          <select
+                            value={specificCountry}
+                            onChange={(e) => setSpecificCountry(e.target.value)}
+                            className="mt-1.5 h-12 w-full rounded-xl border border-border bg-background px-3 text-sm"
+                            required
+                          >
+                            {EU_COUNTRIES.map((name) => (
+                              <option key={name} value={name}>
+                                {name}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      </div>
+                    ) : null}
 
                     <div className="mt-4">
                       <p className="text-xs font-semibold text-muted-foreground">

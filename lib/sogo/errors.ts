@@ -7,21 +7,52 @@ const CODE_HINTS: Record<string, string> = {
   insufficient_funds:
     "Unable to process this request right now. Please try again shortly.",
   validation_failed: "Check the details and try again.",
+  idempotency_key_required: "Please try again.",
   verification_failed:
     "We could not verify that meter, smartcard, or account number.",
   rate_limit_exceeded: "Too many requests. Please wait a moment and try again.",
   service_unavailable:
     "This service is temporarily unavailable. Please try again soon.",
+  gift_cards_unavailable:
+    "The provider could not accept this gift card right now. Please try again shortly.",
   kyc_tier_insufficient:
     "This service is not fully set up yet. Please try again later.",
   kyb_verification_required:
     "This service is not fully set up yet. Please try again later.",
 };
 
-export function sogoErrorToEnglish(message: string, code?: string) {
-  if (code && CODE_HINTS[code]) return CODE_HINTS[code];
+function firstFieldError(errors?: Record<string, string[] | string>) {
+  if (!errors) return "";
+  for (const value of Object.values(errors)) {
+    if (Array.isArray(value) && value[0]) return String(value[0]);
+    if (typeof value === "string" && value) return value;
+  }
+  return "";
+}
+
+export function sogoErrorToEnglish(
+  message: string,
+  code?: string,
+  errors?: Record<string, string[] | string>,
+) {
+  const field = firstFieldError(errors);
+  if (field) return field.slice(0, 220);
 
   const m = (message || "").toLowerCase();
+
+  if (m.includes("not enabled on") && m.includes("gift card")) {
+    return message;
+  }
+
+  if (
+    /not currently available via the partner api/.test(m) ||
+    (code === "service_unavailable" && /gift.?card/.test(m))
+  ) {
+    return CODE_HINTS.gift_cards_unavailable;
+  }
+
+  if (code && CODE_HINTS[code]) return CODE_HINTS[code];
+
   if (!m) return "Something went wrong. Please try again.";
 
   if (m.includes("sogo") || m.includes("partner api")) {
@@ -43,7 +74,6 @@ export function sogoErrorToEnglish(message: string, code?: string) {
     return "Network error. Check your connection and try again.";
   }
 
-  // Strip provider branding from user-facing copy
   return message
     .replace(/\bSogo\b/gi, "this service")
     .replace(/\bsogo\.africa\b/gi, "provider")
