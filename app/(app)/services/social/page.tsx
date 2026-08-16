@@ -7,9 +7,7 @@ import {
   CheckCircle2,
   ChevronDown,
   Link2,
-  Plus,
   RefreshCw,
-  Trash2,
   TrendingUp,
   Wallet,
 } from "lucide-react";
@@ -79,6 +77,65 @@ function parseQuantityInput(raw: string): number | null {
   return Math.round(n);
 }
 
+const EMPTY_COMMENTS_DRAFT = "1. ";
+
+function parseNumberedComments(text: string): string[] {
+  const comments: string[] = [];
+  for (const line of text.replace(/\r\n/g, "\n").split("\n")) {
+    const match = line.match(/^\d+\.\s?(.*)$/);
+    if (match) {
+      comments.push(match[1]);
+    } else if (comments.length) {
+      comments[comments.length - 1] = comments[comments.length - 1]
+        ? `${comments[comments.length - 1]} ${line}`
+        : line;
+    } else if (line.trim()) {
+      comments.push(line);
+    }
+  }
+  return comments.length ? comments : [""];
+}
+
+function applyEnterCommentNumber(
+  prev: string,
+  next: string,
+  maxQuantity: number,
+): { text: string; cursor: number | null } {
+  if (!next.trim()) {
+    return { text: EMPTY_COMMENTS_DRAFT, cursor: EMPTY_COMMENTS_DRAFT.length };
+  }
+
+  const normalized = next.replace(/\r\n/g, "\n");
+  const prevBreaks = (prev.match(/\n/g) || []).length;
+  const nextBreaks = (normalized.match(/\n/g) || []).length;
+  const needsFirstNumber = !/^\d+\.\s?/.test(normalized);
+
+  if (nextBreaks <= prevBreaks && !needsFirstNumber) {
+    return { text: normalized, cursor: null };
+  }
+
+  const lines = normalized.split("\n");
+  const out: string[] = [];
+  let numbered = 0;
+  let cursor: number | null = null;
+
+  for (const line of lines) {
+    if (/^\d+\.\s?/.test(line)) {
+      numbered += 1;
+      if (numbered > maxQuantity) break;
+      out.push(line);
+      continue;
+    }
+    numbered += 1;
+    if (numbered > maxQuantity) break;
+    const prefix = `${numbered}. `;
+    out.push(prefix + line);
+    cursor = out.join("\n").length - line.length;
+  }
+
+  return { text: out.join("\n") || EMPTY_COMMENTS_DRAFT, cursor };
+}
+
 const selectClassName = cn(authInputClassName, "appearance-none pr-10");
 
 export default function SocialBoostPage() {
@@ -92,7 +149,7 @@ export default function SocialBoostPage() {
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [quantityText, setQuantityText] = useState("");
-  const [customComments, setCustomComments] = useState<string[]>([""]);
+  const [commentsDraft, setCommentsDraft] = useState(EMPTY_COMMENTS_DRAFT);
   const [profileUrl, setProfileUrl] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -236,6 +293,10 @@ export default function SocialBoostPage() {
   const isCustomComments = selected
     ? isCustomCommentsService(selected)
     : false;
+  const customComments = useMemo(
+    () => parseNumberedComments(commentsDraft),
+    [commentsDraft],
+  );
   const filledComments = useMemo(
     () => customComments.map((c) => c.trim()).filter(Boolean),
     [customComments],
@@ -266,7 +327,7 @@ export default function SocialBoostPage() {
     if (!selected) return "Choose a package first";
     if (isCustomComments) {
       if (!filledComments.length) {
-        return `Add ${minQuantity.toLocaleString()}–${maxQuantity.toLocaleString()} custom comments (one per row)`;
+        return `Add ${minQuantity.toLocaleString()}–${maxQuantity.toLocaleString()} custom comments`;
       }
       if (!quantityValid) {
         if (filledComments.length < minQuantity) {
@@ -323,14 +384,15 @@ export default function SocialBoostPage() {
     if (!selected) return;
     setSelectedId(selected.service);
     if (isCustomCommentsService(selected)) {
-      setCustomComments((prev) => {
-        if (prev.some((c) => c.trim())) return prev;
-        return [""];
-      });
+      setCommentsDraft((prev) =>
+        parseNumberedComments(prev).some((c) => c.trim())
+          ? prev
+          : EMPTY_COMMENTS_DRAFT,
+      );
       setQuantityText("");
       return;
     }
-    setCustomComments([""]);
+    setCommentsDraft(EMPTY_COMMENTS_DRAFT);
     setQuantityText((prev) => {
       const n = parseQuantityInput(prev);
       if (n == null) return prev;
@@ -424,7 +486,7 @@ export default function SocialBoostPage() {
     );
     setSelectedId(match?.service ?? null);
     setQuantityText("");
-    setCustomComments([""]);
+    setCommentsDraft(EMPTY_COMMENTS_DRAFT);
   }
 
   function onMetricChange(next: string) {
@@ -449,7 +511,7 @@ export default function SocialBoostPage() {
     );
     setSelectedId(match?.service ?? null);
     setQuantityText("");
-    setCustomComments([""]);
+    setCommentsDraft(EMPTY_COMMENTS_DRAFT);
   }
 
   function onQualityChange(next: string) {
@@ -462,33 +524,31 @@ export default function SocialBoostPage() {
     );
     setSelectedId(match?.service ?? null);
     setQuantityText("");
-    setCustomComments([""]);
+    setCommentsDraft(EMPTY_COMMENTS_DRAFT);
   }
 
   function onPackageChange(serviceId: number) {
     setSelectedId(serviceId);
     setQuantityText("");
-    setCustomComments([""]);
+    setCommentsDraft(EMPTY_COMMENTS_DRAFT);
   }
 
-  function updateComment(index: number, value: string) {
-    setCustomComments((prev) =>
-      prev.map((c, i) => (i === index ? value : c)),
+  function onCommentsDraftChange(
+    value: string,
+    textarea?: HTMLTextAreaElement | null,
+  ) {
+    const { text, cursor } = applyEnterCommentNumber(
+      commentsDraft,
+      value,
+      maxQuantity,
     );
-  }
-
-  function addCommentRow() {
-    setCustomComments((prev) => {
-      if (prev.length >= maxQuantity) return prev;
-      return [...prev, ""];
-    });
-  }
-
-  function removeCommentRow(index: number) {
-    setCustomComments((prev) => {
-      if (prev.length <= 1) return [""];
-      return prev.filter((_, i) => i !== index);
-    });
+    setCommentsDraft(text);
+    if (cursor != null && textarea) {
+      requestAnimationFrame(() => {
+        textarea.selectionStart = cursor;
+        textarea.selectionEnd = cursor;
+      });
+    }
   }
 
   function onQuantityTextChange(raw: string) {
@@ -598,7 +658,7 @@ export default function SocialBoostPage() {
                   setSuccess(false);
                   setStatusLabel(null);
                   setQuantityText("");
-                  setCustomComments([""]);
+                  setCommentsDraft(EMPTY_COMMENTS_DRAFT);
                 },
                 icon: "plus",
               }}
@@ -762,44 +822,21 @@ export default function SocialBoostPage() {
                         {maxQuantity.toLocaleString()}
                       </span>
                     </div>
-                    <div className="mt-2 space-y-2">
-                      {customComments.map((comment, index) => (
-                        <div key={index} className="flex items-center gap-2">
-                          <span className="w-6 shrink-0 text-center text-xs font-semibold text-muted-foreground">
-                            {index + 1}
-                          </span>
-                          <input
-                            value={comment}
-                            onChange={(e) =>
-                              updateComment(index, e.target.value)
-                            }
-                            placeholder={`Comment ${index + 1}`}
-                            className={cn(
-                              authInputClassName,
-                              "min-w-0 flex-1 text-sm font-medium",
-                            )}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => removeCommentRow(index)}
-                            disabled={customComments.length <= 1}
-                            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] border border-border bg-muted/40 text-muted-foreground transition hover:bg-muted disabled:opacity-40"
-                            aria-label={`Remove comment ${index + 1}`}
-                          >
-                            <Trash2 className="h-4 w-4" strokeWidth={1.75} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={addCommentRow}
-                      disabled={customComments.length >= maxQuantity}
-                      className="mt-3 inline-flex h-11 items-center gap-2 rounded-[14px] border border-border bg-muted/40 px-3 text-sm font-semibold text-foreground transition hover:bg-muted disabled:opacity-40"
-                    >
-                      <Plus className="h-4 w-4" strokeWidth={2} />
-                      Add more
-                    </button>
+                    <p className="mt-1.5 text-xs text-muted-foreground">
+                      Click enter to write your next comment
+                    </p>
+                    <textarea
+                      value={commentsDraft}
+                      onChange={(e) =>
+                        onCommentsDraftChange(e.target.value, e.target)
+                      }
+                      placeholder="1. Write your first comment"
+                      rows={6}
+                      className={cn(
+                        authInputClassName,
+                        "mt-2 min-h-[140px] resize-y overflow-y-auto py-3 text-sm font-medium leading-6",
+                      )}
+                    />
                     <p
                       className={cn(
                         "mt-1.5 text-xs",

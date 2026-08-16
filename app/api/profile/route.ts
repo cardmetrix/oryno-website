@@ -114,18 +114,55 @@ export async function PATCH(req: Request) {
       },
     });
 
-    const [updated] = await db
-      .update(users)
-      .set({
-        fullName,
-        phone,
-        username,
-        avatarUrl,
-        countryCode,
-        updatedAt: new Date(),
-      })
-      .where(eq(users.id, dbUser.id))
-      .returning();
+    const primaryEmail =
+      clerkUser.primaryEmailAddress?.emailAddress?.toLowerCase().trim() ||
+      dbUser.email;
+    const emailVerified =
+      clerkUser.primaryEmailAddress?.verification?.status === "verified";
+    const emailChanged =
+      primaryEmail.toLowerCase() !== (dbUser.email || "").toLowerCase();
+
+    if (emailChanged) {
+      const taken = await db.query.users.findFirst({
+        where: eq(users.email, primaryEmail),
+        columns: { id: true },
+      });
+      if (taken && taken.id !== dbUser.id) {
+        return NextResponse.json(
+          { error: "That email is already used by another account." },
+          { status: 409 },
+        );
+      }
+    }
+
+    let updated;
+    try {
+      const [row] = await db
+        .update(users)
+        .set({
+          fullName,
+          phone,
+          username,
+          avatarUrl,
+          countryCode,
+          email: primaryEmail,
+          emailVerifiedAt: emailVerified
+            ? emailChanged
+              ? new Date()
+              : (dbUser.emailVerifiedAt ?? new Date())
+            : dbUser.emailVerifiedAt,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, dbUser.id))
+        .returning();
+      updated = row;
+    } catch (updateError) {
+      console.error("[profile-patch-email]", updateError);
+      return NextResponse.json(
+        { error: "Could not update email. It may already be in use." },
+        { status: 409 },
+      );
+    }
 
     if (countryCode) {
       await ensurePrimaryWallet(

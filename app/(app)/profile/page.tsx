@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useUser } from "@clerk/nextjs";
+import { useReverification, useUser } from "@clerk/nextjs";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   BadgeCheck,
@@ -24,11 +24,29 @@ import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
 import { ProfileSkeleton } from "@/components/app/profile-skeleton";
 import { AuthField, authInputClassName } from "@/components/auth/auth-field";
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSlot,
+} from "@/components/ui/input-otp";
+import { clerkErrorMessage } from "@/lib/auth/clerk-errors";
 import { useUploadThing } from "@/lib/uploadthing";
 import type { ProfileDto } from "@/lib/profile";
 import { cn } from "@/lib/utils";
 
-type EditableField = "fullName" | "phone" | "username";
+type EditableField = "fullName" | "phone" | "username" | "email";
+
+type EmailAddressResource = NonNullable<
+  NonNullable<ReturnType<typeof useUser>["user"]>["emailAddresses"][number]
+>;
+
+function normalizeEmail(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizeEmail(value));
+}
 
 function initialsFrom(name?: string | null) {
   if (!name) return "OR";
@@ -52,7 +70,17 @@ export default function ProfilePage() {
     fullName: "",
     phone: "",
     username: "",
+    email: "",
   });
+  const [verifyingEmail, setVerifyingEmail] = useState(false);
+  const [emailCode, setEmailCode] = useState("");
+  const [emailObj, setEmailObj] = useState<EmailAddressResource | null>(null);
+  const [emailBusy, setEmailBusy] = useState(false);
+  const [resendSeconds, setResendSeconds] = useState(0);
+
+  const createEmailAddress = useReverification((email: string) =>
+    user?.createEmailAddress({ email }),
+  );
 
   const bootstrapFromClerk = useMemo(() => {
     if (!user) return null;
@@ -109,6 +137,7 @@ export default function ProfilePage() {
         fullName: data.profile.fullName,
         phone: data.profile.phone || "",
         username: data.profile.username || "",
+        email: data.profile.email || "",
       });
     } catch {
       // Keep Clerk bootstrap visible
@@ -128,6 +157,7 @@ export default function ProfilePage() {
             fullName: bootstrapFromClerk.fullName,
             phone: bootstrapFromClerk.phone || "",
             username: bootstrapFromClerk.username || "",
+            email: bootstrapFromClerk.email || "",
           },
     );
 
@@ -135,6 +165,12 @@ export default function ProfilePage() {
     // Intentionally depend on user id only — avoid refetch loops.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoaded, user?.id]);
+
+  useEffect(() => {
+    if (!verifyingEmail || resendSeconds <= 0) return;
+    const id = window.setTimeout(() => setResendSeconds((s) => s - 1), 1000);
+    return () => window.clearTimeout(id);
+  }, [verifyingEmail, resendSeconds]);
 
   const { startUpload, isUploading } = useUploadThing("profileImage", {
     onClientUploadComplete: async (res) => {
@@ -163,31 +199,134 @@ export default function ProfilePage() {
 
   const display = profile || bootstrapFromClerk;
 
+  async function syncProfileFields() {
+    const res = await fetch("/api/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fullName: form.fullName.trim(),
+        phone: form.phone.trim(),
+        username: form.username.trim(),
+      }),
+    });
+    const data = (await res.json()) as { profile?: ProfileDto; error?: string };
+    if (!res.ok || !data.profile) {
+      throw new Error(data.error || "Could not save profile");
+    }
+    setProfile(data.profile);
+    return data.profile;
+  }
+
+  async function startEmailChange(nextEmail: string) {
+    if (!user) throw new Error("Not signed in");
+    const existing = user.emailAddresses.find(
+      (e) => normalizeEmail(e.emailAddress) === nextEmail,
+    );
+    const target =
+      existing ??
+      (await createEmailAddress(nextEmail)) ??
+      null;
+    if (!target) throw new Error("Could not add that email address.");
+    if (target.verification?.status !== "verified") {
+      await target.prepareVerification({ strategy: "email_code" });
+    }
+    setEmailObj(target);
+    setEmailCode("");
+    setVerifyingEmail(true);
+    setResendSeconds(45);
+  }
+
   async function saveProfile() {
+    if (!user) return;
+    const nextEmail = normalizeEmail(form.email);
+    const currentEmail = normalizeEmail(display?.email || "");
+    if (!isValidEmail(nextEmail)) {
+      toast.error("Enter a valid email address.");
+      return;
+    }
+
     setSaving(true);
     try {
-      const res = await fetch("/api/profile", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fullName: form.fullName.trim(),
-          phone: form.phone.trim(),
-          username: form.username.trim(),
-        }),
-      });
-      const data = (await res.json()) as { profile?: ProfileDto; error?: string };
-      if (!res.ok || !data.profile) {
-        throw new Error(data.error || "Could not save profile");
+      await syncProfileFields();
+
+      if (nextEmail !== currentEmail) {
+        await startEmailChange(nextEmail);
+        toast.success("We sent a verification code to your new email.");
+        return;
       }
-      setProfile(data.profile);
+
       setEditing(false);
-      await user?.reload();
+      await user.reload();
       toast.success("Profile saved");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Save failed");
+      toast.error(clerkErrorMessage(err, "Save failed"));
     } finally {
       setSaving(false);
     }
+  }
+
+  async function verifyEmailCode(code = emailCode) {
+    if (!user || !emailObj) return;
+    const cleaned = code.replace(/\D/g, "");
+    if (cleaned.length < 6) {
+      toast.error("Enter the 6-digit code from your email.");
+      return;
+    }
+    setEmailBusy(true);
+    try {
+      let target = emailObj;
+      if (target.verification?.status !== "verified") {
+        const result = await target.attemptVerification({ code: cleaned });
+        if (result.verification.status !== "verified") {
+          throw new Error("Invalid or expired verification code.");
+        }
+        target = result;
+      }
+
+      await user.update({ primaryEmailAddressId: target.id });
+
+      // Best-effort cleanup of previous emails so login uses the new one.
+      const refreshed = await user.reload();
+      await Promise.all(
+        refreshed.emailAddresses
+          .filter((e) => e.id !== target.id)
+          .map((e) => e.destroy().catch(() => null)),
+      );
+
+      const profile = await syncProfileFields();
+      setForm((f) => ({ ...f, email: profile.email }));
+      setVerifyingEmail(false);
+      setEmailObj(null);
+      setEmailCode("");
+      setEditing(false);
+      await user.reload();
+      toast.success("Email updated");
+    } catch (err) {
+      toast.error(clerkErrorMessage(err, "Could not verify email"));
+    } finally {
+      setEmailBusy(false);
+    }
+  }
+
+  async function resendEmailCode() {
+    if (!emailObj || resendSeconds > 0) return;
+    setEmailBusy(true);
+    try {
+      await emailObj.prepareVerification({ strategy: "email_code" });
+      setResendSeconds(45);
+      toast.success("Code resent");
+    } catch (err) {
+      toast.error(clerkErrorMessage(err, "Could not resend code"));
+    } finally {
+      setEmailBusy(false);
+    }
+  }
+
+  function resetEmailVerification() {
+    setVerifyingEmail(false);
+    setEmailObj(null);
+    setEmailCode("");
+    setResendSeconds(0);
   }
 
   function onPickPhoto() {
@@ -244,6 +383,7 @@ export default function ProfilePage() {
       label: "Email Address",
       value: display.email,
       icon: Mail,
+      editable: true,
     },
     {
       key: "phone",
@@ -363,7 +503,61 @@ export default function ProfilePage() {
         className="mt-5 overflow-hidden rounded-[28px] border border-border bg-background shadow-[var(--shadow-soft)]"
       >
         <AnimatePresence mode="wait">
-          {editing ? (
+          {verifyingEmail ? (
+            <motion.div
+              key="verify-email"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              className="space-y-4 p-4 sm:p-5"
+            >
+              <div>
+                <p className="text-sm font-semibold text-foreground">
+                  Verify your new email
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Enter the 6-digit code we sent to{" "}
+                  <span className="font-semibold text-foreground">
+                    {normalizeEmail(form.email)}
+                  </span>
+                  .
+                </p>
+              </div>
+              <InputOTP
+                maxLength={6}
+                value={emailCode}
+                onChange={setEmailCode}
+                containerClassName="justify-between gap-2"
+              >
+                <InputOTPGroup className="w-full justify-between gap-2">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <InputOTPSlot
+                      key={i}
+                      index={i}
+                      className="h-12 w-11 rounded-[12px] border border-border text-base sm:h-14 sm:w-12"
+                    />
+                  ))}
+                </InputOTPGroup>
+              </InputOTP>
+              <p className="text-center text-sm text-muted-foreground">
+                Didn&apos;t get a code?{" "}
+                {resendSeconds > 0 ? (
+                  <span className="font-semibold text-foreground">
+                    Resend in {resendSeconds}s
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void resendEmailCode()}
+                    disabled={emailBusy}
+                    className="font-semibold text-primary disabled:opacity-60"
+                  >
+                    Resend
+                  </button>
+                )}
+              </p>
+            </motion.div>
+          ) : editing ? (
             <motion.div
               key="edit"
               initial={{ opacity: 0, y: 8 }}
@@ -389,6 +583,17 @@ export default function ProfilePage() {
                   className={authInputClassName}
                 />
               </AuthField>
+              <AuthField label="Email Address">
+                <input
+                  type="email"
+                  autoComplete="email"
+                  value={form.email}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, email: e.target.value }))
+                  }
+                  className={authInputClassName}
+                />
+              </AuthField>
               <AuthField label="Phone Number">
                 <input
                   value={form.phone}
@@ -399,8 +604,8 @@ export default function ProfilePage() {
                 />
               </AuthField>
               <p className="text-xs text-muted-foreground">
-                Email is managed by your Clerk login and can&apos;t be edited
-                here.
+                Changing your email sends a verification code to the new
+                address. Your login email updates after you verify.
               </p>
             </motion.div>
           ) : (
@@ -462,16 +667,49 @@ export default function ProfilePage() {
       </MotionSection>
 
       <MotionSection delay={0.1} className="mt-5 space-y-3">
-        {editing ? (
+        {verifyingEmail ? (
+          <div className="grid grid-cols-2 gap-2.5">
+            <button
+              type="button"
+              onClick={() => {
+                resetEmailVerification();
+                setForm({
+                  fullName: display.fullName,
+                  phone: display.phone || "",
+                  username: display.username || "",
+                  email: display.email || "",
+                });
+              }}
+              className="btn-secondary inline-flex h-12 items-center justify-center text-sm"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={emailBusy || emailCode.length < 6}
+              onClick={() => void verifyEmailCode()}
+              className="btn-primary inline-flex h-12 items-center justify-center gap-2 text-sm disabled:opacity-60"
+            >
+              {emailBusy ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Check className="h-4 w-4" />
+              )}
+              Verify email
+            </button>
+          </div>
+        ) : editing ? (
           <div className="grid grid-cols-2 gap-2.5">
             <button
               type="button"
               onClick={() => {
                 setEditing(false);
+                resetEmailVerification();
                 setForm({
                   fullName: display.fullName,
                   phone: display.phone || "",
                   username: display.username || "",
+                  email: display.email || "",
                 });
               }}
               className="btn-secondary inline-flex h-12 items-center justify-center text-sm"

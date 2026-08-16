@@ -520,7 +520,7 @@ function RegisterForm() {
           Already have an account?{" "}
           <Link
             href={AUTH_LINKS.signIn}
-            className="font-semibold text-primary transition-colors hover:text-oryno-charcoal"
+            className="font-bold text-foreground transition-colors hover:text-foreground/80"
           >
             Sign In
           </Link>
