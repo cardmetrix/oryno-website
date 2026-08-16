@@ -13,7 +13,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowLeft,
-  ArrowDown,
+  ChevronDown,
   Clock3,
   Copy,
   ImagePlus,
@@ -747,7 +747,7 @@ function GiftCardsPageContent() {
                         aria-label="Change gift card"
                         title="Change gift card"
                       >
-                        <ArrowDown className="h-4 w-4" strokeWidth={1.75} />
+                        <ChevronDown className="h-4 w-4" strokeWidth={1.75} />
                       </button>
                     </div>
                   </div>

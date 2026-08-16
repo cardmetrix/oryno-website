@@ -10,10 +10,10 @@ import {
   Check,
   Eye,
   EyeOff,
+  History,
   Landmark,
   Loader2,
   Plus,
-  RefreshCw,
   ShieldCheck,
   Sparkles,
   Trash2,
@@ -254,20 +254,14 @@ function WalletPageContent() {
         subtitle="Balance, payout banks & recent activity"
         backHref="/dashboard"
         actions={
-          <button
-            type="button"
-            onClick={() => void load()}
-            className="flex h-10 w-10 items-center justify-center rounded-[14px] bg-background shadow-[var(--shadow-soft)]"
-            aria-label="Refresh wallet"
+          <Link
+            href="/history"
+            className="inline-flex h-10 items-center justify-center rounded-[14px] border border-border bg-background px-3.5 text-sm font-bold text-foreground shadow-[var(--shadow-soft)] transition hover:bg-muted/50"
+            aria-label="Transaction history"
           >
-            <RefreshCw
-              className={cn(
-                "h-4 w-4 text-foreground",
-                loading && "animate-spin",
-              )}
-              strokeWidth={1.75}
-            />
-          </button>
+            <History className="mr-1.5 h-4 w-4" strokeWidth={1.75} />
+            History
+          </Link>
         }
       />
 
@@ -301,17 +295,17 @@ function WalletPageContent() {
               className={cn(
                 "flex w-full snap-x snap-mandatory overflow-x-auto overscroll-x-contain",
                 "[-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-                "md:grid md:grid-cols-2 md:items-start md:gap-4 md:overflow-visible md:snap-none",
+                "md:grid md:grid-cols-2 md:items-stretch md:gap-4 md:overflow-visible md:snap-none",
               )}
               style={{ WebkitOverflowScrolling: "touch" }}
             >
               <MotionSection
                 className={cn(
                   "box-border w-full min-w-full max-w-full shrink-0 basis-full snap-start snap-always px-4 sm:px-6",
-                  "md:min-w-0 md:max-w-none md:basis-auto md:snap-none md:px-0",
+                  "md:min-w-0 md:max-w-none md:basis-auto md:snap-none md:px-0 md:h-full",
                 )}
               >
-                <div className="overflow-hidden rounded-[28px] bg-background shadow-[var(--shadow-soft)]">
+                <div className="h-full overflow-hidden rounded-[28px] bg-background shadow-[var(--shadow-soft)]">
                   <div className="relative overflow-hidden bg-gradient-to-br from-[#ff8124] via-oryno-orange to-[#e85d00] px-5 py-5 text-white sm:px-6 sm:py-6">
                     <div
                       aria-hidden="true"
@@ -399,7 +393,7 @@ function WalletPageContent() {
               <div
                 className={cn(
                   "box-border w-full min-w-full max-w-full shrink-0 basis-full snap-start snap-always px-4 sm:px-6",
-                  "md:min-w-0 md:max-w-none md:basis-auto md:snap-none md:px-0",
+                  "md:min-w-0 md:max-w-none md:basis-auto md:snap-none md:px-0 md:h-full",
                 )}
               >
                 <UsdWalletCard
@@ -408,18 +402,8 @@ function WalletPageContent() {
                   holderName={data.user.fullName}
                   panel={usdPanel}
                   onPanelChange={setUsdPanel}
+                  className="h-full"
                 />
-                {/* Desktop: actions sit under the USD card */}
-                <div className="mt-3 hidden md:block">
-                  <UsdWalletActionsPanel
-                    localCurrency={currency}
-                    localBalanceFormatted={data.primary.balanceFormatted}
-                    fx={data.fx}
-                    panel={usdPanel}
-                    onPanelChange={setUsdPanel}
-                    onUpdated={() => void load({ soft: true })}
-                  />
-                </div>
               </div>
             </div>
 
@@ -488,13 +472,72 @@ function WalletPageContent() {
             </div>
           ) : null}
 
-          {/* Local sections — mobile only when local; always on md+ */}
+          {/* md+: local sections left, USD actions right */}
+          <div className="mt-4 hidden gap-4 md:grid md:grid-cols-2 md:items-start">
+            <div className="min-w-0 space-y-4">
+              <MotionSection delay={0.06} className="grid grid-cols-3 gap-3">
+                {[
+                  {
+                    label: "Balance",
+                    value: hidden
+                      ? "••••"
+                      : `${symbol}${Number(data.totals.balance).toLocaleString("en-NG", { maximumFractionDigits: 0 })}`,
+                    icon: Zap,
+                  },
+                  {
+                    label: "Banks",
+                    value: String(data.totals.bankCount),
+                    icon: Landmark,
+                  },
+                  {
+                    label: "Recent",
+                    value: String(data.recent.length),
+                    icon: Sparkles,
+                  },
+                ].map((stat, i) => {
+                  const Icon = stat.icon;
+                  return (
+                    <motion.div
+                      key={stat.label}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.08 + i * 0.04 }}
+                      className="rounded-[22px] bg-background p-3.5 shadow-[var(--shadow-soft)] sm:p-4"
+                    >
+                      <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-oryno-orange-muted text-primary">
+                        <Icon className="h-4 w-4" />
+                      </span>
+                      <p className="mt-2.5 text-[11px] font-medium text-muted-foreground">
+                        {stat.label}
+                      </p>
+                      <p className="mt-0.5 truncate text-sm font-bold text-foreground sm:text-base">
+                        {stat.value}
+                      </p>
+                    </motion.div>
+                  );
+                })}
+              </MotionSection>
+            </div>
+            <div className="min-w-0">
+              <UsdWalletActionsPanel
+                localCurrency={currency}
+                localBalanceFormatted={data.primary.balanceFormatted}
+                fx={data.fx}
+                panel={usdPanel}
+                onPanelChange={setUsdPanel}
+                onUpdated={() => void load({ soft: true })}
+                className="mt-0"
+              />
+            </div>
+          </div>
+
+          {/* Local sections — mobile only when local; banks always on md+ */}
           <div
             className={cn(
               walletView === "usd" ? "hidden md:block" : "block",
             )}
           >
-          <MotionSection delay={0.06} className="mt-4 grid grid-cols-3 gap-3">
+          <MotionSection delay={0.06} className="mt-4 grid grid-cols-3 gap-3 md:hidden">
             {[
               {
                 label: "Balance",
