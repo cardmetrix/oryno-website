@@ -25,7 +25,7 @@ import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
 import { TransactionRow } from "@/components/app/transaction-row";
-import { UsdWalletCard } from "@/components/app/usd-wallet-card";
+import { UsdWalletActionsPanel, UsdWalletCard, type UsdPanel } from "@/components/app/usd-wallet-card";
 import { WalletSkeleton } from "@/components/app/wallet-skeleton";
 import type { BankOption, WalletPayload } from "@/lib/wallet-types";
 import { cn } from "@/lib/utils";
@@ -77,6 +77,7 @@ function WalletPageContent() {
   const [bankError, setBankError] = useState<string | null>(null);
   /** Mobile wallet pager: only one currency card is in view at a time */
   const [walletView, setWalletView] = useState<"local" | "usd">("local");
+  const [usdPanel, setUsdPanel] = useState<UsdPanel>("fund");
   const walletPagerRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async (opts?: { soft?: boolean }) => {
@@ -287,47 +288,14 @@ function WalletPageContent() {
       ) : data ? (
         <>
           <div className="-mx-4 sm:-mx-6 md:mx-0">
-            <div className="mb-3 flex gap-1 rounded-2xl bg-muted/70 p-1 mx-4 sm:mx-6 md:hidden">
-              <button
-                type="button"
-                onClick={() => {
-                  setWalletView("local");
-                  walletPagerRef.current?.scrollTo({ left: 0, behavior: "smooth" });
-                }}
-                className={cn(
-                  "h-9 flex-1 rounded-xl text-sm font-semibold transition",
-                  walletView === "local"
-                    ? "bg-background text-foreground shadow-[var(--shadow-soft)]"
-                    : "text-muted-foreground",
-                )}
-              >
-                {currency}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setWalletView("usd");
-                  const el = walletPagerRef.current;
-                  if (el) el.scrollTo({ left: el.clientWidth, behavior: "smooth" });
-                }}
-                className={cn(
-                  "h-9 flex-1 rounded-xl text-sm font-semibold transition",
-                  walletView === "usd"
-                    ? "bg-background text-foreground shadow-[var(--shadow-soft)]"
-                    : "text-muted-foreground",
-                )}
-              >
-                USD
-              </button>
-            </div>
-
             <div
               ref={walletPagerRef}
               onScroll={(e) => {
                 const el = e.currentTarget;
-                // Desktop grid doesn't page — ignore
                 if (window.matchMedia("(min-width: 768px)").matches) return;
-                const idx = Math.round(el.scrollLeft / Math.max(el.clientWidth, 1));
+                const idx = Math.round(
+                  el.scrollLeft / Math.max(el.clientWidth, 1),
+                );
                 setWalletView(idx >= 1 ? "usd" : "local");
               }}
               className={cn(
@@ -337,7 +305,6 @@ function WalletPageContent() {
               )}
               style={{ WebkitOverflowScrolling: "touch" }}
             >
-              {/* Local wallet — full-bleed slide on mobile */}
               <MotionSection
                 className={cn(
                   "box-border w-full min-w-full max-w-full shrink-0 basis-full snap-start snap-always px-4 sm:px-6",
@@ -365,7 +332,6 @@ function WalletPageContent() {
                     <div className="relative flex items-start justify-between gap-3">
                       <div>
                         <p className="inline-flex items-center gap-1.5 text-[11px] font-bold tracking-[0.16em] text-white/80 uppercase">
-                    
                           Primary · {currency}
                         </p>
                         <AnimatePresence mode="wait">
@@ -407,25 +373,16 @@ function WalletPageContent() {
                     </div>
 
                     <div className="relative mt-5 grid grid-cols-2 gap-2.5">
-                      <motion.div
-                        whileHover={{ y: -2 }}
-                        whileTap={{ scale: 0.98 }}
-                      >
+                      <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }}>
                         <Link
                           href="/fund"
                           className="flex h-[50px] items-center justify-center gap-2 rounded-[16px] bg-white font-bold text-black shadow-[0_10px_24px_rgba(0,0,0,0.12)]"
                         >
-                          <Plus
-                            className="h-4 w-4 text-black"
-                            strokeWidth={2.5}
-                          />
+                          <Plus className="h-4 w-4 text-black" strokeWidth={2.5} />
                           <span className="text-black">Fund</span>
                         </Link>
                       </motion.div>
-                      <motion.div
-                        whileHover={{ y: -2 }}
-                        whileTap={{ scale: 0.98 }}
-                      >
+                      <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }}>
                         <Link
                           href="/withdraw"
                           className="flex h-[50px] items-center justify-center gap-2 rounded-[16px] bg-black/25 font-bold text-white ring-1 ring-white/25 backdrop-blur-md"
@@ -439,7 +396,6 @@ function WalletPageContent() {
                 </div>
               </MotionSection>
 
-              {/* USD wallet — full-bleed slide on mobile */}
               <div
                 className={cn(
                   "box-border w-full min-w-full max-w-full shrink-0 basis-full snap-start snap-always px-4 sm:px-6",
@@ -448,24 +404,91 @@ function WalletPageContent() {
               >
                 <UsdWalletCard
                   usd={data.usd}
-                  localCurrency={currency}
-                  localBalanceFormatted={data.primary.balanceFormatted}
-                  holderName={data.user.fullName}
-                  fx={data.fx}
                   hidden={hidden}
-                  onUpdated={() => void load({ soft: true })}
+                  holderName={data.user.fullName}
+                  panel={usdPanel}
+                  onPanelChange={setUsdPanel}
                 />
+                {/* Desktop: actions sit under the USD card */}
+                <div className="mt-3 hidden md:block">
+                  <UsdWalletActionsPanel
+                    localCurrency={currency}
+                    localBalanceFormatted={data.primary.balanceFormatted}
+                    fx={data.fx}
+                    panel={usdPanel}
+                    onPanelChange={setUsdPanel}
+                    onUpdated={() => void load({ soft: true })}
+                  />
+                </div>
               </div>
             </div>
 
-            <p className="mt-2 px-4 text-center text-[11px] text-muted-foreground sm:px-6 md:hidden">
-              {walletView === "local"
-                ? "Swipe left for USD wallet"
-                : "Swipe right for local wallet"}
-            </p>
+            {/* Dots + hint — always under the cards (mobile) */}
+            <div className="mt-2.5 flex flex-col items-center gap-2 px-4 md:hidden sm:px-6">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  aria-label="Show local wallet"
+                  onClick={() => {
+                    setWalletView("local");
+                    walletPagerRef.current?.scrollTo({ left: 0, behavior: "smooth" });
+                  }}
+                  className={cn(
+                    "h-2 rounded-full transition-all",
+                    walletView === "local"
+                      ? "w-6 bg-primary"
+                      : "w-2 bg-muted-foreground/35",
+                  )}
+                />
+                <button
+                  type="button"
+                  aria-label="Show USD wallet"
+                  onClick={() => {
+                    setWalletView("usd");
+                    const el = walletPagerRef.current;
+                    if (el) {
+                      el.scrollTo({ left: el.clientWidth, behavior: "smooth" });
+                    }
+                  }}
+                  className={cn(
+                    "h-2 rounded-full transition-all",
+                    walletView === "usd"
+                      ? "w-6 bg-primary"
+                      : "w-2 bg-muted-foreground/35",
+                  )}
+                />
+              </div>
+              <AnimatePresence mode="wait">
+                <motion.p
+                  key={walletView}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="text-center text-[11px] text-muted-foreground"
+                >
+                  {walletView === "local"
+                    ? "Swipe for USD wallet"
+                    : "Swipe for local wallet"}
+                </motion.p>
+              </AnimatePresence>
+            </div>
           </div>
 
-          {/* Local-only sections — hidden on mobile while USD wallet is in view */}
+          {/* Mobile: USD fund/convert panel under dots (like app) */}
+          {walletView === "usd" ? (
+            <div className="mt-3 md:hidden">
+              <UsdWalletActionsPanel
+                localCurrency={currency}
+                localBalanceFormatted={data.primary.balanceFormatted}
+                fx={data.fx}
+                panel={usdPanel}
+                onPanelChange={setUsdPanel}
+                onUpdated={() => void load({ soft: true })}
+              />
+            </div>
+          ) : null}
+
+          {/* Local sections — mobile only when local; always on md+ */}
           <div
             className={cn(
               walletView === "usd" ? "hidden md:block" : "block",

@@ -13,7 +13,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowLeft,
-  CheckCircle2,
+  ArrowDown,
   Clock3,
   Copy,
   ImagePlus,
@@ -747,7 +747,7 @@ function GiftCardsPageContent() {
                         aria-label="Change gift card"
                         title="Change gift card"
                       >
-                        <RefreshCw className="h-4 w-4" strokeWidth={1.75} />
+                        <ArrowDown className="h-4 w-4" strokeWidth={1.75} />
                       </button>
                     </div>
                   </div>
@@ -1196,14 +1196,6 @@ function GiftCardsPageContent() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {(selectedSell || selectedBuy) && !sellSuccess && !buySuccess ? (
-        <ServiceInstructions
-          service="gift-cards"
-          className="mt-5"
-          delay={0.1}
-        />
-      ) : null}
 
       <ChangeCardSheet
         open={changeSellOpen}
