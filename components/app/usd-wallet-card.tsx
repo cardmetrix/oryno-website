@@ -50,7 +50,7 @@ export function UsdWalletCard({
   className,
 }: Props) {
   const router = useRouter();
-  const [panel, setPanel] = useState<"none" | "fund" | "convert">("none");
+  const [panel, setPanel] = useState<"fund" | "convert">("fund");
   const [fundMethod, setFundMethod] = useState<"paystack" | "convert">(
     "paystack",
   );
@@ -163,7 +163,7 @@ export function UsdWalletCard({
       toast.success("USD wallet funded", {
         description: json.usdFormatted ?? `$${amount} credited`,
       });
-      setPanel("none");
+      setPanel("fund");
       onUpdated?.();
       if (json.transactionId) {
         router.push(`/history/${json.transactionId}`);
@@ -195,7 +195,7 @@ export function UsdWalletCard({
         toast.success("Converted to USD", {
           description: json.toFormatted,
         });
-        setPanel("none");
+        setPanel("fund");
         onUpdated?.();
         if (json.transactionId) router.push(`/history/${json.transactionId}`);
         return;
@@ -215,7 +215,7 @@ export function UsdWalletCard({
       toast.success("Converted to local", {
         description: json.toFormatted,
       });
-      setPanel("none");
+      setPanel("fund");
       onUpdated?.();
       if (json.transactionId) router.push(`/history/${json.transactionId}`);
     } catch (err) {
@@ -249,17 +249,9 @@ export function UsdWalletCard({
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex items-center gap-2.5">
-                <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full border border-white/25">
-                  <Image
-                    src={BRAND_LOGO_SRC}
-                    alt="ORYNO"
-                    fill
-                    sizes="40px"
-                    className="rounded-full object-cover object-center"
-                  />
-                </span>
+              
                 <p className="inline-flex items-center gap-1.5 text-[11px] font-bold tracking-[0.16em] text-white/65 uppercase">
-                  <DollarSign className="h-3.5 w-3.5 text-oryno-orange" />
+            
                   USD Wallet
                 </p>
               </div>
@@ -278,7 +270,7 @@ export function UsdWalletCard({
             </div>
             <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-bold text-white/90 ring-1 ring-white/15">
               <ShieldCheck className="h-3.5 w-3.5 text-oryno-orange" />
-              USD
+            Protected
             </span>
           </div>
 
@@ -286,43 +278,11 @@ export function UsdWalletCard({
             {holderName ? `${holderName} · USD wallet` : "USD wallet"}
           </p>
 
-          <button
-            type="button"
-            disabled={waitlistBusy || waitlistJoined}
-            onClick={async () => {
-              if (waitlistJoined) return;
-              setWaitlistBusy(true);
-              try {
-                const res = await fetch("/api/waitlist/usd-card", {
-                  method: "POST",
-                });
-                const json = (await res.json()) as { error?: string };
-                if (!res.ok) throw new Error(json.error || "Could not join");
-                setWaitlistJoined(true);
-                toast.success("You’re on the USD virtual card waitlist");
-              } catch (err) {
-                toast.error(
-                  err instanceof Error ? err.message : "Could not join waitlist",
-                );
-              } finally {
-                setWaitlistBusy(false);
-              }
-            }}
-            className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-bold text-white/90 ring-1 ring-white/15 disabled:opacity-80"
-          >
-            <CreditCard className="h-3.5 w-3.5 text-oryno-orange" />
-            {waitlistJoined
-              ? "USD virtual card · you’re on the waitlist"
-              : waitlistBusy
-                ? "Joining waitlist…"
-                : "USD virtual card launching soon · Notify me"}
-          </button>
-
           <div className="relative mt-5 grid grid-cols-2 gap-2.5">
             <button
               type="button"
               onClick={() => {
-                setPanel((p) => (p === "fund" ? "none" : "fund"));
+                setPanel("fund");
                 setFundMethod("paystack");
                 setError(null);
               }}
@@ -333,13 +293,13 @@ export function UsdWalletCard({
                   : "bg-white text-black",
               )}
             >
-        <Plus className="h-4 w-4 text-black" strokeWidth={2.5} />
-              Fund 
+              <Plus className="h-4 w-4 text-black" strokeWidth={2.5} />
+              Fund
             </button>
             <button
               type="button"
               onClick={() => {
-                setPanel((p) => (p === "convert" ? "none" : "convert"));
+                setPanel("convert");
                 setError(null);
               }}
               className={cn(
@@ -356,171 +316,168 @@ export function UsdWalletCard({
         </div>
       </motion.div>
 
-      <AnimatePresence initial={false}>
-        {panel !== "none" ? (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="overflow-hidden"
-          >
-            <div className="rounded-[22px] bg-background p-4 shadow-[var(--shadow-soft)] sm:p-5">
-              {panel === "fund" ? (
-                <>
-                  <h3 className="text-sm font-semibold text-foreground">
-                    Fund USD wallet
-                  </h3>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Pay with Paystack (local currency) or convert from your{" "}
-                    {localCurrency} balance ({localBalanceFormatted}).
-                  </p>
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={panel}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -6 }}
+          transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <div className="rounded-[22px] bg-background p-4 shadow-[var(--shadow-soft)] sm:p-5">
+            {panel === "fund" ? (
+              <>
+                <h3 className="text-sm font-semibold text-foreground">
+                  Fund USD wallet
+                </h3>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Pay with Paystack (local currency) or convert from your{" "}
+                  {localCurrency} balance ({localBalanceFormatted}).
+                </p>
 
-                  <div className="mt-3 grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setFundMethod("paystack")}
-                      className={cn(
-                        "rounded-[14px] border px-3 py-2.5 text-xs font-semibold",
-                        fundMethod === "paystack"
-                          ? "border-primary bg-oryno-orange-muted text-primary"
-                          : "border-border text-muted-foreground",
-                      )}
-                    >
-                      Paystack
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFundMethod("convert")}
-                      className={cn(
-                        "rounded-[14px] border px-3 py-2.5 text-xs font-semibold",
-                        fundMethod === "convert"
-                          ? "border-primary bg-oryno-orange-muted text-primary"
-                          : "border-border text-muted-foreground",
-                      )}
-                    >
-                      From {localCurrency}
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <h3 className="text-sm font-semibold text-foreground">
-                    Convert currencies
-                  </h3>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Live open-market rate + 1% ORYNO commission.
-                  </p>
-                  <div className="mt-3 grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setDirection("to_usd")}
-                      className={cn(
-                        "rounded-[14px] border px-3 py-2.5 text-xs font-semibold",
-                        direction === "to_usd"
-                          ? "border-primary bg-oryno-orange-muted text-primary"
-                          : "border-border text-muted-foreground",
-                      )}
-                    >
-                      {localCurrency} → USD
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDirection("to_local")}
-                      className={cn(
-                        "rounded-[14px] border px-3 py-2.5 text-xs font-semibold",
-                        direction === "to_local"
-                          ? "border-primary bg-oryno-orange-muted text-primary"
-                          : "border-border text-muted-foreground",
-                      )}
-                    >
-                      USD → {localCurrency}
-                    </button>
-                  </div>
-                </>
-              )}
-
-              <label className="mt-4 block">
-                <span className="text-sm font-medium text-foreground">
-                  {panel === "convert" && direction === "to_local"
-                    ? "USD amount"
-                    : "USD amount"}
-                </span>
-                <input
-                  inputMode="decimal"
-                  value={amount}
-                  onChange={(e) =>
-                    setAmount(
-                      e.target.value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1"),
-                    )
-                  }
-                  className="mt-2 h-12 w-full rounded-[14px] border border-border bg-muted/40 px-4 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
-                />
-              </label>
-
-              <div className="mt-3 flex flex-wrap gap-2">
-                {USD_PRESETS.map((preset) => (
+                <div className="mt-3 grid grid-cols-2 gap-2">
                   <button
-                    key={preset}
                     type="button"
-                    onClick={() => setAmount(preset)}
+                    onClick={() => setFundMethod("paystack")}
                     className={cn(
-                      "rounded-full px-3 py-1.5 text-xs font-semibold",
-                      amount === preset
-                        ? "bg-oryno-charcoal text-white"
-                        : "bg-muted text-muted-foreground",
+                      "rounded-[14px] border px-3 py-2.5 text-xs font-semibold",
+                      fundMethod === "paystack"
+                        ? "border-primary bg-oryno-orange-muted text-primary"
+                        : "border-border text-muted-foreground",
                     )}
                   >
-                    ${preset}
+                    Paystack
                   </button>
-                ))}
-              </div>
-
-              {preview ? (
-                <div className="mt-4 rounded-[16px] bg-muted/50 px-4 py-3 text-sm">
-                  <p className="text-muted-foreground">{preview.label}</p>
-                  <p className="mt-0.5 font-bold text-foreground">
-                    {preview.value}
-                  </p>
-                  <p className="mt-2 text-xs font-semibold text-primary">
-                    {preview.receive}
-                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setFundMethod("convert")}
+                    className={cn(
+                      "rounded-[14px] border px-3 py-2.5 text-xs font-semibold",
+                      fundMethod === "convert"
+                        ? "border-primary bg-oryno-orange-muted text-primary"
+                        : "border-border text-muted-foreground",
+                    )}
+                  >
+                    From {localCurrency}
+                  </button>
                 </div>
-              ) : null}
-
-              {error ? (
-                <p className="mt-3 text-sm font-medium text-destructive">
-                  {error}
+              </>
+            ) : (
+              <>
+                <h3 className="text-sm font-semibold text-foreground">
+                  Convert currencies
+                </h3>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Live open-market rate + 1% ORYNO commission.
                 </p>
-              ) : null}
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDirection("to_usd")}
+                    className={cn(
+                      "rounded-[14px] border px-3 py-2.5 text-xs font-semibold",
+                      direction === "to_usd"
+                        ? "border-primary bg-oryno-orange-muted text-primary"
+                        : "border-border text-muted-foreground",
+                    )}
+                  >
+                    {localCurrency} → USD
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDirection("to_local")}
+                    className={cn(
+                      "rounded-[14px] border px-3 py-2.5 text-xs font-semibold",
+                      direction === "to_local"
+                        ? "border-primary bg-oryno-orange-muted text-primary"
+                        : "border-border text-muted-foreground",
+                    )}
+                  >
+                    USD → {localCurrency}
+                  </button>
+                </div>
+              </>
+            )}
 
-              <button
-                type="button"
-                disabled={busy || !amount || Number(amount) <= 0}
-                onClick={() =>
-                  void (panel === "fund" ? onFund() : onConvert())
-                }
-                className="btn-primary mt-4 inline-flex h-12 w-full items-center justify-center gap-2 text-sm disabled:opacity-50"
-              >
-                {busy ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Processing…
-                  </>
-                ) : panel === "fund" ? (
-                  fundMethod === "paystack" ? (
-                    "Pay with Paystack"
-                  ) : (
-                    `Convert from ${localCurrency}`
+            <label className="mt-4 block">
+              <span className="text-sm font-medium text-foreground">
+                USD amount
+              </span>
+              <input
+                inputMode="decimal"
+                value={amount}
+                onChange={(e) =>
+                  setAmount(
+                    e.target.value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1"),
                   )
-                ) : direction === "to_usd" ? (
-                  `Convert to USD`
-                ) : (
-                  `Convert to ${localCurrency}`
-                )}
-              </button>
+                }
+                className="mt-2 h-12 w-full rounded-[14px] border border-border bg-muted/40 px-4 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+              />
+            </label>
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              {USD_PRESETS.map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => setAmount(preset)}
+                  className={cn(
+                    "rounded-full px-3 py-1.5 text-xs font-semibold",
+                    amount === preset
+                      ? "bg-oryno-charcoal text-white"
+                      : "bg-muted text-muted-foreground",
+                  )}
+                >
+                  ${preset}
+                </button>
+              ))}
             </div>
-          </motion.div>
-        ) : null}
+
+            {preview ? (
+              <div className="mt-4 rounded-[16px] bg-muted/50 px-4 py-3 text-sm">
+                <p className="text-muted-foreground">{preview.label}</p>
+                <p className="mt-0.5 font-bold text-foreground">
+                  {preview.value}
+                </p>
+                <p className="mt-2 text-xs font-semibold text-primary">
+                  {preview.receive}
+                </p>
+              </div>
+            ) : null}
+
+            {error ? (
+              <p className="mt-3 text-sm font-medium text-destructive">
+                {error}
+              </p>
+            ) : null}
+
+            <button
+              type="button"
+              disabled={busy || !amount || Number(amount) <= 0}
+              onClick={() =>
+                void (panel === "fund" ? onFund() : onConvert())
+              }
+              className="btn-primary mt-4 inline-flex h-12 w-full items-center justify-center gap-2 text-sm disabled:opacity-50"
+            >
+              {busy ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Processing…
+                </>
+              ) : panel === "fund" ? (
+                fundMethod === "paystack" ? (
+                  "Pay with Paystack"
+                ) : (
+                  `Convert from ${localCurrency}`
+                )
+              ) : direction === "to_usd" ? (
+                `Convert to USD`
+              ) : (
+                `Convert to ${localCurrency}`
+              )}
+            </button>
+          </div>
+        </motion.div>
       </AnimatePresence>
     </div>
   );

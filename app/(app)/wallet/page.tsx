@@ -330,7 +330,7 @@ function WalletPageContent() {
                     <div className="relative flex items-start justify-between gap-3">
                       <div>
                         <p className="inline-flex items-center gap-1.5 text-[11px] font-bold tracking-[0.16em] text-white/80 uppercase">
-                          <Sparkles className="h-3.5 w-3.5 text-[#ffd29a]" />
+                    
                           Primary · {currency}
                         </p>
                         <AnimatePresence mode="wait">
@@ -730,67 +730,7 @@ function WalletPageContent() {
               ) : null}
             </div>
           </MotionSection>
-
-          <MotionSection
-            delay={0.12}
-            className="mt-5 rounded-[22px] bg-background p-5 shadow-[var(--shadow-soft)]"
-          >
-            <h2 className="text-base font-semibold text-foreground">
-              Instructions
-            </h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              How to add a payout bank with Paystack
-            </p>
-            <ol className="mt-4 space-y-3">
-              {ADD_BANK_INSTRUCTIONS.map((step, index) => (
-                <li key={step} className="flex gap-3">
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-oryno-orange-muted text-xs font-bold text-primary">
-                    {index + 1}
-                  </span>
-                  <p className="pt-1 text-sm leading-relaxed text-foreground">
-                    {step}
-                  </p>
-                </li>
-              ))}
-            </ol>
-          </MotionSection>
           </div>
-
-          <MotionSection
-            delay={0.14}
-            className="mt-5 rounded-[28px] bg-background p-5 shadow-[var(--shadow-soft)]"
-          >
-            <div className="mb-2 flex items-center justify-between">
-              <h2 className="text-base font-semibold text-foreground">
-                Recent activity
-              </h2>
-              <Link href="/history" className="text-sm font-semibold text-primary">
-                See all
-              </Link>
-            </div>
-            {data.recent.length ? (
-              <div className="divide-y divide-border">
-                {data.recent.map((tx, i) => (
-                  <TransactionRow key={tx.id} transaction={tx} index={i} />
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-[18px] border border-dashed border-border px-4 py-10 text-center">
-                <p className="text-sm font-semibold text-foreground">
-                  No transactions yet
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Fund your wallet to get started.
-                </p>
-                <Link
-                  href="/fund"
-                  className="btn-primary mt-4 inline-flex h-10 items-center px-4 text-sm"
-                >
-                  Fund wallet
-                </Link>
-              </div>
-            )}
-          </MotionSection>
         </>
       ) : null}
     </AppShell>
