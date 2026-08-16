@@ -330,30 +330,6 @@ export default function WithdrawPage() {
                 </div>
               </MotionSection>
 
-              <MotionSection
-                delay={0.06}
-                className="mt-5 rounded-[22px] border border-border bg-background p-5 shadow-[var(--shadow-soft)]"
-              >
-                <h2 className="text-base font-semibold text-foreground">
-                  Instructions
-                </h2>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Follow these steps to withdraw with Paystack
-                </p>
-                <ol className="mt-4 space-y-3">
-                  {WITHDRAW_INSTRUCTIONS.map((step, index) => (
-                    <li key={step} className="flex gap-3">
-                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-oryno-orange-muted text-xs font-bold text-primary">
-                        {index + 1}
-                      </span>
-                      <p className="pt-1 text-sm leading-relaxed text-foreground">
-                        {step}
-                      </p>
-                    </li>
-                  ))}
-                </ol>
-              </MotionSection>
-
               {error ? (
                 <p className="mt-4 text-sm font-medium text-destructive">
                   {error}
