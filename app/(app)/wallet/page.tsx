@@ -8,6 +8,7 @@ import {
   ArrowUpRight,
   Building2,
   Check,
+  Clock,
   Eye,
   EyeOff,
   History,
@@ -15,16 +16,14 @@ import {
   Loader2,
   Plus,
   ShieldCheck,
-  Sparkles,
   Trash2,
+  Wallet,
   X,
-  Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
-import { TransactionRow } from "@/components/app/transaction-row";
 import { UsdWalletActionsPanel, UsdWalletCard, type UsdPanel } from "@/components/app/usd-wallet-card";
 import { WalletSkeleton } from "@/components/app/wallet-skeleton";
 import type { BankOption, WalletPayload } from "@/lib/wallet-types";
@@ -472,7 +471,7 @@ function WalletPageContent() {
             </div>
           ) : null}
 
-          {/* md+: local sections left, USD actions right */}
+          {/* md+: local stats + banks under local card, USD actions under USD */}
           <div className="mt-4 hidden gap-4 md:grid md:grid-cols-2 md:items-start">
             <div className="min-w-0 space-y-4">
               <MotionSection delay={0.06} className="grid grid-cols-3 gap-3">
@@ -482,7 +481,7 @@ function WalletPageContent() {
                     value: hidden
                       ? "••••"
                       : `${symbol}${Number(data.totals.balance).toLocaleString("en-NG", { maximumFractionDigits: 0 })}`,
-                    icon: Zap,
+                    icon: Wallet,
                   },
                   {
                     label: "Banks",
@@ -492,7 +491,7 @@ function WalletPageContent() {
                   {
                     label: "Recent",
                     value: String(data.recent.length),
-                    icon: Sparkles,
+                    icon: Clock,
                   },
                 ].map((stat, i) => {
                   const Icon = stat.icon;
@@ -505,7 +504,7 @@ function WalletPageContent() {
                       className="rounded-[22px] bg-background p-3.5 shadow-[var(--shadow-soft)] sm:p-4"
                     >
                       <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-oryno-orange-muted text-primary">
-                        <Icon className="h-4 w-4" />
+                        <Icon className="h-4 w-4" strokeWidth={1.75} />
                       </span>
                       <p className="mt-2.5 text-[11px] font-medium text-muted-foreground">
                         {stat.label}
@@ -517,6 +516,26 @@ function WalletPageContent() {
                   );
                 })}
               </MotionSection>
+
+              <BankAccountsSection
+                data={data}
+                adding={adding}
+                setAdding={setAdding}
+                flash={flash}
+                bankError={bankError}
+                bankOptions={bankOptions}
+                bankCode={bankCode}
+                setBankCode={setBankCode}
+                accountNumber={accountNumber}
+                setAccountNumber={setAccountNumber}
+                accountName={accountName}
+                setAccountName={setAccountName}
+                resolving={resolving}
+                savingBank={savingBank}
+                onAddAccount={onAddAccount}
+                setPrimary={setPrimary}
+                removeAccount={removeAccount}
+              />
             </div>
             <div className="min-w-0">
               <UsdWalletActionsPanel
@@ -531,270 +550,335 @@ function WalletPageContent() {
             </div>
           </div>
 
-          {/* Local sections — mobile only when local; banks always on md+ */}
+          {/* Mobile: stats + banks under local wallet */}
           <div
             className={cn(
-              walletView === "usd" ? "hidden md:block" : "block",
+              "md:hidden",
+              walletView === "usd" ? "hidden" : "block",
             )}
           >
-          <MotionSection delay={0.06} className="mt-4 grid grid-cols-3 gap-3 md:hidden">
-            {[
-              {
-                label: "Balance",
-                value: hidden ? "••••" : `${symbol}${Number(data.totals.balance).toLocaleString("en-NG", { maximumFractionDigits: 0 })}`,
-                icon: Zap,
-              },
-              {
-                label: "Banks",
-                value: String(data.totals.bankCount),
-                icon: Landmark,
-              },
-              {
-                label: "Recent",
-                value: String(data.recent.length),
-                icon: Sparkles,
-              },
-            ].map((stat, i) => {
-              const Icon = stat.icon;
-              return (
-                <motion.div
-                  key={stat.label}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.08 + i * 0.04 }}
-                  className="rounded-[22px] bg-background p-3.5 shadow-[var(--shadow-soft)] sm:p-4"
-                >
-                  <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-oryno-orange-muted text-primary">
-                    <Icon className="h-4 w-4" />
-                  </span>
-                  <p className="mt-2.5 text-[11px] font-medium text-muted-foreground">
-                    {stat.label}
-                  </p>
-                  <p className="mt-0.5 truncate text-sm font-bold text-foreground sm:text-base">
-                    {stat.value}
-                  </p>
-                </motion.div>
-              );
-            })}
-          </MotionSection>
-
-          <MotionSection
-            delay={0.1}
-            className="mt-5 rounded-[28px] bg-background p-5 shadow-[var(--shadow-soft)] sm:p-6"
-          >
-            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-oryno-orange-muted text-primary">
-                  <Landmark className="h-5 w-5" strokeWidth={1.75} />
-                </span>
-                <div>
-                  <h2 className="text-base font-semibold text-foreground">
-                    Bank accounts
-                  </h2>
-                  <p className="text-sm text-muted-foreground">
-                    For instant withdrawals
-                  </p>
-                </div>
-              </div>
-              <motion.button
-                type="button"
-                whileHover={{ y: -2 }}
-                whileTap={{ scale: 0.97 }}
-                onClick={() => setAdding((v) => !v)}
-                className="inline-flex h-10 items-center gap-1.5 rounded-[14px] bg-primary px-3.5 text-sm font-semibold text-white shadow-[var(--shadow-orange)]"
-              >
-                {adding ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-                {adding ? "Close" : "Add bank"}
-              </motion.button>
-            </div>
-
-            <AnimatePresence>
-              {flash ? (
-                <motion.div
-                  initial={{ opacity: 0, y: -6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  className="mb-4 flex items-center gap-2 rounded-[14px] bg-oryno-orange-muted px-3 py-2.5 text-sm font-medium text-primary"
-                >
-                  <Check className="h-4 w-4" />
-                  {flash}
-                </motion.div>
-              ) : null}
-            </AnimatePresence>
-
-            <AnimatePresence initial={false}>
-              {adding ? (
-                <motion.form
-                  onSubmit={onAddAccount}
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="mb-4 overflow-hidden"
-                >
-                  <div className="space-y-3 rounded-[18px] border border-border bg-muted/40 p-4">
-                    {bankError ? (
-                      <p className="text-sm font-medium text-destructive">
-                        {bankError}
-                      </p>
-                    ) : null}
-                    <label className="block">
-                      <span className="text-sm font-semibold text-foreground">
-                        Bank
-                      </span>
-                      <select
-                        value={bankCode}
-                        onChange={(e) => {
-                          setBankCode(e.target.value);
-                          setAccountName("");
-                        }}
-                        className="mt-2 h-12 w-full rounded-[14px] border border-border bg-background px-4 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
-                      >
-                        {bankOptions.map((bank) => (
-                          <option key={bank.code} value={bank.code}>
-                            {bank.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="block">
-                      <span className="text-sm font-semibold text-foreground">
-                        Account number
-                      </span>
-                      <input
-                        inputMode="numeric"
-                        value={accountNumber}
-                        onChange={(e) => {
-                          setAccountNumber(
-                            e.target.value.replace(/[^\d]/g, "").slice(0, 10),
-                          );
-                          setAccountName("");
-                        }}
-                        placeholder="10-digit account number"
-                        required
-                        className="mt-2 h-12 w-full rounded-[14px] border border-border bg-background px-4 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
-                      />
-                    </label>
-                    <label className="block">
-                      <span className="text-sm font-semibold text-foreground">
-                        Account name
-                      </span>
-                      <div className="relative mt-2">
-                        <input
-                          value={accountName}
-                          readOnly
-                          placeholder={
-                            resolving
-                              ? "Verifying with Paystack…"
-                              : "Resolved after account number"
-                          }
-                          className="h-12 w-full rounded-[14px] border border-border bg-background px-4 pr-10 text-sm outline-none"
-                        />
-                        {resolving ? (
-                          <Loader2 className="absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 animate-spin text-primary" />
-                        ) : null}
-                      </div>
-                    </label>
-                    <button
-                      type="submit"
-                      disabled={
-                        savingBank ||
-                        resolving ||
-                        accountNumber.length < 10 ||
-                        !accountName ||
-                        !bankCode
-                      }
-                      className="btn-primary h-11 w-full text-sm disabled:opacity-50"
-                    >
-                      {savingBank ? "Saving…" : "Verify & save bank"}
-                    </button>
-                  </div>
-                </motion.form>
-              ) : null}
-            </AnimatePresence>
-
-            <div className="space-y-3">
-              {data.banks.map((account, index) => (
-                <motion.div
-                  key={account.id}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.04 }}
-                  className={cn(
-                    "rounded-[18px] border px-4 py-3.5",
-                    account.isPrimary
-                      ? "border-primary/40 bg-oryno-orange-muted/40"
-                      : "border-border bg-background",
-                  )}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex min-w-0 items-start gap-3">
-                      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-background text-primary shadow-[var(--shadow-soft)]">
-                        <Building2 className="h-5 w-5" strokeWidth={1.75} />
-                      </span>
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-sm font-semibold text-foreground">
-                            {account.bankName}
-                          </p>
-                          {account.isPrimary ? (
-                            <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-white uppercase">
-                              Primary
-                            </span>
-                          ) : null}
-                        </div>
-                        <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                          {account.accountName}
-                        </p>
-                        <p className="mt-1 font-mono text-sm font-semibold tracking-wide text-foreground">
-                          {account.accountNumber}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex shrink-0 flex-col items-end gap-2">
-                      {!account.isPrimary ? (
-                        <button
-                          type="button"
-                          onClick={() => void setPrimary(account.id)}
-                          className="text-xs font-semibold text-primary"
-                        >
-                          Make primary
-                        </button>
-                      ) : null}
-                      <button
-                        type="button"
-                        onClick={() => void removeAccount(account.id)}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-[10px] bg-muted text-muted-foreground transition hover:bg-destructive/10 hover:text-[var(--oryno-error)]"
-                        aria-label="Remove bank account"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-
-              {data.banks.length === 0 ? (
-                <div className="rounded-[18px] border border-dashed border-border px-4 py-8 text-center">
-                  <p className="text-sm font-semibold text-foreground">
-                    No bank accounts yet
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Add a Paystack-verified bank to withdraw from your wallet.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setAdding(true)}
-                    className="btn-primary mt-4 inline-flex h-10 items-center px-4 text-sm"
+            <MotionSection delay={0.06} className="mt-4 grid grid-cols-3 gap-3">
+              {[
+                {
+                  label: "Balance",
+                  value: hidden
+                    ? "••••"
+                    : `${symbol}${Number(data.totals.balance).toLocaleString("en-NG", { maximumFractionDigits: 0 })}`,
+                  icon: Wallet,
+                },
+                {
+                  label: "Banks",
+                  value: String(data.totals.bankCount),
+                  icon: Landmark,
+                },
+                {
+                  label: "Recent",
+                  value: String(data.recent.length),
+                  icon: Clock,
+                },
+              ].map((stat, i) => {
+                const Icon = stat.icon;
+                return (
+                  <motion.div
+                    key={stat.label}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.08 + i * 0.04 }}
+                    className="rounded-[22px] bg-background p-3.5 shadow-[var(--shadow-soft)] sm:p-4"
                   >
-                    Add bank account
-                  </button>
-                </div>
-              ) : null}
+                    <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-oryno-orange-muted text-primary">
+                      <Icon className="h-4 w-4" strokeWidth={1.75} />
+                    </span>
+                    <p className="mt-2.5 text-[11px] font-medium text-muted-foreground">
+                      {stat.label}
+                    </p>
+                    <p className="mt-0.5 truncate text-sm font-bold text-foreground sm:text-base">
+                      {stat.value}
+                    </p>
+                  </motion.div>
+                );
+              })}
+            </MotionSection>
+
+            <div className="mt-4">
+              <BankAccountsSection
+                data={data}
+                adding={adding}
+                setAdding={setAdding}
+                flash={flash}
+                bankError={bankError}
+                bankOptions={bankOptions}
+                bankCode={bankCode}
+                setBankCode={setBankCode}
+                accountNumber={accountNumber}
+                setAccountNumber={setAccountNumber}
+                accountName={accountName}
+                setAccountName={setAccountName}
+                resolving={resolving}
+                savingBank={savingBank}
+                onAddAccount={onAddAccount}
+                setPrimary={setPrimary}
+                removeAccount={removeAccount}
+              />
             </div>
-          </MotionSection>
           </div>
         </>
       ) : null}
     </AppShell>
+  );
+}
+
+function BankAccountsSection({
+  data,
+  adding,
+  setAdding,
+  flash,
+  bankError,
+  bankOptions,
+  bankCode,
+  setBankCode,
+  accountNumber,
+  setAccountNumber,
+  accountName,
+  setAccountName,
+  resolving,
+  savingBank,
+  onAddAccount,
+  setPrimary,
+  removeAccount,
+}: {
+  data: WalletPayload;
+  adding: boolean;
+  setAdding: React.Dispatch<React.SetStateAction<boolean>>;
+  flash: string | null;
+  bankError: string | null;
+  bankOptions: BankOption[];
+  bankCode: string;
+  setBankCode: React.Dispatch<React.SetStateAction<string>>;
+  accountNumber: string;
+  setAccountNumber: React.Dispatch<React.SetStateAction<string>>;
+  accountName: string;
+  setAccountName: React.Dispatch<React.SetStateAction<string>>;
+  resolving: boolean;
+  savingBank: boolean;
+  onAddAccount: (e: FormEvent) => void | Promise<void>;
+  setPrimary: (id: string) => void | Promise<void>;
+  removeAccount: (id: string) => void | Promise<void>;
+}) {
+  return (
+    <MotionSection
+      delay={0.1}
+      className="rounded-[28px] bg-background p-5 shadow-[var(--shadow-soft)] sm:p-6"
+    >
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-oryno-orange-muted text-primary">
+            <Landmark className="h-5 w-5" strokeWidth={1.75} />
+          </span>
+          <div>
+            <h2 className="text-base font-semibold text-foreground">
+              Bank accounts
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              For instant withdrawals
+            </p>
+          </div>
+        </div>
+        <motion.button
+          type="button"
+          whileHover={{ y: -2 }}
+          whileTap={{ scale: 0.97 }}
+          onClick={() => setAdding((v) => !v)}
+          className="inline-flex h-10 items-center gap-1.5 rounded-[14px] bg-primary px-3.5 text-sm font-semibold text-white shadow-[var(--shadow-orange)]"
+        >
+          {adding ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+          {adding ? "Close" : "Add bank"}
+        </motion.button>
+      </div>
+
+      <AnimatePresence>
+        {flash ? (
+          <motion.div
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="mb-4 flex items-center gap-2 rounded-[14px] bg-oryno-orange-muted px-3 py-2.5 text-sm font-medium text-primary"
+          >
+            <Check className="h-4 w-4" />
+            {flash}
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+
+      <AnimatePresence initial={false}>
+        {adding ? (
+          <motion.form
+            onSubmit={onAddAccount}
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="mb-4 overflow-hidden"
+          >
+            <div className="space-y-3 rounded-[18px] border border-border bg-muted/40 p-4">
+              {bankError ? (
+                <p className="text-sm font-medium text-destructive">
+                  {bankError}
+                </p>
+              ) : null}
+              <label className="block">
+                <span className="text-sm font-semibold text-foreground">
+                  Bank
+                </span>
+                <select
+                  value={bankCode}
+                  onChange={(e) => {
+                    setBankCode(e.target.value);
+                    setAccountName("");
+                  }}
+                  className="mt-2 h-12 w-full rounded-[14px] border border-border bg-background px-4 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+                >
+                  {bankOptions.map((bank) => (
+                    <option key={bank.code} value={bank.code}>
+                      {bank.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="text-sm font-semibold text-foreground">
+                  Account number
+                </span>
+                <input
+                  inputMode="numeric"
+                  value={accountNumber}
+                  onChange={(e) => {
+                    setAccountNumber(
+                      e.target.value.replace(/[^\d]/g, "").slice(0, 10),
+                    );
+                    setAccountName("");
+                  }}
+                  placeholder="10-digit account number"
+                  required
+                  className="mt-2 h-12 w-full rounded-[14px] border border-border bg-background px-4 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+                />
+              </label>
+              <label className="block">
+                <span className="text-sm font-semibold text-foreground">
+                  Account name
+                </span>
+                <div className="relative mt-2">
+                  <input
+                    value={accountName}
+                    readOnly
+                    placeholder={
+                      resolving
+                        ? "Verifying with Paystack…"
+                        : "Resolved after account number"
+                    }
+                    className="h-12 w-full rounded-[14px] border border-border bg-background px-4 pr-10 text-sm outline-none"
+                  />
+                  {resolving ? (
+                    <Loader2 className="absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 animate-spin text-primary" />
+                  ) : null}
+                </div>
+              </label>
+              <button
+                type="submit"
+                disabled={
+                  savingBank ||
+                  resolving ||
+                  accountNumber.length < 10 ||
+                  !accountName ||
+                  !bankCode
+                }
+                className="btn-primary h-11 w-full text-sm disabled:opacity-50"
+              >
+                {savingBank ? "Saving…" : "Verify & save bank"}
+              </button>
+            </div>
+          </motion.form>
+        ) : null}
+      </AnimatePresence>
+
+      <div className="space-y-3">
+        {data.banks.map((account, index) => (
+          <motion.div
+            key={account.id}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: index * 0.04 }}
+            className={cn(
+              "rounded-[18px] border px-4 py-3.5",
+              account.isPrimary
+                ? "border-primary/40 bg-oryno-orange-muted/40"
+                : "border-border bg-background",
+            )}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 items-start gap-3">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-background text-primary shadow-[var(--shadow-soft)]">
+                  <Building2 className="h-5 w-5" strokeWidth={1.75} />
+                </span>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-semibold text-foreground">
+                      {account.bankName}
+                    </p>
+                    {account.isPrimary ? (
+                      <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-white uppercase">
+                        Primary
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                    {account.accountName}
+                  </p>
+                  <p className="mt-1 font-mono text-sm font-semibold tracking-wide text-foreground">
+                    {account.accountNumber}
+                  </p>
+                </div>
+              </div>
+              <div className="flex shrink-0 flex-col items-end gap-2">
+                {!account.isPrimary ? (
+                  <button
+                    type="button"
+                    onClick={() => void setPrimary(account.id)}
+                    className="text-xs font-semibold text-primary"
+                  >
+                    Make primary
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => void removeAccount(account.id)}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-[10px] bg-muted text-muted-foreground transition hover:bg-destructive/10 hover:text-[var(--oryno-error)]"
+                  aria-label="Remove bank account"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        ))}
+
+        {data.banks.length === 0 ? (
+          <div className="rounded-[18px] border border-dashed border-border px-4 py-8 text-center">
+            <p className="text-sm font-semibold text-foreground">
+              No bank accounts yet
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Add a Paystack-verified bank to withdraw from your wallet.
+            </p>
+            <button
+              type="button"
+              onClick={() => setAdding(true)}
+              className="btn-primary mt-4 inline-flex h-10 items-center px-4 text-sm"
+            >
+              Add bank account
+            </button>
+          </div>
+        ) : null}
+      </div>
+    </MotionSection>
   );
 }

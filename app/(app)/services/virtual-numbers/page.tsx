@@ -502,8 +502,6 @@ export default function VirtualNumbersPage() {
               </div>
             </MotionSection>
 
-            <ServiceInstructions service="virtual-numbers" delay={0.12} />
-
             <div className="hidden pt-2 sm:block">
               <motion.button
                 type="submit"

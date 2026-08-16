@@ -400,8 +400,6 @@ export default function EmailRentPage() {
               </div>
             </MotionSection>
 
-            <ServiceInstructions service="emails" delay={0.12} />
-
             {/* Desktop: clear gap between instructions and rent button */}
             <div className="hidden pt-4 sm:block">
               <motion.button
