@@ -3,7 +3,13 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown } from "lucide-react";
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  Check,
+  ChevronDown,
+  Scale,
+} from "lucide-react";
 import { AppShell } from "@/components/app/app-shell";
 import { HistorySkeleton } from "@/components/app/history-states";
 import { MotionSection } from "@/components/app/motion-section";
@@ -125,7 +131,7 @@ function HistoryAnalyticsContent() {
           <button
             type="button"
             onClick={() => setMonthOpen(true)}
-            className="inline-flex h-10 items-center gap-1.5 rounded-[14px] bg-muted px-3.5 text-sm font-bold text-foreground"
+            className="inline-flex h-10 items-center gap-1.5 rounded-[14px] border border-border bg-background px-3.5 text-sm font-bold text-foreground shadow-[var(--shadow-soft)] transition hover:border-primary/30"
           >
             {activeMonth?.label ?? "—"}
             <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -142,11 +148,13 @@ function HistoryAnalyticsContent() {
               {
                 label: "In",
                 value: formatMoneyAmount(totals.inflow, currency),
+                icon: ArrowDownLeft,
                 tone: "credit" as const,
               },
               {
                 label: "Out",
                 value: formatMoneyAmount(totals.outflow, currency),
+                icon: ArrowUpRight,
                 tone: "debit" as const,
               },
               {
@@ -155,33 +163,56 @@ function HistoryAnalyticsContent() {
                   signed: true,
                   type: totals.net >= 0 ? "credit" : "debit",
                 }),
+                icon: Scale,
+                tone: totals.net >= 0 ? ("credit" as const) : ("debit" as const),
               },
-            ].map((stat) => (
-              <div
-                key={stat.label}
-                className="rounded-[22px] bg-background p-3.5 shadow-[var(--shadow-soft)]"
-              >
-                <p className="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
-                  {stat.label}
-                </p>
-                <p
+            ].map((stat, i) => {
+              const Icon = stat.icon;
+              return (
+                <motion.div
+                  key={stat.label}
+                  initial={{ opacity: 0, y: 14 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.04 + i * 0.05, duration: 0.35 }}
                   className={cn(
-                    "mt-1 truncate text-sm font-bold tabular-nums",
-                    stat.tone === "credit" && "text-oryno-success",
-                    stat.tone === "debit" && "text-foreground",
+                    "rounded-[22px] border p-3.5 shadow-[var(--shadow-soft)]",
+                    stat.tone === "credit"
+                      ? "border-[color-mix(in_srgb,var(--oryno-success)_22%,transparent)] bg-[color-mix(in_srgb,var(--oryno-success)_7%,var(--background))]"
+                      : "border-border/70 bg-background",
                   )}
                 >
-                  {stat.value}
-                </p>
-              </div>
-            ))}
+                  <div className="flex items-center gap-1.5 text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
+                    <Icon
+                      className={cn(
+                        "h-3.5 w-3.5",
+                        stat.tone === "credit" && "text-[var(--oryno-success)]",
+                      )}
+                    />
+                    {stat.label}
+                  </div>
+                  <p
+                    className={cn(
+                      "mt-1.5 truncate text-sm font-bold tabular-nums sm:text-base",
+                      stat.tone === "credit" && "text-[var(--oryno-success)]",
+                      stat.tone === "debit" && "text-foreground",
+                    )}
+                  >
+                    {stat.value}
+                  </p>
+                </motion.div>
+              );
+            })}
           </MotionSection>
 
           <MotionSection
-            delay={0.05}
-            className="mt-5 rounded-[28px] bg-background p-5 shadow-[var(--shadow-soft)]"
+            delay={0.06}
+            className="relative mt-5 overflow-hidden rounded-[28px] border border-border/50 bg-background p-5 shadow-[var(--shadow-soft)]"
           >
-            <div className="mb-4 flex items-end justify-between gap-3">
+            <div
+              aria-hidden
+              className="pointer-events-none absolute -top-20 right-0 h-44 w-44 rounded-full bg-primary/10 blur-3xl"
+            />
+            <div className="relative mb-5 flex items-end justify-between gap-3">
               <div>
                 <h2 className="text-base font-bold text-foreground">
                   Daily cashflow
@@ -190,54 +221,82 @@ function HistoryAnalyticsContent() {
                   In vs out for {activeMonth?.label}
                 </p>
               </div>
-              <p className="text-xs font-semibold text-muted-foreground">
+              <div className="rounded-full bg-oryno-orange-muted px-3 py-1.5 text-xs font-bold text-primary">
                 {Math.round(spendShare * 100)}% spent
-              </p>
+              </div>
             </div>
-            <div className="flex h-40 items-end gap-1 overflow-x-auto pb-1">
-              {series.map((point) => (
-                <div
-                  key={point.key}
-                  className="flex min-w-[10px] flex-1 flex-col items-center justify-end gap-1"
-                  title={`${point.label}: in ${point.inflow}, out ${point.outflow}`}
-                >
-                  <div className="flex w-full items-end justify-center gap-0.5">
-                    <div
-                      className="w-1 rounded-full bg-oryno-success/80"
-                      style={{
-                        height: `${Math.max(4, (point.inflow / maxBar) * 120)}px`,
-                      }}
-                    />
-                    <div
-                      className="w-1 rounded-full bg-primary/80"
-                      style={{
-                        height: `${Math.max(4, (point.outflow / maxBar) * 120)}px`,
-                      }}
-                    />
-                  </div>
-                </div>
-              ))}
+
+            <div className="relative mb-3 flex items-center gap-4 text-[11px] font-semibold text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-[var(--oryno-success)]" />
+                In
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-primary" />
+                Out
+              </span>
+            </div>
+
+            <div className="relative flex h-44 items-end gap-1 overflow-x-auto pb-1">
+              {series.length === 0 ? (
+                <p className="self-center text-sm text-muted-foreground">
+                  No daily activity yet.
+                </p>
+              ) : (
+                series.map((point, index) => (
+                  <motion.div
+                    key={point.key}
+                    initial={{ opacity: 0, scaleY: 0.2 }}
+                    animate={{ opacity: 1, scaleY: 1 }}
+                    transition={{
+                      delay: Math.min(index * 0.012, 0.35),
+                      duration: 0.45,
+                      ease: [0.22, 1, 0.36, 1],
+                    }}
+                    className="flex min-w-[10px] flex-1 origin-bottom flex-col items-center justify-end gap-1"
+                    title={`${point.label}: in ${point.inflow}, out ${point.outflow}`}
+                  >
+                    <div className="flex w-full items-end justify-center gap-0.5">
+                      <div
+                        className="w-1.5 rounded-full bg-[var(--oryno-success)]/85"
+                        style={{
+                          height: `${Math.max(4, (point.inflow / maxBar) * 140)}px`,
+                        }}
+                      />
+                      <div
+                        className="w-1.5 rounded-full bg-primary/85"
+                        style={{
+                          height: `${Math.max(4, (point.outflow / maxBar) * 140)}px`,
+                        }}
+                      />
+                    </div>
+                  </motion.div>
+                ))
+              )}
             </div>
           </MotionSection>
 
           <MotionSection
-            delay={0.08}
-            className="mt-5 rounded-[28px] bg-background p-5 shadow-[var(--shadow-soft)]"
+            delay={0.1}
+            className="mt-5 rounded-[28px] border border-border/50 bg-background p-5 shadow-[var(--shadow-soft)]"
           >
-            <h2 className="text-base font-bold text-foreground">
-              By category
-            </h2>
+            <h2 className="text-base font-bold text-foreground">By category</h2>
             <p className="text-sm text-muted-foreground">
               Where money moved this month
             </p>
-            <div className="mt-4 space-y-3">
+            <div className="mt-4 space-y-4">
               {categories.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   No activity in this period.
                 </p>
               ) : (
-                categories.map((cat) => (
-                  <div key={cat.id}>
+                categories.map((cat, index) => (
+                  <motion.div
+                    key={cat.id}
+                    initial={{ opacity: 0, x: -8 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.05 + index * 0.04 }}
+                  >
                     <div className="mb-1.5 flex items-center justify-between gap-3">
                       <p className="truncate text-sm font-semibold text-foreground">
                         {cat.label}
@@ -246,15 +305,21 @@ function HistoryAnalyticsContent() {
                         {formatMoneyAmount(cat.total, currency)} · {cat.count}
                       </p>
                     </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-muted">
-                      <div
-                        className="h-full rounded-full bg-primary"
-                        style={{
+                    <div className="h-2.5 overflow-hidden rounded-full bg-muted">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{
                           width: `${Math.max(6, (cat.total / maxCategory) * 100)}%`,
                         }}
+                        transition={{
+                          delay: 0.1 + index * 0.05,
+                          duration: 0.55,
+                          ease: [0.22, 1, 0.36, 1],
+                        }}
+                        className="h-full rounded-full bg-gradient-to-r from-primary to-[#ff8a33]"
                       />
                     </div>
-                  </div>
+                  </motion.div>
                 ))
               )}
             </div>
@@ -273,15 +338,17 @@ function HistoryAnalyticsContent() {
             <button
               type="button"
               aria-label="Close"
-              className="absolute inset-0 bg-black/40"
+              className="absolute inset-0 bg-black/45 backdrop-blur-[2px]"
               onClick={() => setMonthOpen(false)}
             />
             <motion.div
-              initial={{ y: 40, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 24, opacity: 0 }}
-              className="relative z-10 max-h-[78vh] w-full overflow-hidden rounded-t-[28px] bg-background shadow-[var(--shadow-soft)] sm:max-w-md sm:rounded-[28px]"
+              initial={{ y: 48, opacity: 0, scale: 0.98 }}
+              animate={{ y: 0, opacity: 1, scale: 1 }}
+              exit={{ y: 28, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 340, damping: 30 }}
+              className="relative z-10 max-h-[78vh] w-full overflow-hidden rounded-t-[28px] border border-border/60 bg-background shadow-[0_24px_80px_rgba(28,28,30,0.28)] sm:max-w-md sm:rounded-[28px]"
             >
+              <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-border sm:hidden" />
               <div className="border-b border-border/70 px-5 py-4">
                 <p className="text-base font-bold text-foreground">Month</p>
                 <p className="mt-0.5 text-sm text-muted-foreground">
@@ -289,26 +356,32 @@ function HistoryAnalyticsContent() {
                 </p>
               </div>
               <div className="max-h-[60vh] space-y-1 overflow-y-auto p-3">
-                {months.map((m) => (
-                  <button
+                {months.map((m, index) => (
+                  <motion.button
                     key={m.key}
                     type="button"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: Math.min(index * 0.02, 0.2) }}
                     onClick={() => {
                       setMonthKey(m.key);
                       setMonthOpen(false);
                     }}
                     className={cn(
-                      "flex w-full items-center justify-between rounded-[16px] px-3.5 py-3 text-left",
+                      "flex w-full items-center justify-between rounded-[16px] px-3.5 py-3 text-left transition",
                       m.key === activeMonth?.key
                         ? "bg-oryno-orange-muted text-primary"
                         : "hover:bg-muted/70",
                     )}
                   >
                     <span className="text-sm font-bold">{m.longLabel}</span>
-                    <span className="text-xs font-semibold text-muted-foreground">
+                    <span className="inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground">
                       {m.label}
+                      {m.key === activeMonth?.key ? (
+                        <Check className="h-4 w-4 text-primary" />
+                      ) : null}
                     </span>
-                  </button>
+                  </motion.button>
                 ))}
               </div>
             </motion.div>
