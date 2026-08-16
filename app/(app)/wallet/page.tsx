@@ -256,7 +256,7 @@ function WalletPageContent() {
           <button
             type="button"
             onClick={() => void load()}
-            className="flex h-10 w-10 items-center justify-center rounded-[14px] border border-border bg-background shadow-[var(--shadow-soft)]"
+            className="flex h-10 w-10 items-center justify-center rounded-[14px] bg-background shadow-[var(--shadow-soft)]"
             aria-label="Refresh wallet"
           >
             <RefreshCw
@@ -273,7 +273,7 @@ function WalletPageContent() {
       {loading && !data ? (
         <WalletSkeleton />
       ) : error && !data ? (
-        <MotionSection className="rounded-[28px] border border-border bg-background px-6 py-14 text-center shadow-[var(--shadow-soft)]">
+        <MotionSection className="rounded-[28px] bg-background px-6 py-14 text-center shadow-[var(--shadow-soft)]">
           <p className="text-lg font-bold text-foreground">Wallet unavailable</p>
           <p className="mt-1.5 text-sm text-muted-foreground">{error}</p>
           <button
@@ -309,7 +309,7 @@ function WalletPageContent() {
                   "md:w-auto md:min-w-0 md:shrink md:snap-none md:px-0",
                 )}
               >
-                <div className="overflow-hidden rounded-[28px] border border-border bg-background shadow-[var(--shadow-soft)]">
+                <div className="overflow-hidden rounded-[28px] bg-background shadow-[var(--shadow-soft)]">
                   <div className="relative overflow-hidden bg-gradient-to-br from-[#ff8124] via-oryno-orange to-[#e85d00] px-5 py-5 text-white sm:px-6 sm:py-6">
                     <div
                       aria-hidden="true"
@@ -500,7 +500,7 @@ function WalletPageContent() {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.08 + i * 0.04 }}
-                  className="rounded-[22px] border border-border bg-background p-3.5 shadow-[var(--shadow-soft)] sm:p-4"
+                  className="rounded-[22px] bg-background p-3.5 shadow-[var(--shadow-soft)] sm:p-4"
                 >
                   <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-oryno-orange-muted text-primary">
                     <Icon className="h-4 w-4" />
@@ -518,7 +518,7 @@ function WalletPageContent() {
 
           <MotionSection
             delay={0.1}
-            className="mt-5 rounded-[28px] border border-border bg-background p-5 shadow-[var(--shadow-soft)] sm:p-6"
+            className="mt-5 rounded-[28px] bg-background p-5 shadow-[var(--shadow-soft)] sm:p-6"
           >
             <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
               <div className="flex items-center gap-3">
@@ -701,7 +701,7 @@ function WalletPageContent() {
                       <button
                         type="button"
                         onClick={() => void removeAccount(account.id)}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-[10px] border border-border text-muted-foreground transition hover:border-[var(--oryno-error)] hover:text-[var(--oryno-error)]"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-[10px] bg-muted text-muted-foreground transition hover:bg-destructive/10 hover:text-[var(--oryno-error)]"
                         aria-label="Remove bank account"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -733,7 +733,7 @@ function WalletPageContent() {
 
           <MotionSection
             delay={0.12}
-            className="mt-5 rounded-[22px] border border-border bg-background p-5 shadow-[var(--shadow-soft)]"
+            className="mt-5 rounded-[22px] bg-background p-5 shadow-[var(--shadow-soft)]"
           >
             <h2 className="text-base font-semibold text-foreground">
               Instructions
@@ -758,7 +758,7 @@ function WalletPageContent() {
 
           <MotionSection
             delay={0.14}
-            className="mt-5 rounded-[28px] border border-border bg-background p-5 shadow-[var(--shadow-soft)]"
+            className="mt-5 rounded-[28px] bg-background p-5 shadow-[var(--shadow-soft)]"
           >
             <div className="mb-2 flex items-center justify-between">
               <h2 className="text-base font-semibold text-foreground">

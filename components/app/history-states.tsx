@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 export function HistorySkeleton() {
   return (
     <div className="space-y-5">
-      <div className="rounded-[28px] border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:p-5">
+      <div className="rounded-[28px] bg-background p-4 shadow-[var(--shadow-soft)] sm:p-5">
         <Skeleton className="h-12 w-full rounded-[14px]" />
         <div className="mt-4 flex gap-2">
           {Array.from({ length: 4 }).map((_, i) => (
@@ -19,7 +19,7 @@ export function HistorySkeleton() {
       {Array.from({ length: 2 }).map((_, g) => (
         <div
           key={g}
-          className="rounded-[28px] border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:p-5"
+          className="rounded-[28px] bg-background p-4 shadow-[var(--shadow-soft)] sm:p-5"
         >
           <Skeleton className="mb-3 h-3 w-36 rounded-full" />
           <div className="space-y-2">
@@ -51,7 +51,7 @@ export function HistoryEmpty({
     <motion.div
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      className="flex flex-col items-center rounded-[28px] border border-border bg-background px-6 py-14 text-center shadow-[var(--shadow-soft)]"
+      className="flex flex-col items-center rounded-[28px] bg-background px-6 py-14 text-center shadow-[var(--shadow-soft)]"
     >
       <motion.span
         initial={{ scale: 0.85 }}

@@ -1,8 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { AnimatePresence } from "framer-motion";
-import { Search, SlidersHorizontal } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import Link from "next/link";
+import { AnimatePresence, motion } from "framer-motion";
+import {
+  ChevronDown,
+  Download,
+  Loader2,
+  PieChart,
+} from "lucide-react";
+import { toast } from "sonner";
 import { AppShell } from "@/components/app/app-shell";
 import {
   HistoryEmpty,
@@ -12,39 +19,59 @@ import {
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
 import { TransactionRow } from "@/components/app/transaction-row";
-import type { AppTransaction, TransactionGroup } from "@/lib/transactions";
+import {
+  buildHistoryMonths,
+  collectCategories,
+  filterHistoryItems,
+  formatMoneyAmount,
+  summarizeCashflow,
+} from "@/lib/history";
+import {
+  groupTransactionsByDate,
+  type AppTransaction,
+} from "@/lib/transactions";
 import { cn } from "@/lib/utils";
 
-const typeFilters = ["All", "Credit", "Debit"] as const;
-const statusFilters = ["Any", "Completed", "Pending", "Failed"] as const;
+type StatementFormat = "pdf" | "xlsx";
+type SheetKind = "category" | "status" | "month" | "statement" | null;
 
 export default function HistoryPage() {
-  const [groups, setGroups] = useState<TransactionGroup[]>([]);
   const [items, setItems] = useState<AppTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [typeFilter, setTypeFilter] =
-    useState<(typeof typeFilters)[number]>("All");
-  const [statusFilter, setStatusFilter] =
-    useState<(typeof statusFilters)[number]>("Any");
-  const [query, setQuery] = useState("");
+  const [monthKey, setMonthKey] = useState("");
+  const [category, setCategory] = useState("all");
+  const [status, setStatus] = useState("all");
+  const [sheet, setSheet] = useState<SheetKind>(null);
+  const [downloading, setDownloading] = useState(false);
+  const [currency, setCurrency] = useState("NGN");
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(false);
     try {
-      const res = await fetch("/api/transactions", { cache: "no-store" });
-      if (!res.ok) throw new Error("Failed");
-      const json = (await res.json()) as {
-        items: AppTransaction[];
-        groups: TransactionGroup[];
-      };
-      setItems(json.items);
-      setGroups(json.groups);
+      const [txRes, walletRes] = await Promise.all([
+        fetch("/api/transactions", { cache: "no-store" }),
+        fetch("/api/wallet", { cache: "no-store" }),
+      ]);
+      if (!txRes.ok) throw new Error("Failed");
+      const json = (await txRes.json()) as { items: AppTransaction[] };
+      setItems(json.items ?? []);
+      if (walletRes.ok) {
+        const wallet = (await walletRes.json()) as {
+          totals?: { currency?: string };
+          primary?: { currency?: string };
+        };
+        setCurrency(
+          wallet.totals?.currency ??
+            wallet.primary?.currency ??
+            json.items?.[0]?.currency ??
+            "NGN",
+        );
+      }
     } catch {
       setError(true);
       setItems([]);
-      setGroups([]);
     } finally {
       setLoading(false);
     }
@@ -54,56 +81,104 @@ export default function HistoryPage() {
     void load();
   }, [load]);
 
-  const filteredGroups = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return groups
-      .map((group) => ({
-        ...group,
-        items: group.items.filter((item) => {
-          const matchesType =
-            typeFilter === "All" ||
-            (typeFilter === "Credit" && item.type === "credit") ||
-            (typeFilter === "Debit" && item.type === "debit");
-          const matchesStatus =
-            statusFilter === "Any" || item.status === statusFilter;
-          const matchesQuery =
-            !q ||
-            item.title.toLowerCase().includes(q) ||
-            item.subtitle.toLowerCase().includes(q) ||
-            (item.category ?? "").toLowerCase().includes(q);
-          return matchesType && matchesStatus && matchesQuery;
-        }),
-      }))
-      .filter((group) => group.items.length > 0);
-  }, [groups, typeFilter, statusFilter, query]);
+  const months = useMemo(() => buildHistoryMonths(items), [items]);
 
-  const hasActiveFilters =
-    typeFilter !== "All" || statusFilter !== "Any" || Boolean(query.trim());
-
-  const totals = useMemo(() => {
-    let inflows = 0;
-    let outflows = 0;
-    for (const item of items) {
-      const raw = Number(item.amount.replace(/[^\d.-]/g, ""));
-      if (!Number.isFinite(raw)) continue;
-      if (item.type === "credit") inflows += Math.abs(raw);
-      else outflows += Math.abs(raw);
+  useEffect(() => {
+    if (!months.length) return;
+    if (!monthKey || !months.some((m) => m.key === monthKey)) {
+      setMonthKey(months[0].key);
     }
-    return { inflows, outflows, count: items.length };
-  }, [items]);
+  }, [months, monthKey]);
 
-  function clearFilters() {
-    setTypeFilter("All");
-    setStatusFilter("Any");
-    setQuery("");
+  const activeMonth = months.find((m) => m.key === monthKey) ?? months[0];
+  const categories = useMemo(() => collectCategories(items), [items]);
+
+  const monthItems = useMemo(
+    () =>
+      filterHistoryItems(items, {
+        monthKey: activeMonth?.key,
+        category,
+        status,
+      }),
+    [items, activeMonth?.key, category, status],
+  );
+
+  const totals = useMemo(() => summarizeCashflow(monthItems), [monthItems]);
+  const groups = useMemo(
+    () => groupTransactionsByDate(monthItems),
+    [monthItems],
+  );
+
+  const categoryLabel =
+    category === "all"
+      ? "All Categories"
+      : (categories.find((c) => c.id === category)?.label ?? "Category");
+  const statusLabel =
+    status === "all"
+      ? "All Status"
+      : status === "successful"
+        ? "Successful"
+        : status === "pending"
+          ? "Pending"
+          : "Failed";
+
+  const hasActiveFilters = category !== "all" || status !== "all";
+
+  async function onEmailStatement(format: StatementFormat) {
+    setSheet(null);
+    setDownloading(true);
+    try {
+      const res = await fetch("/api/transactions/statement", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          format,
+          month: activeMonth?.key ?? null,
+        }),
+      });
+      const json = (await res.json()) as {
+        error?: string;
+        emailedTo?: string;
+        format?: string;
+      };
+      if (!res.ok) throw new Error(json.error || "Could not email statement");
+      toast.success("Statement sent", {
+        description: json.emailedTo
+          ? `${(json.format ?? format).toUpperCase()} emailed to ${json.emailedTo}`
+          : `Your ${(json.format ?? format).toUpperCase()} statement is on the way.`,
+      });
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Could not email your statement. Please try again.",
+      );
+    } finally {
+      setDownloading(false);
+    }
   }
 
   return (
     <AppShell>
       <PageHeader
-        title="History"
-        subtitle="Track credits, debits, and pending activity"
+        title="Transactions"
+        subtitle="Wallet activity & statements"
         backHref="/dashboard"
+        actions={
+          <button
+            type="button"
+            onClick={() => setSheet("statement")}
+            disabled={downloading || loading}
+            className="inline-flex h-10 items-center gap-1.5 rounded-[14px] bg-oryno-orange-muted px-3.5 text-sm font-bold text-primary disabled:opacity-60"
+          >
+            {downloading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            Download
+          </button>
+        }
       />
 
       {loading ? (
@@ -112,72 +187,80 @@ export default function HistoryPage() {
         <HistoryError onRetry={() => void load()} />
       ) : (
         <>
-          <MotionSection className="overflow-hidden rounded-[28px] border border-border bg-background shadow-[var(--shadow-soft)]">
-            <div className="grid grid-cols-3 divide-x divide-border border-b border-border">
-              <Stat
-                label="In"
-                value={`₦${totals.inflows.toLocaleString("en-NG", { maximumFractionDigits: 0 })}`}
-                tone="credit"
-              />
-              <Stat
-                label="Out"
-                value={`₦${totals.outflows.toLocaleString("en-NG", { maximumFractionDigits: 0 })}`}
-                tone="debit"
-              />
-              <Stat label="Txns" value={String(totals.count)} />
-            </div>
+          <MotionSection className="flex flex-wrap gap-2">
+            <FilterPill
+              label={categoryLabel}
+              active={category !== "all"}
+              onClick={() => setSheet("category")}
+            />
+            <FilterPill
+              label={statusLabel}
+              active={status !== "all"}
+              onClick={() => setSheet("status")}
+            />
+          </MotionSection>
 
-            <div className="p-4 sm:p-5">
-              <div className="relative">
-                <Search className="pointer-events-none absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search title, service, note…"
-                  className="h-12 w-full rounded-[16px] border border-border bg-muted/40 pr-4 pl-10 text-sm outline-none transition focus:border-primary focus:bg-background focus:ring-2 focus:ring-primary/15"
-                />
-              </div>
+          <MotionSection
+            delay={0.04}
+            className="mt-3 flex items-center justify-between gap-3"
+          >
+            <button
+              type="button"
+              onClick={() => setSheet("month")}
+              className="inline-flex items-center gap-1.5 rounded-[14px] bg-muted px-3 py-2 text-sm font-bold text-foreground"
+            >
+              {activeMonth?.label ?? "—"}
+              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            </button>
+            <Link
+              href={`/history/analytics?month=${encodeURIComponent(activeMonth?.key ?? "")}`}
+              className="inline-flex h-9 items-center gap-1.5 rounded-full bg-primary px-3.5 text-xs font-bold text-white"
+            >
+              <PieChart className="h-3.5 w-3.5" />
+              Analysis
+            </Link>
+          </MotionSection>
 
-              <div className="mt-4 flex items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                <span className="mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                  <SlidersHorizontal className="h-3.5 w-3.5" />
-                </span>
-                {typeFilters.map((item) => (
-                  <FilterChip
-                    key={item}
-                    active={typeFilter === item}
-                    onClick={() => setTypeFilter(item)}
-                    label={item}
-                  />
-                ))}
-                <span className="mx-1 h-5 w-px shrink-0 bg-border" />
-                {statusFilters.map((item) => (
-                  <FilterChip
-                    key={item}
-                    active={statusFilter === item}
-                    onClick={() => setStatusFilter(item)}
-                    label={item}
-                  />
-                ))}
-              </div>
-            </div>
+          <MotionSection
+            delay={0.06}
+            className="mt-3 flex items-center justify-between gap-3 text-sm font-semibold text-muted-foreground"
+          >
+            <p>
+              In{" "}
+              <span className="font-bold text-oryno-success">
+                {formatMoneyAmount(totals.inflow, currency)}
+              </span>
+            </p>
+            <p>
+              Out{" "}
+              <span className="font-bold text-foreground">
+                {formatMoneyAmount(totals.outflow, currency)}
+              </span>
+            </p>
           </MotionSection>
 
           <div className="mt-5 space-y-4 sm:mt-6 sm:space-y-5">
             <AnimatePresence mode="wait">
-              {filteredGroups.length === 0 ? (
+              {groups.length === 0 ? (
                 <HistoryEmpty
                   filtered={hasActiveFilters || items.length > 0}
-                  onClear={hasActiveFilters ? clearFilters : undefined}
+                  onClear={
+                    hasActiveFilters
+                      ? () => {
+                          setCategory("all");
+                          setStatus("all");
+                        }
+                      : undefined
+                  }
                 />
               ) : (
-                filteredGroups.map((group, groupIndex) => (
+                groups.map((group, groupIndex) => (
                   <MotionSection
                     key={group.date}
-                    delay={0.04 + groupIndex * 0.04}
-                    className="overflow-hidden rounded-[28px] border border-border bg-background shadow-[var(--shadow-soft)]"
+                    delay={0.04 + groupIndex * 0.03}
+                    className="overflow-hidden rounded-[28px] bg-background shadow-[var(--shadow-soft)]"
                   >
-                    <div className="flex items-center justify-between border-b border-border/80 px-4 py-3 sm:px-5">
+                    <div className="flex items-center justify-between px-4 py-3 sm:px-5">
                       <p className="text-[11px] font-bold tracking-[0.14em] text-muted-foreground uppercase">
                         {group.date}
                       </p>
@@ -186,7 +269,7 @@ export default function HistoryPage() {
                         {group.items.length === 1 ? "item" : "items"}
                       </p>
                     </div>
-                    <div className="divide-y divide-border/70 px-1.5 py-1 sm:px-2">
+                    <div className="px-1.5 pb-1 sm:px-2">
                       {group.items.map((tx, index) => (
                         <TransactionRow
                           key={tx.id}
@@ -202,45 +285,103 @@ export default function HistoryPage() {
           </div>
         </>
       )}
+
+      <PickerSheet
+        open={sheet === "category"}
+        title="Category"
+        subtitle="Filter by service type"
+        onClose={() => setSheet(null)}
+      >
+        <OptionList
+          value={category}
+          onChange={(id) => {
+            setCategory(id);
+            setSheet(null);
+          }}
+          options={[
+            { id: "all", title: "All Categories" },
+            ...categories.map((c) => ({ id: c.id, title: c.label })),
+          ]}
+        />
+      </PickerSheet>
+
+      <PickerSheet
+        open={sheet === "status"}
+        title="Status"
+        subtitle="Filter by transaction result"
+        onClose={() => setSheet(null)}
+      >
+        <OptionList
+          value={status}
+          onChange={(id) => {
+            setStatus(id);
+            setSheet(null);
+          }}
+          options={[
+            { id: "all", title: "All Status" },
+            { id: "successful", title: "Successful" },
+            { id: "pending", title: "Pending" },
+            { id: "failed", title: "Failed" },
+          ]}
+        />
+      </PickerSheet>
+
+      <PickerSheet
+        open={sheet === "month"}
+        title="Month"
+        subtitle="Choose a statement period"
+        onClose={() => setSheet(null)}
+      >
+        <OptionList
+          value={activeMonth?.key ?? ""}
+          onChange={(id) => {
+            setMonthKey(id);
+            setSheet(null);
+          }}
+          options={months.map((m) => ({
+            id: m.key,
+            title: m.longLabel,
+            trailing: m.label,
+          }))}
+        />
+      </PickerSheet>
+
+      <PickerSheet
+        open={sheet === "statement"}
+        title="Email statement"
+        subtitle={`We'll send ${activeMonth?.longLabel ?? "this month"} to your account email as PDF or Excel.`}
+        onClose={() => setSheet(null)}
+      >
+        <OptionList
+          value=""
+          onChange={(id) => {
+            if (id === "pdf" || id === "xlsx") void onEmailStatement(id);
+          }}
+          options={[
+            {
+              id: "pdf",
+              title: "PDF document",
+              subtitle: "Best for printing and records",
+            },
+            {
+              id: "xlsx",
+              title: "Excel spreadsheet",
+              subtitle: "Best for accounting and filters",
+            },
+          ]}
+        />
+      </PickerSheet>
     </AppShell>
   );
 }
 
-function Stat({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  tone?: "credit" | "debit";
-}) {
-  return (
-    <div className="px-3 py-3.5 text-center sm:px-4 sm:py-4">
-      <p className="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
-        {label}
-      </p>
-      <p
-        className={cn(
-          "mt-1 truncate text-sm font-bold tabular-nums sm:text-base",
-          tone === "credit" && "text-oryno-success",
-          tone === "debit" && "text-foreground",
-          !tone && "text-foreground",
-        )}
-      >
-        {value}
-      </p>
-    </div>
-  );
-}
-
-function FilterChip({
+function FilterPill({
   label,
   active,
   onClick,
 }: {
   label: string;
-  active: boolean;
+  active?: boolean;
   onClick: () => void;
 }) {
   return (
@@ -248,13 +389,113 @@ function FilterChip({
       type="button"
       onClick={onClick}
       className={cn(
-        "shrink-0 rounded-full px-3.5 py-2 text-xs font-semibold transition sm:text-sm",
+        "inline-flex min-w-0 flex-1 items-center justify-between gap-2 rounded-[14px] px-3.5 py-2.5 text-sm font-bold transition sm:flex-none sm:min-w-[160px]",
         active
-          ? "bg-oryno-charcoal text-white shadow-[var(--shadow-soft)]"
-          : "bg-muted text-muted-foreground hover:bg-oryno-orange-muted hover:text-primary",
+          ? "bg-oryno-orange-muted text-primary"
+          : "bg-muted text-foreground",
       )}
     >
-      {label}
+      <span className="truncate">{label}</span>
+      <ChevronDown
+        className={cn(
+          "h-4 w-4 shrink-0",
+          active ? "text-primary" : "text-muted-foreground",
+        )}
+      />
     </button>
+  );
+}
+
+function PickerSheet({
+  open,
+  title,
+  subtitle,
+  onClose,
+  children,
+}: {
+  open: boolean;
+  title: string;
+  subtitle?: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <AnimatePresence>
+      {open ? (
+        <motion.div
+          className="fixed inset-0 z-50 flex items-end justify-center sm:items-center"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
+          <button
+            type="button"
+            aria-label="Close"
+            className="absolute inset-0 bg-black/40"
+            onClick={onClose}
+          />
+          <motion.div
+            initial={{ y: 40, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 24, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 320, damping: 28 }}
+            className="relative z-10 max-h-[78vh] w-full overflow-hidden rounded-t-[28px] bg-background shadow-[var(--shadow-soft)] sm:max-w-md sm:rounded-[28px]"
+          >
+            <div className="border-b border-border/70 px-5 py-4">
+              <p className="text-base font-bold text-foreground">{title}</p>
+              {subtitle ? (
+                <p className="mt-0.5 text-sm text-muted-foreground">{subtitle}</p>
+              ) : null}
+            </div>
+            <div className="max-h-[60vh] overflow-y-auto px-2 py-2">{children}</div>
+          </motion.div>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
+  );
+}
+
+function OptionList({
+  value,
+  onChange,
+  options,
+}: {
+  value: string;
+  onChange: (id: string) => void;
+  options: Array<{ id: string; title: string; subtitle?: string; trailing?: string }>;
+}) {
+  return (
+    <div className="space-y-1 p-2">
+      {options.map((option) => {
+        const active = option.id === value;
+        return (
+          <button
+            key={option.id}
+            type="button"
+            onClick={() => onChange(option.id)}
+            className={cn(
+              "flex w-full items-center justify-between gap-3 rounded-[16px] px-3.5 py-3 text-left transition",
+              active
+                ? "bg-oryno-orange-muted text-primary"
+                : "hover:bg-muted/70",
+            )}
+          >
+            <div className="min-w-0">
+              <p className="truncate text-sm font-bold">{option.title}</p>
+              {option.subtitle ? (
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                  {option.subtitle}
+                </p>
+              ) : null}
+            </div>
+            {option.trailing ? (
+              <span className="shrink-0 text-xs font-semibold text-muted-foreground">
+                {option.trailing}
+              </span>
+            ) : null}
+          </button>
+        );
+      })}
+    </div>
   );
 }

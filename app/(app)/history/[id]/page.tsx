@@ -161,7 +161,7 @@ export default function TransactionReceiptPage({
       />
 
       {loading ? (
-        <MotionSection className="rounded-[28px] border border-border bg-background p-6 shadow-[var(--shadow-soft)]">
+        <MotionSection className="rounded-[28px] bg-background p-6 shadow-[var(--shadow-soft)]">
           <div className="flex flex-col items-center">
             <Skeleton className="h-14 w-14 rounded-full" />
             <Skeleton className="mt-4 h-5 w-36 rounded-full" />
@@ -174,7 +174,7 @@ export default function TransactionReceiptPage({
           </div>
         </MotionSection>
       ) : error || !tx ? (
-        <MotionSection className="rounded-[28px] border border-border bg-background px-6 py-14 text-center shadow-[var(--shadow-soft)]">
+        <MotionSection className="rounded-[28px] bg-background px-6 py-14 text-center shadow-[var(--shadow-soft)]">
           <p className="text-lg font-bold text-foreground">
             Receipt unavailable
           </p>
@@ -187,7 +187,7 @@ export default function TransactionReceiptPage({
           <MotionSection>
             <div
               ref={receiptRef}
-              className="overflow-hidden rounded-[28px] border border-border bg-background shadow-[var(--shadow-soft)]"
+              className="overflow-hidden rounded-[28px] bg-background shadow-[var(--shadow-soft)]"
             >
               <div className="bg-gradient-to-br from-[#ff8124] via-oryno-orange to-[#e85d00] px-5 py-6 text-white">
                 <div className="flex items-center gap-3">

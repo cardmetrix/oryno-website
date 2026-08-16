@@ -131,6 +131,30 @@ export function mapDbStatus(
   return "Pending";
 }
 
+export function normalizeStatusLabel(
+  status: string | TransactionStatus | undefined | null,
+): TransactionStatus {
+  if (!status) return "Pending";
+  const raw = String(status).toLowerCase();
+  if (raw === "completed" || raw === "successful" || raw === "success") {
+    return "Completed";
+  }
+  if (
+    raw === "failed" ||
+    raw === "reversed" ||
+    raw === "cancelled" ||
+    raw === "canceled"
+  ) {
+    return "Failed";
+  }
+  if (raw === "pending" || raw === "processing") return "Pending";
+  // Already display-cased
+  if (status === "Completed" || status === "Pending" || status === "Failed") {
+    return status;
+  }
+  return mapDbStatus(raw);
+}
+
 export function groupTransactionsByDate(
   items: AppTransaction[],
 ): TransactionGroup[] {

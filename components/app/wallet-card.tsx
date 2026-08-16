@@ -68,12 +68,7 @@ export function WalletCard({
         transition={{ type: "spring", stiffness: 280, damping: 22 }}
         className="relative"
       >
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute -inset-2 rounded-[32px] bg-[radial-gradient(ellipse_at_25%_15%,rgba(255,129,36,0.4),transparent_55%),radial-gradient(ellipse_at_85%_90%,rgba(255,106,0,0.24),transparent_50%)] blur-xl"
-        />
-
-        <div className="relative overflow-hidden rounded-[22px] shadow-[0_18px_40px_rgba(255,106,0,0.3)] ring-1 ring-white/25 sm:rounded-[24px]">
+        <div className="relative overflow-hidden rounded-[22px] shadow-[0_18px_40px_rgba(255,106,0,0.3)] sm:rounded-[24px]">
           <div className="relative w-full overflow-hidden text-white">
             <div className="absolute inset-0 bg-gradient-to-br from-[#ff8124] via-oryno-orange to-[#e85d00]" />
             <div className="absolute inset-0 bg-[linear-gradient(210deg,rgba(255,255,255,0.18)_0%,transparent_42%,rgba(180,60,0,0.22)_100%)]" />

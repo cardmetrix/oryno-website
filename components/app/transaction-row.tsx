@@ -71,7 +71,7 @@ export function TransactionRow({
       >
         <span
           className={cn(
-            "relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl shadow-[var(--shadow-soft)] ring-1 ring-black/5",
+            "relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl",
             credit
               ? "bg-oryno-success/12 text-oryno-success"
               : "bg-oryno-orange-muted text-primary",

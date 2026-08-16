@@ -364,7 +364,7 @@ export function UsdWalletCard({
             exit={{ opacity: 0, height: 0 }}
             className="overflow-hidden"
           >
-            <div className="rounded-[22px] border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:p-5">
+            <div className="rounded-[22px] bg-background p-4 shadow-[var(--shadow-soft)] sm:p-5">
               {panel === "fund" ? (
                 <>
                   <h3 className="text-sm font-semibold text-foreground">
