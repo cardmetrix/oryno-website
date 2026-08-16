@@ -287,6 +287,40 @@ function WalletPageContent() {
       ) : data ? (
         <>
           <div className="-mx-4 sm:-mx-6 md:mx-0">
+            <div className="mb-3 flex gap-1 rounded-2xl bg-muted/70 p-1 mx-4 sm:mx-6 md:hidden">
+              <button
+                type="button"
+                onClick={() => {
+                  setWalletView("local");
+                  walletPagerRef.current?.scrollTo({ left: 0, behavior: "smooth" });
+                }}
+                className={cn(
+                  "h-9 flex-1 rounded-xl text-sm font-semibold transition",
+                  walletView === "local"
+                    ? "bg-background text-foreground shadow-[var(--shadow-soft)]"
+                    : "text-muted-foreground",
+                )}
+              >
+                {currency}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setWalletView("usd");
+                  const el = walletPagerRef.current;
+                  if (el) el.scrollTo({ left: el.clientWidth, behavior: "smooth" });
+                }}
+                className={cn(
+                  "h-9 flex-1 rounded-xl text-sm font-semibold transition",
+                  walletView === "usd"
+                    ? "bg-background text-foreground shadow-[var(--shadow-soft)]"
+                    : "text-muted-foreground",
+                )}
+              >
+                USD
+              </button>
+            </div>
+
             <div
               ref={walletPagerRef}
               onScroll={(e) => {
@@ -297,16 +331,17 @@ function WalletPageContent() {
                 setWalletView(idx >= 1 ? "usd" : "local");
               }}
               className={cn(
-                "flex snap-x snap-mandatory overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-                "md:grid md:grid-cols-2 md:gap-4 md:overflow-visible",
+                "flex w-full snap-x snap-mandatory overflow-x-auto overscroll-x-contain",
+                "[-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+                "md:grid md:grid-cols-2 md:items-start md:gap-4 md:overflow-visible md:snap-none",
               )}
               style={{ WebkitOverflowScrolling: "touch" }}
             >
               {/* Local wallet — full-bleed slide on mobile */}
               <MotionSection
                 className={cn(
-                  "w-full shrink-0 snap-start snap-always px-4 sm:px-6",
-                  "md:w-auto md:min-w-0 md:shrink md:snap-none md:px-0",
+                  "box-border w-full min-w-full max-w-full shrink-0 basis-full snap-start snap-always px-4 sm:px-6",
+                  "md:min-w-0 md:max-w-none md:basis-auto md:snap-none md:px-0",
                 )}
               >
                 <div className="overflow-hidden rounded-[28px] bg-background shadow-[var(--shadow-soft)]">
@@ -407,8 +442,8 @@ function WalletPageContent() {
               {/* USD wallet — full-bleed slide on mobile */}
               <div
                 className={cn(
-                  "w-full shrink-0 snap-start snap-always px-4 sm:px-6",
-                  "md:w-auto md:min-w-0 md:shrink md:snap-none md:px-0",
+                  "box-border w-full min-w-full max-w-full shrink-0 basis-full snap-start snap-always px-4 sm:px-6",
+                  "md:min-w-0 md:max-w-none md:basis-auto md:snap-none md:px-0",
                 )}
               >
                 <UsdWalletCard
@@ -423,56 +458,17 @@ function WalletPageContent() {
               </div>
             </div>
 
-            {/* Mobile pager hints */}
-            <div className="mt-2 flex flex-col items-center gap-2 px-4 md:hidden">
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  aria-label="Show local wallet"
-                  onClick={() => {
-                    setWalletView("local");
-                    walletPagerRef.current?.scrollTo({
-                      left: 0,
-                      behavior: "smooth",
-                    });
-                  }}
-                  className={cn(
-                    "h-2 rounded-full transition-all",
-                    walletView === "local"
-                      ? "w-6 bg-primary"
-                      : "w-2 bg-muted-foreground/35",
-                  )}
-                />
-                <button
-                  type="button"
-                  aria-label="Show USD wallet"
-                  onClick={() => {
-                    setWalletView("usd");
-                    const el = walletPagerRef.current;
-                    if (el) {
-                      el.scrollTo({ left: el.clientWidth, behavior: "smooth" });
-                    }
-                  }}
-                  className={cn(
-                    "h-2 rounded-full transition-all",
-                    walletView === "usd"
-                      ? "w-6 bg-primary"
-                      : "w-2 bg-muted-foreground/35",
-                  )}
-                />
-              </div>
-              <p className="text-center text-[11px] text-muted-foreground">
-                {walletView === "local"
-                  ? "Swipe for USD wallet"
-                  : "Swipe for local wallet"}
-              </p>
-            </div>
+            <p className="mt-2 px-4 text-center text-[11px] text-muted-foreground sm:px-6 md:hidden">
+              {walletView === "local"
+                ? "Swipe left for USD wallet"
+                : "Swipe right for local wallet"}
+            </p>
           </div>
 
           {/* Local-only sections — hidden on mobile while USD wallet is in view */}
           <div
             className={cn(
-              walletView === "usd" && "hidden md:contents",
+              walletView === "usd" ? "hidden md:block" : "block",
             )}
           >
           <MotionSection delay={0.06} className="mt-4 grid grid-cols-3 gap-3">
