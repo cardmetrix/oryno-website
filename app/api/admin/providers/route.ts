@@ -11,7 +11,7 @@ import {
   isReloadlyDemoMode,
   isReloadlySandbox,
 } from "@/lib/reloadly/client";
-import { isSogoDemoMode, isSogoSandbox } from "@/lib/sogo/client";
+import { isSogoDemoMode, isSogoSandbox, fetchSogoNgnBalance } from "@/lib/sogo/client";
 import { isVtpassDemoMode, isVtpassSandbox } from "@/lib/vtpass/client";
 
 export const runtime = "nodejs";
@@ -28,6 +28,7 @@ function modeLabel(input: {
 
 export async function GET() {
   return withAdminApi(async () => {
+    const sogoBalance = isSogoDemoMode() ? null : await fetchSogoNgnBalance();
     const providers = [
       {
         id: "sogo",
@@ -39,6 +40,14 @@ export async function GET() {
           demo: isSogoDemoMode(),
           sandbox: isSogoSandbox(),
         }),
+        note:
+          sogoBalance == null
+            ? isSogoDemoMode()
+              ? "Demo mode"
+              : null
+            : sogoBalance <= 0
+              ? "Sogo NGN wallet is ₦0. Fund it at app.sogo.africa before airtime/data/bills will go through."
+              : `Sogo NGN wallet ₦${sogoBalance.toLocaleString("en-NG", { minimumFractionDigits: 2 })}`,
       },
       {
         id: "vtpass",

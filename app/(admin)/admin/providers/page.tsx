@@ -17,6 +17,7 @@ type Provider = {
   type: string;
   country: string;
   status: string;
+  note?: string | null;
 };
 
 export default function AdminProvidersPage() {
@@ -55,7 +56,17 @@ export default function AdminProvidersPage() {
                 {
                   key: "country",
                   header: "Scope",
-                  cell: (row) => row.country,
+                  cell: (row) =>
+                    row.note ? (
+                      <span>
+                        {row.country}
+                        <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                          {row.note}
+                        </span>
+                      </span>
+                    ) : (
+                      row.country
+                    ),
                 },
                 {
                   key: "status",

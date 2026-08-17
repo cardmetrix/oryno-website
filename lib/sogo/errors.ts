@@ -81,10 +81,9 @@ export function sogoErrorToEnglish(
 }
 
 export function sogoHttpStatus(error: unknown) {
-  const status =
-    error && typeof error === "object" && "status" in error
-      ? Number((error as { status?: number }).status)
-      : 400;
+  const err = error as { status?: number; code?: string };
+  if (err?.code === "insufficient_funds") return 503;
+  const status = Number(err?.status);
   if ([400, 401, 403, 409, 422, 429, 503].includes(status)) return status;
   return 400;
 }

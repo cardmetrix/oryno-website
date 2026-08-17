@@ -355,7 +355,7 @@ async function assertSogoWallet(amount: number) {
   const err = new Error(
     "This service is temporarily unavailable. Please try again shortly.",
   ) as Error & { status?: number; code?: string };
-  err.status = 422;
+  err.status = 503;
   err.code = "insufficient_funds";
   throw err;
 }
@@ -365,8 +365,9 @@ function rethrowSogo(error: unknown, fallback: string): never {
   const wrapped = new Error(
     sogoErrorToEnglish(err.message || fallback, err.code),
   ) as Error & { status?: number; code?: string };
-  wrapped.status = err.status;
   wrapped.code = err.code;
+  wrapped.status =
+    err.code === "insufficient_funds" ? 503 : err.status;
   throw wrapped;
 }
 
