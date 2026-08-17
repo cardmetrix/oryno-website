@@ -150,6 +150,7 @@ export type SogoBillPurchaseData = {
 export type SogoBillPurchaseResponse = {
   message?: string;
   data?: SogoBillPurchaseData;
+  transaction?: SogoBillPurchaseData | Record<string, unknown>;
 };
 
 export type SogoVerifyResult = {

@@ -3,6 +3,7 @@ import { ensureAppUser } from "@/lib/auth/current-user";
 import { createNotification } from "@/lib/notifications-service";
 import { formatMoney } from "@/lib/transactions";
 import { purchaseAirtime } from "@/lib/vtpass";
+import { sogoHttpStatus } from "@/lib/sogo/errors";
 
 export const runtime = "nodejs";
 
@@ -120,7 +121,7 @@ export async function POST(req: Request) {
           .replace(/VTpass/gi, "ORYNO")
           .replace(/vtpass/gi, "ORYNO"),
       },
-      { status: 400 },
+      { status: sogoHttpStatus(error) },
     );
   }
 }

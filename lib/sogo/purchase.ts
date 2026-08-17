@@ -35,6 +35,7 @@ import {
   toSogoPhone,
 } from "./bills";
 import { sogoErrorToEnglish } from "./errors";
+import { fetchSogoNgnBalance } from "./client";
 import type { SogoWebhookEvent } from "./types";
 
 const NETWORK_COLORS: Record<
@@ -346,6 +347,29 @@ async function finalizeTx(
   return row;
 }
 
+async function assertSogoWallet(amount: number) {
+  const balance = await fetchSogoNgnBalance();
+  if (balance == null) return;
+  if (balance + 0.0001 >= amount) return;
+  console.error("[sogo-wallet] NGN balance too low", { balance, amount });
+  const err = new Error(
+    "This service is temporarily unavailable. Please try again shortly.",
+  ) as Error & { status?: number; code?: string };
+  err.status = 422;
+  err.code = "insufficient_funds";
+  throw err;
+}
+
+function rethrowSogo(error: unknown, fallback: string): never {
+  const err = error as { status?: number; code?: string; message?: string };
+  const wrapped = new Error(
+    sogoErrorToEnglish(err.message || fallback, err.code),
+  ) as Error & { status?: number; code?: string };
+  wrapped.status = err.status;
+  wrapped.code = err.code;
+  throw wrapped;
+}
+
 export async function purchaseSogoAirtime(input: {
   userId: string;
   countryCode?: string | null;
@@ -370,6 +394,7 @@ export async function purchaseSogoAirtime(input: {
   const market = resolveCountryCode(input.countryCode);
   const network = await ensureTelecomNetwork(market, networkSlug);
   const idempotencyKey = randomUUID();
+  await assertSogoWallet(priced.face);
 
   const prepared = await debitForPurchase({
     userId: input.userId,
@@ -464,7 +489,7 @@ export async function purchaseSogoAirtime(input: {
         updatedAt: new Date(),
       })
       .where(eq(airtimeOrders.id, order.id));
-    throw new Error(sogoErrorToEnglish(reason));
+    rethrowSogo(error, reason);
   }
 }
 
@@ -503,6 +528,7 @@ export async function purchaseSogoData(input: {
     amount: priced.retail,
   });
   const idempotencyKey = randomUUID();
+  await assertSogoWallet(priced.face);
 
   const prepared = await debitForPurchase({
     userId: input.userId,
@@ -595,7 +621,7 @@ export async function purchaseSogoData(input: {
         updatedAt: new Date(),
       })
       .where(eq(dataOrders.id, order.id));
-    throw new Error(sogoErrorToEnglish(reason));
+    rethrowSogo(error, reason);
   }
 }
 
@@ -651,6 +677,7 @@ export async function purchaseSogoBill(input: {
     category: input.category,
   });
   const idempotencyKey = randomUUID();
+  await assertSogoWallet(priced.face);
 
   const prepared = await debitForPurchase({
     userId: input.userId,
@@ -760,7 +787,7 @@ export async function purchaseSogoBill(input: {
         updatedAt: new Date(),
       })
       .where(eq(billPayments.id, payment.id));
-    throw new Error(sogoErrorToEnglish(reason));
+    rethrowSogo(error, reason);
   }
 }
 

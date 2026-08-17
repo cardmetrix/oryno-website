@@ -208,6 +208,22 @@ export function unwrapSogoData<T>(json: unknown): T {
   return json as T;
 }
 
+export async function fetchSogoNgnBalance(): Promise<number | null> {
+  if (isSogoDemoMode()) return Number.POSITIVE_INFINITY;
+  try {
+    const json = await sogoRequest<{
+      data?: Array<{ currency?: string; balance?: number | string }>;
+    }>("/wallet");
+    const rows = Array.isArray(json?.data) ? json.data : [];
+    const ngn = rows.find((row) => (row.currency || "").toUpperCase() === "NGN");
+    const n = Number(ngn?.balance);
+    return Number.isFinite(n) ? n : null;
+  } catch (error) {
+    console.error("[sogo-wallet]", error);
+    return null;
+  }
+}
+
 export function isSogoUnavailableError(error: unknown) {
   if (!error || typeof error !== "object") return false;
   const err = error as { code?: string; status?: number; message?: string };

@@ -5,7 +5,6 @@ import type {
   SogoBillPlan,
   SogoBillProvider,
   SogoBillPurchaseData,
-  SogoBillPurchaseResponse,
   SogoVerifyResult,
 } from "./types";
 
@@ -623,23 +622,97 @@ function demoPurchase(input: {
 
 export function extractSogoToken(data?: Record<string, unknown> | null) {
   if (!data) return null;
-  const keys = ["token", "prepaid_token", "token_code", "purchased_code", "electricity_token"];
-  for (const key of keys) {
-    const v = data[key];
-    if (typeof v === "string" && v.trim()) return v.trim();
-  }
-  const meta = asRecord(data.meta);
-  if (meta) {
+  const keys = [
+    "token",
+    "prepaid_token",
+    "token_code",
+    "purchased_code",
+    "electricity_token",
+  ];
+  const bags = [
+    data,
+    asRecord(data.meta),
+    asRecord(data.metadata),
+  ].filter(Boolean) as Record<string, unknown>[];
+  for (const bag of bags) {
     for (const key of keys) {
-      const v = meta[key];
+      const v = bag[key];
       if (typeof v === "string" && v.trim()) return v.trim();
     }
   }
   return null;
 }
 
-export function mapSogoBillStatus(status?: string | null) {
-  const s = (status || "").toLowerCase();
+function enumValue(value: unknown): string {
+  if (typeof value === "string") return value;
+  const rec = asRecord(value);
+  if (rec && rec.value != null) return String(rec.value);
+  return "";
+}
+
+function moneyValue(value: unknown): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const n = Number(value.replace(/,/g, ""));
+    return Number.isFinite(n) ? n : 0;
+  }
+  const rec = asRecord(value);
+  if (!rec) return 0;
+  return pickNumber(rec, ["raw", "amount"]);
+}
+
+/**
+ * OpenAPI (`partner-v1`) returns `{ message, transaction }`.
+ * Marketing docs sometimes show `{ data }`. Accept both and flatten
+ * `status.value` / `amount.raw`.
+ */
+export function parseSogoBillPurchase(json: unknown): SogoBillPurchaseData {
+  const rec = asRecord(json) || {};
+  const tx =
+    asRecord(rec.transaction) ||
+    asRecord(rec.data) ||
+    rec;
+  const meta = asRecord(tx.metadata) || asRecord(tx.meta) || {};
+  const status = enumValue(tx.status) || enumValue(rec.status);
+  const reference =
+    pickString(tx, ["reference", "id"]) ||
+    pickString(rec, ["reference"]);
+  if (!reference && !status) {
+    throw new Error(
+      sogoErrorToEnglish(
+        pickString(rec, ["message"]) || "Purchase failed",
+      ),
+    );
+  }
+  const token = extractSogoToken({ ...tx, metadata: meta, meta });
+  return {
+    ...tx,
+    reference,
+    status: status.toLowerCase(),
+    type: enumValue(tx.type) || pickString(tx, ["type"]),
+    network:
+      pickString(tx, ["network"]) ||
+      pickString(meta, ["network"]),
+    phone:
+      pickString(tx, ["phone", "phone_number"]) ||
+      pickString(meta, ["phone_number", "phone"]),
+    amount: moneyValue(tx.amount),
+    fee: moneyValue(tx.fee),
+    total: moneyValue(tx.net_amount) || moneyValue(tx.amount),
+    token,
+    prepaid_token: token,
+    token_code: token,
+    created_at:
+      pickString(tx, ["created_at"]) ||
+      pickString(asRecord(tx.timestamps) || {}, ["created_at"]),
+    metadata: meta,
+  };
+}
+
+export function mapSogoBillStatus(
+  status?: string | { value?: string } | null,
+) {
+  const s = enumValue(status).toLowerCase();
   if (s === "completed" || s === "success" || s === "delivered") {
     return "completed" as const;
   }
@@ -671,17 +744,17 @@ export async function submitSogoAirtime(input: {
       simulated: true,
     };
   }
-  const json = await sogoRequest<SogoBillPurchaseResponse>("/bills/airtime", {
+  const json = await sogoRequest<unknown>("/bills/airtime", {
     method: "POST",
     idempotencyKey: input.idempotencyKey,
     body: JSON.stringify({
       network,
       phone,
       amount: Math.round(input.amount),
+      currency: "NGN",
     }),
   });
-  if (!json?.data) throw new Error(sogoErrorToEnglish(json?.message || "Airtime purchase failed"));
-  return { data: json.data, simulated: false };
+  return { data: parseSogoBillPurchase(json), simulated: false };
 }
 
 export async function submitSogoData(input: {
@@ -704,7 +777,7 @@ export async function submitSogoData(input: {
       simulated: true,
     };
   }
-  const json = await sogoRequest<SogoBillPurchaseResponse>("/bills/data", {
+  const json = await sogoRequest<unknown>("/bills/data", {
     method: "POST",
     idempotencyKey: input.idempotencyKey,
     body: JSON.stringify({
@@ -713,8 +786,7 @@ export async function submitSogoData(input: {
       variation_code: input.variationCode,
     }),
   });
-  if (!json?.data) throw new Error(sogoErrorToEnglish(json?.message || "Data purchase failed"));
-  return { data: json.data, simulated: false };
+  return { data: parseSogoBillPurchase(json), simulated: false };
 }
 
 export async function submitSogoElectricity(input: {
@@ -740,7 +812,7 @@ export async function submitSogoElectricity(input: {
       simulated: true,
     };
   }
-  const json = await sogoRequest<SogoBillPurchaseResponse>("/bills/electricity", {
+  const json = await sogoRequest<unknown>("/bills/electricity", {
     method: "POST",
     idempotencyKey: input.idempotencyKey,
     body: JSON.stringify({
@@ -748,10 +820,10 @@ export async function submitSogoElectricity(input: {
       meter_number: input.meterNumber,
       meter_type: input.meterType,
       amount: Math.round(input.amount),
+      currency: "NGN",
     }),
   });
-  if (!json?.data) throw new Error(sogoErrorToEnglish(json?.message || "Electricity payment failed"));
-  return { data: json.data, simulated: false };
+  return { data: parseSogoBillPurchase(json), simulated: false };
 }
 
 export async function submitSogoCableTv(input: {
@@ -778,7 +850,7 @@ export async function submitSogoCableTv(input: {
       simulated: true,
     };
   }
-  const json = await sogoRequest<SogoBillPurchaseResponse>("/bills/cable-tv", {
+  const json = await sogoRequest<unknown>("/bills/cable-tv", {
     method: "POST",
     idempotencyKey: input.idempotencyKey,
     body: JSON.stringify({
@@ -787,8 +859,8 @@ export async function submitSogoCableTv(input: {
       subscription_type: input.subscriptionType || "renew",
       variation_code: input.variationCode,
       amount: Math.round(input.amount),
+      currency: "NGN",
     }),
   });
-  if (!json?.data) throw new Error(sogoErrorToEnglish(json?.message || "TV payment failed"));
-  return { data: json.data, simulated: false };
+  return { data: parseSogoBillPurchase(json), simulated: false };
 }

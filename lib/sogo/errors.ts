@@ -79,3 +79,12 @@ export function sogoErrorToEnglish(
     .replace(/\bsogo\.africa\b/gi, "provider")
     .slice(0, 220);
 }
+
+export function sogoHttpStatus(error: unknown) {
+  const status =
+    error && typeof error === "object" && "status" in error
+      ? Number((error as { status?: number }).status)
+      : 400;
+  if ([400, 401, 403, 409, 422, 429, 503].includes(status)) return status;
+  return 400;
+}

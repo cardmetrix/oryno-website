@@ -181,7 +181,7 @@ export default function BillsPage() {
     setSubmitting(true);
     setError(null);
     try {
-      const res = await fetch("/api/vtpass/purchase/bill", {
+      const res = await fetch("/api/sogo/bills/purchase", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

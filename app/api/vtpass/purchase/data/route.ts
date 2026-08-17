@@ -3,6 +3,7 @@ import { ensureAppUser } from "@/lib/auth/current-user";
 import { createNotification } from "@/lib/notifications-service";
 import { formatMoney } from "@/lib/transactions";
 import { purchaseData } from "@/lib/vtpass";
+import { sogoHttpStatus } from "@/lib/sogo/errors";
 
 export const runtime = "nodejs";
 
@@ -98,7 +99,7 @@ export async function POST(req: Request) {
         error:
           error instanceof Error ? error.message : "Data purchase failed",
       },
-      { status: 400 },
+      { status: sogoHttpStatus(error) },
     );
   }
 }
