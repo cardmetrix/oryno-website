@@ -238,7 +238,7 @@ function GiftCardsPageContent() {
   const [sellDemo, setSellDemo] = useState(false);
   const [sellUnavailable, setSellUnavailable] = useState(false);
   const [selectedSell, setSelectedSell] = useState<SellBrand | null>(null);
-  const [cardType, setCardType] = useState<"ecode" | "physical">("ecode");
+  const [cardType, setCardType] = useState<"ecode" | "physical">("physical");
   const [cardCountry, setCardCountry] = useState("US");
   const [specificCountry, setSpecificCountry] = useState("Germany");
   const [cardCurrency, setCardCurrency] = useState("USD");
@@ -443,7 +443,7 @@ function GiftCardsPageContent() {
       currencyForCardCountry(cardCountry, selectedSell.currencies),
     );
     setCardType(
-      selectedSell.cardTypes.includes("ecode") ? "ecode" : "physical",
+      selectedSell.cardTypes.includes("physical") ? "physical" : "ecode",
     );
     setSellAmount(String(selectedSell.denominations[0] || 100));
     setCode("");
@@ -828,7 +828,7 @@ function GiftCardsPageContent() {
                   >
                     <div className="grid grid-cols-2 gap-2">
                       {(
-                        ["ecode", "physical"] as const
+                        ["physical", "ecode"] as const
                       )
                         .filter((t) => selectedSell.cardTypes.includes(t))
                         .map((t) => (

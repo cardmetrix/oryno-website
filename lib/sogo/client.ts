@@ -228,7 +228,9 @@ export function isSogoUnavailableError(error: unknown) {
   if (!error || typeof error !== "object") return false;
   const err = error as { code?: string; status?: number; message?: string };
   if (err.code === "service_unavailable" || err.status === 503) return true;
-  return /temporarily unavailable|not currently available/i.test(err.message || "");
+  return /temporarily unavailable|not currently available|could not accept this gift card/i.test(
+    err.message || "",
+  );
 }
 
 /** True after a successful live catalog or rates response in this process. */

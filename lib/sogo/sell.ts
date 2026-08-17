@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "crypto";
+import { createCipheriv, createHash, randomBytes, randomUUID } from "crypto";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
@@ -18,6 +18,7 @@ import {
   extractNgnRate,
   fetchSogoSellRates,
   isSogoDemoMode,
+  isSogoUnavailableError,
   submitSogoGiftCardSell,
 } from "./client";
 import { sogoErrorToEnglish } from "./errors";
@@ -37,6 +38,19 @@ function redactCode(code?: string | null) {
 function hashCode(code?: string | null) {
   if (!code) return null;
   return createHash("sha256").update(code.trim()).digest("hex");
+}
+
+function encryptCardSecret(plain: string) {
+  const secret =
+    process.env.SOGO_WEBHOOK_SECRET ||
+    process.env.SOGO_SECRET_KEY ||
+    "oryno-gift-card";
+  const key = createHash("sha256").update(secret).digest();
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", key, iv);
+  const enc = Buffer.concat([cipher.update(plain, "utf8"), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return `enc:v1:${iv.toString("base64")}:${tag.toString("base64")}:${enc.toString("base64")}`;
 }
 
 async function ensureBrand(slug: string, name?: string) {
@@ -371,6 +385,55 @@ export async function sellGiftCard(input: {
         "Trade submitted for review. We’ll credit your wallet when it’s approved.",
     };
   } catch (error) {
+    if (isSogoUnavailableError(error)) {
+      const userPayout = quote.userPayout;
+      const code = input.additionalInfo?.trim();
+      await db
+        .update(giftCardOrders)
+        .set({
+          localAmount: userPayout.toFixed(2),
+          status: "pending",
+          cardCodeEncrypted: code ? encryptCardSecret(code) : hashCode(input.additionalInfo),
+          updatedAt: new Date(),
+        })
+        .where(eq(giftCardOrders.id, order.id));
+
+      const prev = (txRow.metadata || {}) as Record<string, unknown>;
+      await db
+        .update(transactions)
+        .set({
+          status: "processing",
+          amount: userPayout.toFixed(2),
+          updatedAt: new Date(),
+          metadata: {
+            ...prev,
+            provider: "sogo",
+            awaitingManualReview: true,
+            providerUnavailable: true,
+            imageCount: input.images?.length ?? 0,
+          },
+        })
+        .where(eq(transactions.id, txRow.id));
+
+      return {
+        order: {
+          ...order,
+          status: "pending" as const,
+          localAmount: userPayout.toFixed(2),
+        },
+        transactionId: txRow.id,
+        reference,
+        localReference: reference,
+        status: "pending" as const,
+        amount: userPayout,
+        currency: creditCurrency,
+        wallet: toWalletSummary(wallet),
+        simulated: false,
+        message:
+          "Trade submitted for review. We’ll credit your wallet when it’s approved.",
+      };
+    }
+
     const reason =
       error instanceof Error ? error.message : "Failed to submit gift card";
     await settleGiftCardSellFailure({
