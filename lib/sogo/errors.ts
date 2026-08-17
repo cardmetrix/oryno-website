@@ -5,7 +5,7 @@ const CODE_HINTS: Record<string, string> = {
   secret_key_required: "This service is temporarily unavailable.",
   environment_mismatch: "This service is temporarily unavailable.",
   insufficient_funds:
-    "Unable to process this request right now. Please try again shortly.",
+    "Insufficient balance from Sogo. Fund the Sogo NGN wallet and try again.",
   validation_failed: "Check the details and try again.",
   idempotency_key_required: "Please try again.",
   verification_failed:
@@ -55,11 +55,11 @@ export function sogoErrorToEnglish(
 
   if (!m) return "Something went wrong. Please try again.";
 
+  if (m.includes("insufficient")) {
+    return CODE_HINTS.insufficient_funds;
+  }
   if (m.includes("sogo") || m.includes("partner api")) {
     return "This service is temporarily unavailable. Please try again.";
-  }
-  if (m.includes("insufficient")) {
-    return "Unable to process this request right now. Please try again shortly.";
   }
   if (m.includes("verif")) {
     return "We could not verify that meter, smartcard, or account number.";
@@ -82,7 +82,7 @@ export function sogoErrorToEnglish(
 
 export function sogoHttpStatus(error: unknown) {
   const err = error as { status?: number; code?: string };
-  if (err?.code === "insufficient_funds") return 503;
+  if (err?.code === "insufficient_funds") return 422;
   const status = Number(err?.status);
   if ([400, 401, 403, 409, 422, 429, 503].includes(status)) return status;
   return 400;

@@ -353,9 +353,9 @@ async function assertSogoWallet(amount: number) {
   if (balance + 0.0001 >= amount) return;
   console.error("[sogo-wallet] NGN balance too low", { balance, amount });
   const err = new Error(
-    "This service is temporarily unavailable. Please try again shortly.",
+    "Insufficient balance from Sogo. Fund the Sogo NGN wallet and try again.",
   ) as Error & { status?: number; code?: string };
-  err.status = 503;
+  err.status = 422;
   err.code = "insufficient_funds";
   throw err;
 }
@@ -367,7 +367,7 @@ function rethrowSogo(error: unknown, fallback: string): never {
   ) as Error & { status?: number; code?: string };
   wrapped.code = err.code;
   wrapped.status =
-    err.code === "insufficient_funds" ? 503 : err.status;
+    err.code === "insufficient_funds" ? 422 : err.status;
   throw wrapped;
 }
 
