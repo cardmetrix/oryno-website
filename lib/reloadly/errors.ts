@@ -1,14 +1,28 @@
+const RELOADLY_INSUFFICIENT =
+  "Insufficient balance from Reloadly. Top up the Reloadly gift-card wallet and try again.";
+
 const CODE_HINTS: Record<string, string> = {
   INVALID_TOKEN: "Gift card service is temporarily unavailable.",
   UNAUTHORIZED: "Gift card service is temporarily unavailable.",
-  INSUFFICIENT_BALANCE:
-    "Unable to complete this purchase right now. Please try again shortly.",
+  INSUFFICIENT_BALANCE: RELOADLY_INSUFFICIENT,
 };
 
 export function reloadlyErrorToEnglish(message: string, code?: string) {
   if (code && CODE_HINTS[code]) return CODE_HINTS[code];
   const m = (message || "").toLowerCase();
   if (!m) return "Something went wrong. Please try again.";
+
+  if (m.includes("insufficient wallet")) {
+    return "Insufficient wallet balance";
+  }
+  if (
+    m.includes("insufficient balance from reloadly") ||
+    m.includes("provider balance") ||
+    m.includes("top up the reloadly") ||
+    m.includes("top up your reloadly")
+  ) {
+    return RELOADLY_INSUFFICIENT;
+  }
   if (
     m.includes("access denied") ||
     m.includes("access_denied") ||
@@ -17,17 +31,28 @@ export function reloadlyErrorToEnglish(message: string, code?: string) {
   ) {
     return "Gift card buying credentials don’t match this environment. Check Reloadly sandbox/live keys, or set RELOADLY_DEMO=true.";
   }
-  if (m.includes("reloadly") || m.includes("authentication")) {
+  if (m.includes("authentication") || m.includes("invalid_token")) {
     return "Gift card buying is temporarily unavailable. Please try again.";
   }
-  if (m.includes("insufficient") || m.includes("balance")) {
-    return "Unable to complete this purchase right now. Please try again shortly.";
+  if (m.includes("insufficient") || m.includes("balance too low")) {
+    return RELOADLY_INSUFFICIENT;
   }
-  if (m.includes("denomination") || m.includes("unitprice") || m.includes("price")) {
+  if (
+    m.includes("denomination") ||
+    m.includes("unitprice") ||
+    m.includes("unit price")
+  ) {
     return "That amount isn’t available for this card. Pick another value.";
   }
   if (m.includes("email")) {
     return "Enter a valid email to receive the gift card.";
   }
   return message.replace(/\bReloadly\b/gi, "gift card service").slice(0, 220);
+}
+
+export function reloadlyBuyHttpStatus(message: string) {
+  const m = (message || "").toLowerCase();
+  if (m.includes("unauthorized")) return 401;
+  if (m.includes("insufficient")) return 422;
+  return 400;
 }

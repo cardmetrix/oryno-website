@@ -1,6 +1,6 @@
 import type { GiftCardBrandView, SogoCatalogBrand } from "./types";
 
-/** Domains used for open logo APIs (Clearbit / DuckDuckGo / Google). */
+/** Domains used for public favicon APIs (Google / DuckDuckGo). */
 export const BRAND_LOGO_DOMAINS: Record<string, string> = {
   amazon: "amazon.com",
   apple: "apple.com",
@@ -51,15 +51,6 @@ const LOCAL_PNG = new Set([
   "spotify",
 ]);
 
-/** Brands whose Clearbit/open-API logos are missing or unreliable — prefer local art. */
-const LOCAL_FIRST = new Set([
-  "foot-locker",
-  "vanilla",
-  "netspend",
-  "dicks-sporting",
-  "dickssportinggoods",
-]);
-
 export function brandDomain(slug: string) {
   const key = slug.toLowerCase();
   if (BRAND_LOGO_DOMAINS[key]) return BRAND_LOGO_DOMAINS[key];
@@ -73,18 +64,21 @@ function localGiftCardArt(slug: string) {
     : `/gift-cards/${key}.svg`;
 }
 
+/** Clearbit Logo API is shut down and fails DNS (ERR_NAME_NOT_RESOLVED). */
+export function isUsableGiftCardImage(url: string | null | undefined) {
+  if (!url) return false;
+  if (url.startsWith("/")) return true;
+  if (!/^https?:\/\//i.test(url)) return false;
+  return !/clearbit\.com/i.test(url);
+}
+
 /**
- * Prefer provider OpenAPI image fields, then open logo APIs, then local art.
- * Open APIs: Clearbit Logo API (public).
+ * Prefer provider image URLs, then local art, then public favicon APIs.
+ * Avoid Clearbit — that hostname no longer resolves (ERR_NAME_NOT_RESOLVED).
  */
 export function giftCardImagePath(slug: string, providerImage?: string | null) {
-  if (providerImage && /^https?:\/\//i.test(providerImage)) {
-    return providerImage;
-  }
-  const key = slug.toLowerCase();
-  if (LOCAL_FIRST.has(key)) return localGiftCardArt(key);
-  const domain = brandDomain(slug);
-  return `https://logo.clearbit.com/${domain}?size=128`;
+  if (isUsableGiftCardImage(providerImage)) return providerImage as string;
+  return localGiftCardArt(slug.toLowerCase());
 }
 
 export function giftCardImageFallbacks(slug: string) {
@@ -92,14 +86,10 @@ export function giftCardImageFallbacks(slug: string) {
   const key = slug.toLowerCase();
   const local = localGiftCardArt(key);
   const remote = [
-    `https://logo.clearbit.com/${domain}?size=128`,
-    `https://icons.duckduckgo.com/ip3/${domain}.ico`,
     `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`,
+    `https://icons.duckduckgo.com/ip3/${domain}.ico`,
   ];
-  if (LOCAL_FIRST.has(key)) {
-    return [local, ...remote];
-  }
-  return [...remote, local];
+  return [local, ...remote];
 }
 
 /** Pick image URL from raw OpenAPI / provider catalog objects. */
@@ -122,7 +112,7 @@ export function pickProviderImage(
   ];
   for (const key of keys) {
     const v = raw[key];
-    if (typeof v === "string" && /^https?:\/\//i.test(v.trim())) {
+    if (typeof v === "string" && isUsableGiftCardImage(v.trim())) {
       return v.trim();
     }
   }

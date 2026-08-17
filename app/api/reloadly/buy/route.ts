@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
 import { createNotification } from "@/lib/notifications-service";
-import { buyGiftCard, reloadlyErrorToEnglish } from "@/lib/reloadly";
+import {
+  buyGiftCard,
+  reloadlyBuyHttpStatus,
+  reloadlyErrorToEnglish,
+} from "@/lib/reloadly";
 import { formatMoney } from "@/lib/transactions";
 
 export const runtime = "nodejs";
@@ -79,13 +83,12 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     console.error("[reloadly-buy]", error);
+    const message = reloadlyErrorToEnglish(
+      error instanceof Error ? error.message : "Failed to buy gift card",
+    );
     return NextResponse.json(
-      {
-        error: reloadlyErrorToEnglish(
-          error instanceof Error ? error.message : "Failed to buy gift card",
-        ),
-      },
-      { status: 400 },
+      { error: message },
+      { status: reloadlyBuyHttpStatus(message) },
     );
   }
 }

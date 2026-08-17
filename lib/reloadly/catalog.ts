@@ -1,5 +1,10 @@
 import type { BuyProductView, ReloadlyProduct } from "./types";
-import { brandDomain, giftCardImagePath } from "@/lib/sogo/catalog";
+import {
+  brandDomain,
+  giftCardImageFallbacks,
+  giftCardImagePath,
+  isUsableGiftCardImage,
+} from "@/lib/sogo/catalog";
 
 /** Map common Reloadly brand names → domains for open logo APIs */
 const BUY_BRAND_DOMAINS: Record<string, string> = {
@@ -40,16 +45,19 @@ export function buyBrandDomain(brandName: string) {
   );
 }
 
-/** Prefer Reloadly logoUrls, else open logo API (Clearbit / Google). */
+/** Prefer Reloadly logoUrls, else local art / public favicons. */
 export function buyProductImage(
   product: Pick<ReloadlyProduct, "logoUrls" | "brand" | "productName">,
 ) {
-  const providerLogo = product.logoUrls?.find((u) => /^https?:\/\//i.test(u));
+  const providerLogo = product.logoUrls?.find((u) => isUsableGiftCardImage(u));
   if (providerLogo) return providerLogo;
 
   const brandName = product.brand?.brandName || product.productName || "gift";
-  const domain = buyBrandDomain(brandName);
-  return `https://logo.clearbit.com/${domain}?size=128`;
+  const slug = brandName
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+  return giftCardImagePath(slug);
 }
 
 export function buyProductImageFallbacks(
@@ -61,13 +69,11 @@ export function buyProductImageFallbacks(
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
-  const provider = product.logoUrls?.filter((u) => /^https?:\/\//i.test(u)) ?? [];
+  const provider = product.logoUrls?.filter((u) => isUsableGiftCardImage(u)) ?? [];
   return [
     ...provider,
-    `https://logo.clearbit.com/${domain}?size=128`,
-    `https://icons.duckduckgo.com/ip3/${domain}.ico`,
+    ...giftCardImageFallbacks(slug),
     `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`,
-    giftCardImagePath(slug),
   ];
 }
 
@@ -86,7 +92,7 @@ export const DEMO_RELOADLY_PRODUCTS: ReloadlyProduct[] = [
       "50": 50,
       "100": 100,
     },
-    logoUrls: ["https://logo.clearbit.com/amazon.com?size=128"],
+    logoUrls: ["/gift-cards/amazon.png"],
     brand: { brandId: 2, brandName: "Amazon" },
     country: { isoName: "US", name: "United States", currencyCode: "USD" },
     redeemInstruction: {
@@ -108,7 +114,7 @@ export const DEMO_RELOADLY_PRODUCTS: ReloadlyProduct[] = [
       "50": 50,
       "100": 100,
     },
-    logoUrls: ["https://logo.clearbit.com/apple.com?size=128"],
+    logoUrls: ["/gift-cards/apple.png"],
     brand: { brandId: 3, brandName: "Apple" },
     country: { isoName: "US", name: "United States", currencyCode: "USD" },
   },
@@ -126,7 +132,7 @@ export const DEMO_RELOADLY_PRODUCTS: ReloadlyProduct[] = [
       "50": 50,
       "100": 100,
     },
-    logoUrls: ["https://logo.clearbit.com/google.com?size=128"],
+    logoUrls: ["/gift-cards/google-play.png"],
     brand: { brandId: 4, brandName: "Google Play" },
     country: { isoName: "US", name: "United States", currencyCode: "USD" },
   },
@@ -139,7 +145,7 @@ export const DEMO_RELOADLY_PRODUCTS: ReloadlyProduct[] = [
     recipientCurrencyCode: "USD",
     minRecipientDenomination: 5,
     maxRecipientDenomination: 100,
-    logoUrls: ["https://logo.clearbit.com/steampowered.com?size=128"],
+    logoUrls: ["/gift-cards/steam.png"],
     brand: { brandId: 5, brandName: "Steam" },
     country: { isoName: "US", name: "United States", currencyCode: "USD" },
   },
@@ -156,7 +162,7 @@ export const DEMO_RELOADLY_PRODUCTS: ReloadlyProduct[] = [
       "50": 50,
       "100": 100,
     },
-    logoUrls: ["https://logo.clearbit.com/netflix.com?size=128"],
+    logoUrls: ["/gift-cards/netflix.png"],
     brand: { brandId: 6, brandName: "Netflix" },
     country: { isoName: "US", name: "United States", currencyCode: "USD" },
   },
@@ -173,7 +179,7 @@ export const DEMO_RELOADLY_PRODUCTS: ReloadlyProduct[] = [
       "30": 30,
       "60": 60,
     },
-    logoUrls: ["https://logo.clearbit.com/spotify.com?size=128"],
+    logoUrls: ["/gift-cards/spotify.png"],
     brand: { brandId: 7, brandName: "Spotify" },
     country: { isoName: "US", name: "United States", currencyCode: "USD" },
   },
@@ -191,7 +197,7 @@ export const DEMO_RELOADLY_PRODUCTS: ReloadlyProduct[] = [
       "50": 50,
       "100": 100,
     },
-    logoUrls: ["https://logo.clearbit.com/xbox.com?size=128"],
+    logoUrls: ["/gift-cards/xbox.png"],
     brand: { brandId: 8, brandName: "Xbox" },
     country: { isoName: "US", name: "United States", currencyCode: "USD" },
   },
@@ -209,7 +215,7 @@ export const DEMO_RELOADLY_PRODUCTS: ReloadlyProduct[] = [
       "50": 50,
       "100": 100,
     },
-    logoUrls: ["https://logo.clearbit.com/playstation.com?size=128"],
+    logoUrls: ["/gift-cards/playstation.png"],
     brand: { brandId: 9, brandName: "PlayStation" },
     country: { isoName: "US", name: "United States", currencyCode: "USD" },
   },
@@ -217,9 +223,11 @@ export const DEMO_RELOADLY_PRODUCTS: ReloadlyProduct[] = [
 
 export function toBuyProductView(p: ReloadlyProduct): BuyProductView {
   const map = p.fixedRecipientToSenderDenominationsMap || {};
-  const dens = (
-    p.fixedRecipientDenominations?.filter((n) => Number.isFinite(n)) ?? []
-  ).slice().sort((a, b) => a - b);
+  const dens = (p.fixedRecipientDenominations ?? [])
+    .map((n) => Number(n))
+    .filter((n) => Number.isFinite(n) && n > 0)
+    .slice()
+    .sort((a, b) => a - b);
   const brandName = p.brand?.brandName || p.productName;
   const type = (p.denominationType || "FIXED").toUpperCase();
   const isRange = type === "RANGE";

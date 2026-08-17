@@ -18,11 +18,10 @@ import {
   assertReloadlyReady,
   fetchReloadlyCards,
   fetchReloadlyProduct,
+  fetchReloadlyProducts,
   isReloadlyDemoMode,
   placeReloadlyOrder,
-  reloadlyMarkup,
 } from "./client";
-import { reloadlyErrorToEnglish } from "./errors";
 import type { BuyProductView } from "./types";
 
 function localReference() {
@@ -211,12 +210,21 @@ export async function buyGiftCard(input: {
     throw new Error("Select a valid card amount");
   }
 
-  const product = await fetchReloadlyProduct(input.productId);
+  let product = await fetchReloadlyProduct(input.productId);
+  if (!product) {
+    const catalog = await fetchReloadlyProducts({});
+    product =
+      catalog.find((p) => p.productId === input.productId) ?? null;
+  }
   if (!product) throw new Error("Gift card product not found");
 
+  const amount = Number(input.unitPrice);
   const denomType = (product.denominationType || "FIXED").toUpperCase();
   if (denomType === "FIXED" && product.denominations.length) {
-    if (!product.denominations.includes(input.unitPrice)) {
+    const matches = product.denominations.some(
+      (d) => Math.abs(Number(d) - amount) < 0.001,
+    );
+    if (!matches) {
       throw new Error("That amount isn’t available for this card");
     }
   } else {
@@ -372,6 +380,6 @@ export async function buyGiftCard(input: {
       .update(giftCardOrders)
       .set({ status: "failed", updatedAt: new Date() })
       .where(eq(giftCardOrders.id, order.id));
-    throw new Error(reloadlyErrorToEnglish(reason));
+    throw new Error(reason);
   }
 }

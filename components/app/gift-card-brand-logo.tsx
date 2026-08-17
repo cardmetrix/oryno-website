@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { giftCardImageFallbacks } from "@/lib/sogo/catalog";
+import {
+  giftCardImageFallbacks,
+  isUsableGiftCardImage,
+} from "@/lib/sogo/catalog";
 import { cn } from "@/lib/utils";
 
 function brandImageSrc(brand: { slug?: string; image: string }) {
-  if (brand.image && /^https?:\/\//i.test(brand.image)) return brand.image;
-  if (brand.image?.startsWith("/")) return brand.image;
+  if (isUsableGiftCardImage(brand.image)) return brand.image;
   return giftCardImageFallbacks(brand.slug || "gift")[0];
 }
 
@@ -29,7 +31,7 @@ export function GiftCardBrandLogo({
     ...(brand.slug
       ? giftCardImageFallbacks(brand.slug).filter((u) => u !== primary)
       : []),
-  ].filter((u, i, arr) => u && arr.indexOf(u) === i);
+  ].filter((u, i, arr) => isUsableGiftCardImage(u) && arr.indexOf(u) === i);
   const [idx, setIdx] = useState(0);
   const src = chain[Math.min(idx, Math.max(chain.length - 1, 0))] || primary;
   const remote = /^https?:\/\//i.test(src);

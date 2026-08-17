@@ -45,6 +45,7 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
+import { useUser } from "@clerk/nextjs";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 
@@ -220,6 +221,7 @@ export default function GiftCardsPage() {
 
 function GiftCardsPageContent() {
   const router = useRouter();
+  const { user } = useUser();
   const searchParams = useSearchParams();
   const slugParam = searchParams.get("slug");
   const productIdParam = searchParams.get("productId");
@@ -283,6 +285,11 @@ function GiftCardsPageContent() {
     { cardNumber: string | null; pinCode: string | null }[]
   >([]);
   const isMobile = useIsMobile();
+
+  useEffect(() => {
+    const email = user?.primaryEmailAddress?.emailAddress?.trim();
+    if (email && !buyEmail) setBuyEmail(email);
+  }, [user, buyEmail]);
 
   const changeSellOptions = useMemo(() => {
     const q = changeSellQuery.trim().toLowerCase();
