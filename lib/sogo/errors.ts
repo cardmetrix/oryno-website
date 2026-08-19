@@ -1,11 +1,12 @@
+import { publicServiceError, SERVICE_UNAVAILABLE } from "@/lib/service-errors";
+
 const CODE_HINTS: Record<string, string> = {
   authentication_failed: "This service is temporarily unavailable.",
   authentication_required: "This service is temporarily unavailable.",
   invalid_scope: "This service is temporarily unavailable.",
   secret_key_required: "This service is temporarily unavailable.",
   environment_mismatch: "This service is temporarily unavailable.",
-  insufficient_funds:
-    "Insufficient balance from Sogo. Fund the Sogo NGN wallet and try again.",
+  insufficient_funds: SERVICE_UNAVAILABLE,
   validation_failed: "Check the details and try again.",
   idempotency_key_required: "Please try again.",
   verification_failed:
@@ -36,12 +37,12 @@ export function sogoErrorToEnglish(
   errors?: Record<string, string[] | string>,
 ) {
   const field = firstFieldError(errors);
-  if (field) return field.slice(0, 220);
+  if (field) return publicServiceError(field.slice(0, 220));
 
   const m = (message || "").toLowerCase();
 
   if (m.includes("not enabled on") && m.includes("gift card")) {
-    return message;
+    return publicServiceError(message);
   }
 
   if (
@@ -51,12 +52,12 @@ export function sogoErrorToEnglish(
     return CODE_HINTS.gift_cards_unavailable;
   }
 
-  if (code && CODE_HINTS[code]) return CODE_HINTS[code];
+  if (code && CODE_HINTS[code]) return publicServiceError(CODE_HINTS[code]);
 
   if (!m) return "Something went wrong. Please try again.";
 
   if (m.includes("insufficient")) {
-    return CODE_HINTS.insufficient_funds;
+    return SERVICE_UNAVAILABLE;
   }
   if (m.includes("sogo") || m.includes("partner api")) {
     return "This service is temporarily unavailable. Please try again.";
@@ -74,10 +75,12 @@ export function sogoErrorToEnglish(
     return "Network error. Check your connection and try again.";
   }
 
-  return message
-    .replace(/\bSogo\b/gi, "this service")
-    .replace(/\bsogo\.africa\b/gi, "provider")
-    .slice(0, 220);
+  return publicServiceError(
+    message
+      .replace(/\bSogo\b/gi, "this service")
+      .replace(/\bsogo\.africa\b/gi, "provider")
+      .slice(0, 220),
+  );
 }
 
 export function sogoHttpStatus(error: unknown) {

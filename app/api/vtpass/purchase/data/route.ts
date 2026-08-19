@@ -4,6 +4,7 @@ import { createNotification } from "@/lib/notifications-service";
 import { formatMoney } from "@/lib/transactions";
 import { purchaseData } from "@/lib/vtpass";
 import { sogoHttpStatus } from "@/lib/sogo/errors";
+import { publicServiceError } from "@/lib/service-errors";
 
 export const runtime = "nodejs";
 
@@ -96,8 +97,9 @@ export async function POST(req: Request) {
     console.error("[vtpass-data]", error);
     return NextResponse.json(
       {
-        error:
+        error: publicServiceError(
           error instanceof Error ? error.message : "Data purchase failed",
+        ),
       },
       { status: sogoHttpStatus(error) },
     );

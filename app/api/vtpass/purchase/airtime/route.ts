@@ -4,6 +4,7 @@ import { createNotification } from "@/lib/notifications-service";
 import { formatMoney } from "@/lib/transactions";
 import { purchaseAirtime } from "@/lib/vtpass";
 import { sogoHttpStatus } from "@/lib/sogo/errors";
+import { publicServiceError } from "@/lib/service-errors";
 
 export const runtime = "nodejs";
 
@@ -113,11 +114,12 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     console.error("[vtpass-airtime]", error);
-    const raw =
-      error instanceof Error ? error.message : "Airtime purchase failed";
+    const message = publicServiceError(
+      error instanceof Error ? error.message : "Airtime purchase failed",
+    );
     return NextResponse.json(
       {
-        error: raw
+        error: message
           .replace(/VTpass/gi, "ORYNO")
           .replace(/vtpass/gi, "ORYNO"),
       },

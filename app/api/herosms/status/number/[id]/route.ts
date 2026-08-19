@@ -19,7 +19,7 @@ export async function GET(
       return NextResponse.json({ error: "Missing id" }, { status: 400 });
     }
 
-    const status = await pollNumberStatus(id);
+    const status = await pollNumberStatus(id, user.id);
     return NextResponse.json({ ok: true, ...status });
   } catch (error) {
     console.error("[herosms-number-status]", error);

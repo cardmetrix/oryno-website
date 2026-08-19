@@ -635,7 +635,7 @@ export async function assertReloadlyReady(minBalance = 0.01) {
   console.log(LOG_PREFIX, "balance", bal);
   if (!Number.isFinite(bal.balance) || bal.balance < minBalance) {
     throw new Error(
-      "Insufficient balance from Reloadly. Top up the Reloadly gift-card wallet and try again.",
+      "This service is unavailable. Please try again later.",
     );
   }
   return { demo: false as const, ...bal };

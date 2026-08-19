@@ -1,12 +1,12 @@
+import { publicServiceError, SERVICE_UNAVAILABLE } from "@/lib/service-errors";
+
 /**
  * Map JustAnotherPanel / SMM panel errors to clear English for the UI.
  * Never expose the provider brand name.
  */
 const JAP_ERROR_EN: Record<string, string> = {
-  "not enough funds":
-    "Provider account has no balance. Top up your boost provider wallet, then try again.",
-  "neworder.error.not_enough_funds":
-    "Provider account has no balance. Top up your boost provider wallet, then try again.",
+  "not enough funds": SERVICE_UNAVAILABLE,
+  "neworder.error.not_enough_funds": SERVICE_UNAVAILABLE,
   "incorrect service id": "This boost package isn’t available. Pick another one.",
   "incorrect service": "This boost package isn’t available. Pick another one.",
   "neworder.error.incorrect_service_id":
@@ -36,14 +36,16 @@ export function japErrorToEnglish(raw: unknown): string {
   if (!text) return "Something went wrong. Please try again.";
 
   const lower = text.toLowerCase();
-  if (JAP_ERROR_EN[lower]) return JAP_ERROR_EN[lower];
+  if (JAP_ERROR_EN[lower]) return publicServiceError(JAP_ERROR_EN[lower]);
 
   for (const [key, en] of Object.entries(JAP_ERROR_EN)) {
-    if (lower.includes(key)) return en;
+    if (lower.includes(key)) return publicServiceError(en);
   }
 
-  return text
-    .replace(/JustAnotherPanel/gi, "ORYNO")
-    .replace(/justanotherpanel/gi, "oryno")
-    .replace(/\bJAP\b/g, "ORYNO");
+  return publicServiceError(
+    text
+      .replace(/JustAnotherPanel/gi, "ORYNO")
+      .replace(/justanotherpanel/gi, "oryno")
+      .replace(/\bJAP\b/g, "ORYNO"),
+  );
 }

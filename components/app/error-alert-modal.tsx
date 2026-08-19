@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { publicServiceError } from "@/lib/service-errors";
 import { cn } from "@/lib/utils";
 
 type ErrorAlertModalProps = {
@@ -25,6 +26,7 @@ export function ErrorAlertModal({
   page = "ORYNO",
   className,
 }: ErrorAlertModalProps) {
+  const displayError = error ? publicServiceError(error) : null;
   const open = Boolean(error);
   const [note, setNote] = useState("");
   const [sending, setSending] = useState(false);
@@ -133,7 +135,7 @@ export function ErrorAlertModal({
               Error details
             </p>
             <p className="mt-1 text-sm leading-relaxed font-medium break-words text-red-700">
-              {error}
+              {displayError}
             </p>
           </div>
 

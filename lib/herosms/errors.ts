@@ -1,3 +1,5 @@
+import { publicServiceError, SERVICE_UNAVAILABLE } from "@/lib/service-errors";
+
 /**
  * Provider API often returns Chinese (or mixed) error strings / SMS-Activate codes.
  * Map known messages to clear English for the UI — never expose provider brand.
@@ -11,8 +13,7 @@ const HERO_ERROR_EN: Record<string, string> = {
   未授权:
     "Not authorized for this service. Contact ORYNO support.",
   没有权限: "Permission denied for this service.",
-  余额不足:
-    "Provider account has no balance. Top up your SMS/email provider wallet, then try again.",
+  余额不足: SERVICE_UNAVAILABLE,
   没有可用的邮箱: "No emails available for this domain. Try another one.",
   没有可用邮箱: "No emails available for this domain. Try another one.",
   邮箱不存在: "Email activation not found",
@@ -32,8 +33,7 @@ const HERO_ERROR_EN: Record<string, string> = {
   Unauthorized: "Not authorized for this service. Contact ORYNO support.",
   NO_NUMBERS:
     "No numbers available for this country and service. Try another country.",
-  NO_BALANCE:
-    "Provider account has no balance. Top up your SMS/email provider wallet, then try again.",
+  NO_BALANCE: SERVICE_UNAVAILABLE,
   BAD_KEY:
     "Service credentials are invalid. Contact ORYNO support.",
   BAD_SERVICE: "This service isn’t available right now. Try another one.",
@@ -55,11 +55,13 @@ export function herosmsErrorToEnglish(raw: unknown): string {
   if (!text) return "Something went wrong. Please try again.";
 
   const upper = text.toUpperCase();
-  if (HERO_ERROR_EN[upper]) return HERO_ERROR_EN[upper];
-  if (HERO_ERROR_EN[text]) return HERO_ERROR_EN[text];
+  if (HERO_ERROR_EN[upper]) return publicServiceError(HERO_ERROR_EN[upper]);
+  if (HERO_ERROR_EN[text]) return publicServiceError(HERO_ERROR_EN[text]);
 
   for (const [key, en] of Object.entries(HERO_ERROR_EN)) {
-    if (text.includes(key) || upper.includes(key.toUpperCase())) return en;
+    if (text.includes(key) || upper.includes(key.toUpperCase())) {
+      return publicServiceError(en);
+    }
   }
 
   // HTTP status leftovers
@@ -67,11 +69,13 @@ export function herosmsErrorToEnglish(raw: unknown): string {
     return "Not authorized for this service. Contact ORYNO support.";
   }
 
-  return text
-    .replace(/HeroSMS/gi, "ORYNO")
-    .replace(/hero-sms/gi, "oryno")
-    .replace(/VTpass/gi, "ORYNO")
-    .replace(/JustAnotherPanel/gi, "ORYNO");
+  return publicServiceError(
+    text
+      .replace(/HeroSMS/gi, "ORYNO")
+      .replace(/hero-sms/gi, "oryno")
+      .replace(/VTpass/gi, "ORYNO")
+      .replace(/JustAnotherPanel/gi, "ORYNO"),
+  );
 }
 
 /** Normalize signup site for email rentals (host only, lowercase). */

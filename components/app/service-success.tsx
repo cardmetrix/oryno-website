@@ -155,11 +155,11 @@ export function ServiceSuccess({
     >
       <DialogContent
         className={cn(
-          "max-w-md gap-0 overflow-y-auto rounded-[28px] border-border p-5 text-center sm:p-7",
+          "max-w-md gap-0 overflow-y-auto rounded-[28px] border-border px-5 pt-2 pb-5 text-center sm:px-7 sm:pt-3 sm:pb-7 [&>button]:top-3",
           className,
         )}
       >
-        <div className="relative mx-auto flex h-20 w-20 items-center justify-center">
+        <div className="relative -mt-1 mx-auto flex h-20 w-20 items-center justify-center">
           <span
             aria-hidden
             className={cn(
@@ -183,7 +183,7 @@ export function ServiceSuccess({
           </span>
         </div>
 
-        <DialogTitle className="mt-5 text-2xl font-bold tracking-tight text-foreground">
+        <DialogTitle className="mt-3 text-2xl font-bold tracking-tight text-foreground">
           {title}
         </DialogTitle>
         <DialogDescription className="mx-auto mt-2 max-w-sm text-sm text-muted-foreground">

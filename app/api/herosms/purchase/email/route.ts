@@ -3,6 +3,7 @@ import { ensureAppUser } from "@/lib/auth/current-user";
 import { createNotification } from "@/lib/notifications-service";
 import { formatMoney } from "@/lib/transactions";
 import { herosmsErrorToEnglish, purchaseEmailActivation } from "@/lib/herosms";
+import { publicServiceError } from "@/lib/service-errors";
 
 export const runtime = "nodejs";
 
@@ -83,15 +84,13 @@ export async function POST(req: Request) {
     console.error("[herosms-purchase-email]", error);
     const raw =
       error instanceof Error ? error.message : "Failed to rent email";
-    const errorMessage = herosmsErrorToEnglish(raw);
+    const errorMessage = publicServiceError(herosmsErrorToEnglish(raw));
     const lower = errorMessage.toLowerCase();
-    const code = lower.includes("no balance") || lower.includes("provider account")
-      ? "PROVIDER_BALANCE"
+    const code = lower.includes("unavailable")
+      ? "SERVICE_UNAVAILABLE"
       : lower.includes("credentials") || lower.includes("not authorized")
         ? "PROVIDER_AUTH"
-        : lower.includes("insufficient wallet")
-          ? "WALLET_BALANCE"
-          : "PURCHASE_FAILED";
+        : "PURCHASE_FAILED";
 
     return NextResponse.json(
       { error: errorMessage, code },

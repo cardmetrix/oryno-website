@@ -26,6 +26,7 @@ import {
 } from "./client";
 import { countryFlagEmoji } from "./countries";
 import { herosmsErrorToEnglish, normalizeEmailSite } from "./errors";
+import { notifyServiceEvent } from "@/lib/notify/service-events";
 
 const LOG_PREFIX = "[herosms]";
 
@@ -453,32 +454,147 @@ export async function purchaseEmailActivation(input: {
   }
 }
 
-export async function pollNumberStatus(activationId: string) {
+export async function pollNumberStatus(
+  activationId: string,
+  userId?: string,
+) {
+  const result =
+    activationId.startsWith("demo_") || isHerosmsDemoMode()
+      ? {
+          status: "STATUS_OK" as const,
+          code: "482913",
+          demo: true as const,
+        }
+      : await getHerosmsStatus(activationId);
+
   if (activationId.startsWith("demo_") || isHerosmsDemoMode()) {
     console.log(LOG_PREFIX, "poll number DEMO", { activationId });
-    return {
-      status: "STATUS_OK" as const,
-      code: "482913",
-      demo: true,
-    };
+  } else {
+    console.log(LOG_PREFIX, "poll number LIVE", { activationId });
   }
-  console.log(LOG_PREFIX, "poll number LIVE", { activationId });
-  return getHerosmsStatus(activationId);
+
+  const code = "code" in result ? result.code : null;
+  if (result.status === "STATUS_OK" && code) {
+    await maybeNotifyNumberCode(activationId, String(code), userId);
+  }
+
+  return result;
 }
 
-export async function pollEmailStatus(emailId: string) {
+export async function pollEmailStatus(emailId: string, userId?: string) {
+  const status =
+    emailId.startsWith("demo_") || isHerosmsDemoMode()
+      ? {
+          id: emailId,
+          status: "OK",
+          value: "482913",
+          message: "Your verification code is 482913",
+          demo: true as const,
+        }
+      : await getHerosmsEmailStatus(emailId);
+
   if (emailId.startsWith("demo_") || isHerosmsDemoMode()) {
     console.log(LOG_PREFIX, "poll email DEMO", { emailId });
-    return {
-      id: emailId,
-      status: "OK",
-      value: "482913",
-      message: "Your verification code is 482913",
-      demo: true,
-    };
+  } else {
+    console.log(LOG_PREFIX, "poll email LIVE", { emailId });
   }
-  console.log(LOG_PREFIX, "poll email LIVE", { emailId });
-  return getHerosmsEmailStatus(emailId);
+
+  const code = String(
+    (status as { value?: string; code?: string }).value ||
+      (status as { value?: string; code?: string }).code ||
+      "",
+  ).trim();
+  const done =
+    Boolean(code) &&
+    /ok|received|completed/i.test(String(status.status || "OK"));
+  if (done) {
+    await maybeNotifyEmailCode(emailId, code, userId);
+  }
+
+  return status;
+}
+
+async function findServiceTx(externalRef: string, userId?: string) {
+  const ref = externalRef.slice(0, 120);
+  return db.query.transactions.findFirst({
+    where: userId
+      ? and(eq(transactions.externalRef, ref), eq(transactions.userId, userId))
+      : eq(transactions.externalRef, ref),
+  });
+}
+
+async function maybeNotifyNumberCode(
+  activationId: string,
+  code: string,
+  userId?: string,
+) {
+  const tx = await findServiceTx(activationId, userId);
+  if (!tx) return;
+  const meta = (tx.metadata || {}) as Record<string, unknown>;
+  if (meta.completionNotifiedAt) return;
+
+  await db
+    .update(transactions)
+    .set({
+      metadata: {
+        ...meta,
+        completionNotifiedAt: new Date().toISOString(),
+        smsCode: code,
+      },
+      updatedAt: new Date(),
+    })
+    .where(eq(transactions.id, tx.id));
+
+  if (tx.relatedOrderId) {
+    await db
+      .update(userVirtualNumbers)
+      .set({ status: "completed", updatedAt: new Date() })
+      .where(eq(userVirtualNumbers.id, tx.relatedOrderId));
+  }
+
+  const phone =
+    typeof meta.phoneNumber === "string" ? meta.phoneNumber : "your number";
+  await notifyServiceEvent({
+    userId: tx.userId,
+    title: "SMS code received",
+    body: `Code for ${phone}: ${code}`,
+    type: "virtual_number",
+    href: "/services/virtual-numbers",
+    metadata: { activationId, transactionId: tx.id },
+  });
+}
+
+async function maybeNotifyEmailCode(
+  emailId: string,
+  code: string,
+  userId?: string,
+) {
+  const tx = await findServiceTx(emailId, userId);
+  if (!tx) return;
+  const meta = (tx.metadata || {}) as Record<string, unknown>;
+  if (meta.completionNotifiedAt) return;
+
+  await db
+    .update(transactions)
+    .set({
+      metadata: {
+        ...meta,
+        completionNotifiedAt: new Date().toISOString(),
+        emailCode: code,
+      },
+      updatedAt: new Date(),
+    })
+    .where(eq(transactions.id, tx.id));
+
+  const address = typeof meta.email === "string" ? meta.email : "your inbox";
+  await notifyServiceEvent({
+    userId: tx.userId,
+    title: "Email code received",
+    body: `Code for ${address}: ${code}`,
+    type: "email",
+    href: "/services/emails",
+    metadata: { emailId, transactionId: tx.id },
+  });
 }
 
 export async function cancelEmail(emailId: string) {

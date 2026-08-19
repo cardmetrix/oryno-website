@@ -1,19 +1,18 @@
-const RELOADLY_INSUFFICIENT =
-  "Insufficient balance from Reloadly. Top up the Reloadly gift-card wallet and try again.";
+import { publicServiceError, SERVICE_UNAVAILABLE } from "@/lib/service-errors";
 
 const CODE_HINTS: Record<string, string> = {
   INVALID_TOKEN: "Gift card service is temporarily unavailable.",
   UNAUTHORIZED: "Gift card service is temporarily unavailable.",
-  INSUFFICIENT_BALANCE: RELOADLY_INSUFFICIENT,
+  INSUFFICIENT_BALANCE: SERVICE_UNAVAILABLE,
 };
 
 export function reloadlyErrorToEnglish(message: string, code?: string) {
-  if (code && CODE_HINTS[code]) return CODE_HINTS[code];
+  if (code && CODE_HINTS[code]) return publicServiceError(CODE_HINTS[code]);
   const m = (message || "").toLowerCase();
   if (!m) return "Something went wrong. Please try again.";
 
   if (m.includes("insufficient wallet")) {
-    return "Insufficient wallet balance";
+    return SERVICE_UNAVAILABLE;
   }
   if (
     m.includes("insufficient balance from reloadly") ||
@@ -21,7 +20,7 @@ export function reloadlyErrorToEnglish(message: string, code?: string) {
     m.includes("top up the reloadly") ||
     m.includes("top up your reloadly")
   ) {
-    return RELOADLY_INSUFFICIENT;
+    return SERVICE_UNAVAILABLE;
   }
   if (
     m.includes("access denied") ||
@@ -35,7 +34,7 @@ export function reloadlyErrorToEnglish(message: string, code?: string) {
     return "Gift card buying is temporarily unavailable. Please try again.";
   }
   if (m.includes("insufficient") || m.includes("balance too low")) {
-    return RELOADLY_INSUFFICIENT;
+    return SERVICE_UNAVAILABLE;
   }
   if (
     m.includes("denomination") ||
@@ -47,7 +46,9 @@ export function reloadlyErrorToEnglish(message: string, code?: string) {
   if (m.includes("email")) {
     return "Enter a valid email to receive the gift card.";
   }
-  return message.replace(/\bReloadly\b/gi, "gift card service").slice(0, 220);
+  return publicServiceError(
+    message.replace(/\bReloadly\b/gi, "gift card service").slice(0, 220),
+  );
 }
 
 export function reloadlyBuyHttpStatus(message: string) {

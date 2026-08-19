@@ -4,6 +4,7 @@ import { ensureAppUser } from "@/lib/auth/current-user";
 import { createNotification } from "@/lib/notifications-service";
 import { sellGiftCard } from "@/lib/sogo";
 import { formatMoney } from "@/lib/transactions";
+import { publicServiceError } from "@/lib/service-errors";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -134,10 +135,11 @@ export async function POST(req: Request) {
     const status = httpStatusFor(error);
     return NextResponse.json(
       {
-        error:
+        error: publicServiceError(
           error instanceof Error
             ? error.message
             : "Failed to sell gift card",
+        ),
       },
       { status },
     );

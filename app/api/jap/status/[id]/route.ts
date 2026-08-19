@@ -20,7 +20,7 @@ export async function GET(
     }
 
     console.log("[jap-status]", { orderId: id });
-    const data = await pollJapOrderStatus(id);
+    const data = await pollJapOrderStatus(id, user.id);
     return NextResponse.json({ ok: true, data });
   } catch (error) {
     console.error("[jap-status] failed", error);
