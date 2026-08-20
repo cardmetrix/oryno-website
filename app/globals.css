@@ -34,6 +34,8 @@
   --secondary-foreground: var(--oryno-orange);
   --accent: var(--oryno-gray-light);
   --accent-foreground: var(--oryno-charcoal);
+  --popover: var(--oryno-white);
+  --popover-foreground: var(--oryno-charcoal);
   --input: var(--oryno-gray-divider);
   --destructive: var(--oryno-error);
   --destructive-foreground: var(--oryno-white);
@@ -117,6 +119,8 @@
   --secondary-foreground: var(--oryno-orange-soft);
   --accent: #1c1c1f;
   --accent-foreground: #f4f4f5;
+  --popover: #141416;
+  --popover-foreground: #f4f4f5;
   --input: #2a2a2e;
 
   --oryno-shadow-soft: 0 4px 16px rgba(0, 0, 0, 0.28);
@@ -164,6 +168,8 @@
   --color-secondary-foreground: var(--secondary-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
   --color-input: var(--input);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
