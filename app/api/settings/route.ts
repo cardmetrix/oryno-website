@@ -1,22 +1,22 @@
-import { NextResponse } from "next/server";
-import { currentUser } from "@clerk/nextjs/server";
-import { eq } from "drizzle-orm";
+import { APP_VERSION } from "@/lib/app-version";
 import { ensureAppUser } from "@/lib/auth/current-user";
 import {
-  isLanguageAllowedForCountry,
-  resolveLanguageForCountry,
+    isLanguageAllowedForCountry,
+    resolveLanguageForCountry,
 } from "@/lib/country";
 import { db } from "@/lib/db";
 import { ensureWalletSchema } from "@/lib/db/ensure-schema";
-import { userSecurity, users } from "@/lib/db/schema";
+import { users, userSecurity } from "@/lib/db/schema";
 import { notifyTransactionPinChanged } from "@/lib/notify/pin-events";
 import { toProfileDto } from "@/lib/profile";
-import { APP_VERSION } from "@/lib/app-version";
 import {
-  getTransactionPinStatus,
-  setTransactionPin,
-  TransactionPinError,
+    getTransactionPinStatus,
+    setTransactionPin,
+    TransactionPinError,
 } from "@/lib/security/transaction-pin";
+import { currentUser } from "@clerk/nextjs/server";
+import { eq } from "drizzle-orm";
+import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
@@ -33,8 +33,18 @@ async function getOrCreateSecurity(userId: string) {
   return created;
 }
 
-async function securityPayload(userId: string) {
+async function securityPayload(userId: string, totpEnabled?: boolean) {
   const security = await getOrCreateSecurity(userId);
+  if (
+    typeof totpEnabled === "boolean" &&
+    security.twoFactorEnabled !== totpEnabled
+  ) {
+    await db
+      .update(userSecurity)
+      .set({ twoFactorEnabled: totpEnabled, updatedAt: new Date() })
+      .where(eq(userSecurity.userId, userId));
+    security.twoFactorEnabled = totpEnabled;
+  }
   const status = await getTransactionPinStatus(userId);
   return {
     twoFactorEnabled: security.twoFactorEnabled,
@@ -71,7 +81,10 @@ export async function GET() {
         language: dbUser.language,
         notificationsEnabled,
       },
-      security: await securityPayload(dbUser.id),
+      security: await securityPayload(
+        dbUser.id,
+        Boolean((clerkUser as { totpEnabled?: boolean }).totpEnabled),
+      ),
       appVersion: APP_VERSION,
     });
   } catch (error) {
@@ -213,7 +226,13 @@ export async function PATCH(req: Request) {
             ? refreshedClerk.publicMetadata.notificationsEnabled
             : true,
       },
-      security: await securityPayload(dbUser.id),
+      security: await securityPayload(
+        dbUser.id,
+        Boolean(
+          (refreshedClerk as { totpEnabled?: boolean } | null)?.totpEnabled ??
+            (clerkUser as { totpEnabled?: boolean }).totpEnabled,
+        ),
+      ),
       appVersion: APP_VERSION,
     });
   } catch (error) {

@@ -12,3 +12,12 @@ export function clerkErrorMessage(err: unknown, fallback: string): string {
   if (typeof anyErr.message === "string" && anyErr.message) return anyErr.message;
   return fallback;
 }
+
+export function pickLoginSecondFactor(
+  factors: Array<{ strategy: string }> | null | undefined,
+): "totp" | "email_code" | null {
+  if (!factors?.length) return null;
+  if (factors.some((f) => f.strategy === "totp")) return "totp";
+  if (factors.some((f) => f.strategy === "email_code")) return "email_code";
+  return null;
+}

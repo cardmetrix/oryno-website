@@ -15,12 +15,12 @@ import {
   InputOTPGroup,
   InputOTPSlot,
 } from "@/components/ui/input-otp";
-import { clerkErrorMessage } from "@/lib/auth/clerk-errors";
+import { clerkErrorMessage, pickLoginSecondFactor } from "@/lib/auth/clerk-errors";
 import { syncSessionToDatabase } from "@/lib/auth/client-sync";
 import { RedirectIfSignedIn } from "@/components/auth/redirect-if-signed-in";
 import { AUTH_LINKS } from "@/lib/auth-links";
 
-type LoginStep = "credentials" | "otp";
+type LoginStep = "credentials" | "otp" | "totp";
 
 type SignInLike = NonNullable<ReturnType<typeof useSignIn>["signIn"]>;
 
@@ -147,11 +147,21 @@ function LoginForm() {
         return;
       }
 
-      // After password, Clerk may require email OTP (client trust / verification)
+      // After password, Clerk may require TOTP or email OTP.
       if (
         result.status === "needs_second_factor" ||
         (result.status as string) === "needs_client_trust"
       ) {
+        const next =
+          result.status === "needs_second_factor"
+            ? pickLoginSecondFactor(result.supportedSecondFactors)
+            : "email_code";
+        if (next === "totp") {
+          setOtp("");
+          setError(null);
+          setStep("totp");
+          return;
+        }
         await sendEmailOtp(result);
         return;
       }
@@ -177,6 +187,51 @@ function LoginForm() {
         return;
       }
       setError(message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function onVerifyTotp(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!isLoaded || !signIn || !setActive) return;
+
+    const code = otp.replace(/\D/g, "");
+    if (code.length < 6) {
+      setError("Enter the 6-digit code from Google Authenticator.");
+      return;
+    }
+
+    setError(null);
+    setLoading(true);
+
+    try {
+      const result = await signIn.attemptSecondFactor({
+        strategy: "totp",
+        code,
+      });
+
+      if (result.status === "complete") {
+        await finishSignIn(result.createdSessionId);
+        return;
+      }
+
+      setError("Verification incomplete. Try a new authenticator code.");
+    } catch (err) {
+      setError(clerkErrorMessage(err, "Invalid authenticator code. Try again."));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function switchToEmail() {
+    if (!signIn) return;
+    setError(null);
+    setLoading(true);
+    try {
+      await sendEmailOtp(signIn);
+    } catch (err) {
+      setError(clerkErrorMessage(err, "Could not send an email code."));
     } finally {
       setLoading(false);
     }
@@ -227,6 +282,87 @@ function LoginForm() {
     } catch (err) {
       setError(clerkErrorMessage(err, "Could not resend the code."));
     }
+  }
+
+  if (step === "totp") {
+    const canEmail =
+      (signIn?.supportedSecondFactors || []).some(
+        (f: { strategy: string }) => f.strategy === "email_code",
+      ) ?? false;
+
+    return (
+      <AuthSplitLayout
+        title="Authenticator code"
+        subtitle="Enter the 6-digit code from Google Authenticator."
+        panelTitle="One more step to your wallet."
+        panelSubtitle="Confirm the code from your authenticator app to finish signing in."
+        top={
+          <button
+            type="button"
+            onClick={() => {
+              setStep("credentials");
+              setError(null);
+              setOtp("");
+            }}
+            className="inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ArrowLeft className="h-4 w-4" strokeWidth={1.75} />
+            Back to Sign In
+          </button>
+        }
+      >
+        <form onSubmit={onVerifyTotp} className="flex flex-col">
+          <InputOTP
+            maxLength={6}
+            value={otp}
+            onChange={setOtp}
+            containerClassName="justify-between gap-2"
+          >
+            <InputOTPGroup className="w-full justify-between gap-2">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <InputOTPSlot
+                  key={i}
+                  index={i}
+                  className="h-12 w-11 rounded-[12px] border border-border text-base sm:h-14 sm:w-12"
+                />
+              ))}
+            </InputOTPGroup>
+          </InputOTP>
+
+          {canEmail ? (
+            <p className="mt-5 text-center text-sm text-muted-foreground">
+              Can’t open your authenticator?{" "}
+              <button
+                type="button"
+                onClick={() => void switchToEmail()}
+                className="font-semibold text-primary"
+              >
+                Use email code
+              </button>
+            </p>
+          ) : (
+            <p className="mt-5 text-center text-sm text-muted-foreground">
+              Open Google Authenticator and use the current code.
+            </p>
+          )}
+
+          {error ? (
+            <p className="mt-4 text-sm text-destructive">{error}</p>
+          ) : null}
+
+          <motion.button
+            type="submit"
+            disabled={!isLoaded || loading || otp.length < 6}
+            whileHover={otp.length >= 6 ? { y: -2 } : undefined}
+            whileTap={otp.length >= 6 ? { scale: 0.985 } : undefined}
+            className="btn-primary mt-8 h-12 w-full text-base disabled:opacity-50"
+          >
+            {loading ? "Verifying…" : "Verify & Sign In"}
+          </motion.button>
+          <div id="clerk-captcha" className="mt-4" />
+        </form>
+      </AuthSplitLayout>
+    );
   }
 
   if (step === "otp") {
