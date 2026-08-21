@@ -4,6 +4,7 @@ import { ensureAppUserDetailed } from "@/lib/auth/current-user";
 import { getCountryInfo, resolveCountryCode } from "@/lib/country";
 import { detectCountryWithGoogle } from "@/lib/geo/google-country";
 import { notifyUserLogin } from "@/lib/notify/auth-events";
+import { twoFactorStatus } from "@/lib/security/totp-auth";
 import { currencyForCountry, ensurePrimaryWallet } from "@/lib/wallet";
 
 export const runtime = "nodejs";
@@ -100,6 +101,8 @@ export async function POST(req: Request) {
       }
     }
 
+    const twoFa = await twoFactorStatus({ userId: user.id, request: req });
+
     return NextResponse.json({
       ok: true,
       user: {
@@ -117,6 +120,7 @@ export async function POST(req: Request) {
         currency: wallet.currency,
         balance: wallet.balance,
       },
+      twoFactorRequired: twoFa.required && !twoFa.verified,
     });
   } catch (error) {
     console.error("[auth-sync]", error);

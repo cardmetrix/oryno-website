@@ -303,6 +303,12 @@ export const userSecurity = pgTable("user_security", {
   /** AES-GCM encrypted PIN for admin/support recovery — never exposed to clients. */
   pinEncrypted: text("pin_encrypted"),
   twoFactorEnabled: boolean("two_factor_enabled").notNull().default(false),
+  /** AES-GCM encrypted TOTP secret (Google Authenticator). Independent of Clerk MFA. */
+  totpSecretEncrypted: text("totp_secret_encrypted"),
+  /** Temporary secret during enrollment until the first code is verified. */
+  totpPendingSecretEncrypted: text("totp_pending_secret_encrypted"),
+  failedTotpAttempts: integer("failed_totp_attempts").notNull().default(0),
+  totpLockedUntil: timestamp("totp_locked_until", { withTimezone: true }),
   biometricEnabled: boolean("biometric_enabled").notNull().default(false),
   failedPinAttempts: integer("failed_pin_attempts").notNull().default(0),
   lockedUntil: timestamp("locked_until", { withTimezone: true }),

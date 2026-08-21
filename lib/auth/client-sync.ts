@@ -29,6 +29,7 @@ export async function syncSessionToDatabase(options?: {
   countryCode?: string;
   currency?: string;
   countryName?: string;
+  twoFactorRequired?: boolean;
 }> {
   let countryCode: string | undefined;
 
@@ -78,6 +79,7 @@ export async function syncSessionToDatabase(options?: {
 
   const json = (await res.json()) as {
     country?: { code?: string; currency?: string; name?: string };
+    twoFactorRequired?: boolean;
   };
 
   const resolvedCode = json.country?.code ?? countryCode;
@@ -112,5 +114,6 @@ export async function syncSessionToDatabase(options?: {
     countryCode: info?.code,
     currency: info?.currency ?? json.country?.currency,
     countryName: info?.name ?? json.country?.name,
+    twoFactorRequired: Boolean(json.twoFactorRequired),
   };
 }

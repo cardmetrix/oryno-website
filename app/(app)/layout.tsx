@@ -4,6 +4,7 @@ import { AuthSessionSync } from "@/components/auth/auth-session-sync";
 import { CrispChatBoot } from "@/components/app/crisp-chat";
 import { CountryProvider } from "@/components/providers/country-provider";
 import { ensureAppUser } from "@/lib/auth/current-user";
+import { twoFactorStatus } from "@/lib/security/totp-auth";
 
 export default async function AppLayout({
   children,
@@ -29,6 +30,11 @@ export default async function AppLayout({
 
   if (user.status === "suspended" || user.status === "deleted") {
     redirect("/login?error=account_disabled");
+  }
+
+  const twoFa = await twoFactorStatus({ userId: user.id });
+  if (twoFa.required && !twoFa.verified) {
+    redirect("/verify-2fa");
   }
 
   return (

@@ -127,6 +127,13 @@
       "when": 1786600000000,
       "tag": "0017_testimonial_reviews",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1786800000000,
+      "tag": "0019_custom_totp",
+      "breakpoints": true
     }
   ]
 }

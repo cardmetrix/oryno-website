@@ -33,18 +33,8 @@ async function getOrCreateSecurity(userId: string) {
   return created;
 }
 
-async function securityPayload(userId: string, totpEnabled?: boolean) {
+async function securityPayload(userId: string) {
   const security = await getOrCreateSecurity(userId);
-  if (
-    typeof totpEnabled === "boolean" &&
-    security.twoFactorEnabled !== totpEnabled
-  ) {
-    await db
-      .update(userSecurity)
-      .set({ twoFactorEnabled: totpEnabled, updatedAt: new Date() })
-      .where(eq(userSecurity.userId, userId));
-    security.twoFactorEnabled = totpEnabled;
-  }
   const status = await getTransactionPinStatus(userId);
   return {
     twoFactorEnabled: security.twoFactorEnabled,
@@ -81,10 +71,7 @@ export async function GET() {
         language: dbUser.language,
         notificationsEnabled,
       },
-      security: await securityPayload(
-        dbUser.id,
-        Boolean((clerkUser as { totpEnabled?: boolean }).totpEnabled),
-      ),
+      security: await securityPayload(dbUser.id),
       appVersion: APP_VERSION,
     });
   } catch (error) {
@@ -113,7 +100,6 @@ export async function PATCH(req: Request) {
       theme?: "light" | "dark" | "system";
       language?: string;
       notificationsEnabled?: boolean;
-      twoFactorEnabled?: boolean;
       biometricEnabled?: boolean;
       pin?: string;
       currentPin?: string;
@@ -161,10 +147,6 @@ export async function PATCH(req: Request) {
     };
     let touchedSecurityFlags = false;
 
-    if (typeof body.twoFactorEnabled === "boolean") {
-      securityPatch.twoFactorEnabled = body.twoFactorEnabled;
-      touchedSecurityFlags = true;
-    }
     if (typeof body.biometricEnabled === "boolean") {
       securityPatch.biometricEnabled = body.biometricEnabled;
       touchedSecurityFlags = true;
@@ -226,13 +208,7 @@ export async function PATCH(req: Request) {
             ? refreshedClerk.publicMetadata.notificationsEnabled
             : true,
       },
-      security: await securityPayload(
-        dbUser.id,
-        Boolean(
-          (refreshedClerk as { totpEnabled?: boolean } | null)?.totpEnabled ??
-            (clerkUser as { totpEnabled?: boolean }).totpEnabled,
-        ),
-      ),
+      security: await securityPayload(dbUser.id),
       appVersion: APP_VERSION,
     });
   } catch (error) {

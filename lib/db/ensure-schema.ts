@@ -203,6 +203,22 @@ export async function ensureWalletSchema() {
         ADD COLUMN IF NOT EXISTS "pin_encrypted" text
       `);
       await db.execute(sql`
+        ALTER TABLE "user_security"
+        ADD COLUMN IF NOT EXISTS "totp_secret_encrypted" text
+      `);
+      await db.execute(sql`
+        ALTER TABLE "user_security"
+        ADD COLUMN IF NOT EXISTS "totp_pending_secret_encrypted" text
+      `);
+      await db.execute(sql`
+        ALTER TABLE "user_security"
+        ADD COLUMN IF NOT EXISTS "failed_totp_attempts" integer DEFAULT 0 NOT NULL
+      `);
+      await db.execute(sql`
+        ALTER TABLE "user_security"
+        ADD COLUMN IF NOT EXISTS "totp_locked_until" timestamp with time zone
+      `);
+      await db.execute(sql`
         CREATE TABLE IF NOT EXISTS "usd_virtual_card_waitlist" (
           "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
           "user_id" uuid REFERENCES "users"("id") ON DELETE cascade,

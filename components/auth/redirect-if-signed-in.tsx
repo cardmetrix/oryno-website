@@ -11,7 +11,22 @@ export function RedirectIfSignedIn() {
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
-    router.replace("/dashboard");
+    void (async () => {
+      try {
+        const res = await fetch("/api/auth/2fa/status", { cache: "no-store" });
+        const json = (await res.json().catch(() => ({}))) as {
+          required?: boolean;
+          verified?: boolean;
+        };
+        if (res.ok && json.required && !json.verified) {
+          router.replace("/verify-2fa");
+          return;
+        }
+      } catch {
+        // Fall through to dashboard; app layout will re-check 2FA.
+      }
+      router.replace("/dashboard");
+    })();
   }, [isLoaded, isSignedIn, router]);
 
   return null;

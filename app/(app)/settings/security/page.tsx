@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useUser } from "@clerk/nextjs";
 import { motion } from "framer-motion";
 import { Copy, KeyRound, Loader2, Shield } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
@@ -24,7 +23,6 @@ import {
 } from "@/components/ui/input-otp";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
-import { clerkErrorMessage } from "@/lib/auth/clerk-errors";
 
 type SecurityState = {
   twoFactorEnabled: boolean;
@@ -32,23 +30,18 @@ type SecurityState = {
   hasPin: boolean;
 };
 
-type TotpResource = {
-  secret?: string;
-  uri?: string;
-};
-
 export default function SecurityPage() {
-  const { user } = useUser();
   const [security, setSecurity] = useState<SecurityState | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showPinForm, setShowPinForm] = useState(false);
   const [showTotp, setShowTotp] = useState(false);
+  const [showDisableTotp, setShowDisableTotp] = useState(false);
   const [currentPin, setCurrentPin] = useState("");
   const [pin, setPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
 
-  const totpOn = Boolean(user?.totpEnabled || security?.twoFactorEnabled);
+  const totpOn = Boolean(security?.twoFactorEnabled);
 
   const load = useCallback(async () => {
     try {
@@ -117,31 +110,7 @@ export default function SecurityPage() {
       setShowTotp(true);
       return;
     }
-    if (
-      !window.confirm(
-        "Turn off Google Authenticator? It will no longer be required at sign-in.",
-      )
-    ) {
-      return;
-    }
-    void disableTotp();
-  }
-
-  async function disableTotp() {
-    if (!user) return;
-    setSaving(true);
-    try {
-      await user.disableTOTP();
-      await patch({ twoFactorEnabled: false });
-      await user.reload();
-      toast.success("2FA disabled");
-    } catch (err) {
-      toast.error(
-        clerkErrorMessage(err, "Could not disable 2FA. Sign in again and retry."),
-      );
-    } finally {
-      setSaving(false);
-    }
+    setShowDisableTotp(true);
   }
 
   return (
@@ -277,6 +246,16 @@ export default function SecurityPage() {
           );
         }}
       />
+
+      <TotpDisableDialog
+        open={showDisableTotp}
+        onOpenChange={setShowDisableTotp}
+        onDisabled={() => {
+          setSecurity((prev) =>
+            prev ? { ...prev, twoFactorEnabled: false } : prev,
+          );
+        }}
+      />
     </AppShell>
   );
 }
@@ -290,7 +269,6 @@ function TotpSetupDialog({
   onOpenChange: (open: boolean) => void;
   onEnabled: () => void;
 }) {
-  const { user } = useUser();
   const [secret, setSecret] = useState("");
   const [uri, setUri] = useState("");
   const [code, setCode] = useState("");
@@ -306,31 +284,36 @@ function TotpSetupDialog({
   }
 
   async function startEnrollment() {
-    if (!user) return;
     setLoading(true);
     try {
-      const totp = (await user.createTOTP()) as TotpResource;
-      setSecret(totp.secret || "");
-      setUri(totp.uri || "");
+      const res = await fetch("/api/settings/2fa/setup", { method: "POST" });
+      const json = (await res.json()) as {
+        error?: string;
+        secret?: string;
+        uri?: string;
+      };
+      if (!res.ok) throw new Error(json.error || "Could not start authenticator setup");
+      setSecret(json.secret || "");
+      setUri(json.uri || "");
       setStarted(true);
     } catch (err) {
-      toast.error(clerkErrorMessage(err, "Could not start authenticator setup"));
+      toast.error(err instanceof Error ? err.message : "Could not start authenticator setup");
     } finally {
       setLoading(false);
     }
   }
 
   async function verify() {
-    if (!user || code.length < 6) return;
+    if (code.length < 6) return;
     setVerifying(true);
     try {
-      await user.verifyTOTP({ code: code.trim() });
-      await fetch("/api/settings", {
-        method: "PATCH",
+      const res = await fetch("/api/settings/2fa/enable", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ twoFactorEnabled: true }),
-      }).catch(() => undefined);
-      await user.reload();
+        body: JSON.stringify({ code: code.trim() }),
+      });
+      const json = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(json.error || "Invalid authenticator code");
       toast.success("2FA enabled", {
         description: "Google Authenticator is now required at sign-in.",
       });
@@ -339,7 +322,7 @@ function TotpSetupDialog({
       onOpenChange(false);
     } catch (err) {
       setCode("");
-      toast.error(clerkErrorMessage(err, "Invalid authenticator code"));
+      toast.error(err instanceof Error ? err.message : "Invalid authenticator code");
     } finally {
       setVerifying(false);
     }
@@ -429,6 +412,82 @@ function TotpSetupDialog({
             </button>
           </div>
         )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function TotpDisableDialog({
+  open,
+  onOpenChange,
+  onDisabled,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onDisabled: () => void;
+}) {
+  const [code, setCode] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function disable() {
+    if (code.length < 6) return;
+    setSaving(true);
+    try {
+      const res = await fetch("/api/settings/2fa/disable", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: code.trim() }),
+      });
+      const json = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(json.error || "Could not disable 2FA");
+      toast.success("2FA disabled");
+      setCode("");
+      onDisabled();
+      onOpenChange(false);
+    } catch (err) {
+      setCode("");
+      toast.error(err instanceof Error ? err.message : "Could not disable 2FA");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) setCode("");
+        onOpenChange(next);
+      }}
+    >
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Turn off Google Authenticator</DialogTitle>
+          <DialogDescription>
+            Enter the current 6-digit code to confirm. It will no longer be
+            required at sign-in.
+          </DialogDescription>
+        </DialogHeader>
+        <InputOTP maxLength={6} value={code} onChange={setCode}>
+          <InputOTPGroup className="w-full justify-between gap-2">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <InputOTPSlot
+                key={i}
+                index={i}
+                className="h-12 w-11 rounded-[12px] border border-border"
+              />
+            ))}
+          </InputOTPGroup>
+        </InputOTP>
+        <button
+          type="button"
+          disabled={saving || code.length < 6}
+          onClick={() => void disable()}
+          className="btn-primary inline-flex h-11 w-full items-center justify-center gap-2 text-sm disabled:opacity-60"
+        >
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          Turn off 2FA
+        </button>
       </DialogContent>
     </Dialog>
   );

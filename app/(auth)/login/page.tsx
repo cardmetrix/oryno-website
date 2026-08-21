@@ -106,6 +106,10 @@ function LoginForm() {
       }
       return;
     }
+    if (sync.twoFactorRequired) {
+      router.replace("/verify-2fa");
+      return;
+    }
     redirectAfterLogin();
   }
 
