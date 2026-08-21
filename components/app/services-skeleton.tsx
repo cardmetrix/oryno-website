@@ -20,7 +20,7 @@ export function ServicesSkeleton() {
           <MotionSection
             key={i}
             delay={i * 0.03}
-            className="flex flex-col items-center rounded-[22px] border border-border bg-background px-3 py-5 shadow-[var(--shadow-soft)] sm:rounded-[24px] sm:py-6"
+            className="flex flex-col items-center px-1 py-2 sm:py-3"
           >
             <Skeleton className="h-14 w-14 rounded-2xl sm:h-16 sm:w-16" />
             <Skeleton className="mt-3 h-3 w-16 rounded-full" />

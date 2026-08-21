@@ -235,18 +235,10 @@ function ServiceCard({
     >
       <Link
         href={item.href}
-        className="group relative flex h-full flex-col items-center justify-center gap-3 overflow-hidden rounded-[22px] border border-border bg-background px-3 py-5 text-center shadow-[var(--shadow-soft)] transition hover:border-primary/30 hover:shadow-[0_14px_32px_rgba(255,106,0,0.14)] sm:rounded-[24px] sm:px-4 sm:py-6"
+        className="group flex h-full flex-col items-center justify-center gap-2.5 px-1 py-2 text-center sm:gap-3 sm:py-3"
       >
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 opacity-0 transition duration-300 group-hover:opacity-100"
-          style={{
-            background: `radial-gradient(circle at 50% 0%, ${item.accent}22, transparent 65%)`,
-          }}
-        />
-
         <motion.span
-          className="relative flex h-14 w-14 items-center justify-center rounded-2xl text-white shadow-[0_10px_22px_rgba(0,0,0,0.16)] ring-1 ring-white/20 sm:h-16 sm:w-16"
+          className="flex h-14 w-14 items-center justify-center rounded-2xl text-white shadow-[0_10px_22px_rgba(0,0,0,0.16)] ring-1 ring-white/20 sm:h-16 sm:w-16"
           style={{
             background: `linear-gradient(145deg, ${item.accent}, #e85d00)`,
           }}
@@ -256,7 +248,7 @@ function ServiceCard({
           <Icon className="h-6 w-6 sm:h-7 sm:w-7" strokeWidth={1.75} />
         </motion.span>
 
-        <p className="relative text-[13px] leading-tight font-bold tracking-tight text-foreground sm:text-sm">
+        <p className="text-[13px] leading-tight font-bold tracking-tight text-foreground sm:text-sm">
           {item.label}
         </p>
       </Link>
