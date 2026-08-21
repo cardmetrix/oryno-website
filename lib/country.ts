@@ -126,6 +126,17 @@ export function formatCountryMoney(
   return `${info.currencySymbol}${formatted}`;
 }
 
+export function formatUsd(amount: string | number) {
+  const value = typeof amount === "number" ? amount : Number(amount);
+  const formatted = Number.isFinite(value)
+    ? Math.abs(value).toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })
+    : "0.00";
+  return `$${formatted}`;
+}
+
 export function countryFromPhone(phone?: string | null): SupportedCountryCode | null {
   if (!phone) return null;
   const normalized = phone.replace(/\s+/g, "");

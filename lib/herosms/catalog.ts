@@ -27,9 +27,11 @@ export type HeroPriceOffer = {
   flagEmoji: string;
   service: string;
   serviceName: string;
-  /** Cost in USD from HeroSMS */
+  /** HeroSMS wholesale USD */
+  costUsd: number;
+  /** Retail USD charged to the user's USD card */
   priceUsd: number;
-  /** Cost in user wallet currency (after FX + markup) */
+  /** Equivalent local amount at the app USD buy rate (display only) */
   priceLocal: number;
   currency: string;
   count: number;

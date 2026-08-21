@@ -8,7 +8,7 @@ import {
   getJapServicesSafe,
   japUsdCost,
 } from "@/lib/jap";
-import { createUsdPricer } from "@/lib/pricing/service-pricing";
+import { createUsdPricer, usdFromLocalRetail } from "@/lib/pricing/service-pricing";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -40,7 +40,7 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const platform = searchParams.get("platform") || "All";
     const query = searchParams.get("q") || "";
-    const currency = currencyForCountry(user.countryCode);
+    const localCurrency = currencyForCountry(user.countryCode);
 
     const {
       services: raw,
@@ -67,7 +67,7 @@ export async function GET(req: Request) {
             .sort((a, b) => a.rate - b.rate)
             .slice(0, 400);
 
-    const quote = await quoteLocalUsd(currency);
+    const quote = await quoteLocalUsd(localCurrency);
     const priceUsd = await createUsdPricer("jap");
 
     const services = sliced.map((s) => {
@@ -97,9 +97,11 @@ export async function GET(req: Request) {
         max: s.max,
         refill: s.refill,
         cancel: s.cancel,
-        currency,
-        priceLocalPerThousand: perThousand.local,
+        currency: "USD",
+        priceUsdPerThousand: usdFromLocalRetail(perThousand.local, quote.buyRate),
         sampleQuantity: sampleQty,
+        samplePriceUsd: usdFromLocalRetail(sample.local, quote.buyRate),
+        priceLocalPerThousand: perThousand.local,
         samplePriceLocal: sample.local,
         listPriceLocal: sample.listLocal,
         priceOverride: sample.overrideApplied,
@@ -121,7 +123,8 @@ export async function GET(req: Request) {
       ok: true,
       demo,
       fallback,
-      currency,
+      currency: "USD",
+      fx: quote,
       platforms: [
         "All",
         ...platforms.filter((p) => p !== "Other"),

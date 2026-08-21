@@ -25,7 +25,6 @@ import { PageHeader } from "@/components/app/page-header";
 import { ServiceSuccess } from "@/components/app/service-success";
 import { ErrorAlertModal } from "@/components/app/error-alert-modal";
 import { ServiceInstructions } from "@/components/app/service-instructions";
-import { useCountry } from "@/components/providers/country-provider";
 import {
   Dialog,
   DialogContent,
@@ -41,7 +40,7 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { formatCountryMoney } from "@/lib/country";
+import { formatUsd } from "@/lib/country";
 import { cn } from "@/lib/utils";
 
 type HeroService = { code: string; name: string };
@@ -53,6 +52,7 @@ type HeroOffer = {
   flagEmoji: string;
   service: string;
   serviceName: string;
+  costUsd?: number;
   priceUsd: number;
   priceLocal: number;
   currency: string;
@@ -60,7 +60,6 @@ type HeroOffer = {
 };
 
 export default function VirtualNumbersPage() {
-  const { country } = useCountry();
   const isMobile = useIsMobile();
   const [services, setServices] = useState<HeroService[]>([]);
   const [service, setService] = useState("wa");
@@ -209,6 +208,7 @@ export default function VirtualNumbersPage() {
           iso: selected.iso,
           service: selected.service,
           serviceName: selected.serviceName,
+          costUsd: selected.costUsd ?? selected.priceUsd,
           priceUsd: selected.priceUsd,
           priceLocal: selected.priceLocal,
         }),
@@ -227,8 +227,7 @@ export default function VirtualNumbersPage() {
     }
   }
 
-  const money = (n: number) =>
-    formatCountryMoney(n, country?.code || "NG");
+  const money = (n: number) => formatUsd(n);
 
   return (
     <AppShell hideNav>
@@ -236,8 +235,8 @@ export default function VirtualNumbersPage() {
         title="Virtual Numbers"
         subtitle={
           liveMode
-            ? "Live SMS verification numbers"
-            : "SMS verification numbers"
+            ? "Live SMS numbers · billed in USD"
+            : "SMS verification numbers · billed in USD"
         }
         backHref="/services"
       />
@@ -392,7 +391,7 @@ export default function VirtualNumbersPage() {
                   </span>
                   {selected ? (
                     <span className="shrink-0 text-sm font-bold text-primary">
-                      {money(selected.priceLocal)}
+                      {money(selected.priceUsd)}
                     </span>
                   ) : null}
                   <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -459,7 +458,7 @@ export default function VirtualNumbersPage() {
                         </p>
                       </div>
                       <span className="shrink-0 text-sm font-bold tabular-nums text-primary">
-                        {money(offer.priceLocal)}
+                        {money(offer.priceUsd)}
                       </span>
                       {active ? (
                         <Check
@@ -492,12 +491,12 @@ export default function VirtualNumbersPage() {
                 />
                 <Row
                   label="Amount"
-                  value={selected ? money(selected.priceLocal) : money(0)}
+                  value={selected ? money(selected.priceUsd) : money(0)}
                   accent
                 />
                 <div className="flex items-center gap-2 border-t border-border pt-3 font-semibold">
                   <Wallet className="h-4 w-4 text-primary" />
-                  Pay from wallet
+                  Pay from USD card
                 </div>
               </div>
             </MotionSection>
@@ -512,7 +511,7 @@ export default function VirtualNumbersPage() {
                 {submitting
                   ? "Getting number…"
                   : selected
-                    ? `Get number · ${money(selected.priceLocal)}`
+                    ? `Get number · ${money(selected.priceUsd)}`
                     : "Select a country"}
               </motion.button>
             </div>
@@ -531,7 +530,7 @@ export default function VirtualNumbersPage() {
                 {submitting
                   ? "Getting number…"
                   : selected
-                    ? `Get number · ${money(selected.priceLocal)}`
+                    ? `Get number · ${money(selected.priceUsd)}`
                     : "Select a country"}
               </button>
             </div>

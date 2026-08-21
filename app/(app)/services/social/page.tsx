@@ -18,7 +18,6 @@ import { ServiceSuccess } from "@/components/app/service-success";
 import { ErrorAlertModal } from "@/components/app/error-alert-modal";
 import { ServiceInstructions } from "@/components/app/service-instructions";
 import { AuthField, authInputClassName } from "@/components/auth/auth-field";
-import { useCountry } from "@/components/providers/country-provider";
 import {
   Drawer,
   DrawerContent,
@@ -27,7 +26,7 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { formatCountryMoney } from "@/lib/country";
+import { formatUsd } from "@/lib/country";
 import { isCustomCommentsService } from "@/lib/jap/catalog";
 import { cn } from "@/lib/utils";
 
@@ -45,8 +44,10 @@ type JapServiceRow = {
   refill: boolean;
   cancel: boolean;
   currency: string;
+  priceUsdPerThousand?: number;
   priceLocalPerThousand: number;
   sampleQuantity: number;
+  samplePriceUsd?: number;
   samplePriceLocal: number;
 };
 
@@ -62,8 +63,12 @@ function clampQty(n: number, min: number, max: number) {
   return Math.min(max, Math.max(min, Math.round(n)));
 }
 
+function usdPerThousand(service: JapServiceRow) {
+  return service.priceUsdPerThousand || service.priceLocalPerThousand;
+}
+
 function priceFor(service: JapServiceRow, quantity: number) {
-  return (service.priceLocalPerThousand * quantity) / 1000;
+  return (usdPerThousand(service) * quantity) / 1000;
 }
 
 /** Global floor: users type any amount from 100 up (within package max). */
@@ -139,7 +144,6 @@ function applyEnterCommentNumber(
 const selectClassName = cn(authInputClassName, "appearance-none pr-10");
 
 export default function SocialBoostPage() {
-  const { country } = useCountry();
   const isMobile = useIsMobile();
   const [platforms, setPlatforms] = useState<string[]>([]);
   const [platform, setPlatform] = useState("");
@@ -335,7 +339,7 @@ export default function SocialBoostPage() {
         }
         return `Maximum is ${maxQuantity.toLocaleString()} comments`;
       }
-      return `${filledComments.length.toLocaleString()} comments · ${formatCountryMoney(priceFor(selected, filledComments.length), country?.code || "NG")}`;
+      return `${filledComments.length.toLocaleString()} comments · ${formatUsd(priceFor(selected, filledComments.length))}`;
     }
     if (!quantityText.trim()) {
       return `Enter any amount from ${minQuantity.toLocaleString()}–${maxQuantity.toLocaleString()}`;
@@ -347,7 +351,7 @@ export default function SocialBoostPage() {
     if (quantity > maxQuantity) {
       return `Maximum is ${maxQuantity.toLocaleString()}`;
     }
-    return `${quantity.toLocaleString()} ${selected.metric.toLowerCase()} · ${formatCountryMoney(priceFor(selected, quantity), country?.code || "NG")}`;
+    return `${quantity.toLocaleString()} ${selected.metric.toLowerCase()} · ${formatUsd(priceFor(selected, quantity))}`;
   }, [
     selected,
     isCustomComments,
@@ -357,7 +361,6 @@ export default function SocialBoostPage() {
     quantity,
     minQuantity,
     maxQuantity,
-    country?.code,
   ]);
 
   const canSubmit = useMemo(() => {
@@ -377,8 +380,7 @@ export default function SocialBoostPage() {
     profileUrl,
   ]);
 
-  const money = (n: number) =>
-    formatCountryMoney(n, country?.code || "NG");
+  const money = (n: number) => formatUsd(n);
 
   useEffect(() => {
     if (!selected) return;
@@ -623,8 +625,8 @@ export default function SocialBoostPage() {
         title="Social Boosting"
         subtitle={
           liveMode
-            ? "Live boosts · followers, likes, views"
-            : "Grow followers, likes, views"
+            ? "Live boosts · billed in USD"
+            : "Grow followers, likes, views · billed in USD"
         }
         backHref="/services"
       />
@@ -750,7 +752,7 @@ export default function SocialBoostPage() {
                   options={packagesForType.map((item) => ({
                     value: String(item.service),
                     label: item.name,
-                    trailing: `${money(item.samplePriceLocal)}/${item.sampleQuantity.toLocaleString()}`,
+                    trailing: `${money(item.samplePriceUsd || item.samplePriceLocal)}/${item.sampleQuantity.toLocaleString()}`,
                   }))}
                   disabled={!packagesForType.length}
                   sheetTitle="Package"
@@ -946,7 +948,7 @@ export default function SocialBoostPage() {
                 <div className="flex items-center justify-between border-t border-border pt-3">
                   <span className="inline-flex items-center gap-2 font-semibold text-foreground">
                     <Wallet className="h-4 w-4 text-primary" />
-                    Pay from wallet
+                    Pay from USD card
                   </span>
                 </div>
               </div>

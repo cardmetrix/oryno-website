@@ -6,11 +6,12 @@ import {
   transactions,
   wallets,
 } from "@/lib/db/schema";
-import { quoteLocalUsd, roundMoney } from "@/lib/fx/rates";
+import { quoteLocalUsd } from "@/lib/fx/rates";
 import { resolveCountryCode } from "@/lib/country";
+import { usdFromLocalRetail } from "@/lib/pricing/service-pricing";
+import { debitUsdWallet } from "@/lib/wallet-usd";
 import {
   currencyForCountry,
-  ensurePrimaryWallet,
   toWalletSummary,
 } from "@/lib/wallet";
 import {
@@ -20,7 +21,6 @@ import {
   getJapServices,
   isJapDemoMode,
   isJapLive,
-  japMarkup,
 } from "./client";
 import {
   FALLBACK_JAP_SERVICES,
@@ -31,72 +31,6 @@ import {
 import { japErrorToEnglish } from "./errors";
 
 const LOG_PREFIX = "[jap]";
-
-async function debitWallet(input: {
-  userId: string;
-  countryCode?: string | null;
-  amount: number;
-  title: string;
-  subtitle: string;
-  metadata?: Record<string, unknown>;
-}) {
-  if (!Number.isFinite(input.amount) || input.amount <= 0) {
-    throw new Error("Enter a valid amount");
-  }
-
-  const currency = currencyForCountry(input.countryCode);
-  const wallet = await ensurePrimaryWallet(input.userId, currency);
-
-  if (wallet.status === "frozen" || wallet.status === "closed") {
-    throw new Error("Wallet is not available for payments");
-  }
-
-  const amountStr = input.amount.toFixed(2);
-
-  return db.transaction(async (tx) => {
-    const current = await tx.query.wallets.findFirst({
-      where: eq(wallets.id, wallet.id),
-    });
-    if (!current) throw new Error("Wallet not found");
-    if (Number(current.balance) < input.amount) {
-      throw new Error("Insufficient wallet balance");
-    }
-
-    const next = (Number(current.balance) - input.amount).toFixed(2);
-    const [updated] = await tx
-      .update(wallets)
-      .set({ balance: next, updatedAt: new Date() })
-      .where(eq(wallets.id, current.id))
-      .returning();
-
-    const [txRow] = await tx
-      .insert(transactions)
-      .values({
-        userId: input.userId,
-        walletId: current.id,
-        type: "debit",
-        category: "social",
-        title: input.title,
-        subtitle: input.subtitle,
-        amount: amountStr,
-        currency,
-        status: "processing",
-        balanceAfter: next,
-        metadata: {
-          provider: "jap",
-          ...(input.metadata ?? {}),
-        },
-      })
-      .returning();
-
-    return {
-      wallet: updated ?? { ...current, balance: next },
-      transaction: txRow,
-      amount: input.amount,
-      currency,
-    };
-  });
-}
 
 async function refundDebit(input: {
   walletId: string;
@@ -141,6 +75,23 @@ export async function usdToLocalJapPrice(
     buyRate: quote.buyRate,
   });
   return { local: priced.local, currency, quote, markup: priced.markup };
+}
+
+/** Retail USD for boosting — local retail (markup + app buyRate) converted back at that rate. */
+export async function usdRetailJapPrice(
+  usd: number,
+  countryCode?: string | null,
+  serviceKey?: string | null,
+) {
+  const priced = await usdToLocalJapPrice(usd, countryCode, serviceKey);
+  return {
+    usd: usdFromLocalRetail(priced.local, priced.quote.buyRate),
+    local: priced.local,
+    currency: "USD" as const,
+    localCurrency: priced.currency,
+    quote: priced.quote,
+    markup: priced.markup,
+  };
 }
 
 async function ensureSocialPackage(input: {
@@ -259,14 +210,15 @@ export async function purchaseJapBoost(input: {
 
   const commentsPayload = needsComments ? comments.join("\n") : undefined;
 
-  const priceUsd = japUsdCost(input.rateUsd, quantity);
-  const { local, currency } = await usdToLocalJapPrice(
-    priceUsd,
+  const wholesaleUsd = japUsdCost(input.rateUsd, quantity);
+  const { usd, local, quote } = await usdRetailJapPrice(
+    wholesaleUsd,
     input.countryCode,
     String(input.serviceId),
   );
-  // Always charge admin/server retail — ignore client-posted priceLocal for security.
-  const chargeAmount = local;
+  // Always charge admin/server retail USD — ignore client-posted amounts.
+  const chargeAmount = usd;
+  const currency = "USD";
 
   const pkg = await ensureSocialPackage({
     countryCode: resolveCountryCode(input.countryCode),
@@ -285,28 +237,33 @@ export async function purchaseJapBoost(input: {
     quantity,
     needsComments,
     commentsCount: comments.length,
-    priceUsd,
+    wholesaleUsd,
     chargeAmount,
     currency,
+    buyRate: quote.buyRate,
   });
 
   // Fail before debiting wallet when live provider is down / empty
   if (!isJapDemoMode()) {
-    await assertJapReady(Math.max(0.01, priceUsd * 0.5));
+    await assertJapReady(Math.max(0.01, wholesaleUsd * 0.5));
   }
 
-  const debit = await debitWallet({
+  const debit = await debitUsdWallet({
     userId: input.userId,
-    countryCode: input.countryCode,
     amount: chargeAmount,
+    category: "social",
     title: "Social boost",
     subtitle: `${quantity.toLocaleString()} ${input.metric} · ${input.platform}`,
     metadata: {
+      provider: "jap",
       kind: "social_boost",
       japServiceId: input.serviceId,
       quantity,
       link,
-      priceUsd,
+      costUsd: wholesaleUsd,
+      priceUsd: chargeAmount,
+      priceLocal: local,
+      buyRate: quote.buyRate,
       ...(needsComments ? { customComments: true, commentsCount: comments.length } : {}),
     },
   });

@@ -6,7 +6,9 @@ import {
   virtualNumberOffers,
   wallets,
 } from "@/lib/db/schema";
-import { quoteLocalUsd, roundMoney } from "@/lib/fx/rates";
+import { quoteLocalUsd } from "@/lib/fx/rates";
+import { usdFromLocalRetail } from "@/lib/pricing/service-pricing";
+import { debitUsdWallet } from "@/lib/wallet-usd";
 import {
   currencyForCountry,
   ensurePrimaryWallet,
@@ -142,6 +144,23 @@ export async function usdToLocalPrice(
   return { local: priced.local, currency, quote, markup: priced.markup };
 }
 
+/** Retail USD for numbers — local retail (markup + app buyRate) converted back at that rate. */
+export async function usdRetailNumberPrice(
+  usd: number,
+  countryCode?: string | null,
+  serviceKey?: string | null,
+) {
+  const priced = await usdToLocalPrice(usd, countryCode, serviceKey);
+  return {
+    usd: usdFromLocalRetail(priced.local, priced.quote.buyRate),
+    local: priced.local,
+    currency: "USD" as const,
+    localCurrency: priced.currency,
+    quote: priced.quote,
+    markup: priced.markup,
+  };
+}
+
 async function ensureOffer(input: {
   countryCode: string;
   countryName: string;
@@ -190,16 +209,23 @@ export async function purchaseVirtualNumber(input: {
   iso?: string | null;
   service: string;
   serviceName: string;
+  /** HeroSMS wholesale USD. Prefer costUsd when the client also posts retail priceUsd. */
   priceUsd: number;
+  costUsd?: number;
   priceLocal: number;
 }) {
+  const wholesaleUsd =
+    Number.isFinite(input.costUsd) && (input.costUsd as number) > 0
+      ? (input.costUsd as number)
+      : input.priceUsd;
   const serviceKey = `${input.heroCountryId}:${input.service}`;
-  const { local, currency } = await usdToLocalPrice(
-    input.priceUsd,
+  const { usd, local, quote } = await usdRetailNumberPrice(
+    wholesaleUsd,
     input.countryCode,
     serviceKey,
   );
-  const chargeAmount = local;
+  const chargeAmount = usd;
+  const currency = "USD";
 
   const offer = await ensureOffer({
     countryCode: (input.iso || input.countryCode || "NG").slice(0, 2).toUpperCase(),
@@ -219,27 +245,31 @@ export async function purchaseVirtualNumber(input: {
     live: isHerosmsLive(),
     service: input.service,
     heroCountryId: input.heroCountryId,
-    priceUsd: input.priceUsd,
+    wholesaleUsd,
     chargeAmount,
     currency,
+    buyRate: quote.buyRate,
   });
 
   // Fail before debiting wallet when live provider is down / empty
   if (!isHerosmsDemoMode()) {
-    await assertHerosmsReady(Math.max(0.01, input.priceUsd * 0.5));
+    await assertHerosmsReady(Math.max(0.01, wholesaleUsd * 0.5));
   }
 
-  const prepared = await debitWallet({
+  const prepared = await debitUsdWallet({
     userId: input.userId,
-    countryCode: input.countryCode,
     amount: chargeAmount,
     category: "virtual_number",
     title: `${input.serviceName} number`,
     subtitle: input.countryName,
     metadata: {
+      provider: "herosms",
       service: input.service,
       heroCountryId: input.heroCountryId,
-      priceUsd: input.priceUsd,
+      costUsd: wholesaleUsd,
+      priceUsd: chargeAmount,
+      priceLocal: local,
+      buyRate: quote.buyRate,
     },
   });
 
@@ -260,7 +290,7 @@ export async function purchaseVirtualNumber(input: {
       const num = await getHerosmsNumber({
         service: input.service,
         country: input.heroCountryId,
-        maxPrice: input.priceUsd * 1.25,
+        maxPrice: wholesaleUsd * 1.25,
       });
       activationId = num.activationId;
       phoneNumber = num.phoneNumber;

@@ -20,6 +20,7 @@ export async function POST(req: Request) {
       service?: string;
       serviceName?: string;
       priceUsd?: number;
+      costUsd?: number;
       priceLocal?: number;
     };
 
@@ -35,7 +36,10 @@ export async function POST(req: Request) {
       );
     }
 
-    const priceUsd = Number(body.priceUsd);
+    const costUsd = Number(body.costUsd);
+    const priceUsd = Number.isFinite(costUsd) && costUsd > 0
+      ? costUsd
+      : Number(body.priceUsd);
     if (!Number.isFinite(priceUsd) || priceUsd <= 0) {
       return NextResponse.json(
         { error: "Invalid price — refresh and try again" },
@@ -58,6 +62,7 @@ export async function POST(req: Request) {
       service: body.service,
       serviceName: body.serviceName || body.service,
       priceUsd,
+      costUsd: Number.isFinite(costUsd) && costUsd > 0 ? costUsd : undefined,
       priceLocal: Number(body.priceLocal) || 0,
     });
 

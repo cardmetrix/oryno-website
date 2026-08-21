@@ -270,6 +270,15 @@ export async function priceUsdToLocal(input: {
 }
 
 /**
+ * Retail USD charged to the USD card: local retail (markup + app buyRate) ÷ buyRate.
+ */
+export function usdFromLocalRetail(localRetail: number, buyRate: number) {
+  if (!Number.isFinite(localRetail) || localRetail <= 0) return 0;
+  if (!Number.isFinite(buyRate) || buyRate <= 0) return roundMoney(localRetail);
+  return Math.max(0.01, roundMoney(localRetail / buyRate));
+}
+
+/**
  * Adjust a provider face/local amount (VTpass, Sogo payout) with group + override.
  */
 export async function priceLocalAmount(input: {

@@ -55,6 +55,79 @@ export async function ensureUsdWallet(userId: string): Promise<WalletRow> {
   return again;
 }
 
+type UsdDebitCategory = "virtual_number" | "social" | "other";
+
+/**
+ * Debit the user's USD card/wallet for USD-priced services (numbers, boosting).
+ */
+export async function debitUsdWallet(input: {
+  userId: string;
+  amount: number;
+  category: UsdDebitCategory;
+  title: string;
+  subtitle: string;
+  metadata?: Record<string, unknown>;
+}) {
+  if (!Number.isFinite(input.amount) || input.amount <= 0) {
+    throw new Error("Enter a valid amount");
+  }
+
+  const amount = roundMoney(input.amount);
+  const wallet = await ensureUsdWallet(input.userId);
+
+  if (wallet.status === "frozen" || wallet.status === "closed") {
+    throw new Error("USD card is not available for payments");
+  }
+
+  const amountStr = amount.toFixed(2);
+
+  return db.transaction(async (tx) => {
+    const current = await tx.query.wallets.findFirst({
+      where: eq(wallets.id, wallet.id),
+    });
+    if (!current) throw new Error("USD wallet not found");
+    if (Number(current.balance) < amount) {
+      throw new Error(
+        "Insufficient USD card balance. Fund your USD wallet to continue.",
+      );
+    }
+
+    const next = (Number(current.balance) - amount).toFixed(2);
+    const [updated] = await tx
+      .update(wallets)
+      .set({ balance: next, updatedAt: new Date() })
+      .where(eq(wallets.id, current.id))
+      .returning();
+
+    const [txRow] = await tx
+      .insert(transactions)
+      .values({
+        userId: input.userId,
+        walletId: current.id,
+        type: "debit",
+        category: input.category,
+        title: input.title,
+        subtitle: input.subtitle,
+        amount: amountStr,
+        currency: "USD",
+        status: "processing",
+        balanceAfter: next,
+        metadata: {
+          chargedFrom: "usd_wallet",
+          ...(input.metadata ?? {}),
+        },
+      })
+      .returning();
+
+    return {
+      wallet: updated ?? { ...current, balance: next },
+      transaction: txRow,
+      amount,
+      currency: "USD" as const,
+    };
+  });
+}
+
 function parseAmount(value: string | number) {
   const n = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(n) || n <= 0) {

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
+import { quoteLocalUsd } from "@/lib/fx/rates";
+import { createUsdPricer, usdFromLocalRetail } from "@/lib/pricing/service-pricing";
 import { currencyForCountry } from "@/lib/wallet";
 import {
   FALLBACK_COUNTRIES,
@@ -7,7 +9,6 @@ import {
   herosmsErrorToEnglish,
   isHerosmsDemoMode,
   POPULAR_SERVICES,
-  usdToLocalPrice,
   type HeroPriceOffer,
 } from "@/lib/herosms";
 import { resolveCountryIso, countryFlagUrl, countryFlagEmoji } from "@/lib/herosms/countries";
@@ -24,7 +25,22 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const service = searchParams.get("service") || "ot";
     const countryParam = searchParams.get("country");
-    const currency = currencyForCountry(user.countryCode);
+    const localCurrency = currencyForCountry(user.countryCode);
+    const quote = await quoteLocalUsd(localCurrency);
+    const price = await createUsdPricer("herosms");
+
+    const retailFor = (costUsd: number, serviceKey: string) => {
+      const local = price({
+        serviceKey,
+        usd: costUsd,
+        buyRate: quote.buyRate,
+      });
+      return {
+        costUsd,
+        priceUsd: usdFromLocalRetail(local.local, quote.buyRate),
+        priceLocal: local.local,
+      };
+    };
 
     const serviceName =
       POPULAR_SERVICES.find((s) => s.code === service)?.name || service;
@@ -37,12 +53,8 @@ export async function GET(req: Request) {
 
       const offers: HeroPriceOffer[] = [];
       for (const c of countries) {
-        const priceUsd = 0.12 + (c.id % 7) * 0.03;
-        const { local } = await usdToLocalPrice(
-          priceUsd,
-          user.countryCode,
-          `${c.id}:${service}`,
-        );
+        const costUsd = 0.12 + (c.id % 7) * 0.03;
+        const priced = retailFor(costUsd, `${c.id}:${service}`);
         offers.push({
           countryId: c.id,
           countryName: c.name,
@@ -51,9 +63,8 @@ export async function GET(req: Request) {
           flagEmoji: c.flagEmoji,
           service,
           serviceName,
-          priceUsd,
-          priceLocal: local,
-          currency,
+          ...priced,
+          currency: "USD",
           count: 50 + (c.id % 40),
         });
       }
@@ -63,7 +74,8 @@ export async function GET(req: Request) {
         demo: true,
         service,
         serviceName,
-        currency,
+        currency: "USD",
+        fx: quote,
         offers,
       });
     }
@@ -110,11 +122,7 @@ export async function GET(req: Request) {
       const fallback = FALLBACK_COUNTRIES.find((c) => c.id === id);
       const iso = resolveCountryIso(id, fallback?.name) || fallback?.iso || null;
       const name = fallback?.name || `Country ${id}`;
-      const { local } = await usdToLocalPrice(
-        cost,
-        user.countryCode,
-        `${id}:${service}`,
-      );
+      const priced = retailFor(cost, `${id}:${service}`);
 
       offers.push({
         countryId: id,
@@ -124,9 +132,8 @@ export async function GET(req: Request) {
         flagEmoji: iso ? countryFlagEmoji(iso) : "🏳️",
         service,
         serviceName,
-        priceUsd: cost,
-        priceLocal: local,
-        currency,
+        ...priced,
+        currency: "USD",
         count,
       });
     }
@@ -149,7 +156,7 @@ export async function GET(req: Request) {
       // keep fallbacks
     }
 
-    offers.sort((a, b) => a.priceLocal - b.priceLocal);
+    offers.sort((a, b) => a.priceUsd - b.priceUsd);
     console.log("[herosms-prices] LIVE offers", {
       service,
       count: offers.length,
@@ -160,7 +167,8 @@ export async function GET(req: Request) {
       demo: false,
       service,
       serviceName,
-      currency,
+      currency: "USD",
+      fx: quote,
       offers,
     });
   } catch (error) {
