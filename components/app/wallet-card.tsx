@@ -88,16 +88,7 @@ export function WalletCard({
 
             <div className="relative flex flex-col gap-3 p-3.5 sm:p-4">
               <div className="flex items-center gap-3">
-                <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full border border-white/25">
-                  <Image
-                    src={BRAND_LOGO_SRC}
-                    alt="ORYNO"
-                    fill
-                    sizes="40px"
-                    className="rounded-full object-cover object-center"
-                    priority
-                  />
-                </span>
+             
                 <div className="min-w-0">
                   <p className="text-[11px] font-bold tracking-[0.22em] text-white/90 uppercase">
                     ORYNO

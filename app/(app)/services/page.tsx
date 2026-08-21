@@ -106,7 +106,7 @@ export default function ServicesPage() {
               <div className="relative flex items-start justify-between gap-3">
                 <div>
                   <p className="inline-flex items-center gap-1.5 text-[11px] font-bold tracking-[0.16em] text-white/80 uppercase">
-                    <Sparkles className="h-3.5 w-3.5" />
+                 
                     Catalog
                   </p>
                   <h2 className="mt-1 text-xl font-bold tracking-tight sm:text-2xl">
