@@ -412,8 +412,6 @@ function GiftCardsPageContent() {
       cancelled = true;
     };
   }, [mode, buyCountry]);
-
-  // Select sell brand from URL slug, else first brand
   useEffect(() => {
     if (mode !== "sell" || sellLoading || sellBrands.length === 0) return;
     if (slugParam) {
