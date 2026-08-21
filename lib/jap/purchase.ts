@@ -21,7 +21,6 @@ import {
   isJapDemoMode,
   isJapLive,
   japMarkup,
-  type JapOrderStatus,
 } from "./client";
 import {
   FALLBACK_JAP_SERVICES,
@@ -30,7 +29,6 @@ import {
   normalizeCustomComments,
 } from "./catalog";
 import { japErrorToEnglish } from "./errors";
-import { notifyServiceEvent } from "@/lib/notify/service-events";
 
 const LOG_PREFIX = "[jap]";
 
@@ -398,59 +396,17 @@ export async function purchaseJapBoost(input: {
   }
 }
 
-export async function pollJapOrderStatus(orderId: string, userId?: string) {
-  const ref = orderId.slice(0, 120);
-  let data: JapOrderStatus;
-
+export async function pollJapOrderStatus(orderId: string) {
   if (orderId.startsWith("demo_") || isJapDemoMode()) {
     console.log(LOG_PREFIX, "poll DEMO", { orderId });
-    data = {
-      status: "Completed",
+    return {
+      status: "In progress",
       start_count: "0",
       remains: "0",
       charge: "0",
       currency: "USD",
     };
-  } else {
-    console.log(LOG_PREFIX, "poll LIVE", { orderId });
-    data = await getJapOrderStatus(orderId);
   }
-
-  const status = String(data.status || "").toLowerCase();
-  const completed = ["completed", "complete", "done"].includes(status);
-  if (completed) {
-    await maybeNotifySocialComplete(ref, userId);
-  }
-
-  return data;
-}
-
-async function maybeNotifySocialComplete(providerRef: string, userId?: string) {
-  const order = await db.query.socialOrders.findFirst({
-    where: userId
-      ? and(
-          eq(socialOrders.providerRef, providerRef),
-          eq(socialOrders.userId, userId),
-        )
-      : eq(socialOrders.providerRef, providerRef),
-  });
-  if (!order || order.status === "completed") return;
-
-  await db
-    .update(socialOrders)
-    .set({ status: "completed", updatedAt: new Date() })
-    .where(eq(socialOrders.id, order.id));
-
-  await notifyServiceEvent({
-    userId: order.userId,
-    title: "Boost completed",
-    body: "Your social boost order is complete.",
-    type: "social",
-    href: "/services/social",
-    metadata: {
-      orderId: providerRef,
-      socialOrderId: order.id,
-      transactionId: order.transactionId,
-    },
-  });
+  console.log(LOG_PREFIX, "poll LIVE", { orderId });
+  return getJapOrderStatus(orderId);
 }

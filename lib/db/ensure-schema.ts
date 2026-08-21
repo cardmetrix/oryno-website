@@ -87,6 +87,19 @@ export async function ensureWalletSchema() {
         END $$
       `);
       await db.execute(sql`
+        DO $$ BEGIN
+          IF NOT EXISTS (
+            SELECT 1
+            FROM pg_enum e
+            JOIN pg_type t ON e.enumtypid = t.oid
+            WHERE t.typname = 'ad_placement'
+              AND e.enumlabel = 'services_carousel'
+          ) THEN
+            ALTER TYPE "public"."ad_placement" ADD VALUE 'services_carousel';
+          END IF;
+        END $$
+      `);
+      await db.execute(sql`
         CREATE TABLE IF NOT EXISTS "ads" (
           "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
           "title" varchar(120) NOT NULL,

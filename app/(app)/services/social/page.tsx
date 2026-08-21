@@ -419,7 +419,7 @@ export default function SocialBoostPage() {
   }, [qualities, quality]);
 
   useEffect(() => {
-    if (!success || !orderId) return;
+    if (!success || !orderId || orderId.startsWith("demo_")) return;
     let cancelled = false;
     let tries = 0;
 

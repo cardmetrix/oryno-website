@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { withAdminApi } from "@/lib/admin/api";
 import { writeAdminAudit } from "@/lib/admin/auth";
+import { assertLiveAdCap } from "@/lib/admin/ad-limits";
 import {
   DEFAULT_OVERLAY,
   DEFAULT_OVERLAY_COLORS,
@@ -149,6 +150,17 @@ export async function PATCH(req: Request, ctx: Ctx) {
         { error: "Expiry must be after the start date" },
         { status: 400 },
       );
+    }
+
+    const nextPlacement = (patch.placement ?? existing.placement) as AdPlacement;
+    const nextStatus = (patch.status ?? existing.status) as AdStatus;
+    const cap = await assertLiveAdCap({
+      placement: nextPlacement,
+      status: nextStatus,
+      excludeId: id,
+    });
+    if (!cap.ok) {
+      return NextResponse.json({ error: cap.error }, { status: 400 });
     }
 
     const [updated] = await db

@@ -33,6 +33,7 @@ import {
   AD_STATUS_OPTIONS,
   DEFAULT_OVERLAY,
   findAdServiceLinkByHref,
+  maxLiveAdsForPlacement,
   type AdPlacement,
   type AdStatus,
 } from "@/lib/admin/ads";
@@ -49,6 +50,7 @@ type Ad = {
   overlay: string;
   overlayColors: string[];
   placement: AdPlacement;
+  placementLabel?: string;
   status: AdStatus;
   statusLabel: string;
   sortOrder: number;
@@ -70,6 +72,7 @@ type Response = {
   statusOptions: typeof AD_STATUS_OPTIONS;
   placementOptions: typeof AD_PLACEMENT_OPTIONS;
   serviceLinkOptions?: ServiceLinkOption[];
+  liveCountsByPlacement?: Record<string, number>;
 };
 
 type FormState = {
@@ -126,6 +129,7 @@ export default function AdminAdsPage() {
   const { data, loading, error, reload } =
     useAdminQuery<Response>("/api/admin/ads");
   const [filter, setFilter] = useState<"" | AdStatus>("");
+  const [placementFilter, setPlacementFilter] = useState<"" | AdPlacement>("");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Ad | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -136,17 +140,33 @@ export default function AdminAdsPage() {
     ? data.statusOptions
     : AD_STATUS_OPTIONS;
 
+  const placementOptions = data?.placementOptions?.length
+    ? data.placementOptions
+    : AD_PLACEMENT_OPTIONS;
+
   const serviceLinkOptions = data?.serviceLinkOptions?.length
     ? data.serviceLinkOptions
     : AD_SERVICE_LINK_OPTIONS;
 
   const ads = useMemo(() => {
-    const rows = data?.ads ?? [];
-    if (!filter) return rows;
-    return rows.filter((a) => a.status === filter);
-  }, [data?.ads, filter]);
+    let rows = data?.ads ?? [];
+    if (filter) rows = rows.filter((a) => a.status === filter);
+    if (placementFilter) {
+      rows = rows.filter((a) => a.placement === placementFilter);
+    }
+    return rows;
+  }, [data?.ads, filter, placementFilter]);
 
   const isCustomLink = form.linkOptionId === "custom";
+  const formMaxLive = maxLiveAdsForPlacement(form.placement);
+  const formLiveCount =
+    data?.liveCountsByPlacement?.[form.placement] ??
+    (data?.ads ?? []).filter(
+      (a) =>
+        a.placement === form.placement &&
+        a.status === "live" &&
+        a.id !== editing?.id,
+    ).length;
 
   function openCreate() {
     setEditing(null);
@@ -263,7 +283,7 @@ export default function AdminAdsPage() {
     <>
       <AdminPageHeader
         title="Ads"
-        subtitle="Home carousel creatives with schedule, archive, and expiry"
+        subtitle="Home & services carousel creatives with links, schedule, and expiry"
         actions={
           <motion.button
             type="button"
@@ -278,9 +298,25 @@ export default function AdminAdsPage() {
         }
       />
 
+      <div className="mb-3 flex flex-wrap gap-2">
+        <FilterChip
+          label="All placements"
+          active={placementFilter === ""}
+          onClick={() => setPlacementFilter("")}
+        />
+        {placementOptions.map((opt) => (
+          <FilterChip
+            key={opt.value}
+            label={opt.label}
+            active={placementFilter === opt.value}
+            onClick={() => setPlacementFilter(opt.value)}
+          />
+        ))}
+      </div>
+
       <div className="mb-4 flex flex-wrap gap-2">
         <FilterChip
-          label="All"
+          label="All status"
           active={filter === ""}
           onClick={() => setFilter("")}
         />
@@ -348,6 +384,8 @@ export default function AdminAdsPage() {
 
                   <div className="space-y-3 p-3.5">
                     <p className="text-xs text-muted-foreground">
+                      {ad.placementLabel || ad.placement}
+                      {" · "}
                       Order {ad.sortOrder}
                       {ad.endsAt
                         ? ` · Expires ${new Date(ad.endsAt).toLocaleString()}`
@@ -421,12 +459,42 @@ export default function AdminAdsPage() {
           <DialogHeader>
             <DialogTitle>{editing ? "Edit ad" : "Create ad"}</DialogTitle>
             <DialogDescription>
-              Upload a banner image, set the link, and optionally schedule an
-              expiry date.
+              Upload a banner image, choose home or services placement, set an
+              in-app screen or external link, and optionally schedule expiry.
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={onSave} className="space-y-3">
+            <Field label="Placement">
+              <select
+                value={form.placement}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    placement: e.target.value as AdPlacement,
+                  }))
+                }
+                className={inputClass}
+              >
+                {placementOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                    {"description" in opt && opt.description
+                      ? ` — ${opt.description}`
+                      : ""}
+                  </option>
+                ))}
+              </select>
+              {formMaxLive != null ? (
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Max {formMaxLive} live ads here
+                  {form.status === "live"
+                    ? ` · ${formLiveCount}/${formMaxLive} other live`
+                    : ""}
+                  .
+                </p>
+              ) : null}
+            </Field>
             <Field label="Title">
               <input
                 required

@@ -3,7 +3,10 @@ import { NextResponse } from "next/server";
 import {
   DEFAULT_OVERLAY,
   DEFAULT_OVERLAY_COLORS,
+  isAdPlacement,
+  maxLiveAdsForPlacement,
   shapeAd,
+  type AdPlacement,
 } from "@/lib/admin/ads";
 import { db } from "@/lib/db";
 import { ensureWalletSchema } from "@/lib/db/ensure-schema";
@@ -11,12 +14,15 @@ import { ads } from "@/lib/db/schema";
 
 export const runtime = "nodejs";
 
-/** Public ads for home carousel (web + mobile). */
+/** Public ads for carousels (web + mobile). */
 export async function GET(req: Request) {
   try {
     await ensureWalletSchema();
     const { searchParams } = new URL(req.url);
-    const placement = searchParams.get("placement") || "home_carousel";
+    const rawPlacement = searchParams.get("placement") || "home_carousel";
+    const placement: AdPlacement = isAdPlacement(rawPlacement)
+      ? rawPlacement
+      : "home_carousel";
     const now = new Date();
 
     const rows = await db
@@ -25,16 +31,19 @@ export async function GET(req: Request) {
       .where(
         and(
           eq(ads.status, "live"),
-          eq(ads.placement, placement as "home_carousel" | "promo_banner"),
+          eq(ads.placement, placement),
           or(isNull(ads.startsAt), lte(ads.startsAt, now)),
           or(isNull(ads.endsAt), gt(ads.endsAt, now)),
         ),
       )
       .orderBy(asc(ads.sortOrder), asc(ads.createdAt));
 
+    const maxLive = maxLiveAdsForPlacement(placement);
+    const limited = maxLive != null ? rows.slice(0, maxLive) : rows;
+
     return NextResponse.json({
       ok: true,
-      ads: rows.map((row) => {
+      ads: limited.map((row) => {
         const shaped = shapeAd(row);
         return {
           id: shaped.id,

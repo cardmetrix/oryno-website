@@ -5,7 +5,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
-import { isExternalAdHref } from "@/lib/admin/ads";
+import { isExternalAdHref, type AdPlacement } from "@/lib/admin/ads";
+import { cn } from "@/lib/utils";
 
 type AdSlide = {
   id: string;
@@ -21,16 +22,28 @@ const INTERVAL_MS = 10_000;
 const DEFAULT_OVERLAY =
   "from-oryno-charcoal/85 via-oryno-charcoal/40 to-transparent";
 
-export function AdCarousel() {
+type AdCarouselProps = {
+  placement?: AdPlacement;
+  className?: string;
+  /** When false, render nothing while loading (services screen). */
+  reserveSpaceWhileLoading?: boolean;
+};
+
+export function AdCarousel({
+  placement = "home_carousel",
+  className,
+  reserveSpaceWhileLoading = true,
+}: AdCarouselProps) {
   const [ads, setAds] = useState<AdSlide[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
+    setLoaded(false);
     (async () => {
       try {
-        const res = await fetch("/api/ads?placement=home_carousel", {
+        const res = await fetch(`/api/ads?placement=${placement}`, {
           cache: "no-store",
         });
         if (!res.ok) throw new Error("Failed");
@@ -67,7 +80,7 @@ export function AdCarousel() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [placement]);
 
   useEffect(() => {
     if (ads.length <= 1) return;
@@ -77,14 +90,31 @@ export function AdCarousel() {
     return () => window.clearInterval(id);
   }, [ads.length]);
 
-  if (!loaded || ads.length === 0) return null;
+  if (!loaded) {
+    if (!reserveSpaceWhileLoading) return null;
+    return (
+      <div
+        className={cn(
+          "h-[128px] w-full animate-pulse rounded-[22px] border border-border/80 bg-muted sm:h-[148px] md:h-[172px] md:rounded-[28px]",
+          className,
+        )}
+      />
+    );
+  }
+
+  if (ads.length === 0) return null;
 
   const safeIndex = index % ads.length;
   const ad = ads[safeIndex];
   const remote = /^https?:\/\//i.test(ad.imageUrl);
 
   return (
-    <div className="ad-carousel relative h-[128px] w-full overflow-hidden rounded-[22px] border border-border/80 bg-muted shadow-[var(--shadow-soft)] sm:h-[148px] md:h-[172px] md:rounded-[28px] lg:h-full lg:min-h-[200px]">
+    <div
+      className={cn(
+        "ad-carousel relative h-[128px] w-full overflow-hidden rounded-[22px] border border-border/80 bg-muted shadow-[var(--shadow-soft)] sm:h-[148px] md:h-[172px] md:rounded-[28px] lg:h-full lg:min-h-[200px]",
+        className,
+      )}
+    >
       <AnimatePresence mode="wait">
         <motion.div
           key={ad.id}

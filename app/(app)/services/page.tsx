@@ -16,6 +16,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { GiftCardIcon } from "@/components/icons/gift-card-icon";
+import { AdCarousel } from "@/components/app/ad-carousel";
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
@@ -198,6 +199,12 @@ export default function ServicesPage() {
               )}
             </AnimatePresence>
           </div>
+
+          <AdCarousel
+            placement="services_carousel"
+            reserveSpaceWhileLoading={false}
+            className="mt-5 sm:mt-6 lg:min-h-0 lg:h-[148px]"
+          />
         </>
       )}
     </AppShell>

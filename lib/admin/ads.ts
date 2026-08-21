@@ -11,10 +11,32 @@ export type AdStatus = (typeof AD_STATUS_OPTIONS)[number]["value"];
 
 export const AD_PLACEMENT_OPTIONS = [
   { value: "home_carousel", label: "Home carousel" },
+  {
+    value: "services_carousel",
+    label: "Services carousel",
+    description: "Shown under the services list (max 3 live)",
+    maxLive: 3,
+  },
   { value: "promo_banner", label: "Promo banner" },
 ] as const;
 
 export type AdPlacement = (typeof AD_PLACEMENT_OPTIONS)[number]["value"];
+
+/** Live-ad caps per placement. Undefined = no hard limit. */
+export function maxLiveAdsForPlacement(placement: AdPlacement): number | null {
+  const opt = AD_PLACEMENT_OPTIONS.find((o) => o.value === placement);
+  if (opt && "maxLive" in opt && typeof opt.maxLive === "number") {
+    return opt.maxLive;
+  }
+  return null;
+}
+
+export function adPlacementLabel(placement: string) {
+  return (
+    AD_PLACEMENT_OPTIONS.find((o) => o.value === placement)?.label ||
+    placement
+  );
+}
 
 /** Preset destinations for ad links — services + common app screens. */
 export const AD_SERVICE_LINK_OPTIONS = [
@@ -158,6 +180,7 @@ export function shapeAd(row: {
       ? row.overlayColors
       : [...DEFAULT_OVERLAY_COLORS],
     placement: row.placement,
+    placementLabel: adPlacementLabel(row.placement),
     status: row.status,
     statusLabel: adStatusLabel(row.status),
     sortOrder: row.sortOrder,

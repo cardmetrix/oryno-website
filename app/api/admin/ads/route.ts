@@ -3,6 +3,10 @@ import { NextResponse } from "next/server";
 import { withAdminApi } from "@/lib/admin/api";
 import { writeAdminAudit } from "@/lib/admin/auth";
 import {
+  assertLiveAdCap,
+  liveAdCountsByPlacement,
+} from "@/lib/admin/ad-limits";
+import {
   AD_PLACEMENT_OPTIONS,
   AD_STATUS_OPTIONS,
   DEFAULT_OVERLAY,
@@ -47,6 +51,7 @@ export async function GET(req: Request) {
       statusOptions: AD_STATUS_OPTIONS,
       placementOptions: AD_PLACEMENT_OPTIONS,
       serviceLinkOptions: AD_SERVICE_LINK_OPTIONS,
+      liveCountsByPlacement: await liveAdCountsByPlacement(),
       ads: rows.map(shapeAd),
     });
   });
@@ -104,6 +109,11 @@ export async function POST(req: Request) {
         { error: "Expiry must be after the start date" },
         { status: 400 },
       );
+    }
+
+    const cap = await assertLiveAdCap({ placement, status });
+    if (!cap.ok) {
+      return NextResponse.json({ error: cap.error }, { status: 400 });
     }
 
     let imageUrl = String(body.imageUrl || "").trim();

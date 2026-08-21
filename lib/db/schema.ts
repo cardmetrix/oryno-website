@@ -1094,6 +1094,7 @@ export const adStatusEnum = pgEnum("ad_status", [
 
 export const adPlacementEnum = pgEnum("ad_placement", [
   "home_carousel",
+  "services_carousel",
   "promo_banner",
 ]);
 
