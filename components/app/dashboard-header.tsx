@@ -5,24 +5,36 @@ import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
 import { motion } from "framer-motion";
 import { Menu, Search } from "lucide-react";
-import { BRAND_LOGO_SRC } from "@/components/brand-logo";
 import { NotificationDropdown } from "./notification-dropdown";
 import { useMobileNav } from "./mobile-nav-context";
+
+function initialsFrom(name?: string | null) {
+  if (!name) return "OR";
+  return (
+    name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() ?? "")
+      .join("") || "OR"
+  );
+}
 
 export function DashboardHeader() {
   const { user } = useUser();
   const { toggle } = useMobileNav();
 
-  const firstName =
-    user?.firstName?.trim() ||
-    user?.fullName?.split(/\s+/)[0] ||
+  const fullName =
+    [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
+    user?.fullName ||
     user?.username ||
-    "there";
-
+    "ORYNO User";
+  const firstName =
+    user?.firstName?.trim() || fullName.split(/\s+/)[0] || "there";
   const avatarUrl =
     (typeof user?.publicMetadata?.avatarUrl === "string"
       ? user.publicMetadata.avatarUrl
-      : null) || (user?.hasImage ? user.imageUrl : null);
+      : null) || user?.imageUrl || null;
 
   return (
     <motion.header
@@ -47,28 +59,23 @@ export function DashboardHeader() {
             aria-label="Open profile"
             className="flex min-w-0 flex-1 items-center gap-2.5 rounded-[14px] transition hover:opacity-90 sm:gap-3"
           >
-            <span className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[14px] border border-border bg-background shadow-[var(--shadow-soft)] sm:h-11 sm:w-11">
+            <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full bg-oryno-orange-muted sm:h-11 sm:w-11">
               {avatarUrl ? (
                 <Image
                   src={avatarUrl}
-                  alt=""
+                  alt={fullName}
                   fill
                   sizes="44px"
                   className="object-cover"
                 />
               ) : (
-                <Image
-                  src={BRAND_LOGO_SRC}
-                  alt="ORYNO"
-                  width={44}
-                  height={44}
-                  className="h-[70%] w-[70%] object-contain"
-                  priority
-                />
+                <span className="flex h-full w-full items-center justify-center text-xs font-bold text-primary sm:text-sm">
+                  {initialsFrom(fullName)}
+                </span>
               )}
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+              <span className="block truncate text-sm font-semibold tracking-tight text-foreground sm:text-base">
                 Welcome back, {firstName} 👋
               </span>
             </span>
