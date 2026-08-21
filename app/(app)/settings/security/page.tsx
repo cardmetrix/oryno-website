@@ -342,76 +342,84 @@ function TotpSetupDialog({
         onOpenChange(next);
       }}
     >
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Google Authenticator</DialogTitle>
-          <DialogDescription>
+      <DialogContent className="flex w-[calc(100%-1.25rem)] max-w-md max-h-[min(92svh,720px)] flex-col gap-0 overflow-hidden rounded-[24px] border-border p-0 shadow-[var(--shadow-soft)] sm:w-full">
+        <DialogHeader className="shrink-0 space-y-1 border-b border-border bg-muted/40 px-4 py-4 pr-12 text-left sm:px-6">
+          <div className="mb-1 flex h-10 w-10 items-center justify-center rounded-2xl bg-oryno-orange-muted text-primary">
+            <Shield className="h-4 w-4" />
+          </div>
+          <DialogTitle className="text-base font-bold sm:text-lg">
+            Google Authenticator
+          </DialogTitle>
+          <DialogDescription className="text-xs leading-5 sm:text-sm">
             Scan the QR code in Google Authenticator, then enter the 6-digit
             code to finish.
           </DialogDescription>
         </DialogHeader>
 
-        {!started ? (
-          <button
-            type="button"
-            disabled={loading}
-            onClick={() => void startEnrollment()}
-            className="btn-primary inline-flex h-11 items-center justify-center gap-2 text-sm disabled:opacity-60"
-          >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            Generate QR code
-          </button>
-        ) : (
-          <div className="space-y-4">
-            <div className="mx-auto rounded-2xl border border-border bg-white p-4">
-              {uri ? <QRCodeSVG value={uri} size={180} /> : null}
-            </div>
-            {secret ? (
-              <button
-                type="button"
-                onClick={() => void copySecret()}
-                className="flex w-full items-center gap-3 rounded-2xl bg-muted/50 px-4 py-3 text-left"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="text-[11px] font-bold tracking-wide text-muted-foreground uppercase">
-                    Can’t scan? Enter this key
-                  </p>
-                  <p className="mt-1 truncate font-mono text-sm font-semibold">
-                    {secret}
-                  </p>
-                </div>
-                <Copy className="h-4 w-4 text-primary" />
-              </button>
-            ) : null}
-
-            <div>
-              <p className="mb-2 text-xs font-semibold text-muted-foreground">
-                Enter the 6-digit code
-              </p>
-              <InputOTP maxLength={6} value={code} onChange={setCode}>
-                <InputOTPGroup className="w-full justify-between gap-2">
-                  {Array.from({ length: 6 }).map((_, i) => (
-                    <InputOTPSlot
-                      key={i}
-                      index={i}
-                      className="h-12 w-11 rounded-[12px] border border-border"
-                    />
-                  ))}
-                </InputOTPGroup>
-              </InputOTP>
-            </div>
-
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-5">
+          {!started ? (
             <button
               type="button"
-              disabled={verifying || code.length < 6}
-              onClick={() => void verify()}
+              disabled={loading}
+              onClick={() => void startEnrollment()}
               className="btn-primary inline-flex h-11 w-full items-center justify-center gap-2 text-sm disabled:opacity-60"
             >
-              {verifying ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              Enable 2FA
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Generate QR code
             </button>
-          </div>
-        )}
+          ) : (
+            <div className="flex flex-col gap-4 sm:gap-5">
+              <div className="flex justify-center">
+                <div className="flex size-[168px] items-center justify-center rounded-[20px] border border-border bg-white p-3 sm:size-[196px] sm:p-4">
+                  {uri ? (
+                    <QRCodeSVG
+                      value={uri}
+                      size={164}
+                      className="size-[144px] sm:size-[164px]"
+                    />
+                  ) : (
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  )}
+                </div>
+              </div>
+
+              {secret ? (
+                <button
+                  type="button"
+                  onClick={() => void copySecret()}
+                  className="flex w-full items-start gap-3 rounded-2xl bg-muted/50 px-3 py-3 text-left sm:px-4"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[11px] font-bold tracking-wide text-muted-foreground uppercase">
+                      Can’t scan? Enter this key
+                    </p>
+                    <p className="mt-1 break-all font-mono text-xs font-semibold leading-5 sm:text-sm">
+                      {secret}
+                    </p>
+                  </div>
+                  <Copy className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                </button>
+              ) : null}
+
+              <div>
+                <p className="mb-2 text-xs font-semibold text-muted-foreground">
+                  Enter the 6-digit code
+                </p>
+                <TotpCodeInput value={code} onChange={setCode} />
+              </div>
+
+              <button
+                type="button"
+                disabled={verifying || code.length < 6}
+                onClick={() => void verify()}
+                className="btn-primary inline-flex h-11 w-full items-center justify-center gap-2 text-sm disabled:opacity-60"
+              >
+                {verifying ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Enable 2FA
+              </button>
+            </div>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );
@@ -460,36 +468,61 @@ function TotpDisableDialog({
         onOpenChange(next);
       }}
     >
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Turn off Google Authenticator</DialogTitle>
-          <DialogDescription>
+      <DialogContent className="flex w-[calc(100%-1.25rem)] max-w-md max-h-[min(92svh,720px)] flex-col gap-0 overflow-hidden rounded-[24px] border-border p-0 shadow-[var(--shadow-soft)] sm:w-full">
+        <DialogHeader className="shrink-0 space-y-1 border-b border-border bg-muted/40 px-4 py-4 pr-12 text-left sm:px-6">
+          <div className="mb-1 flex h-10 w-10 items-center justify-center rounded-2xl bg-oryno-orange-muted text-primary">
+            <Shield className="h-4 w-4" />
+          </div>
+          <DialogTitle className="text-base font-bold sm:text-lg">
+            Turn off Google Authenticator
+          </DialogTitle>
+          <DialogDescription className="text-xs leading-5 sm:text-sm">
             Enter the current 6-digit code to confirm. It will no longer be
             required at sign-in.
           </DialogDescription>
         </DialogHeader>
-        <InputOTP maxLength={6} value={code} onChange={setCode}>
-          <InputOTPGroup className="w-full justify-between gap-2">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <InputOTPSlot
-                key={i}
-                index={i}
-                className="h-12 w-11 rounded-[12px] border border-border"
-              />
-            ))}
-          </InputOTPGroup>
-        </InputOTP>
-        <button
-          type="button"
-          disabled={saving || code.length < 6}
-          onClick={() => void disable()}
-          className="btn-primary inline-flex h-11 w-full items-center justify-center gap-2 text-sm disabled:opacity-60"
-        >
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-          Turn off 2FA
-        </button>
+
+        <div className="flex flex-col gap-4 px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-5">
+          <TotpCodeInput value={code} onChange={setCode} />
+          <button
+            type="button"
+            disabled={saving || code.length < 6}
+            onClick={() => void disable()}
+            className="btn-primary inline-flex h-11 w-full items-center justify-center gap-2 text-sm disabled:opacity-60"
+          >
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            Turn off 2FA
+          </button>
+        </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function TotpCodeInput({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <InputOTP
+      maxLength={6}
+      value={value}
+      onChange={onChange}
+      containerClassName="w-full justify-center"
+    >
+      <InputOTPGroup className="flex w-full max-w-[360px] justify-between gap-1.5 sm:gap-2">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <InputOTPSlot
+            key={i}
+            index={i}
+            className="h-11 min-w-0 flex-1 rounded-[12px] border border-border text-base first:rounded-[12px] last:rounded-[12px] sm:h-12"
+          />
+        ))}
+      </InputOTPGroup>
+    </InputOTP>
   );
 }
 
