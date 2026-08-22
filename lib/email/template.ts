@@ -36,17 +36,7 @@ export function renderBrandedEmail(content: BrandedEmailContent) {
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border-radius:20px;overflow:hidden;border:1px solid #ebe6e0;">
           <tr>
             <td style="background:linear-gradient(135deg,#FF6A00 0%,#ff8a33 100%);padding:22px 28px;">
-              <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
-                <tr>
-                  <td style="vertical-align:middle;width:36px;">
-                    ${emailBrandLogoHtml(36)}
-                  </td>
-                  <td style="vertical-align:middle;padding-left:12px;">
-                    <div style="font-size:20px;font-weight:800;letter-spacing:-0.02em;color:#ffffff;">ORYNO</div>
-                    <div style="font-size:12px;color:rgba(255,255,255,0.88);margin-top:2px;">Borderless wallet</div>
-                  </td>
-                </tr>
-              </table>
+              ${emailBrandLogoHtml(40)}
             </td>
           </tr>
           <tr>

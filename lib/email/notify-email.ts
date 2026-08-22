@@ -79,16 +79,15 @@ export async function deliverNotificationEmail(input: {
   const ctaLabel =
     CTA_BY_TYPE[input.type || "system"]?.label || "View in ORYNO";
 
-  const greeting = user.fullName?.trim()
-    ? `Hi ${user.fullName.trim()},`
-    : "Hi,";
+  const firstName = user.fullName?.trim().split(/\s+/)[0] || "there";
+  const greeting = `Hi ${firstName},`;
 
   return sendBrandedEmail({
     to: user.email,
     subject: input.title,
-    title: input.title,
+    title: greeting,
     preheader: input.body,
-    body: `${greeting}\n\n${input.body}`,
+    body: input.body,
     bodyHtml: `<p style="margin:0 0 12px;">${escapeBasic(greeting)}</p><p style="margin:0 0 12px;">${escapeBasic(input.body)}</p>`,
     cta: { label: ctaLabel, href },
     footerNote:
