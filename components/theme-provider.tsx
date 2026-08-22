@@ -12,7 +12,10 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
       attribute="class"
       defaultTheme="light"
       enableSystem={false}
-      disableTransitionOnChange
+      storageKey="oryno-theme"
+      // Keep transitions on for smooth light ↔ dark; hydration flash is avoided
+      // by defaultTheme="light" + suppressHydrationWarning on <html>.
+      disableTransitionOnChange={false}
     >
       {children}
     </NextThemesProvider>

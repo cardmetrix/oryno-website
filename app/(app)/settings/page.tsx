@@ -69,7 +69,10 @@ export default function SettingsPage() {
       const json = (await res.json()) as SettingsPayload;
       setData(json);
       if (json.preferences.theme) {
-        setTheme(json.preferences.theme === "system" ? "light" : json.preferences.theme);
+        const next =
+          json.preferences.theme === "system" ? "light" : json.preferences.theme;
+        // Sync without transition class — initial load should not animate.
+        setTheme(next);
       }
     } catch {
       toast.error("Could not load settings");
@@ -125,10 +128,9 @@ export default function SettingsPage() {
   }
 
   async function onThemePersist(nextDark: boolean) {
-    const theme = nextDark ? "dark" : "light";
-    setTheme(theme);
+    // ThemeToggle already applied local theme with a smooth transition.
     try {
-      await patch({ theme });
+      await patch({ theme: nextDark ? "dark" : "light" });
     } catch {
       // Theme still applied locally
     }

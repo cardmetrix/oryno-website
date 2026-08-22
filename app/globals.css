@@ -226,6 +226,33 @@ body {
   line-height: 1.5;
 }
 
+/* Smooth light ↔ dark theme crossfade (toggled via .theme-transition) */
+html.theme-transition,
+html.theme-transition *,
+html.theme-transition *::before,
+html.theme-transition *::after {
+  transition:
+    background-color 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+    background 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+    color 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+    fill 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+    stroke 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+    outline-color 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+    caret-color 0.4s cubic-bezier(0.22, 1, 0.36, 1) !important;
+  transition-delay: 0s !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.theme-transition,
+  html.theme-transition *,
+  html.theme-transition *::before,
+  html.theme-transition *::after {
+    transition: none !important;
+  }
+}
+
 ::selection {
   background: color-mix(in srgb, var(--oryno-orange) 28%, white);
   color: var(--oryno-charcoal);

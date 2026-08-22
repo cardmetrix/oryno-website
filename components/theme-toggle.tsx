@@ -14,6 +14,28 @@ type ThemeToggleProps = {
   onCheckedChangePersist?: (isDark: boolean) => void;
 };
 
+const TRANSITION_MS = 420;
+
+function startThemeTransition(apply: () => void) {
+  if (typeof document === "undefined") {
+    apply();
+    return;
+  }
+
+  const root = document.documentElement;
+  root.classList.add("theme-transition");
+
+  // Allow the browser to paint the transition class before flipping theme.
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => {
+      apply();
+      window.setTimeout(() => {
+        root.classList.remove("theme-transition");
+      }, TRANSITION_MS);
+    });
+  });
+}
+
 export function ThemeToggle({
   className,
   variant = "switch",
@@ -27,8 +49,10 @@ export function ThemeToggle({
   const isDark = resolvedTheme === "dark";
 
   function apply(nextDark: boolean) {
-    setTheme(nextDark ? "dark" : "light");
-    onCheckedChangePersist?.(nextDark);
+    startThemeTransition(() => {
+      setTheme(nextDark ? "dark" : "light");
+      onCheckedChangePersist?.(nextDark);
+    });
   }
 
   if (!mounted) {
