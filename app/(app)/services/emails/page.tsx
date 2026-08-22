@@ -19,7 +19,6 @@ import { PageHeader } from "@/components/app/page-header";
 import { ServiceSuccess } from "@/components/app/service-success";
 import { ErrorAlertModal } from "@/components/app/error-alert-modal";
 import { ServiceInstructions } from "@/components/app/service-instructions";
-import { useCountry } from "@/components/providers/country-provider";
 import {
   Dialog,
   DialogContent,
@@ -35,7 +34,7 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { formatCountryMoney } from "@/lib/country";
+import { formatUsd } from "@/lib/country";
 import { cn } from "@/lib/utils";
 
 type Domain = {
@@ -57,7 +56,6 @@ const SITES = [
 ];
 
 export default function EmailRentPage() {
-  const { country } = useCountry();
   const isMobile = useIsMobile();
   const [domains, setDomains] = useState<Domain[]>([]);
   const [loading, setLoading] = useState(true);
@@ -209,14 +207,13 @@ export default function EmailRentPage() {
     }
   }
 
-  const money = (n: number) =>
-    formatCountryMoney(n, country?.code || "NG");
+  const money = (n: number) => formatUsd(n);
 
   return (
     <AppShell hideNav>
       <PageHeader
         title="Rent Email"
-        subtitle="Temporary inboxes for OTP & sign-ups"
+        subtitle="Temporary inboxes for OTP & sign-ups · billed in USD"
         backHref="/services"
       />
 
@@ -350,7 +347,7 @@ export default function EmailRentPage() {
                   </span>
                   {selected ? (
                     <span className="shrink-0 text-sm font-bold text-primary">
-                      {money(selected.costLocal)}
+                      {money(selected.costUsd)}
                     </span>
                   ) : null}
                   <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -390,12 +387,12 @@ export default function EmailRentPage() {
                 <Row label="Domain" value={domain ? `@${domain}` : "—"} />
                 <Row
                   label="Amount"
-                  value={selected ? money(selected.costLocal) : money(0)}
+                  value={selected ? money(selected.costUsd) : money(0)}
                   accent
                 />
                 <div className="flex items-center gap-2 border-t border-border pt-3 font-semibold">
                   <Wallet className="h-4 w-4 text-primary" />
-                  Pay from wallet
+                  Pay from USD card
                 </div>
               </div>
             </MotionSection>
@@ -411,7 +408,7 @@ export default function EmailRentPage() {
                 {submitting
                   ? "Reserving…"
                   : selected
-                    ? `Rent email · ${money(selected.costLocal)}`
+                    ? `Rent email · ${money(selected.costUsd)}`
                     : "Continue"}
               </motion.button>
             </div>
@@ -431,7 +428,7 @@ export default function EmailRentPage() {
                 {submitting
                   ? "Reserving…"
                   : selected
-                    ? `Rent · ${money(selected.costLocal)}`
+                    ? `Rent · ${money(selected.costUsd)}`
                     : "Continue"}
               </button>
             </div>
@@ -507,7 +504,7 @@ function DomainPickerSheet({
             ) : null}
           </div>
           <span className="shrink-0 text-sm font-bold tabular-nums text-primary">
-            {formatPrice(d.costLocal)}
+            {formatPrice(d.costUsd)}
           </span>
           {active ? (
             <Check className="h-4 w-4 shrink-0 text-primary" strokeWidth={2.25} />

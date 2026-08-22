@@ -1167,7 +1167,7 @@ function GiftCardsPageContent() {
                       aria-label="Change gift card"
                       title="Change gift card"
                     >
-                      <RefreshCw className="h-4 w-4" strokeWidth={1.75} />
+                         <ChevronDown className="h-4 w-4" strokeWidth={1.75} />
                     </button>
                   </div>
                   {selectedBuy.redeemHint ? (

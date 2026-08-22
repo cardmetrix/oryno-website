@@ -2,39 +2,15 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useUser } from "@clerk/nextjs";
 import { motion } from "framer-motion";
 import { Menu, Search } from "lucide-react";
+import { useProfileDisplay } from "@/hooks/use-profile-display";
 import { NotificationDropdown } from "./notification-dropdown";
 import { useMobileNav } from "./mobile-nav-context";
 
-function initialsFrom(name?: string | null) {
-  if (!name) return "OR";
-  return (
-    name
-      .split(/\s+/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((part) => part[0]?.toUpperCase() ?? "")
-      .join("") || "OR"
-  );
-}
-
 export function DashboardHeader() {
-  const { user } = useUser();
+  const { display, firstName } = useProfileDisplay();
   const { toggle } = useMobileNav();
-
-  const fullName =
-    [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
-    user?.fullName ||
-    user?.username ||
-    "ORYNO User";
-  const firstName =
-    user?.firstName?.trim() || fullName.split(/\s+/)[0] || "there";
-  const avatarUrl =
-    (typeof user?.publicMetadata?.avatarUrl === "string"
-      ? user.publicMetadata.avatarUrl
-      : null) || user?.imageUrl || null;
 
   return (
     <motion.header
@@ -60,17 +36,17 @@ export function DashboardHeader() {
             className="flex min-w-0 flex-1 items-center gap-2.5 rounded-[14px] transition hover:opacity-90 sm:gap-3"
           >
             <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full bg-oryno-orange-muted sm:h-11 sm:w-11">
-              {avatarUrl ? (
+              {display?.avatarUrl ? (
                 <Image
-                  src={avatarUrl}
-                  alt={fullName}
+                  src={display.avatarUrl}
+                  alt={display.fullName}
                   fill
-                  sizes="44px"
                   className="object-cover"
+                  sizes="44px"
                 />
               ) : (
                 <span className="flex h-full w-full items-center justify-center text-xs font-bold text-primary sm:text-sm">
-                  {initialsFrom(fullName)}
+                  {display?.initials ?? "OR"}
                 </span>
               )}
             </span>

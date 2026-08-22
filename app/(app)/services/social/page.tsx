@@ -64,7 +64,7 @@ function clampQty(n: number, min: number, max: number) {
 }
 
 function usdPerThousand(service: JapServiceRow) {
-  return service.priceUsdPerThousand || service.priceLocalPerThousand;
+  return service.priceUsdPerThousand ?? 0;
 }
 
 function priceFor(service: JapServiceRow, quantity: number) {
@@ -752,7 +752,7 @@ export default function SocialBoostPage() {
                   options={packagesForType.map((item) => ({
                     value: String(item.service),
                     label: item.name,
-                    trailing: `${money(item.samplePriceUsd || item.samplePriceLocal)}/${item.sampleQuantity.toLocaleString()}`,
+                    trailing: `${money(item.samplePriceUsd ?? 0)}/${item.sampleQuantity.toLocaleString()}`,
                   }))}
                   disabled={!packagesForType.length}
                   sheetTitle="Package"
