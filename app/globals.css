@@ -226,31 +226,15 @@ body {
   line-height: 1.5;
 }
 
-/* Smooth light ↔ dark theme crossfade (toggled via .theme-transition) */
-html.theme-transition,
-html.theme-transition *,
-html.theme-transition *::before,
-html.theme-transition *::after {
-  transition:
-    background-color 0.4s cubic-bezier(0.22, 1, 0.36, 1),
-    background 0.4s cubic-bezier(0.22, 1, 0.36, 1),
-    color 0.4s cubic-bezier(0.22, 1, 0.36, 1),
-    border-color 0.4s cubic-bezier(0.22, 1, 0.36, 1),
-    fill 0.4s cubic-bezier(0.22, 1, 0.36, 1),
-    stroke 0.4s cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 0.4s cubic-bezier(0.22, 1, 0.36, 1),
-    outline-color 0.4s cubic-bezier(0.22, 1, 0.36, 1),
-    caret-color 0.4s cubic-bezier(0.22, 1, 0.36, 1) !important;
-  transition-delay: 0s !important;
+/* Instant theme swap: suppress staggered color transitions, keep the switch thumb. */
+html.disable-theme-transitions,
+html.disable-theme-transitions * {
+  transition: none !important;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  html.theme-transition,
-  html.theme-transition *,
-  html.theme-transition *::before,
-  html.theme-transition *::after {
-    transition: none !important;
-  }
+html.disable-theme-transitions [data-theme-toggle],
+html.disable-theme-transitions [data-theme-toggle] * {
+  transition: transform 200ms ease, background-color 200ms ease !important;
 }
 
 ::selection {

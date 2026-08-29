@@ -27,6 +27,13 @@ const promos = [
     href: "/services/bills",
     tone: "from-[#ff7a1a] to-oryno-orange",
   },
+  {
+    emoji: "🏆",
+    title: "Fund betting wallets",
+    subtitle: "Bet9ja, SportyBet, 1xBet and more — instant from your balance",
+    href: "/services/betting",
+    tone: "from-[#16A34A] to-[#15803d]",
+  },
 ];
 
 export function PromoBanner() {

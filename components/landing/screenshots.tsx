@@ -33,7 +33,7 @@ export function Screenshots({ shots }: ScreenshotsProps) {
             Clean screens. Confident actions.
           </motion.h2>
           <motion.p variants={fadeUp} className="section-copy mx-auto mt-3">
-            Real product screens — wallet, gift cards, data, bills, numbers, and
+            Real product screens — wallet, gift cards, data, bills, betting, numbers, and
             more.
           </motion.p>
         </motion.div>

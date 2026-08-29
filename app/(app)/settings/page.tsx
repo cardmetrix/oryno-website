@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useClerk, useUser } from "@clerk/nextjs";
-import { useTheme } from "next-themes";
 import { motion } from "framer-motion";
 import {
   Bell,
@@ -54,10 +53,10 @@ type SettingsPayload = {
 export default function SettingsPage() {
   const { isLoaded } = useUser();
   const { signOut } = useClerk();
-  const { setTheme } = useTheme();
   const { country } = useCountry();
   const [data, setData] = useState<SettingsPayload | null>(null);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const languages = languagesForCountry(
     data?.profile.countryCode ?? country.code,
   );
@@ -68,18 +67,14 @@ export default function SettingsPage() {
       if (!res.ok) throw new Error("Failed");
       const json = (await res.json()) as SettingsPayload;
       setData(json);
-      if (json.preferences.theme) {
-        const next =
-          json.preferences.theme === "system" ? "light" : json.preferences.theme;
-        // Sync without transition class — initial load should not animate.
-        setTheme(next);
-      }
+      // Do not call setTheme here — the toggle already owns the live theme.
+      // Overwriting on load caused a visible light/dark glitch.
     } catch {
       toast.error("Could not load settings");
     } finally {
       setLoading(false);
     }
-  }, [setTheme]);
+  }, []);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -128,11 +123,14 @@ export default function SettingsPage() {
   }
 
   async function onThemePersist(nextDark: boolean) {
-    // ThemeToggle already applied local theme with a smooth transition.
+    // ThemeToggle already painted the theme instantly.
+    setSaving(true);
     try {
       await patch({ theme: nextDark ? "dark" : "light" });
     } catch {
       // Theme still applied locally
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -278,7 +276,8 @@ export default function SettingsPage() {
               </div>
             </div>
             <ThemeToggle
-              onCheckedChangePersist={(checked) => void onThemePersist(checked)}
+              disabled={saving || loading}
+              onCheckedChangePersist={(checked) => onThemePersist(checked)}
             />
           </div>
         </Section>

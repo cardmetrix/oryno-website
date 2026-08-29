@@ -58,7 +58,7 @@ export default function ServicesPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/services", { cache: "force-cache" });
+      const res = await fetch("/api/services", { cache: "no-store" });
       if (!res.ok) throw new Error("Failed");
       const json = (await res.json()) as { services: ApiService[] };
       setServices(
@@ -115,8 +115,8 @@ export default function ServicesPage() {
                     {services.length} services ready
                   </h2>
                   <p className="mt-1 max-w-md text-sm text-white/85">
-                    Airtime, data, bills, boosting, numbers — search or filter
-                    to jump in fast.
+                    Airtime, data, bills, betting, boosting, numbers — search or
+                    filter to jump in fast.
                   </p>
                 </div>
                 <span className="rounded-full bg-black/20 px-2.5 py-1 text-[11px] font-bold text-[#ffd29a] ring-1 ring-white/20">
@@ -131,7 +131,7 @@ export default function ServicesPage() {
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search airtime, DStv, Instagram…"
+                  placeholder="Search airtime, Bet9ja, DStv, Instagram…"
                   className="h-12 w-full rounded-[16px] border border-border bg-muted/40 pr-4 pl-10 text-sm outline-none transition focus:border-primary focus:bg-background focus:ring-2 focus:ring-primary/15"
                 />
               </div>

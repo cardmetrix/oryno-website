@@ -103,7 +103,7 @@ export function NotificationDropdown() {
           type="button"
           whileHover={{ y: -1 }}
           whileTap={{ scale: 0.96 }}
-          className="relative flex h-10 w-10 items-center justify-center rounded-[14px] border border-border bg-background shadow-[var(--shadow-soft)] transition hover:bg-muted"
+          className="relative flex h-10 w-10 items-center justify-center rounded-[14px] "
           aria-label="Notifications"
         >
           <Bell className="h-5 w-5 text-foreground" strokeWidth={1.75} />

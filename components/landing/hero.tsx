@@ -60,7 +60,7 @@ export function Hero({ homeSrc, walletSrc }: HeroProps) {
             variants={fadeUp}
             className="mt-5 max-w-md text-base leading-relaxed text-muted-foreground sm:text-lg"
           >
-         The smarter way to manage your digital life—buy and sell gift cards, purchase airtime and data, pay bills, get virtual numbers, and grow your social media, all in one secure app built for Africa.
+         The smarter way to manage your digital life—buy and sell gift cards, purchase airtime and data, pay bills, fund betting wallets, get virtual numbers, and grow your social media, all in one secure app built for Africa.
           </motion.p>
 
           <motion.div variants={fadeUp} className="mt-8 flex flex-col gap-4">

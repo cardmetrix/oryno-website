@@ -9,6 +9,7 @@ import {
   Megaphone,
   Mail,
   ShieldCheck,
+  Trophy,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { GiftCardIcon } from "@/components/icons/gift-card-icon";
@@ -47,6 +48,12 @@ const features: {
     icon: Tv,
     title: "TV Subscriptions",
     description: "Renew DStv, GOtv, Startimes and more in a few taps.",
+  },
+  {
+    icon: Trophy,
+    title: "Betting Funding",
+    description:
+      "Fund Bet9ja, SportyBet, 1xBet, BetKing and more from your wallet.",
   },
   {
     icon: Phone,

@@ -34,6 +34,7 @@ export const DEFAULT_COUNTRY_SERVICES = [
   "airtime",
   "data",
   "bills",
+  "betting",
   "virtual_numbers",
   "social",
   "gift_cards",

@@ -156,8 +156,8 @@ export function Download() {
             variants={fadeUp}
             className="mx-auto mt-4 max-w-lg text-base leading-relaxed text-[#5c3310]/80 sm:text-lg dark:text-white/70"
           >
-            Download ORYNO and manage airtime, data, bills, virtual numbers, and
-            more — all from one premium app.
+            Download ORYNO and manage airtime, data, bills, betting wallets,
+            virtual numbers, and more — all from one premium app.
           </motion.p>
 
           <motion.div

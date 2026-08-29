@@ -97,7 +97,7 @@ export const servicesDirectory: ServiceDirectoryItem[] = [
     shortDescription: "Fund SportyBet, Bet9ja & more",
     longDescription:
       "Verify a betting account ID and credit Bet9ja, SportyBet, 1xBet, BetKing, MelBet and other Nigerian bookmakers from your ORYNO wallet.",
-    category: "Lifestyle",
+    category: "Utilities",
     tags: ["Bet9ja", "SportyBet", "1xBet", "BetKing", "MelBet"],
     eta: "Instant",
     accent: "#16A34A",
