@@ -12,7 +12,7 @@ import {
   type SyncedUser,
 } from "@/lib/auth/sync-user";
 import { resolveLanguageForCountry } from "@/lib/country";
-import { countryOverrideForUsername } from "@/lib/country-overrides";
+import { countryOverrideForUser } from "@/lib/country-overrides";
 import { currencyForCountry, ensurePrimaryWallet } from "@/lib/wallet";
 
 export async function requireClerkAuth() {
@@ -54,7 +54,10 @@ async function resolveAndSync(options?: {
         where: eq(users.clerkId, clerkUser.id),
       });
       if (existing) {
-        const locked = countryOverrideForUsername(existing.username);
+        const locked = countryOverrideForUser({
+          username: existing.username,
+          email: existing.email,
+        });
         if (locked && existing.countryCode !== locked) {
           const [updated] = await db
             .update(users)

@@ -7,7 +7,7 @@ import {
   resolveCountryCode,
   resolveLanguageForCountry,
 } from "@/lib/country";
-import { countryOverrideForUsername } from "@/lib/country-overrides";
+import { countryOverrideForUser } from "@/lib/country-overrides";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { currencyForCountry, ensurePrimaryWallet } from "@/lib/wallet";
@@ -21,7 +21,10 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const locked = countryOverrideForUsername(user.username);
+    const locked = countryOverrideForUser({
+      username: user.username,
+      email: user.email,
+    });
     const country = getCountryInfo(locked ?? user.countryCode);
     if (locked && user.countryCode !== locked) {
       await db
@@ -70,7 +73,10 @@ export async function PATCH(req: Request) {
       );
     }
 
-    const locked = countryOverrideForUsername(user.username);
+    const locked = countryOverrideForUser({
+      username: user.username,
+      email: user.email,
+    });
     const country = getCountryInfo(
       locked ?? resolveCountryCode(body.countryCode),
     );

@@ -3,15 +3,36 @@ import {
   type SupportedCountryCode,
 } from "@/lib/country";
 
-/** Force a market for specific usernames (test / partner accounts). */
+/** Force a market for specific accounts. Google / IP location cannot override these. */
 const USERNAME_COUNTRY: Record<string, SupportedCountryCode> = {
   ziecozeno4: "GH",
 };
 
+const EMAIL_COUNTRY: Record<string, SupportedCountryCode> = {
+  "ziecozeno2@gmail.com": "GH",
+};
+
+export function countryOverrideForUser(input: {
+  username?: string | null;
+  email?: string | null;
+}): SupportedCountryCode | null {
+  const username = input.username?.trim().toLowerCase();
+  if (username && USERNAME_COUNTRY[username]) {
+    return resolveCountryCode(USERNAME_COUNTRY[username]);
+  }
+
+  const email = input.email?.trim().toLowerCase();
+  if (email && EMAIL_COUNTRY[email]) {
+    return resolveCountryCode(EMAIL_COUNTRY[email]);
+  }
+
+  return null;
+}
+
+/** @deprecated use countryOverrideForUser */
 export function countryOverrideForUsername(
   username?: string | null,
+  email?: string | null,
 ): SupportedCountryCode | null {
-  if (!username) return null;
-  const mapped = USERNAME_COUNTRY[username.trim().toLowerCase()];
-  return mapped ? resolveCountryCode(mapped) : null;
+  return countryOverrideForUser({ username, email });
 }

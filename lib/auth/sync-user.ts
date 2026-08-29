@@ -14,7 +14,7 @@ import {
   resolveLanguageForCountry,
   type SupportedCountryCode,
 } from "@/lib/country";
-import { countryOverrideForUsername } from "@/lib/country-overrides";
+import { countryOverrideForUser } from "@/lib/country-overrides";
 
 export type SyncedUser = typeof users.$inferSelect;
 
@@ -274,9 +274,10 @@ export async function syncClerkUserToDb(
   let dbUser: SyncedUser;
 
   if (existing) {
-    const lockedCountry = countryOverrideForUsername(
-      username ?? existing.username,
-    );
+    const lockedCountry = countryOverrideForUser({
+      username: username ?? existing.username,
+      email: email || existing.email,
+    });
     const nextCountry =
       lockedCountry ??
       (options?.forceCountry && detectedCountry
@@ -335,7 +336,7 @@ export async function syncClerkUserToDb(
     }
   } else {
     const countryCode =
-      countryOverrideForUsername(username) ??
+      countryOverrideForUser({ username, email }) ??
       resolveCountryCode(detectedCountry ?? phoneCountry ?? "NG");
 
     try {
