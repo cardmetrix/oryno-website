@@ -6,6 +6,7 @@ export type ServiceInstructionId =
   | "virtual-numbers"
   | "emails"
   | "gift-cards"
+  | "betting"
   | "catalog";
 
 export type ServiceInstructionsContent = {
@@ -85,6 +86,16 @@ export const SERVICE_INSTRUCTIONS: Record<
       "Sell: pick a brand, enter the code or upload photos, and get Naira credit.",
       "Buy: pick a product and amount, pay from your wallet, and receive the code.",
       "Every trade appears in History with a receipt you can revisit anytime.",
+    ],
+  },
+  betting: {
+    subtitle: "Follow these steps to fund a betting wallet",
+    steps: [
+      "Betting funding is available for Nigeria accounts.",
+      "Fund your ORYNO wallet first if your balance is low.",
+      "Pick a bookmaker (Bet9ja, SportyBet, 1xBet, BetKing, and more).",
+      "Enter the betting account ID and verify the customer name.",
+      "Choose an amount, pay from your wallet, and keep the History receipt.",
     ],
   },
   catalog: {

@@ -6,8 +6,8 @@ import { motion } from "framer-motion";
 import {
   ArrowRight,
   MoreHorizontal,
-  Phone,
   Smartphone,
+  Trophy,
   TrendingUp,
   Wifi,
 } from "lucide-react";
@@ -26,7 +26,7 @@ import type { WalletPayload } from "@/lib/wallet-types";
 const quickActions = [
   { href: "/services/gift-cards", label: "Gift Cards", icon: GiftCardIcon },
   { href: "/services/social", label: "Boosting", icon: TrendingUp },
-  { href: "/services/virtual-numbers", label: "Numbers", icon: Phone },
+  { href: "/services/betting", label: "Betting", icon: Trophy },
   { href: "/services/airtime", label: "Airtime", icon: Smartphone },
   { href: "/services/data", label: "Data", icon: Wifi },
   { href: "/services", label: "More", icon: MoreHorizontal },

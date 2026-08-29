@@ -67,4 +67,32 @@ curl -X POST \
   -H "Content-Type: application/json" \
   -d '{"serviceID":"mtn","phone":"08012345678","amount":100}' \
   https://orynoafrica.com/api/external/v1/services/airtime/purchase
+
+# Betting providers + demo IDs
+curl -H "Authorization: Bearer $TOKEN" \
+  https://orynoafrica.com/api/external/v1/services/betting/providers
+
+# Verify betting account
+curl -X POST \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"serviceID":"bet9ja","customerRef":"12345678"}' \
+  https://orynoafrica.com/api/external/v1/services/betting/verify
+
+# Fund betting wallet
+curl -X POST \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"serviceID":"bet9ja","customerRef":"12345678","amount":2000}' \
+  https://orynoafrica.com/api/external/v1/services/betting/fund
 ```
+
+Demo customer IDs (when `VTU_AFRICA_API_KEY` is unset or `BETTING_DEMO=true`):
+
+| ID | Result |
+|---|---|
+| `12345678` | Adaobi Okafor — verify + fund succeed |
+| `87654321` | Chinedu Eze — verify + fund succeed |
+| `10000001` | Sporty Demo User — verify + fund succeed |
+| `00000000` | Verification fails |
+| `99999999` | Verifies, then funding fails and wallet is refunded |

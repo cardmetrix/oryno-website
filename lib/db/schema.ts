@@ -79,6 +79,7 @@ export const transactionCategoryEnum = pgEnum("transaction_category", [
   "virtual_number",
   "social",
   "gift_card",
+  "betting",
   "cashback",
   "referral",
   "refund",
@@ -724,6 +725,35 @@ export const billPayments = pgTable(
     ...timestamps,
   },
   (t) => [index("bill_payments_user_idx").on(t.userId)],
+);
+
+// ─── 5b. Betting wallet funding ──────────────────────────────────────────────
+
+export const bettingOrders = pgTable(
+  "betting_orders",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    providerSlug: varchar("provider_slug", { length: 80 }).notNull(),
+    providerName: varchar("provider_name", { length: 120 }).notNull(),
+    customerRef: varchar("customer_ref", { length: 80 }).notNull(),
+    customerName: varchar("customer_name", { length: 160 }),
+    amount: numeric("amount", { precision: 18, scale: 2 }).notNull(),
+    status: orderStatusEnum("status").notNull().default("pending"),
+    transactionId: uuid("transaction_id").references(() => transactions.id, {
+      onDelete: "set null",
+    }),
+    providerRef: varchar("provider_ref", { length: 120 }),
+    failureReason: text("failure_reason"),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+    ...timestamps,
+  },
+  (t) => [
+    index("betting_orders_user_idx").on(t.userId),
+    index("betting_orders_status_idx").on(t.status),
+  ],
 );
 
 // ─── 6. Virtual numbers ──────────────────────────────────────────────────────

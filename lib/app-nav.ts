@@ -7,6 +7,7 @@ import {
   Phone,
   Settings,
   Smartphone,
+  Trophy,
   TrendingUp,
   User,
   Wallet,
@@ -36,6 +37,7 @@ export const serviceNav = [
   { href: "/services/airtime", label: "Airtime", icon: Smartphone },
   { href: "/services/data", label: "Data", icon: Wifi },
   { href: "/services/bills", label: "Bills", icon: Zap },
+  { href: "/services/betting", label: "Betting", icon: Trophy },
   { href: "/services", label: "All Services", icon: LayoutGrid },
 ] as const;
 

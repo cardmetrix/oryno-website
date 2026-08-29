@@ -46,6 +46,7 @@ const isPublicRoute = createRouteMatcher([
   "/api/jap(.*)",
   "/api/reloadly(.*)",
   "/api/sogo(.*)",
+  "/api/betting(.*)",
   "/api/mobile-health(.*)",
 ]);
 

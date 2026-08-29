@@ -25,6 +25,7 @@ export const EXTERNAL_ALLOWED_ROOTS = new Set([
   "jap",
   "reloadly",
   "sogo",
+  "betting",
   "uploadthing",
 ]);
 
@@ -39,6 +40,9 @@ export const EXTERNAL_PATH_ALIASES: Record<string, string> = {
   "/services/bills/purchase": "/vtpass/purchase/bill",
   "/services/bills/verify": "/vtpass/verify",
   "/services/bills/variations": "/vtpass/variations",
+  "/services/betting/providers": "/betting/providers",
+  "/services/betting/verify": "/betting/verify",
+  "/services/betting/fund": "/betting/fund",
   "/services/vtpass": "/vtpass/services",
   "/services/variations": "/vtpass/variations",
   "/services/international/countries": "/vtpass/international/countries",

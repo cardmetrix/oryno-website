@@ -471,52 +471,52 @@ function WalletPageContent() {
             </div>
           ) : null}
 
-          {/* md+: local stats + banks under local card, USD actions under USD */}
-          <div className="mt-4 hidden gap-4 md:grid md:grid-cols-2 md:items-start">
-            <div className="min-w-0 space-y-4">
-              <MotionSection delay={0.06} className="grid grid-cols-3 gap-3">
-                {[
-                  {
-                    label: "Balance",
-                    value: hidden
-                      ? "••••"
-                      : `${symbol}${Number(data.totals.balance).toLocaleString("en-NG", { maximumFractionDigits: 0 })}`,
-                    icon: Wallet,
-                  },
-                  {
-                    label: "Banks",
-                    value: String(data.totals.bankCount),
-                    icon: Landmark,
-                  },
-                  {
-                    label: "Recent",
-                    value: String(data.recent.length),
-                    icon: Clock,
-                  },
-                ].map((stat, i) => {
-                  const Icon = stat.icon;
-                  return (
-                    <motion.div
-                      key={stat.label}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.08 + i * 0.04 }}
-                      className="rounded-[22px] bg-background p-3.5 shadow-[var(--shadow-soft)] sm:p-4"
-                    >
-                      <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-oryno-orange-muted text-primary">
-                        <Icon className="h-4 w-4" strokeWidth={1.75} />
-                      </span>
-                      <p className="mt-2.5 text-[11px] font-medium text-muted-foreground">
-                        {stat.label}
-                      </p>
-                      <p className="mt-0.5 truncate text-sm font-bold text-foreground sm:text-base">
-                        {stat.value}
-                      </p>
-                    </motion.div>
-                  );
-                })}
-              </MotionSection>
+          {/* md+: stats full width, then equal-height bank + USD cards */}
+          <div className="mt-4 hidden md:block">
+            <MotionSection delay={0.06} className="grid grid-cols-3 gap-3">
+              {[
+                {
+                  label: "Balance",
+                  value: hidden
+                    ? "••••"
+                    : `${symbol}${Number(data.totals.balance).toLocaleString("en-NG", { maximumFractionDigits: 0 })}`,
+                  icon: Wallet,
+                },
+                {
+                  label: "Banks",
+                  value: String(data.totals.bankCount),
+                  icon: Landmark,
+                },
+                {
+                  label: "Recent",
+                  value: String(data.recent.length),
+                  icon: Clock,
+                },
+              ].map((stat, i) => {
+                const Icon = stat.icon;
+                return (
+                  <motion.div
+                    key={stat.label}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.08 + i * 0.04 }}
+                    className="rounded-[22px] bg-background p-3.5 shadow-[var(--shadow-soft)] sm:p-4"
+                  >
+                    <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-oryno-orange-muted text-primary">
+                      <Icon className="h-4 w-4" strokeWidth={1.75} />
+                    </span>
+                    <p className="mt-2.5 text-[11px] font-medium text-muted-foreground">
+                      {stat.label}
+                    </p>
+                    <p className="mt-0.5 truncate text-sm font-bold text-foreground sm:text-base">
+                      {stat.value}
+                    </p>
+                  </motion.div>
+                );
+              })}
+            </MotionSection>
 
+            <div className="mt-4 grid grid-cols-2 items-stretch gap-4">
               <BankAccountsSection
                 data={data}
                 adding={adding}
@@ -535,9 +535,8 @@ function WalletPageContent() {
                 onAddAccount={onAddAccount}
                 setPrimary={setPrimary}
                 removeAccount={removeAccount}
+                className="h-full"
               />
-            </div>
-            <div className="min-w-0">
               <UsdWalletActionsPanel
                 localCurrency={currency}
                 localBalanceFormatted={data.primary.balanceFormatted}
@@ -545,7 +544,7 @@ function WalletPageContent() {
                 panel={usdPanel}
                 onPanelChange={setUsdPanel}
                 onUpdated={() => void load({ soft: true })}
-                className="mt-0"
+                className="mt-0 h-full"
               />
             </div>
           </div>
@@ -646,6 +645,7 @@ function BankAccountsSection({
   onAddAccount,
   setPrimary,
   removeAccount,
+  className,
 }: {
   data: WalletPayload;
   adding: boolean;
@@ -664,11 +664,15 @@ function BankAccountsSection({
   onAddAccount: (e: FormEvent) => void | Promise<void>;
   setPrimary: (id: string) => void | Promise<void>;
   removeAccount: (id: string) => void | Promise<void>;
+  className?: string;
 }) {
   return (
     <MotionSection
       delay={0.1}
-      className="rounded-[28px] bg-background p-5 shadow-[var(--shadow-soft)] sm:p-6"
+      className={cn(
+        "flex flex-col rounded-[28px] bg-background p-5 shadow-[var(--shadow-soft)] sm:p-6",
+        className,
+      )}
     >
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -800,7 +804,7 @@ function BankAccountsSection({
         ) : null}
       </AnimatePresence>
 
-      <div className="space-y-3">
+      <div className="min-h-0 flex-1 space-y-3">
         {data.banks.map((account, index) => (
           <motion.div
             key={account.id}

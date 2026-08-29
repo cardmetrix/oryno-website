@@ -134,6 +134,13 @@
       "when": 1786800000000,
       "tag": "0019_custom_totp",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1786900000000,
+      "tag": "0020_betting_funding",
+      "breakpoints": true
     }
   ]
 }

@@ -295,16 +295,17 @@ export function UsdWalletActionsPanel({
   }
 
   return (
-    <AnimatePresence mode="wait" initial={false}>
+    <div className={cn("mt-3 h-full", className)}>
+      <AnimatePresence mode="wait" initial={false}>
       <motion.div
         key={panel}
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -6 }}
         transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-        className={cn("mt-3", className)}
+        className="h-full"
       >
-        <div className="rounded-[22px] bg-background p-4 shadow-[var(--shadow-soft)] sm:p-5">
+        <div className="flex h-full flex-col rounded-[22px] bg-background p-4 shadow-[var(--shadow-soft)] sm:p-5">
           {panel === "fund" ? (
             <>
               <h3 className="text-sm font-semibold text-foreground">
@@ -428,11 +429,12 @@ export function UsdWalletActionsPanel({
             <p className="mt-3 text-sm font-medium text-destructive">{error}</p>
           ) : null}
 
+          <div className="mt-auto pt-4">
           <button
             type="button"
             disabled={busy || !amount || Number(amount) <= 0}
             onClick={() => void (panel === "fund" ? onFund() : onConvert())}
-            className="btn-primary mt-4 inline-flex h-12 w-full items-center justify-center gap-2 text-sm disabled:opacity-50"
+            className="btn-primary inline-flex h-12 w-full items-center justify-center gap-2 text-sm disabled:opacity-50"
           >
             {busy ? (
               <>
@@ -451,8 +453,10 @@ export function UsdWalletActionsPanel({
               `Convert to ${localCurrency}`
             )}
           </button>
+          </div>
         </div>
       </motion.div>
     </AnimatePresence>
+    </div>
   );
 }

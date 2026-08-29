@@ -32,6 +32,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   data: 'Mobile data',
   bill: 'Bills',
   bills: 'Bills',
+  betting: 'Betting funding',
   gift_card: 'Gift cards',
   giftcard: 'Gift cards',
   social: 'Social boost',
