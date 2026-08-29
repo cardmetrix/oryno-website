@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { ensureAppUser } from "@/lib/auth/current-user";
 import { db } from "@/lib/db";
 import { transactions } from "@/lib/db/schema";
+import { getDisplayFx } from "@/lib/display-currency";
 import { toTransactionReceipt } from "@/lib/transactions";
 
 export const runtime = "nodejs";
@@ -32,8 +33,9 @@ export async function GET(_req: Request, { params }: Params) {
       );
     }
 
+    const displayFx = await getDisplayFx(user.countryCode);
     return NextResponse.json({
-      transaction: toTransactionReceipt(row),
+      transaction: toTransactionReceipt(row, displayFx),
     });
   } catch (error) {
     console.error("[transactions-id-get]", error);

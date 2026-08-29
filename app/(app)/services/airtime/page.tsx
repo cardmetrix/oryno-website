@@ -16,7 +16,6 @@ import {
 import { SelectSheet } from "@/components/app/select-sheet";
 import { useCountry } from "@/components/providers/country-provider";
 import { airtimePresets, estimateAirtimeCashback } from "@/lib/telecom";
-import { formatCountryMoney } from "@/lib/country";
 import { cleanNetworkName } from "@/lib/vtpass/catalog";
 import { cn } from "@/lib/utils";
 
@@ -28,7 +27,7 @@ type Variation = {
 };
 
 export default function AirtimePage() {
-  const { country, loading: countryLoading } = useCountry();
+  const { country, loading: countryLoading, formatServiceMoney } = useCountry();
   const countryCode = country?.code || "NG";
   const isNigeria = countryCode === "NG";
 
@@ -230,7 +229,7 @@ export default function AirtimePage() {
     }
   }
 
-  const money = (n: number) => formatCountryMoney(n, countryCode);
+  const money = (n: number) => formatServiceMoney(n);
 
   return (
     <AppShell hideNav>

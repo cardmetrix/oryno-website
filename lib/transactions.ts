@@ -1,3 +1,5 @@
+import { convertNgnToLocal, type NgnLocalQuote } from "@/lib/fx/rates";
+
 export type TransactionStatus = "Completed" | "Pending" | "Failed";
 
 export type AppTransaction = {
@@ -40,18 +42,38 @@ type TransactionRowLike = {
   createdAt: Date | string;
 };
 
-export function toAppTransaction(row: TransactionRowLike): AppTransaction {
+function presentAmount(
+  amount: string | number,
+  storedCurrency: string,
+  fx?: NgnLocalQuote | null,
+) {
+  const raw = typeof amount === "number" ? amount : Number(amount);
+  if (fx && fx.to !== "NGN" && storedCurrency === "NGN") {
+    const local = convertNgnToLocal(raw, fx.ngnToLocal);
+    return { value: local, currency: fx.to, formatted: formatMoney(local, fx.to) };
+  }
+  return {
+    value: raw,
+    currency: storedCurrency,
+    formatted: formatMoney(raw, storedCurrency),
+  };
+}
+
+export function toAppTransaction(
+  row: TransactionRowLike,
+  fx?: NgnLocalQuote | null,
+): AppTransaction {
   const credit = row.type === "credit";
-  const signed = formatMoney(row.amount, row.currency);
+  const presented = presentAmount(row.amount, row.currency, fx);
   return {
     id: row.id,
     title: row.title,
     subtitle: row.subtitle || row.category.replace(/_/g, " "),
-    amount: `${credit ? "+" : "-"}${signed}`,
+    amount: `${credit ? "+" : "-"}${presented.formatted}`,
     type: credit ? "credit" : "debit",
     status: mapDbStatus(row.status),
     category: row.category,
-    currency: row.currency,
+    currency: presented.currency,
     createdAt:
       typeof row.createdAt === "string"
         ? row.createdAt
@@ -59,8 +81,11 @@ export function toAppTransaction(row: TransactionRowLike): AppTransaction {
   };
 }
 
-export function toTransactionReceipt(row: TransactionRowLike): TransactionReceipt {
-  const base = toAppTransaction(row);
+export function toTransactionReceipt(
+  row: TransactionRowLike,
+  fx?: NgnLocalQuote | null,
+): TransactionReceipt {
+  const base = toAppTransaction(row, fx);
   const meta = row.metadata ?? null;
   const metaRef =
     meta && typeof meta.reference === "string" ? meta.reference : null;
@@ -76,14 +101,14 @@ export function toTransactionReceipt(row: TransactionRowLike): TransactionReceip
 
   return {
     ...base,
-    amountRaw: String(row.amount),
-    amountUnsigned: formatMoney(row.amount, row.currency),
+    amountRaw: String(presentAmount(row.amount, row.currency, fx).value),
+    amountUnsigned: presentAmount(row.amount, row.currency, fx).formatted,
     balanceAfter:
       row.balanceAfter == null ? null : String(row.balanceAfter),
     balanceAfterFormatted:
       row.balanceAfter == null
         ? null
-        : formatMoney(row.balanceAfter, row.currency),
+        : presentAmount(row.balanceAfter, row.currency, fx).formatted,
     externalRef: row.externalRef,
     reference,
     categoryLabel: row.category.replace(/_/g, " "),

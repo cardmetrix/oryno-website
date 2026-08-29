@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
 import { getCountryInfo } from "@/lib/country";
 import { ensureWalletSchema } from "@/lib/db/ensure-schema";
+import { getDisplayFx } from "@/lib/display-currency";
 import { quoteLocalUsd } from "@/lib/fx/rates";
 import {
-  currencyForCountry,
   ensurePrimaryWallet,
   listBankAccounts,
   listUserWallets,
@@ -33,17 +33,19 @@ export async function GET(req: Request) {
       );
     }
 
-    const currency = currencyForCountry(user.countryCode);
+    const displayFx = await getDisplayFx(user.countryCode);
+    const currency = displayFx.to;
 
     let primary: WalletRow;
     try {
-      primary = await ensurePrimaryWallet(user.id, currency);
+      // Non-NG markets still settle on the Nigeria (NGN) ledger, then convert.
+      primary = await ensurePrimaryWallet(user.id, "NGN");
     } catch (walletError) {
       console.error("[wallet-get-primary]", walletError);
       const fallbackWallets = await listUserWallets(user.id).catch(() => []);
       const found =
+        fallbackWallets.find((w) => w.currency === "NGN") ??
         fallbackWallets.find((w) => w.isPrimary) ??
-        fallbackWallets.find((w) => w.currency === currency) ??
         fallbackWallets[0];
       if (!found) throw walletError;
       primary = found;
@@ -62,17 +64,17 @@ export async function GET(req: Request) {
       console.error("[wallet-get-banks]", error);
       return [];
     });
-    const recent = await recentWalletTransactions(user.id, 8).catch(
+    const recent = await recentWalletTransactions(user.id, 8, displayFx).catch(
       (error) => {
         console.error("[wallet-get-recent]", error);
         return [];
       },
     );
 
-    const walletsSummary = walletRows.map(toWalletSummary);
+    const walletsSummary = walletRows.map((w) => toWalletSummary(w, displayFx));
     const primarySummary =
       walletsSummary.find((w) => w.id === primary.id) ??
-      toWalletSummary(primary);
+      toWalletSummary(primary, displayFx);
     const usdSummary =
       (usdRow && walletsSummary.find((w) => w.id === usdRow.id)) ||
       (usdRow ? toWalletSummary(usdRow) : null) ||
@@ -92,6 +94,7 @@ export async function GET(req: Request) {
         banks: bankRows.map(toBankSummary),
         recent,
         fx,
+        displayFx,
         totals: {
           balance: primarySummary.balance,
           balanceFormatted: primarySummary.balanceFormatted,

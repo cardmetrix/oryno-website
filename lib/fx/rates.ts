@@ -142,3 +142,57 @@ export function usdFromLocal(localAmount: number, buyRate: number) {
 }
 
 export { FX_COMMISSION };
+
+export type NgnLocalQuote = {
+  from: "NGN";
+  to: string;
+  /** Multiply an NGN amount by this to get the display currency. */
+  ngnToLocal: number;
+  /** Multiply a local amount by this to get NGN. */
+  localToNgn: number;
+  provider: string;
+  asOf: string;
+};
+
+/** Mid-market quote for showing the Nigeria (NGN) ledger in another currency. */
+export async function quoteNgnToLocal(
+  localCurrency: string,
+): Promise<NgnLocalQuote> {
+  const to = localCurrency.toUpperCase();
+  if (to === "NGN") {
+    return {
+      from: "NGN",
+      to: "NGN",
+      ngnToLocal: 1,
+      localToNgn: 1,
+      provider: "identity",
+      asOf: new Date().toISOString(),
+    };
+  }
+
+  const [ngn, local] = await Promise.all([
+    getUsdMidRate("NGN"),
+    getUsdMidRate(to),
+  ]);
+  const ngnToLocal = local.midRate / ngn.midRate;
+  if (!Number.isFinite(ngnToLocal) || ngnToLocal <= 0) {
+    throw new Error(`No NGN→${to} rate available`);
+  }
+
+  return {
+    from: "NGN",
+    to,
+    ngnToLocal,
+    localToNgn: 1 / ngnToLocal,
+    provider: ngn.provider,
+    asOf: new Date().toISOString(),
+  };
+}
+
+export function convertNgnToLocal(ngnAmount: number, ngnToLocal: number) {
+  return roundMoney(Number(ngnAmount) * ngnToLocal);
+}
+
+export function convertLocalToNgn(localAmount: number, localToNgn: number) {
+  return roundMoney(Number(localAmount) * localToNgn);
+}

@@ -24,8 +24,12 @@ export async function GET() {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
+    const { getDisplayFx } = await import("@/lib/display-currency");
+    const displayFx = await getDisplayFx(dbUser.countryCode);
+
     return NextResponse.json({
       profile: toProfileDto(dbUser, { clerkImageUrl: clerkUser.imageUrl }),
+      displayFx,
     });
   } catch (error) {
     console.error("[profile-get]", error);

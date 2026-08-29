@@ -9,7 +9,6 @@ import {
 import { createNotification } from "@/lib/notifications-service";
 import {
   countryFromPhone as countryFromPhoneLib,
-  currencyForCountry,
   resolveCountryCode,
   resolveLanguageForCountry,
   type SupportedCountryCode,
@@ -395,7 +394,7 @@ export async function syncClerkUserToDb(
     .values({ userId: dbUser.id })
     .onConflictDoNothing();
 
-  const currency = currencyForCountry(dbUser.countryCode);
+  const currency = "NGN";
   try {
     const { ensurePrimaryWallet } = await import("@/lib/wallet");
     await ensurePrimaryWallet(dbUser.id, currency);

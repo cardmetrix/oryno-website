@@ -3,9 +3,9 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { ensureWalletSchema } from "@/lib/db/ensure-schema";
 import { bettingOrders, transactions, wallets } from "@/lib/db/schema";
+import { nigeriaServiceLedgerCurrency } from "@/lib/display-currency";
 import { formatMoney } from "@/lib/transactions";
 import {
-  currencyForCountry,
   ensurePrimaryWallet,
   toWalletSummary,
 } from "@/lib/wallet";
@@ -36,7 +36,7 @@ async function debitForBetting(input: {
     throw Object.assign(new Error("Enter a valid amount"), { status: 400 });
   }
 
-  const currency = currencyForCountry(input.countryCode);
+  const currency = nigeriaServiceLedgerCurrency();
   const wallet = await ensurePrimaryWallet(input.userId, currency);
 
   if (wallet.status === "frozen" || wallet.status === "closed") {

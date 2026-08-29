@@ -13,7 +13,7 @@ import {
 } from "@/lib/auth/sync-user";
 import { resolveLanguageForCountry } from "@/lib/country";
 import { countryOverrideForUser } from "@/lib/country-overrides";
-import { currencyForCountry, ensurePrimaryWallet } from "@/lib/wallet";
+import { ensurePrimaryWallet } from "@/lib/wallet";
 
 export async function requireClerkAuth() {
   const { userId } = await auth();
@@ -69,10 +69,7 @@ async function resolveAndSync(options?: {
             .where(eq(users.id, existing.id))
             .returning();
           if (updated) {
-            await ensurePrimaryWallet(
-              updated.id,
-              currencyForCountry(locked),
-            ).catch(() => undefined);
+            await ensurePrimaryWallet(updated.id, "NGN").catch(() => undefined);
             return { user: updated, debug };
           }
         }

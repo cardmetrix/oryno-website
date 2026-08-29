@@ -3,6 +3,7 @@ import { desc, eq } from "drizzle-orm";
 import { ensureAppUser } from "@/lib/auth/current-user";
 import { db } from "@/lib/db";
 import { transactions } from "@/lib/db/schema";
+import { getDisplayFx } from "@/lib/display-currency";
 import {
   groupTransactionsByDate,
   toAppTransaction,
@@ -23,7 +24,8 @@ export async function GET() {
       limit: 100,
     });
 
-    const items = rows.map(toAppTransaction);
+    const displayFx = await getDisplayFx(user.countryCode);
+    const items = rows.map((row) => toAppTransaction(row, displayFx));
 
     return NextResponse.json({
       items,

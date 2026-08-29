@@ -13,8 +13,8 @@ import {
 } from "@/lib/db/schema";
 import { estimateAirtimeCashback } from "@/lib/telecom";
 import { resolveCountryCode } from "@/lib/country";
+import { nigeriaServiceLedgerCurrency } from "@/lib/display-currency";
 import {
-  currencyForCountry,
   ensurePrimaryWallet,
   toWalletSummary,
 } from "@/lib/wallet";
@@ -219,7 +219,7 @@ async function debitForPurchase(input: {
     throw new Error("Enter a valid amount");
   }
 
-  const currency = currencyForCountry(input.countryCode);
+  const currency = nigeriaServiceLedgerCurrency();
   const wallet = await ensurePrimaryWallet(input.userId, currency);
 
   if (wallet.status === "frozen" || wallet.status === "closed") {

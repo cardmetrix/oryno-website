@@ -15,7 +15,6 @@ import {
 } from "@/components/app/vtpass-service-picker";
 import { SelectSheet } from "@/components/app/select-sheet";
 import { useCountry } from "@/components/providers/country-provider";
-import { formatCountryMoney } from "@/lib/country";
 import { cleanNetworkName, inferDataPlanCategory } from "@/lib/vtpass/catalog";
 import { cn } from "@/lib/utils";
 
@@ -29,7 +28,7 @@ type Variation = {
 const FILTERS = ["All", "Daily", "Weekly", "Monthly"] as const;
 
 export default function DataPage() {
-  const { country, loading: countryLoading } = useCountry();
+  const { country, loading: countryLoading, formatServiceMoney } = useCountry();
   const countryCode = country?.code || "NG";
   const isNigeria = countryCode === "NG";
 
@@ -215,7 +214,7 @@ export default function DataPage() {
     }
   }
 
-  const money = (n: number) => formatCountryMoney(n, countryCode);
+  const money = (n: number) => formatServiceMoney(n);
 
   return (
     <AppShell hideNav>

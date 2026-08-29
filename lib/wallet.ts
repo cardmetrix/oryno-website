@@ -13,6 +13,7 @@ import {
   type AppTransaction,
 } from "@/lib/transactions";
 import { currencyForCountry as currencyFromCountryLib } from "@/lib/country";
+import { convertNgnToLocal, type NgnLocalQuote } from "@/lib/fx/rates";
 import type {
   BankAccountSummary,
   FundingMethod,
@@ -57,14 +58,23 @@ export function formatCardDisplay(cardNumber: string, hidden = false) {
   return `${digits.slice(0, 4)}  ${digits.slice(4, 8)}  ${digits.slice(8)}`;
 }
 
-export function toWalletSummary(wallet: WalletRow): WalletSummary {
+export function toWalletSummary(
+  wallet: WalletRow,
+  fx?: NgnLocalQuote | null,
+): WalletSummary {
   const cardNumber =
     wallet.cardNumber || generateWalletCardNumber(wallet.userId, wallet.currency);
+  const convert =
+    fx && fx.to !== "NGN" && wallet.currency === "NGN";
+  const balanceValue = convert
+    ? convertNgnToLocal(Number(wallet.balance), fx.ngnToLocal)
+    : Number(wallet.balance);
+  const currency = convert ? fx.to : wallet.currency;
   return {
     id: wallet.id,
-    currency: wallet.currency,
-    balance: wallet.balance,
-    balanceFormatted: formatMoney(wallet.balance, wallet.currency),
+    currency,
+    balance: Number.isFinite(balanceValue) ? balanceValue.toFixed(2) : wallet.balance,
+    balanceFormatted: formatMoney(balanceValue, currency),
     status: wallet.status,
     isPrimary: wallet.isPrimary,
     dailyLimit: wallet.dailyLimit,
@@ -225,6 +235,7 @@ export async function listBankAccounts(userId: string) {
 export async function recentWalletTransactions(
   userId: string,
   limit = 8,
+  fx?: NgnLocalQuote | null,
 ): Promise<AppTransaction[]> {
   const rows = await db.query.transactions.findMany({
     where: eq(transactions.userId, userId),
@@ -232,7 +243,7 @@ export async function recentWalletTransactions(
     limit,
   });
 
-  return rows.map(toAppTransaction);
+  return rows.map((row) => toAppTransaction(row, fx));
 }
 
 function assertHealthy(wallet: WalletRow) {

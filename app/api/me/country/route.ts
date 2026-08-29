@@ -8,9 +8,10 @@ import {
   resolveLanguageForCountry,
 } from "@/lib/country";
 import { countryOverrideForUser } from "@/lib/country-overrides";
+import { getDisplayFx } from "@/lib/display-currency";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
-import { currencyForCountry, ensurePrimaryWallet } from "@/lib/wallet";
+import { ensurePrimaryWallet } from "@/lib/wallet";
 
 export const runtime = "nodejs";
 
@@ -36,13 +37,12 @@ export async function GET() {
         })
         .where(eq(users.id, user.id));
     }
-    const wallet = await ensurePrimaryWallet(
-      user.id,
-      currencyForCountry(country.code),
-    );
+    const displayFx = await getDisplayFx(country.code);
+    const wallet = await ensurePrimaryWallet(user.id, "NGN");
 
     return NextResponse.json({
       country,
+      displayFx,
       wallet: {
         id: wallet.id,
         currency: wallet.currency,
@@ -91,10 +91,8 @@ export async function PATCH(req: Request) {
       .where(eq(users.id, user.id))
       .returning();
 
-    const wallet = await ensurePrimaryWallet(
-      user.id,
-      currencyForCountry(country.code),
-    );
+    const displayFx = await getDisplayFx(country.code);
+    const wallet = await ensurePrimaryWallet(user.id, "NGN");
 
     try {
       const clerkUser = await currentUser();
@@ -120,6 +118,7 @@ export async function PATCH(req: Request) {
     return NextResponse.json({
       ok: true,
       country,
+      displayFx,
       profileCountryCode: updated.countryCode,
       wallet: {
         id: wallet.id,

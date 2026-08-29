@@ -15,7 +15,6 @@ import {
 } from "@/components/app/vtpass-service-picker";
 import { SelectSheet } from "@/components/app/select-sheet";
 import { useCountry } from "@/components/providers/country-provider";
-import { formatCountryMoney } from "@/lib/country";
 import { cn } from "@/lib/utils";
 
 type DemoTest = {
@@ -28,7 +27,7 @@ type DemoTest = {
 const FALLBACK_PRESETS = ["500", "1000", "2000", "5000", "10000"];
 
 export default function BettingPage() {
-  const { country } = useCountry();
+  const { country, formatServiceMoney } = useCountry();
   const isNigeria = (country?.code || "NG") === "NG";
 
   const [services, setServices] = useState<VtpassServiceOption[]>([]);
@@ -159,7 +158,7 @@ export default function BettingPage() {
     setCustomerName(null);
   }
 
-  const money = (n: number) => formatCountryMoney(n, country?.code || "NG");
+  const money = (n: number) => formatServiceMoney(n);
 
   if (!isNigeria) {
     return (
