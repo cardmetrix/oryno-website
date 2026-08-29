@@ -8,8 +8,17 @@ import {
   wallets,
 } from "@/lib/db/schema";
 import { createNotification } from "@/lib/notifications-service";
-import { formatMoney } from "@/lib/transactions";
+import {
+  currencyForCountry,
+  formatCountryMoney,
+  resolveCountryCode,
+} from "@/lib/country";
+import { convertLocalToNgn } from "@/lib/fx/rates";
 import { ensurePrimaryWallet, toWalletSummary } from "@/lib/wallet";
+import {
+  countryFromCurrency,
+  fundPresetsForCountry,
+} from "@/lib/paystack/country";
 import {
   hasPaystackKeys,
   isPaystackDemoMode,
@@ -206,8 +215,17 @@ export async function creditWalletFromDeposit(input: {
     throw new Error("Invalid deposit amount");
   }
 
-  const amount = (input.amountKobo / 100).toFixed(2);
-  const currency = (input.currency || "NGN").toUpperCase();
+  const paidLocal = input.amountKobo / 100;
+  const paidCurrency = (input.currency || "NGN").toUpperCase();
+  const paidCountry = countryFromCurrency(paidCurrency);
+  let ledgerNgn = paidLocal;
+  if (paidCurrency !== "NGN") {
+    const { getDisplayFx } = await import("@/lib/display-currency");
+    const fx = await getDisplayFx(paidCountry);
+    ledgerNgn = convertLocalToNgn(paidLocal, fx.localToNgn);
+  }
+  const amount = ledgerNgn.toFixed(2);
+  const currency = "NGN";
 
   const already = await db.query.walletFundings.findFirst({
     where: eq(walletFundings.externalRef, input.reference),
@@ -216,7 +234,7 @@ export async function creditWalletFromDeposit(input: {
     return { duplicated: true as const, fundingId: already.id };
   }
 
-  const wallet = await ensurePrimaryWallet(input.userId, currency);
+  const wallet = await ensurePrimaryWallet(input.userId, "NGN");
 
   const result = await db.transaction(async (tx) => {
     const current = await tx.query.wallets.findFirst({
@@ -234,7 +252,7 @@ export async function creditWalletFromDeposit(input: {
         type: "credit",
         category: "fund",
         title: "Wallet funded",
-        subtitle: "Paystack bank transfer",
+        subtitle: "Paystack deposit",
         amount,
         currency,
         status: "completed",
@@ -244,6 +262,8 @@ export async function creditWalletFromDeposit(input: {
           channel: input.channel ?? "bank_transfer",
           provider: "paystack",
           paidAt: input.paidAt,
+          paidLocal,
+          paidCurrency,
         },
       })
       .returning();
@@ -268,6 +288,8 @@ export async function creditWalletFromDeposit(input: {
         metadata: {
           provider: "paystack",
           channel: input.channel ?? "dedicated_nuban",
+          paidLocal,
+          paidCurrency,
           raw: input.raw ?? null,
         },
       })
@@ -283,11 +305,15 @@ export async function creditWalletFromDeposit(input: {
   const { scheduleReferralCheck } = await import("@/lib/referrals/service");
   scheduleReferralCheck(input.userId);
 
+  const amountFormatted = formatCountryMoney(paidLocal, paidCountry);
+  const { getDisplayFx } = await import("@/lib/display-currency");
+  const fx = await getDisplayFx(paidCountry);
+
   try {
     await createNotification({
       userId: input.userId,
       title: "Wallet funded",
-      body: `${formatMoney(amount, currency)} received via bank transfer. Ref ${input.reference}`,
+      body: `${amountFormatted} received via Paystack. Ref ${input.reference}`,
       type: "fund",
       metadata: {
         href: "/wallet",
@@ -303,9 +329,39 @@ export async function creditWalletFromDeposit(input: {
     duplicated: false as const,
     fundingId: result.funding.id,
     transactionId: result.transaction.id,
-    wallet: toWalletSummary(result.wallet),
-    amountFormatted: formatMoney(amount, currency),
+    wallet: toWalletSummary(result.wallet, fx),
+    amountFormatted,
     reference: input.reference,
+  };
+}
+
+export type WalletFundMethod = "dva" | "checkout";
+
+export async function getWalletFundOptions(user: typeof users.$inferSelect) {
+  const countryCode = resolveCountryCode(user.countryCode);
+  const currency = currencyForCountry(countryCode);
+  const presets = fundPresetsForCountry(countryCode);
+  const demoMode = isPaystackDemoMode();
+
+  if (countryCode === "NG") {
+    const account = await getOrCreateDepositAccount(user.id);
+    return {
+      method: "dva" as const,
+      countryCode,
+      currency,
+      presets,
+      account,
+      demoMode,
+    };
+  }
+
+  return {
+    method: "checkout" as const,
+    countryCode,
+    currency,
+    presets,
+    account: null,
+    demoMode,
   };
 }
 

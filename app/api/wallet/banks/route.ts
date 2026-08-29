@@ -1,15 +1,20 @@
 import { NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { ensureAppUser } from "@/lib/auth/current-user";
+import { currencyForCountry, resolveCountryCode } from "@/lib/country";
 import { db } from "@/lib/db";
 import { ensureWalletSchema } from "@/lib/db/ensure-schema";
 import { userBankAccounts } from "@/lib/db/schema";
 import {
   createOrReuseTransferRecipient,
-  listNigerianBanks,
+  listPaystackBanks,
   resolveBankAccount,
 } from "@/lib/paystack/banks";
 import { isPaystackDemoMode } from "@/lib/paystack/client";
+import {
+  accountNumberRules,
+  addBankInstructions,
+} from "@/lib/paystack/country";
 import { listBankAccounts, toBankSummary } from "@/lib/wallet";
 
 export const runtime = "nodejs";
@@ -22,14 +27,23 @@ export async function GET() {
     }
 
     await ensureWalletSchema();
+    const countryCode = resolveCountryCode(user.countryCode);
     const [banks, options] = await Promise.all([
       listBankAccounts(user.id),
-      listNigerianBanks(),
+      listPaystackBanks(countryCode),
     ]);
 
     return NextResponse.json({
       banks: banks.map(toBankSummary),
-      options: options.map((b) => ({ name: b.name, code: b.code })),
+      options: options.map((b) => ({
+        name: b.name,
+        code: b.code,
+        type: b.type,
+      })),
+      countryCode,
+      currency: currencyForCountry(countryCode),
+      accountRules: accountNumberRules(countryCode),
+      instructions: addBankInstructions(countryCode),
       demoMode: isPaystackDemoMode(),
     });
   } catch (error) {
@@ -49,6 +63,9 @@ export async function POST(req: Request) {
     }
 
     await ensureWalletSchema();
+    const countryCode = resolveCountryCode(user.countryCode);
+    const currency = currencyForCountry(countryCode);
+    const rules = accountNumberRules(countryCode);
 
     const body = (await req.json()) as {
       bankCode?: string;
@@ -67,9 +84,9 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
-    if (accountNumber.length < 10) {
+    if (accountNumber.length < rules.min) {
       return NextResponse.json(
-        { error: "Enter a valid 10-digit account number" },
+        { error: `Enter a valid ${rules.label.toLowerCase()}` },
         { status: 400 },
       );
     }
@@ -77,14 +94,18 @@ export async function POST(req: Request) {
     const resolved = await resolveBankAccount({
       accountNumber,
       bankCode,
+      countryCode,
     });
 
-    // Prefer client name when provided (manual entry); else Paystack-resolved.
     const accountName =
       (body.accountName ?? "").trim() || resolved.accountName;
     if (!accountName) {
       return NextResponse.json(
-        { error: "Could not resolve account name" },
+        {
+          error:
+            resolved.message ||
+            "Enter the account name as it appears on your bank or mobile-money wallet",
+        },
         { status: 400 },
       );
     }
@@ -93,7 +114,9 @@ export async function POST(req: Request) {
       accountName,
       accountNumber: resolved.accountNumber,
       bankCode,
-      currency: "NGN",
+      currency,
+      countryCode,
+      type: resolved.type,
     });
 
     const bankName =
@@ -119,7 +142,7 @@ export async function POST(req: Request) {
         bankName,
         bankCode,
         accountName: recipient.accountName || accountName,
-        accountNumber: resolved.accountNumber.slice(0, 10),
+        accountNumber: resolved.accountNumber.slice(0, 32),
         paystackRecipientCode: recipient.recipientCode,
         isPrimary: makePrimary,
         verified: true,
@@ -198,8 +221,7 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { searchParams } = new URL(req.url);
-    const id = searchParams.get("id");
+    const id = new URL(req.url).searchParams.get("id");
     if (!id) {
       return NextResponse.json({ error: "Missing bank id" }, { status: 400 });
     }

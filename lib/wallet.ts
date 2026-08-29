@@ -12,8 +12,16 @@ import {
   toAppTransaction,
   type AppTransaction,
 } from "@/lib/transactions";
-import { currencyForCountry as currencyFromCountryLib } from "@/lib/country";
-import { convertNgnToLocal, type NgnLocalQuote } from "@/lib/fx/rates";
+import {
+  currencyForCountry as currencyFromCountryLib,
+  resolveCountryCode,
+} from "@/lib/country";
+import {
+  convertLocalToNgn,
+  convertNgnToLocal,
+  type NgnLocalQuote,
+} from "@/lib/fx/rates";
+import { getDisplayFx } from "@/lib/display-currency";
 import type {
   BankAccountSummary,
   FundingMethod,
@@ -374,13 +382,18 @@ export async function withdrawWallet(input: {
   const { ensureWalletSchema } = await import("@/lib/db/ensure-schema");
   await ensureWalletSchema();
 
-  const currency =
-    input.currency ?? currencyForCountry(input.countryCode);
-  const countryCode = (input.countryCode ?? "NG").toUpperCase();
-  const amount = parseAmount(input.amount);
+  const countryCode = resolveCountryCode(input.countryCode);
+  const payoutCurrency = currencyForCountry(countryCode);
+  const localAmount = parseAmount(input.amount);
+  const fx = await getDisplayFx(countryCode);
+  const ledgerNgn =
+    payoutCurrency === "NGN"
+      ? localAmount
+      : convertLocalToNgn(localAmount, fx.localToNgn);
   const fee = Math.max(0, Number(input.fee ?? 0));
-  const total = Math.round((amount + fee) * 100) / 100;
-  const amountStr = amount.toFixed(2);
+  const ledgerTotal = Math.round((ledgerNgn + fee) * 100) / 100;
+  const amountStr = ledgerNgn.toFixed(2);
+  const localAmountStr = localAmount.toFixed(2);
   const feeStr = fee.toFixed(2);
   const reference = `WDR_${Date.now().toString(36).toUpperCase()}_${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
 
@@ -399,17 +412,17 @@ export async function withdrawWallet(input: {
     const wallet = await tx.query.wallets.findFirst({
       where: and(
         eq(wallets.userId, input.userId),
-        eq(wallets.currency, currency),
+        eq(wallets.currency, "NGN"),
       ),
     });
     if (!wallet) throw new Error("Wallet not found.");
     assertHealthy(wallet);
 
-    if (Number(wallet.balance) < total) {
+    if (Number(wallet.balance) < ledgerTotal) {
       throw new Error("Insufficient wallet balance.");
     }
 
-    const nextBalance = (Number(wallet.balance) - total).toFixed(2);
+    const nextBalance = (Number(wallet.balance) - ledgerTotal).toFixed(2);
 
     const [txRow] = await tx
       .insert(transactions)
@@ -421,10 +434,17 @@ export async function withdrawWallet(input: {
         title: "Withdrawal",
         subtitle: `${bank.bankName} · ${maskAccountNumber(bank.accountNumber)}`,
         amount: amountStr,
-        currency,
+        currency: "NGN",
         status: "processing",
         balanceAfter: nextBalance,
-        metadata: { fee: feeStr, bankAccountId: bank.id, reference },
+        metadata: {
+          fee: feeStr,
+          bankAccountId: bank.id,
+          reference,
+          localAmount: localAmountStr,
+          payoutCurrency,
+          countryCode,
+        },
       })
       .returning();
 
@@ -445,7 +465,7 @@ export async function withdrawWallet(input: {
         bankAccountId: bank.id,
         amount: amountStr,
         fee: feeStr,
-        currency,
+        currency: "NGN",
         countryCode,
         status: "processing",
         providerRef: reference,
@@ -465,9 +485,10 @@ export async function withdrawWallet(input: {
   try {
     const payout = await sendPaystackWithdrawal({
       bank: prepared.bank,
-      amount,
-      currency,
+      amount: localAmount,
+      currency: payoutCurrency,
       reference,
+      countryCode,
     });
 
     const transferStatus = payout.transfer.status;
@@ -503,6 +524,9 @@ export async function withdrawWallet(input: {
           reference,
           paystackTransferCode: payout.transfer.transferCode,
           simulated: Boolean(payout.simulated),
+          localAmount: localAmountStr,
+          payoutCurrency,
+          countryCode,
         },
       })
       .where(eq(transactions.id, prepared.transaction.id))
@@ -514,6 +538,9 @@ export async function withdrawWallet(input: {
       wallet: prepared.wallet,
       bank: prepared.bank,
       pending: nextWithdrawalStatus !== "completed",
+      localAmount,
+      payoutCurrency,
+      countryCode,
     };
   } catch (error) {
     // Reverse debit if Paystack transfer could not be started.
@@ -524,7 +551,7 @@ export async function withdrawWallet(input: {
       if (wallet) {
         const restored = (
           Number(wallet.balance) +
-          amount +
+          ledgerNgn +
           fee
         ).toFixed(2);
         await tx

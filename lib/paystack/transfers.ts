@@ -2,7 +2,9 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { transactions, wallets, withdrawals } from "@/lib/db/schema";
 import { createNotification } from "@/lib/notifications-service";
-import { formatMoney } from "@/lib/transactions";
+import { formatCountryMoney } from "@/lib/country";
+import { convertNgnToLocal } from "@/lib/fx/rates";
+import { getDisplayFx } from "@/lib/display-currency";
 import {
   hasPaystackKeys,
   isPaystackDemoMode,
@@ -22,6 +24,18 @@ type TransferData = {
 
 export function nairaToKobo(amount: number) {
   return Math.round(amount * 100);
+}
+
+async function formatWithdrawalAmount(
+  ledgerNgn: string | number,
+  countryCode?: string | null,
+) {
+  const fx = await getDisplayFx(countryCode);
+  const local =
+    fx.to === "NGN"
+      ? Number(ledgerNgn)
+      : convertNgnToLocal(Number(ledgerNgn), fx.ngnToLocal);
+  return formatCountryMoney(local, countryCode);
 }
 
 export async function initiatePaystackTransfer(input: {
@@ -68,8 +82,13 @@ export async function sendPaystackWithdrawal(input: {
   amount: number;
   currency: string;
   reference: string;
+  countryCode?: string | null;
 }) {
-  const recipientCode = await ensureBankRecipient(input.bank, input.currency);
+  const recipientCode = await ensureBankRecipient(
+    input.bank,
+    input.currency,
+    input.countryCode,
+  );
 
   try {
     const transfer = await initiatePaystackTransfer({
@@ -160,7 +179,7 @@ export async function settlePaystackTransfer(input: {
       await createNotification({
         userId: withdrawal.userId,
         title: "Withdrawal completed",
-        body: `${formatMoney(withdrawal.amount, withdrawal.currency)} has been sent to your bank.`,
+        body: `${await formatWithdrawalAmount(withdrawal.amount, withdrawal.countryCode)} has been sent to your bank.`,
         type: "withdraw",
         metadata: {
           href: "/wallet",

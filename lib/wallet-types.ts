@@ -25,6 +25,7 @@ export type BankAccountSummary = {
 export type BankOption = {
   name: string;
   code: string;
+  type?: string;
 };
 
 export type FundingMethod =

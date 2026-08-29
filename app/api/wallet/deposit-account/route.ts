@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
 import { ensureWalletSchema } from "@/lib/db/ensure-schema";
-import { getOrCreateDepositAccount } from "@/lib/paystack/deposit-accounts";
-import { isPaystackDemoMode } from "@/lib/paystack/client";
+import { getWalletFundOptions } from "@/lib/paystack/deposit-accounts";
 
 export const runtime = "nodejs";
 
@@ -14,11 +13,8 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const account = await getOrCreateDepositAccount(user.id);
-    return NextResponse.json({
-      account,
-      demoMode: isPaystackDemoMode(),
-    });
+    const options = await getWalletFundOptions(user);
+    return NextResponse.json(options);
   } catch (error) {
     console.error("[deposit-account-get]", error);
     return NextResponse.json(
@@ -41,11 +37,10 @@ export async function POST() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const account = await getOrCreateDepositAccount(user.id);
+    const options = await getWalletFundOptions(user);
     return NextResponse.json({
       ok: true,
-      account,
-      demoMode: isPaystackDemoMode(),
+      ...options,
     });
   } catch (error) {
     console.error("[deposit-account-post]", error);

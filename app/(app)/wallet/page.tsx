@@ -29,13 +29,12 @@ import { WalletSkeleton } from "@/components/app/wallet-skeleton";
 import type { BankOption, WalletPayload } from "@/lib/wallet-types";
 import { cn } from "@/lib/utils";
 
-const ADD_BANK_INSTRUCTIONS = [
-  "Select your bank from the Paystack bank list.",
-  "Enter your 10-digit NUBAN account number.",
-  "We verify the account name with Paystack before saving.",
-  "Confirm the resolved name matches your bank records.",
-  "Save the account — it becomes available for withdrawals.",
-];
+const DEFAULT_ACCOUNT_RULES = {
+  min: 10,
+  max: 10,
+  label: "10-digit account number",
+  hint: "Nigerian NUBAN",
+};
 
 export default function WalletPage() {
   return (
@@ -72,6 +71,8 @@ function WalletPageContent() {
   const [bankCode, setBankCode] = useState("");
   const [accountName, setAccountName] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
+  const [accountRules, setAccountRules] = useState(DEFAULT_ACCOUNT_RULES);
+  const [nameEditable, setNameEditable] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
   const [bankError, setBankError] = useState<string | null>(null);
   /** Mobile wallet pager: only one currency card is in view at a time */
@@ -94,10 +95,12 @@ function WalletPageContent() {
       if (banksRes.ok) {
         const banksJson = (await banksRes.json()) as {
           options?: BankOption[];
+          accountRules?: typeof DEFAULT_ACCOUNT_RULES;
         };
         const options = banksJson.options ?? [];
         setBankOptions(options);
         setBankCode((prev) => prev || options[0]?.code || "");
+        if (banksJson.accountRules) setAccountRules(banksJson.accountRules);
       }
     } catch {
       setError("Couldn’t load your wallet. Pull to retry.");
@@ -110,6 +113,51 @@ function WalletPageContent() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Paystack local wallet funding callback: /wallet?local_fund=1&reference=...
+  useEffect(() => {
+    const localFund = searchParams.get("local_fund");
+    const reference =
+      searchParams.get("reference") || searchParams.get("trxref");
+    if (!localFund || !reference) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/wallet/fund/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reference }),
+        });
+        const json = (await res.json()) as {
+          error?: string;
+          transactionId?: string;
+          amountFormatted?: string;
+        };
+        if (!res.ok) throw new Error(json.error || "Could not verify payment");
+        if (cancelled) return;
+        toast.success("Wallet funded", {
+          description: json.amountFormatted,
+        });
+        await load({ soft: true });
+        router.replace(
+          json.transactionId
+            ? `/history/${json.transactionId}`
+            : "/wallet",
+        );
+      } catch (err) {
+        if (cancelled) return;
+        toast.error(
+          err instanceof Error ? err.message : "Payment verification failed",
+        );
+        router.replace("/wallet");
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams, load, router]);
 
   // Paystack USD funding callback: /wallet?usd_fund=1&reference=...
   useEffect(() => {
@@ -157,7 +205,7 @@ function WalletPageContent() {
   }, [searchParams, load, router]);
 
   useEffect(() => {
-    if (!adding || accountNumber.length < 10 || !bankCode) return;
+    if (!adding || accountNumber.length < accountRules.min || !bankCode) return;
 
     const timer = window.setTimeout(async () => {
       setResolving(true);
@@ -171,13 +219,22 @@ function WalletPageContent() {
         const json = (await res.json()) as {
           error?: string;
           accountName?: string;
+          unresolved?: boolean;
+          message?: string;
         };
         if (!res.ok) throw new Error(json.error || "Could not verify account");
         setAccountName(json.accountName ?? "");
+        setNameEditable(Boolean(json.unresolved) || !json.accountName);
+        if (json.unresolved && json.message) {
+          setBankError(json.message);
+        }
       } catch (err) {
         setAccountName("");
+        setNameEditable(true);
         setBankError(
-          err instanceof Error ? err.message : "Could not verify account",
+          err instanceof Error
+            ? err.message
+            : "Could not verify account — enter the name manually",
         );
       } finally {
         setResolving(false);
@@ -185,7 +242,7 @@ function WalletPageContent() {
     }, 450);
 
     return () => window.clearTimeout(timer);
-  }, [adding, accountNumber, bankCode]);
+  }, [adding, accountNumber, bankCode, accountRules.min]);
 
   async function onAddAccount(e: FormEvent) {
     e.preventDefault();
@@ -530,6 +587,8 @@ function WalletPageContent() {
                 setAccountNumber={setAccountNumber}
                 accountName={accountName}
                 setAccountName={setAccountName}
+                accountRules={accountRules}
+                nameEditable={nameEditable}
                 resolving={resolving}
                 savingBank={savingBank}
                 onAddAccount={onAddAccount}
@@ -613,6 +672,8 @@ function WalletPageContent() {
                 setAccountNumber={setAccountNumber}
                 accountName={accountName}
                 setAccountName={setAccountName}
+                accountRules={accountRules}
+                nameEditable={nameEditable}
                 resolving={resolving}
                 savingBank={savingBank}
                 onAddAccount={onAddAccount}
@@ -640,6 +701,8 @@ function BankAccountsSection({
   setAccountNumber,
   accountName,
   setAccountName,
+  accountRules,
+  nameEditable,
   resolving,
   savingBank,
   onAddAccount,
@@ -659,6 +722,8 @@ function BankAccountsSection({
   setAccountNumber: React.Dispatch<React.SetStateAction<string>>;
   accountName: string;
   setAccountName: React.Dispatch<React.SetStateAction<string>>;
+  accountRules: { min: number; max: number; label: string; hint: string };
+  nameEditable: boolean;
   resolving: boolean;
   savingBank: boolean;
   onAddAccount: (e: FormEvent) => void | Promise<void>;
@@ -741,27 +806,30 @@ function BankAccountsSection({
                   }}
                   className="mt-2 h-12 w-full rounded-[14px] border border-border bg-background px-4 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
                 >
-                  {bankOptions.map((bank) => (
-                    <option key={bank.code} value={bank.code}>
+                  {bankOptions.map((bank, index) => (
+                    <option key={`${bank.code}-${index}`} value={bank.code}>
                       {bank.name}
+                      {bank.type === "mobile_money" ? " · MoMo" : ""}
                     </option>
                   ))}
                 </select>
               </label>
               <label className="block">
                 <span className="text-sm font-semibold text-foreground">
-                  Account number
+                  {accountRules.label}
                 </span>
                 <input
                   inputMode="numeric"
                   value={accountNumber}
                   onChange={(e) => {
                     setAccountNumber(
-                      e.target.value.replace(/[^\d]/g, "").slice(0, 10),
+                      e.target.value
+                        .replace(/[^\d]/g, "")
+                        .slice(0, accountRules.max),
                     );
                     setAccountName("");
                   }}
-                  placeholder="10-digit account number"
+                  placeholder={accountRules.hint}
                   required
                   className="mt-2 h-12 w-full rounded-[14px] border border-border bg-background px-4 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
                 />
@@ -773,11 +841,14 @@ function BankAccountsSection({
                 <div className="relative mt-2">
                   <input
                     value={accountName}
-                    readOnly
+                    readOnly={!nameEditable}
+                    onChange={(e) => setAccountName(e.target.value)}
                     placeholder={
                       resolving
                         ? "Verifying with Paystack…"
-                        : "Resolved after account number"
+                        : nameEditable
+                          ? "Type the name on the account"
+                          : "Resolved after account number"
                     }
                     className="h-12 w-full rounded-[14px] border border-border bg-background px-4 pr-10 text-sm outline-none"
                   />
@@ -791,7 +862,7 @@ function BankAccountsSection({
                 disabled={
                   savingBank ||
                   resolving ||
-                  accountNumber.length < 10 ||
+                  accountNumber.length < accountRules.min ||
                   !accountName ||
                   !bankCode
                 }

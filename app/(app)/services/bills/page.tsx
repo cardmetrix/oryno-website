@@ -395,6 +395,8 @@ export default function BillsPage() {
                     id: s.serviceID,
                     title: s.name,
                     image: s.image ?? null,
+                    domain: s.domain,
+                    imageFallbacks: s.imageFallbacks,
                     subtitle: "Tap to select",
                   }))}
                 />

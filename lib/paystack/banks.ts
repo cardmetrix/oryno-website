@@ -1,6 +1,13 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { userBankAccounts } from "@/lib/db/schema";
+import { currencyForCountry, resolveCountryCode } from "@/lib/country";
+import {
+  accountNumberRules,
+  demoBanksForCountry,
+  paystackCountrySlug,
+  paystackRecipientType,
+} from "@/lib/paystack/country";
 import {
   hasPaystackKeys,
   isPaystackDemoMode,
@@ -12,20 +19,12 @@ export type PaystackBankOption = {
   code: string;
   slug?: string;
   active?: boolean;
+  type?: string;
+  currency?: string;
 };
 
-/** Fallback list when Paystack keys are missing */
-export const DEMO_BANK_OPTIONS: PaystackBankOption[] = [
-  { name: "Access Bank", code: "044" },
-  { name: "GTBank", code: "058" },
-  { name: "Kuda", code: "50211" },
-  { name: "Zenith Bank", code: "057" },
-  { name: "UBA", code: "033" },
-  { name: "First Bank", code: "011" },
-  { name: "Opay", code: "999992" },
-  { name: "Palmpay", code: "999991" },
-  { name: "Moniepoint", code: "50515" },
-];
+/** Fallback list when Paystack keys are missing (Nigeria). */
+export const DEMO_BANK_OPTIONS: PaystackBankOption[] = demoBanksForCountry("NG");
 
 type PaystackBankRow = {
   name: string;
@@ -33,6 +32,7 @@ type PaystackBankRow = {
   slug?: string;
   active?: boolean;
   currency?: string;
+  type?: string;
 };
 
 type ResolveData = {
@@ -55,55 +55,117 @@ type RecipientData = {
   };
 };
 
-let banksCache: { at: number; items: PaystackBankOption[] } | null = null;
+const banksCache = new Map<string, { at: number; items: PaystackBankOption[] }>();
 const BANKS_TTL_MS = 1000 * 60 * 60;
 
-export async function listNigerianBanks(): Promise<PaystackBankOption[]> {
-  if (!hasPaystackKeys()) {
-    return DEMO_BANK_OPTIONS;
+function normalizeAccountNumber(raw: string, countryCode?: string | null) {
+  const rules = accountNumberRules(countryCode);
+  return raw.replace(/\D/g, "").slice(0, rules.max);
+}
+
+function recipientTypeForBank(
+  bank: PaystackBankOption | undefined,
+  countryCode?: string | null,
+) {
+  if (bank?.type === "mobile_money") return "mobile_money";
+  return paystackRecipientType(countryCode);
+}
+
+async function fetchPaystackBankPage(
+  countrySlug: string,
+  currency: string,
+  type?: string,
+) {
+  const params = new URLSearchParams({
+    country: countrySlug,
+    currency,
+    perPage: "100",
+  });
+  if (type) params.set("type", type);
+  const res = await paystackFetch<PaystackBankRow[]>(`/bank?${params.toString()}`);
+  return res.data ?? [];
+}
+
+function mapBankRows(rows: PaystackBankRow[], fallbackType?: string) {
+  return rows
+    .filter((b) => b.active !== false && b.code && b.name)
+    .map((b) => ({
+      name: b.name,
+      code: String(b.code),
+      slug: b.slug,
+      active: b.active,
+      type: b.type || fallbackType,
+      currency: b.currency,
+    }));
+}
+
+export async function listPaystackBanks(
+  countryCode?: string | null,
+): Promise<PaystackBankOption[]> {
+  const country = resolveCountryCode(countryCode);
+  const cacheKey = country;
+  const cached = banksCache.get(cacheKey);
+  if (cached && Date.now() - cached.at < BANKS_TTL_MS) {
+    return cached.items;
   }
 
-  if (banksCache && Date.now() - banksCache.at < BANKS_TTL_MS) {
-    return banksCache.items;
+  if (!hasPaystackKeys()) {
+    return demoBanksForCountry(country);
   }
+
+  const slug = paystackCountrySlug(country);
+  const currency = currencyForCountry(country);
 
   try {
-    const res = await paystackFetch<PaystackBankRow[]>(
-      "/bank?country=nigeria&currency=NGN&perPage=100",
-    );
-    const items = (res.data ?? [])
-      .filter((b) => b.active !== false && b.code && b.name)
-      .map((b) => ({
-        name: b.name,
-        code: b.code,
-        slug: b.slug,
-        active: b.active,
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name));
+    const pages = [fetchPaystackBankPage(slug, currency)];
+    if (country === "GH" || country === "KE") {
+      pages.push(fetchPaystackBankPage(slug, currency, "mobile_money"));
+    }
+    const [banks, momo] = await Promise.all(pages);
+    const items = [
+      ...mapBankRows(banks),
+      ...mapBankRows(momo ?? [], "mobile_money"),
+    ];
 
-    banksCache = { at: Date.now(), items };
-    return items;
+    const seen = new Set<string>();
+    const unique = items.filter((b) => {
+      const key = `${b.code}:${b.type ?? ""}`;
+      if (seen.has(key) || seen.has(b.code)) return false;
+      seen.add(key);
+      seen.add(b.code);
+      return true;
+    }).sort((a, b) => a.name.localeCompare(b.name));
+
+    banksCache.set(cacheKey, { at: Date.now(), items: unique });
+    return unique;
   } catch (error) {
-    console.error("[paystack-banks-list]", error);
-    return DEMO_BANK_OPTIONS;
+    console.error("[paystack-banks-list]", country, error);
+    return demoBanksForCountry(country);
   }
+}
+
+export async function listNigerianBanks(): Promise<PaystackBankOption[]> {
+  return listPaystackBanks("NG");
 }
 
 export async function resolveBankAccount(input: {
   accountNumber: string;
   bankCode: string;
+  countryCode?: string | null;
 }) {
-  const accountNumber = input.accountNumber.replace(/\D/g, "").slice(0, 10);
+  const country = resolveCountryCode(input.countryCode);
+  const rules = accountNumberRules(country);
+  const accountNumber = normalizeAccountNumber(input.accountNumber, country);
   const bankCode = input.bankCode.trim();
 
-  if (accountNumber.length < 10) {
-    throw new Error("Enter a valid 10-digit account number");
+  if (accountNumber.length < rules.min) {
+    throw new Error(`Enter a valid ${rules.label.toLowerCase()}`);
   }
   if (!bankCode) {
     throw new Error("Select a bank");
   }
 
-  const banks = await listNigerianBanks();
+  const banks = await listPaystackBanks(country);
   const bank = banks.find((b) => b.code === bankCode);
   const bankName = bank?.name ?? "Bank";
 
@@ -113,21 +175,44 @@ export async function resolveBankAccount(input: {
       accountName: "DEMO ACCOUNT HOLDER",
       bankCode,
       bankName,
+      type: bank?.type,
+      unresolved: false,
       demoMode: true,
     };
   }
 
-  const res = await paystackFetch<ResolveData>(
-    `/bank/resolve?account_number=${encodeURIComponent(accountNumber)}&bank_code=${encodeURIComponent(bankCode)}`,
-  );
+  try {
+    const res = await paystackFetch<ResolveData>(
+      `/bank/resolve?account_number=${encodeURIComponent(accountNumber)}&bank_code=${encodeURIComponent(bankCode)}`,
+    );
 
-  return {
-    accountNumber: res.data.account_number || accountNumber,
-    accountName: res.data.account_name.trim(),
-    bankCode,
-    bankName,
-    demoMode: isPaystackDemoMode(),
-  };
+    return {
+      accountNumber: res.data.account_number || accountNumber,
+      accountName: res.data.account_name.trim(),
+      bankCode,
+      bankName,
+      type: bank?.type,
+      unresolved: false,
+      demoMode: isPaystackDemoMode(),
+    };
+  } catch (error) {
+    if (country !== "NG") {
+      return {
+        accountNumber,
+        accountName: "",
+        bankCode,
+        bankName,
+        type: bank?.type,
+        unresolved: true,
+        demoMode: isPaystackDemoMode(),
+        message:
+          error instanceof Error
+            ? error.message
+            : "Enter the account name as it appears on your bank or mobile-money wallet",
+      };
+    }
+    throw error;
+  }
 }
 
 export async function createOrReuseTransferRecipient(input: {
@@ -135,18 +220,24 @@ export async function createOrReuseTransferRecipient(input: {
   accountNumber: string;
   bankCode: string;
   currency?: string;
+  countryCode?: string | null;
+  type?: string;
 }) {
-  const accountNumber = input.accountNumber.replace(/\D/g, "").slice(0, 10);
+  const country = resolveCountryCode(input.countryCode);
+  const accountNumber = normalizeAccountNumber(input.accountNumber, country);
   const bankCode = input.bankCode.trim();
   const accountName = input.accountName.trim();
-  const currency = (input.currency ?? "NGN").toUpperCase();
+  const currency = (input.currency ?? currencyForCountry(country)).toUpperCase();
+  const banks = await listPaystackBanks(country);
+  const bank = banks.find((b) => b.code === bankCode);
+  const type = input.type || recipientTypeForBank(bank, country);
 
   if (!hasPaystackKeys()) {
     return {
       recipientCode: `RCP_DEMO_${accountNumber}`,
       accountName,
-      bankName:
-        DEMO_BANK_OPTIONS.find((b) => b.code === bankCode)?.name ?? "Bank",
+      bankName: bank?.name ?? demoBanksForCountry(country).find((b) => b.code === bankCode)?.name ?? "Bank",
+      type,
       demoMode: true as const,
     };
   }
@@ -154,7 +245,7 @@ export async function createOrReuseTransferRecipient(input: {
   const res = await paystackFetch<RecipientData>("/transferrecipient", {
     method: "POST",
     body: JSON.stringify({
-      type: "nuban",
+      type,
       name: accountName,
       account_number: accountNumber,
       bank_code: bankCode,
@@ -165,7 +256,8 @@ export async function createOrReuseTransferRecipient(input: {
   return {
     recipientCode: res.data.recipient_code,
     accountName: res.data.details?.account_name?.trim() || accountName,
-    bankName: res.data.details?.bank_name || undefined,
+    bankName: res.data.details?.bank_name || bank?.name || undefined,
+    type,
     demoMode: isPaystackDemoMode() as boolean,
   };
 }
@@ -173,6 +265,7 @@ export async function createOrReuseTransferRecipient(input: {
 export async function ensureBankRecipient(
   bank: typeof userBankAccounts.$inferSelect,
   currency = "NGN",
+  countryCode?: string | null,
 ) {
   if (bank.paystackRecipientCode) {
     return bank.paystackRecipientCode;
@@ -186,6 +279,7 @@ export async function ensureBankRecipient(
     accountNumber: bank.accountNumber,
     bankCode: bank.bankCode,
     currency,
+    countryCode,
   });
 
   const [updated] = await db

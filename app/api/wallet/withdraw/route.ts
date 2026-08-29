@@ -9,12 +9,9 @@ import {
   setTransactionPin,
   TransactionPinError,
 } from "@/lib/security/transaction-pin";
-import { formatMoney } from "@/lib/transactions";
-import {
-  currencyForCountry,
-  toWalletSummary,
-  withdrawWallet,
-} from "@/lib/wallet";
+import { formatCountryMoney } from "@/lib/country";
+import { getDisplayFx } from "@/lib/display-currency";
+import { toWalletSummary, withdrawWallet } from "@/lib/wallet";
 
 export const runtime = "nodejs";
 
@@ -103,14 +100,14 @@ export async function POST(req: Request) {
       amount: body.amount ?? 0,
       bankAccountId: body.bankAccountId,
       countryCode: user.countryCode ?? "NG",
-      currency: currencyForCountry(user.countryCode),
       fee: WITHDRAW_FEE,
     });
 
-    const amountFormatted = formatMoney(
-      result.withdrawal.amount,
-      result.withdrawal.currency,
+    const amountFormatted = formatCountryMoney(
+      result.localAmount,
+      result.countryCode,
     );
+    const fx = await getDisplayFx(user.countryCode);
 
     const pending = Boolean(result.pending);
     try {
@@ -136,7 +133,7 @@ export async function POST(req: Request) {
       message: pending ? "Withdrawal processing" : "Withdrawal completed",
       pending,
       status: result.withdrawal.status,
-      wallet: toWalletSummary(result.wallet),
+      wallet: toWalletSummary(result.wallet, fx),
       withdrawalId: result.withdrawal.id,
       transactionId: result.transaction.id,
       amountFormatted,

@@ -229,6 +229,8 @@ export default function BettingPage() {
                     id: s.serviceID,
                     title: s.name,
                     image: s.image ?? null,
+                    domain: s.domain,
+                    imageFallbacks: s.imageFallbacks,
                     subtitle: "Tap to select",
                   }))}
                 />

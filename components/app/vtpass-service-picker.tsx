@@ -9,6 +9,8 @@ export type VtpassServiceOption = {
   serviceID: string;
   name: string;
   image?: string | null;
+  domain?: string | null;
+  imageFallbacks?: string[] | null;
   minAmount?: number;
   maxAmount?: number;
 };
@@ -68,6 +70,8 @@ export function VtpassServicePicker({
               <ServiceLogo
                 src={service.image}
                 alt={service.name}
+                domain={service.domain}
+                fallbacks={service.imageFallbacks}
                 fallback={service.name}
               />
               <div className="min-w-0 flex-1">

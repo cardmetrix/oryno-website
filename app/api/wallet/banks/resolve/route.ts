@@ -22,6 +22,7 @@ export async function POST(req: Request) {
     const resolved = await resolveBankAccount({
       bankCode: body.bankCode ?? "",
       accountNumber: body.accountNumber ?? "",
+      countryCode: user.countryCode,
     });
 
     return NextResponse.json({
@@ -30,7 +31,9 @@ export async function POST(req: Request) {
       accountName: resolved.accountName,
       bankCode: resolved.bankCode,
       bankName: resolved.bankName,
+      unresolved: Boolean(resolved.unresolved),
       demoMode: resolved.demoMode,
+      message: resolved.message,
     });
   } catch (error) {
     const message =

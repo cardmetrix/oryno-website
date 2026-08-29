@@ -34,7 +34,7 @@ export default function WithdrawPage() {
   const [wallet, setWallet] = useState<WalletSummary | null>(null);
   const [banks, setBanks] = useState<BankAccountSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [amount, setAmount] = useState("5000");
+  const [amount, setAmount] = useState("");
   const [bankAccountId, setBankAccountId] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,6 +68,14 @@ export default function WithdrawPage() {
         const primary =
           json.banks.find((b) => b.isPrimary) ?? json.banks[0];
         if (primary) setBankAccountId(primary.id);
+        const currency = json.primary.currency;
+        setAmount((prev) => {
+          if (prev) return prev;
+          if (currency === "GHS") return "50";
+          if (currency === "KES") return "500";
+          if (currency === "ZAR") return "100";
+          return "5000";
+        });
 
         if (settingsRes.ok) {
           const settings = (await settingsRes.json()) as {
@@ -170,7 +178,7 @@ export default function WithdrawPage() {
     <AppShell hideNav>
       <PageHeader
         title="Withdraw"
-        subtitle="Send funds to your bank via Paystack"
+        subtitle="Send funds to your bank or mobile money via Paystack"
         backHref="/wallet"
       />
 

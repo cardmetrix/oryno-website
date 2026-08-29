@@ -1,3 +1,4 @@
+import { openLogoUrls } from "@/lib/brand-logos";
 import type { GiftCardBrandView, SogoCatalogBrand } from "./types";
 
 /** Domains used for public favicon APIs (Google / DuckDuckGo). */
@@ -85,11 +86,7 @@ export function giftCardImageFallbacks(slug: string) {
   const domain = brandDomain(slug);
   const key = slug.toLowerCase();
   const local = localGiftCardArt(key);
-  const remote = [
-    `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`,
-    `https://icons.duckduckgo.com/ip3/${domain}.ico`,
-  ];
-  return [local, ...remote];
+  return [local, ...openLogoUrls(domain)];
 }
 
 /** Pick image URL from raw OpenAPI / provider catalog objects. */

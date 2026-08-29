@@ -12,6 +12,8 @@ export type SelectSheetOption = {
   subtitle?: string;
   trailing?: string;
   image?: string | null;
+  domain?: string | null;
+  imageFallbacks?: string[] | null;
 };
 
 type SelectSheetProps = {
@@ -65,6 +67,8 @@ export function SelectSheet({
           <ServiceLogo
             src={valueImage ?? selected?.image}
             alt={valueLabel ?? selected?.title ?? label}
+            domain={selected?.domain}
+            fallbacks={selected?.imageFallbacks}
             fallback={valueLabel ?? selected?.title ?? "?"}
           />
         ) : null}
@@ -155,6 +159,8 @@ export function SelectSheet({
                           <ServiceLogo
                             src={option.image}
                             alt={option.title}
+                            domain={option.domain}
+                            fallbacks={option.imageFallbacks}
                             fallback={option.title}
                           />
                         ) : null}

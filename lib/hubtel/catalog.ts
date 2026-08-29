@@ -1,7 +1,8 @@
+import { openLogoPrimary } from "@/lib/brand-logos";
 import type { HubtelBillCategory, HubtelBillPlan, HubtelBillService } from "./types";
 
 function logo(domain: string) {
-  return `https://icons.duckduckgo.com/ip3/${domain}.ico`;
+  return openLogoPrimary(domain);
 }
 
 /**

@@ -1,11 +1,9 @@
 import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
+import { currencyForCountry } from "@/lib/country";
 import { ensureWalletSchema } from "@/lib/db/ensure-schema";
 import { isPaystackDemoMode } from "@/lib/paystack/client";
-import {
-  creditWalletFromDeposit,
-  getOrCreateDepositAccount,
-} from "@/lib/paystack/deposit-accounts";
+import { creditWalletFromDeposit } from "@/lib/paystack/deposit-accounts";
 
 export const runtime = "nodejs";
 
@@ -32,36 +30,35 @@ export async function POST(req: Request) {
       amount?: string | number;
     };
 
-    const naira = Number(body.amount);
-    if (!Number.isFinite(naira) || naira <= 0) {
+    const localAmount = Number(body.amount);
+    if (!Number.isFinite(localAmount) || localAmount <= 0) {
       return NextResponse.json(
         { error: "Enter a valid amount greater than zero." },
         { status: 400 },
       );
     }
 
-    const account = await getOrCreateDepositAccount(user.id);
-    const amountKobo = Math.round(naira * 100);
-    const reference = `DEMO_DVA_${Date.now().toString(36).toUpperCase()}`;
+    const currency = currencyForCountry(user.countryCode);
+    const amountKobo = Math.round(localAmount * 100);
+    const reference = `DEMO_FND_${Date.now().toString(36).toUpperCase()}`;
 
     const result = await creditWalletFromDeposit({
       userId: user.id,
       amountKobo,
-      currency: account.currency || "NGN",
+      currency,
       reference,
-      channel: "dedicated_nuban",
+      channel: "paystack_demo",
       paidAt: new Date().toISOString(),
       raw: {
         demo: true,
-        accountNumber: account.accountNumber,
-        bankName: account.bankName,
+        countryCode: user.countryCode,
+        currency,
       },
     });
 
     return NextResponse.json({
       ok: true,
       message: "Demo deposit credited",
-      account,
       ...result,
     });
   } catch (error) {

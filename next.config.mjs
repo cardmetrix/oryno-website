@@ -89,8 +89,23 @@ const nextConfig = {
       },
       {
         protocol: 'https',
+        hostname: 'logos.hunter.io',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
         hostname: 'www.google.com',
         pathname: '/s2/favicons/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 't3.gstatic.com',
+        pathname: '/faviconV2/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'icon.horse',
+        pathname: '/icon/**',
       },
       {
         protocol: 'https',

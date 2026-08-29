@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { Check, Copy, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
@@ -11,8 +11,6 @@ import { PageHeader } from "@/components/app/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { WalletSummary } from "@/lib/wallet-types";
 import { cn } from "@/lib/utils";
-
-const DEMO_AMOUNTS = ["1000", "2000", "5000", "10000"];
 
 type DepositAccount = {
   id: string;
@@ -27,26 +25,48 @@ type DepositAccount = {
   instructions: string;
 };
 
-const FUND_INSTRUCTIONS = [
-  "Copy the account number above (or the account name if needed).",
-  "Open your bank or fintech app and start a transfer to that account.",
-  "Enter any amount you want to add to your ORYNO wallet.",
-  "Confirm the transfer. Use the exact bank and account name shown.",
-  "When Paystack confirms the payment, your wallet balance updates automatically.",
-];
+type FundMethod = "dva" | "checkout";
+
+function currencySymbol(currency?: string) {
+  return currency === "GHS"
+    ? "GH₵"
+    : currency === "KES"
+      ? "KSh"
+      : currency === "ZAR"
+        ? "R"
+        : "₦";
+}
 
 export default function FundPage() {
+  return (
+    <Suspense
+      fallback={
+        <AppShell hideNav>
+          <PageHeader title="Fund Wallet" subtitle="Paystack" backHref="/wallet" />
+        </AppShell>
+      }
+    >
+      <FundPageContent />
+    </Suspense>
+  );
+}
+
+function FundPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [wallet, setWallet] = useState<WalletSummary | null>(null);
   const [deposit, setDeposit] = useState<DepositAccount | null>(null);
+  const [method, setMethod] = useState<FundMethod>("dva");
+  const [presets, setPresets] = useState<string[]>(["1000", "2000", "5000", "10000"]);
   const [demoMode, setDemoMode] = useState(true);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<"number" | "name" | null>(null);
-  const [demoAmount, setDemoAmount] = useState("5000");
+  const [amount, setAmount] = useState("5000");
   const lastBalanceRef = useRef<string | null>(null);
   const redirectedRef = useRef(false);
+  const verifyingRef = useRef(false);
 
   const goToLatestFundReceipt = useCallback(async () => {
     if (redirectedRef.current) return;
@@ -116,16 +136,25 @@ export default function FundPage() {
 
       if (depositRes.ok) {
         const json = (await depositRes.json()) as {
-          account: DepositAccount;
+          method?: FundMethod;
+          account?: DepositAccount | null;
           demoMode?: boolean;
+          presets?: string[];
         };
-        setDeposit(json.account);
-        setDemoMode(Boolean(json.demoMode ?? json.account.demoMode));
+        setMethod(json.method === "checkout" ? "checkout" : "dva");
+        setDeposit(json.account ?? null);
+        setDemoMode(Boolean(json.demoMode ?? json.account?.demoMode));
+        if (json.presets?.length) {
+          setPresets(json.presets);
+          setAmount((prev) =>
+            json.presets!.includes(prev) ? prev : json.presets![0],
+          );
+        }
       } else {
         const json = (await depositRes.json().catch(() => ({}))) as {
           error?: string;
         };
-        setError(json.error || "Could not load deposit account");
+        setError(json.error || "Could not load funding details");
       }
     } catch {
       setError("Could not load funding details");
@@ -138,13 +167,53 @@ export default function FundPage() {
     void load();
   }, [load]);
 
-  // Poll balance while user is on Fund — Paystack webhook credits in the background
   useEffect(() => {
     const id = window.setInterval(() => {
       void refreshWallet({ silent: true });
     }, 8000);
     return () => window.clearInterval(id);
   }, [refreshWallet]);
+
+  useEffect(() => {
+    const reference =
+      searchParams.get("reference") || searchParams.get("trxref");
+    if (!reference || verifyingRef.current) return;
+    verifyingRef.current = true;
+
+    (async () => {
+      try {
+        const res = await fetch("/api/wallet/fund/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reference }),
+        });
+        const json = (await res.json()) as {
+          error?: string;
+          amountFormatted?: string;
+          transactionId?: string;
+          wallet?: WalletSummary;
+        };
+        if (!res.ok) throw new Error(json.error || "Could not verify payment");
+        if (json.wallet) {
+          lastBalanceRef.current = json.wallet.balance;
+          setWallet(json.wallet);
+        }
+        toast.success("Wallet funded", {
+          description: json.amountFormatted,
+        });
+        if (json.transactionId) {
+          redirectedRef.current = true;
+          router.replace(`/history/${json.transactionId}`);
+          return;
+        }
+        await goToLatestFundReceipt();
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : "Payment verification failed",
+        );
+      }
+    })();
+  }, [searchParams, router, goToLatestFundReceipt]);
 
   async function copyText(value: string, kind: "number" | "name") {
     try {
@@ -159,31 +228,62 @@ export default function FundPage() {
     }
   }
 
-  async function onIHaveFunded() {
-    if (!demoMode) {
-      toast.message("Waiting for Paystack", {
-        description:
-          "Transfer to the account above. Your balance updates when payment is confirmed.",
-      });
-      void refreshWallet({ silent: true });
+  async function onPayWithPaystack() {
+    const value = Number(amount);
+    if (!Number.isFinite(value) || value <= 0) {
+      setError("Enter a valid amount");
       return;
     }
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/wallet/fund/initialize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: value,
+          callbackUrl: `${window.location.origin}/fund?local_fund=1`,
+        }),
+      });
+      const json = (await res.json()) as {
+        error?: string;
+        mode?: string;
+        authorizationUrl?: string;
+      };
+      if (!res.ok) throw new Error(json.error || "Could not start Paystack");
+      if (json.authorizationUrl) {
+        window.location.href = json.authorizationUrl;
+        return;
+      }
+      if (json.mode === "demo") {
+        await onSimulate();
+        return;
+      }
+      throw new Error("Paystack checkout is not available");
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Could not start Paystack";
+      setError(message);
+      toast.error(message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
-    const amount = Number(demoAmount);
-    if (!Number.isFinite(amount) || amount <= 0) {
+  async function onSimulate() {
+    const value = Number(amount);
+    if (!Number.isFinite(value) || value <= 0) {
       setError("Enter a valid demo amount");
       return;
     }
 
-
-    
     setSubmitting(true);
     setError(null);
     try {
       const res = await fetch("/api/wallet/fund/simulate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount }),
+        body: JSON.stringify({ amount: value }),
       });
       const json = (await res.json()) as {
         error?: string;
@@ -208,7 +308,7 @@ export default function FundPage() {
       }
 
       toast.success("Demo funding successful", {
-        description: `${json.amountFormatted ?? `₦${amount.toLocaleString()}`} added to your wallet`,
+        description: json.amountFormatted ?? "Wallet credited",
       });
       await goToLatestFundReceipt();
     } catch (err) {
@@ -221,20 +321,29 @@ export default function FundPage() {
     }
   }
 
-  const symbol =
-    wallet?.currency === "GHS"
-      ? "GH₵"
-      : wallet?.currency === "KES"
-        ? "KSh"
-        : wallet?.currency === "ZAR"
-          ? "R"
-          : "₦";
+  async function onIHaveFunded() {
+    if (!demoMode) {
+      toast.message("Waiting for Paystack", {
+        description:
+          "Complete the transfer. Your balance updates when payment is confirmed.",
+      });
+      void refreshWallet({ silent: true });
+      return;
+    }
+    await onSimulate();
+  }
+
+  const symbol = currencySymbol(wallet?.currency);
 
   return (
     <AppShell hideNav>
       <PageHeader
         title="Fund Wallet"
-        subtitle="Transfer to your personal ORYNO account number"
+        subtitle={
+          method === "checkout"
+            ? "Pay with Paystack card, bank, or mobile money"
+            : "Transfer to your personal ORYNO account number"
+        }
         backHref="/wallet"
       />
 
@@ -265,51 +374,113 @@ export default function FundPage() {
             </MotionSection>
           ) : null}
 
-          <MotionSection
-            delay={0.04}
-            className="rounded-[22px] border border-border bg-background p-5 shadow-[var(--shadow-soft)]"
-          >
-            <div className="mb-3 flex items-center justify-between gap-2">
+          {method === "dva" ? (
+            <MotionSection
+              delay={0.04}
+              className="rounded-[22px] border border-border bg-background p-5 shadow-[var(--shadow-soft)]"
+            >
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <h2 className="text-base font-semibold text-foreground">
+                  Bank details
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void load();
+                    void refreshWallet({ silent: true });
+                  }}
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-primary"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  Refresh
+                </button>
+              </div>
+
+              {deposit ? (
+                <div className="space-y-3 rounded-[18px] bg-muted/40 p-4">
+                  <DetailRow label="Bank" value={deposit.bankName} />
+                  <DetailRow
+                    label="Account name"
+                    value={deposit.accountName}
+                    onCopy={() => void copyText(deposit.accountName, "name")}
+                    copied={copied === "name"}
+                  />
+                  <DetailRow
+                    label="Account number"
+                    value={deposit.accountNumber}
+                    mono
+                    emphasize
+                    onCopy={() => void copyText(deposit.accountNumber, "number")}
+                    copied={copied === "number"}
+                  />
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Deposit account unavailable. Try refresh.
+                </p>
+              )}
+            </MotionSection>
+          ) : (
+            <MotionSection
+              delay={0.04}
+              className="rounded-[22px] border border-border bg-background p-5 shadow-[var(--shadow-soft)]"
+            >
               <h2 className="text-base font-semibold text-foreground">
-                Bank details
+                Amount to fund
               </h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Paystack checkout for {wallet?.currency ?? "your local currency"}.
+                Your ORYNO wallet is credited after payment.
+              </p>
+              <label className="mt-4 block">
+                <span className="text-sm font-medium text-foreground">
+                  Amount ({symbol})
+                </span>
+                <input
+                  inputMode="decimal"
+                  value={amount}
+                  onChange={(e) =>
+                    setAmount(e.target.value.replace(/[^\d.]/g, ""))
+                  }
+                  className="mt-2 h-12 w-full rounded-[14px] border border-border bg-muted/40 px-4 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+                />
+              </label>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {presets.map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setAmount(preset)}
+                    className={cn(
+                      "rounded-full px-3.5 py-1.5 text-xs font-semibold transition",
+                      amount === preset
+                        ? "bg-oryno-charcoal text-white"
+                        : "bg-muted text-muted-foreground hover:bg-oryno-orange-muted hover:text-primary",
+                    )}
+                  >
+                    {symbol}
+                    {Number(preset).toLocaleString()}
+                  </button>
+                ))}
+              </div>
               <button
                 type="button"
-                onClick={() => {
-                  void load();
-                  void refreshWallet({ silent: true });
-                }}
-                className="inline-flex items-center gap-1 text-xs font-semibold text-primary"
+                disabled={submitting}
+                onClick={() => void onPayWithPaystack()}
+                className="btn-primary mt-4 inline-flex h-12 w-full items-center justify-center gap-2 text-base disabled:opacity-50 md:max-w-sm"
               >
-                <RefreshCw className="h-3.5 w-3.5" />
-                Refresh
+                {submitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Opening Paystack…
+                  </>
+                ) : (
+                  `Pay ${symbol}${Number(amount || 0).toLocaleString()} with Paystack`
+                )}
               </button>
-            </div>
+            </MotionSection>
+          )}
 
-            {deposit ? (
-              <div className="space-y-3 rounded-[18px] bg-muted/40 p-4">
-                <DetailRow label="Bank" value={deposit.bankName} />
-                <DetailRow
-                  label="Account name"
-                  value={deposit.accountName}
-                  onCopy={() => void copyText(deposit.accountName, "name")}
-                  copied={copied === "name"}
-                />
-                <DetailRow
-                  label="Account number"
-                  value={deposit.accountNumber}
-                  mono
-                  emphasize
-                  onCopy={() => void copyText(deposit.accountNumber, "number")}
-                  copied={copied === "number"}
-                />
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Deposit account unavailable. Try refresh.
-              </p>
-            )}
-          </MotionSection>
           {demoMode ? (
             <MotionSection
               delay={0.12}
@@ -324,14 +495,14 @@ export default function FundPage() {
               </p>
 
               <div className="mt-4 flex flex-wrap gap-2">
-                {DEMO_AMOUNTS.map((preset) => (
+                {presets.map((preset) => (
                   <button
                     key={preset}
                     type="button"
-                    onClick={() => setDemoAmount(preset)}
+                    onClick={() => setAmount(preset)}
                     className={cn(
                       "rounded-full px-3.5 py-1.5 text-xs font-semibold transition",
-                      demoAmount === preset
+                      amount === preset
                         ? "bg-oryno-charcoal text-white"
                         : "bg-muted text-muted-foreground hover:bg-oryno-orange-muted hover:text-primary",
                     )}
@@ -344,7 +515,7 @@ export default function FundPage() {
 
               <button
                 type="button"
-                disabled={submitting || !deposit}
+                disabled={submitting || (method === "dva" && !deposit)}
                 onClick={() => void onIHaveFunded()}
                 className="btn-primary mt-4 inline-flex h-12 w-full items-center justify-center gap-2 text-base disabled:opacity-50 md:max-w-sm"
               >
@@ -358,7 +529,7 @@ export default function FundPage() {
                 )}
               </button>
             </MotionSection>
-          ) : (
+          ) : method === "dva" ? (
             <MotionSection delay={0.12} className="mt-5 md:max-w-sm">
               <button
                 type="button"
@@ -369,7 +540,7 @@ export default function FundPage() {
                 I’ve funded — check balance
               </button>
             </MotionSection>
-          )}
+          ) : null}
 
           {error ? (
             <p className="mt-4 text-sm font-medium text-destructive">{error}</p>

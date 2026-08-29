@@ -1,3 +1,4 @@
+import { openLogoPrimary, openLogoUrls } from "@/lib/brand-logos";
 import {
   resolveCountryCode,
   type SupportedCountryCode,
@@ -8,6 +9,7 @@ export type BettingProvider = {
   name: string;
   domain: string;
   image: string;
+  imageFallbacks: string[];
   minAmount: number;
   maxAmount: number;
   popular?: boolean;
@@ -16,21 +18,19 @@ export type BettingProvider = {
 const MIN = 100;
 const MAX = 500_000;
 
-function logo(domain: string) {
-  return `https://icons.duckduckgo.com/ip3/${domain}.ico`;
-}
-
 function bookie(
   serviceID: string,
   name: string,
   domain: string,
   popular = false,
 ): BettingProvider {
+  const urls = openLogoUrls(domain);
   return {
     serviceID,
     name,
     domain,
-    image: logo(domain),
+    image: urls[0] || openLogoPrimary(name),
+    imageFallbacks: urls.slice(1),
     minAmount: MIN,
     maxAmount: MAX,
     popular,

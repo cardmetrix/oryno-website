@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import { openLogoUrls } from "@/lib/brand-logos";
 import {
   giftCardImageFallbacks,
   isUsableGiftCardImage,
@@ -31,6 +32,7 @@ export function GiftCardBrandLogo({
     ...(brand.slug
       ? giftCardImageFallbacks(brand.slug).filter((u) => u !== primary)
       : []),
+    ...openLogoUrls(brand.name || brand.slug || ""),
   ].filter((u, i, arr) => isUsableGiftCardImage(u) && arr.indexOf(u) === i);
   const [idx, setIdx] = useState(0);
   const src = chain[Math.min(idx, Math.max(chain.length - 1, 0))] || primary;
