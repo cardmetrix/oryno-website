@@ -233,50 +233,6 @@ export default function BettingPage() {
           </MotionSection>
         ) : (
           <form key="form" onSubmit={onSubmit} className="space-y-4 sm:space-y-5">
-            {demoMode ? (
-              <MotionSection className="rounded-2xl border border-primary/20 bg-primary/5 p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-5">
-                <p className="text-xs font-bold uppercase tracking-wide text-primary">
-                  Demo mode
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  No live bookmaker is credited. Wallet is still debited so you
-                  can test the full flow. Use these IDs:
-                </p>
-                <div className="mt-3 space-y-2">
-                  {demoTests.map((test) => (
-                    <button
-                      key={test.customerId}
-                      type="button"
-                      onClick={() => {
-                        setCustomerRef(test.customerId);
-                        setCustomerName(null);
-                      }}
-                      className="flex w-full items-center justify-between gap-3 rounded-[14px] border border-border bg-background px-3 py-2.5 text-left"
-                    >
-                      <span>
-                        <span className="block text-sm font-semibold">
-                          {test.customerId}
-                          {test.name ? ` · ${test.name}` : ""}
-                        </span>
-                        <span className="block text-xs text-muted-foreground">
-                          {test.note}
-                        </span>
-                      </span>
-                      <span
-                        className={cn(
-                          "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase",
-                          test.outcome === "success"
-                            ? "bg-emerald-100 text-emerald-700"
-                            : "bg-amber-100 text-amber-800",
-                        )}
-                      >
-                        {test.outcome.replace("_", " ")}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </MotionSection>
-            ) : null}
 
             <MotionSection className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6">
               <h2 className="mb-3 text-base font-semibold">Bookmaker</h2>

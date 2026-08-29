@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/app-shell";
+import { KycSelfieCamera } from "@/components/app/kyc-selfie-camera";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
 import { AuthField, authInputClassName } from "@/components/auth/auth-field";
@@ -88,6 +89,7 @@ export default function KycPage() {
   const [uploadTarget, setUploadTarget] = useState<
     "front" | "back" | "selfie" | null
   >(null);
+  const [selfieCameraOpen, setSelfieCameraOpen] = useState(false);
 
   const targetLevel = useMemo(() => {
     const next = nextKycLevel(kycLevel);
@@ -167,15 +169,19 @@ export default function KycPage() {
     },
   });
 
-  function pickFile(target: "front" | "back" | "selfie") {
+  function uploadFile(target: "front" | "back" | "selfie", file: File) {
+    setUploadTarget(target);
+    void startUpload([file]);
+  }
+
+  function pickFile(target: "front" | "back") {
     const input = document.createElement("input");
     input.type = "file";
     input.accept = "image/*";
     input.onchange = () => {
       const file = input.files?.[0];
       if (!file) return;
-      setUploadTarget(target);
-      void startUpload([file]);
+      uploadFile(target, file);
     };
     input.click();
   }
@@ -388,10 +394,16 @@ export default function KycPage() {
                   label="Selfie"
                   url={selfieUrl}
                   uploading={isUploading && uploadTarget === "selfie"}
-                  onClick={() => pickFile("selfie")}
+                  onClick={() => setSelfieCameraOpen(true)}
                   selfie
                 />
               ) : null}
+
+              <KycSelfieCamera
+                open={selfieCameraOpen}
+                onOpenChange={setSelfieCameraOpen}
+                onCapture={(file) => uploadFile("selfie", file)}
+              />
 
               <div className="grid grid-cols-2 gap-2.5 pt-1">
                 <button
@@ -615,7 +627,11 @@ function UploadTile({
       <div className="min-w-0">
         <p className="text-sm font-semibold text-foreground">{label}</p>
         <p className="text-xs text-muted-foreground">
-          {url ? "Tap to replace" : "Tap to upload"}
+          {url
+            ? "Tap to replace"
+            : selfie
+              ? "Tap to take a selfie"
+              : "Tap to upload"}
         </p>
       </div>
     </button>

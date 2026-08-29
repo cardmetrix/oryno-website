@@ -54,7 +54,7 @@ export function UsdWalletCard({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       className={cn(
-        "relative h-full overflow-hidden rounded-[28px] border border-white/10 bg-[#1C1C1E] shadow-[0_18px_40px_rgba(0,0,0,0.28)]",
+        "relative flex h-full min-h-full flex-col overflow-hidden rounded-[28px] border border-white/10 bg-[#1C1C1E] shadow-[0_18px_40px_rgba(0,0,0,0.28)]",
         className,
       )}
     >
@@ -71,7 +71,7 @@ export function UsdWalletCard({
         className="pointer-events-none absolute inset-y-0 w-1/3 skew-x-[-18deg] bg-gradient-to-r from-transparent via-white/10 to-transparent"
       />
 
-      <div className="relative px-5 py-5 text-white sm:px-6 sm:py-6">
+      <div className="relative flex flex-1 flex-col px-5 py-5 text-white sm:px-6 sm:py-6">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="inline-flex items-center gap-1.5 text-[11px] font-bold tracking-[0.16em] text-white/65 uppercase">
@@ -96,10 +96,10 @@ export function UsdWalletCard({
         </div>
 
         <p className="mt-1.5 text-sm text-white/70">
-          {holderName ? `${holderName} · USD wallet` : "USD wallet"}
+        USD Wallet
         </p>
 
-        <div className="relative mt-5 grid grid-cols-2 gap-2.5">
+        <div className="relative mt-5 grid grid-cols-2 gap-2.5 md:mt-auto md:pt-5">
           <button
             type="button"
             onClick={() => onPanelChange("fund")}

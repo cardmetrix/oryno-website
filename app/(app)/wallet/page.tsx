@@ -255,7 +255,7 @@ function WalletPageContent() {
         actions={
           <Link
             href="/history"
-            className="inline-flex h-10 items-center justify-center rounded-[14px] border border-border bg-background px-3.5 text-sm font-bold text-foreground shadow-[var(--shadow-soft)] transition hover:bg-muted/50"
+            className="inline-flex h-10 items-center justify-center rounded-[14px] bg-primary px-3.5 text-sm font-bold text-white shadow-[var(--shadow-orange)] transition hover:bg-primary/90"
             aria-label="Transaction history"
           >
             <History className="mr-1.5 h-4 w-4" strokeWidth={1.75} />
@@ -294,18 +294,18 @@ function WalletPageContent() {
               className={cn(
                 "flex w-full snap-x snap-mandatory overflow-x-auto overscroll-x-contain",
                 "[-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-                "md:grid md:grid-cols-2 md:items-stretch md:gap-4 md:overflow-visible md:snap-none",
+                "md:grid md:grid-cols-2 md:items-stretch md:gap-4 md:overflow-visible md:snap-none md:auto-rows-fr",
               )}
               style={{ WebkitOverflowScrolling: "touch" }}
             >
               <MotionSection
                 className={cn(
                   "box-border w-full min-w-full max-w-full shrink-0 basis-full snap-start snap-always px-4 sm:px-6",
-                  "md:min-w-0 md:max-w-none md:basis-auto md:snap-none md:px-0 md:h-full",
+                  "md:flex md:h-auto md:min-h-full md:min-w-0 md:max-w-none md:basis-auto md:snap-none md:flex-col md:px-0",
                 )}
               >
-                <div className="h-full overflow-hidden rounded-[28px] bg-background shadow-[var(--shadow-soft)]">
-                  <div className="relative overflow-hidden bg-gradient-to-br from-[#ff8124] via-oryno-orange to-[#e85d00] px-5 py-5 text-white sm:px-6 sm:py-6">
+                <div className="flex min-h-full flex-1 flex-col overflow-hidden rounded-[28px] bg-background shadow-[var(--shadow-soft)]">
+                  <div className="relative flex min-h-full flex-1 flex-col overflow-hidden bg-gradient-to-br from-[#ff8124] via-oryno-orange to-[#e85d00] px-5 py-5 text-white sm:px-6 sm:py-6">
                     <div
                       aria-hidden="true"
                       className="pointer-events-none absolute -top-12 -right-10 h-40 w-40 rounded-full bg-white/15 blur-2xl"
@@ -339,7 +339,7 @@ function WalletPageContent() {
                           </motion.p>
                         </AnimatePresence>
                         <p className="mt-1.5 text-sm text-white/85">
-                          {data.user.fullName} · {data.user.countryCode} wallet
+                         {data.user.countryCode} wallet
                         </p>
                       </div>
 
@@ -365,7 +365,7 @@ function WalletPageContent() {
                       </div>
                     </div>
 
-                    <div className="relative mt-5 grid grid-cols-2 gap-2.5">
+                    <div className="relative mt-5 grid grid-cols-2 gap-2.5 md:mt-auto md:pt-5">
                       <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }}>
                         <Link
                           href="/fund"
@@ -392,7 +392,7 @@ function WalletPageContent() {
               <div
                 className={cn(
                   "box-border w-full min-w-full max-w-full shrink-0 basis-full snap-start snap-always px-4 sm:px-6",
-                  "md:min-w-0 md:max-w-none md:basis-auto md:snap-none md:px-0 md:h-full",
+                  "md:flex md:h-auto md:min-h-full md:min-w-0 md:max-w-none md:basis-auto md:snap-none md:flex-col md:px-0",
                 )}
               >
                 <UsdWalletCard
@@ -401,7 +401,7 @@ function WalletPageContent() {
                   holderName={data.user.fullName}
                   panel={usdPanel}
                   onPanelChange={setUsdPanel}
-                  className="h-full"
+                  className="min-h-full flex-1"
                 />
               </div>
             </div>
