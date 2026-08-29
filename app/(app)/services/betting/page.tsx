@@ -408,8 +408,6 @@ export default function BettingPage() {
                 ? "Funding…"
                 : `Fund wallet · ${money(amountNumber)}`}
             </motion.button>
-
-            <ServiceInstructions service="betting" />
           </form>
         )}
       </AnimatePresence>
