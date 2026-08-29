@@ -7,6 +7,7 @@ import {
   resolveCountryCode,
   resolveLanguageForCountry,
 } from "@/lib/country";
+import { countryOverrideForUsername } from "@/lib/country-overrides";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { currencyForCountry, ensurePrimaryWallet } from "@/lib/wallet";
@@ -20,7 +21,18 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const country = getCountryInfo(user.countryCode);
+    const locked = countryOverrideForUsername(user.username);
+    const country = getCountryInfo(locked ?? user.countryCode);
+    if (locked && user.countryCode !== locked) {
+      await db
+        .update(users)
+        .set({
+          countryCode: locked,
+          language: resolveLanguageForCountry(user.language, locked),
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, user.id));
+    }
     const wallet = await ensurePrimaryWallet(
       user.id,
       currencyForCountry(country.code),
@@ -58,7 +70,10 @@ export async function PATCH(req: Request) {
       );
     }
 
-    const country = getCountryInfo(resolveCountryCode(body.countryCode));
+    const locked = countryOverrideForUsername(user.username);
+    const country = getCountryInfo(
+      locked ?? resolveCountryCode(body.countryCode),
+    );
 
     const [updated] = await db
       .update(users)

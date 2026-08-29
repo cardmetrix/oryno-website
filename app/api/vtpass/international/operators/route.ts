@@ -8,6 +8,39 @@ import {
 
 export const runtime = "nodejs";
 
+const GH_OPERATORS = [
+  {
+    operator_id: "5",
+    name: "MTN Ghana",
+    operator_image:
+      "https://sandbox.vtpass.com/resources/images/operators/80.png",
+  },
+  {
+    operator_id: "6",
+    name: "Telecel Ghana",
+    operator_image:
+      "https://sandbox.vtpass.com/resources/images/operators/80.png",
+  },
+  {
+    operator_id: "7",
+    name: "AirtelTigo Ghana",
+    operator_image:
+      "https://sandbox.vtpass.com/resources/images/operators/80.png",
+  },
+];
+
+function demoIntlOperators(code: string) {
+  if (code === "GH") return GH_OPERATORS;
+  return [
+    {
+      operator_id: "5",
+      name: `${code} Demo Operator`,
+      operator_image:
+        "https://sandbox.vtpass.com/resources/images/operators/80.png",
+    },
+  ];
+}
+
 export async function GET(req: Request) {
   try {
     const user = await ensureAppUser();
@@ -26,14 +59,7 @@ export async function GET(req: Request) {
     }
 
     const operators = isVtpassDemoMode()
-      ? [
-          {
-            operator_id: "5",
-            name: `${code} Demo Operator`,
-            operator_image:
-              "https://sandbox.vtpass.com/resources/images/operators/80.png",
-          },
-        ]
+      ? demoIntlOperators(code.toUpperCase())
       : await getIntlAirtimeOperators(code, productTypeId);
 
     return NextResponse.json({

@@ -11,6 +11,9 @@ import {
   syncClerkUserToDb,
   type SyncedUser,
 } from "@/lib/auth/sync-user";
+import { resolveLanguageForCountry } from "@/lib/country";
+import { countryOverrideForUsername } from "@/lib/country-overrides";
+import { currencyForCountry, ensurePrimaryWallet } from "@/lib/wallet";
 
 export async function requireClerkAuth() {
   const { userId } = await auth();
@@ -50,7 +53,28 @@ async function resolveAndSync(options?: {
       const existing = await db.query.users.findFirst({
         where: eq(users.clerkId, clerkUser.id),
       });
-      if (existing) return { user: existing, debug };
+      if (existing) {
+        const locked = countryOverrideForUsername(existing.username);
+        if (locked && existing.countryCode !== locked) {
+          const [updated] = await db
+            .update(users)
+            .set({
+              countryCode: locked,
+              language: resolveLanguageForCountry(existing.language, locked),
+              updatedAt: new Date(),
+            })
+            .where(eq(users.id, existing.id))
+            .returning();
+          if (updated) {
+            await ensurePrimaryWallet(
+              updated.id,
+              currencyForCountry(locked),
+            ).catch(() => undefined);
+            return { user: updated, debug };
+          }
+        }
+        return { user: existing, debug };
+      }
     } catch (error) {
       console.error("[ensureAppUser-lookup]", error);
     }

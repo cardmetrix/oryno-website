@@ -14,6 +14,7 @@ import {
   resolveLanguageForCountry,
   type SupportedCountryCode,
 } from "@/lib/country";
+import { countryOverrideForUsername } from "@/lib/country-overrides";
 
 export type SyncedUser = typeof users.$inferSelect;
 
@@ -53,7 +54,7 @@ const DEFAULT_COUNTRIES = [
     currency: "GHS",
     currencySymbol: "GH₵",
     flagEmoji: "🇬🇭",
-    status: "beta" as const,
+    status: "live" as const,
   },
   {
     code: "KE",
@@ -273,12 +274,16 @@ export async function syncClerkUserToDb(
   let dbUser: SyncedUser;
 
   if (existing) {
+    const lockedCountry = countryOverrideForUsername(
+      username ?? existing.username,
+    );
     const nextCountry =
-      options?.forceCountry && detectedCountry
+      lockedCountry ??
+      (options?.forceCountry && detectedCountry
         ? detectedCountry
         : resolveCountryCode(
             existing.countryCode ?? detectedCountry ?? phoneCountry,
-          );
+          ));
 
     const nextLanguage = resolveLanguageForCountry(
       existing.language,
@@ -329,9 +334,9 @@ export async function syncClerkUserToDb(
       dbUser = updated;
     }
   } else {
-    const countryCode = resolveCountryCode(
-      detectedCountry ?? phoneCountry ?? "NG",
-    );
+    const countryCode =
+      countryOverrideForUsername(username) ??
+      resolveCountryCode(detectedCountry ?? phoneCountry ?? "NG");
 
     try {
       const [created] = await db
