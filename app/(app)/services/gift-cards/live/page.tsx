@@ -17,6 +17,7 @@ import {
 } from "@/components/app/gift-card-brand-logo";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
+import { useCountry } from "@/components/providers/country-provider";
 import { cn } from "@/lib/utils";
 
 type Mode = "sell" | "buy";
@@ -57,6 +58,7 @@ const FALLBACK_BUY_COUNTRIES = [
 
 export default function GiftCardsLivePage() {
   const router = useRouter();
+  const { formatServiceMoney } = useCountry();
   const [mode, setMode] = useState<Mode>("sell");
 
   const [sellBrands, setSellBrands] = useState<SellBrand[]>([]);
@@ -323,9 +325,7 @@ export default function GiftCardsLivePage() {
                         </div>
                         <div className="text-right">
                           <p className="text-sm font-bold tabular-nums">
-                            {rate != null
-                              ? `₦${rate.toLocaleString("en-NG")}`
-                              : "—"}
+                            {rate != null ? formatServiceMoney(rate) : "—"}
                           </p>
                           <p className="text-[10px] text-muted-foreground">
                             / $1

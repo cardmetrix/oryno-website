@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { ensureWalletSchema } from "@/lib/db/ensure-schema";
 import { bettingOrders, transactions, wallets } from "@/lib/db/schema";
-import { nigeriaServiceLedgerCurrency } from "@/lib/display-currency";
+import { getDisplayFx, nigeriaServiceLedgerCurrency } from "@/lib/display-currency";
 import { formatMoney } from "@/lib/transactions";
 import {
   ensurePrimaryWallet,
@@ -186,13 +186,7 @@ export async function fundBettingWallet(input: {
   await ensureWalletSchema();
 
   const country = (input.countryCode || "NG").toUpperCase();
-  if (country !== "NG") {
-    throw Object.assign(new Error("Betting funding is available for Nigeria accounts"), {
-      status: 400,
-    });
-  }
-
-  const provider = findBettingProvider(input.serviceID);
+  const provider = findBettingProvider(input.serviceID, country);
   if (!provider) {
     throw Object.assign(new Error("Unknown betting provider"), { status: 400 });
   }
@@ -221,6 +215,7 @@ export async function fundBettingWallet(input: {
   const verified = await verifyBettingCustomer({
     serviceID: provider.serviceID,
     customerId: customerRef,
+    countryCode: country,
   });
   if (!verified.ok) {
     throw Object.assign(
@@ -280,6 +275,7 @@ export async function fundBettingWallet(input: {
       amount,
       reference: requestId,
       phone: input.phone,
+      countryCode: country,
     });
 
     if (!funded.ok) {
@@ -304,7 +300,8 @@ export async function fundBettingWallet(input: {
     });
 
     const wallet = await ensurePrimaryWallet(input.userId, prepared.currency);
-    const summary = toWalletSummary(wallet);
+    const fx = await getDisplayFx(country);
+    const summary = toWalletSummary(wallet, fx);
 
     return {
       status: "completed",

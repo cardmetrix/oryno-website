@@ -83,7 +83,7 @@ export const SERVICE_INSTRUCTIONS: Record<
     subtitle: "How to buy or sell gift cards on ORYNO",
     steps: [
       "Use the Sell or Buy tab at the top — Sell is the default.",
-      "Sell: pick a brand, enter the code or upload photos, and get Naira credit.",
+      "Sell: pick a brand, enter the code or upload photos, and get wallet credit in your currency.",
       "Buy: pick a product and amount, pay from your wallet, and receive the code.",
       "Every trade appears in History with a receipt you can revisit anytime.",
     ],
@@ -91,9 +91,9 @@ export const SERVICE_INSTRUCTIONS: Record<
   betting: {
     subtitle: "Follow these steps to fund a betting wallet",
     steps: [
-      "Betting funding is available for Nigeria accounts.",
+      "Bookmakers match your account country (Nigeria, Ghana, Kenya, or South Africa).",
       "Fund your ORYNO wallet first if your balance is low.",
-      "Pick a bookmaker (Bet9ja, SportyBet, 1xBet, BetKing, and more).",
+      "Pick a bookmaker, then enter the betting account ID.",
       "Enter the betting account ID and verify the customer name.",
       "Choose an amount, pay from your wallet, and keep the History receipt.",
     ],

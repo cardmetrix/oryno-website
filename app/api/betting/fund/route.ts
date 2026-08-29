@@ -3,9 +3,11 @@ import { ensureAppUser } from "@/lib/auth/current-user";
 import {
   bettingErrorToEnglish,
   bettingHttpStatus,
-  formatBettingAmount,
   fundBettingWallet,
 } from "@/lib/betting";
+import { formatCountryMoney } from "@/lib/country";
+import { getDisplayFx } from "@/lib/display-currency";
+import { convertLocalToNgn, convertNgnToLocal } from "@/lib/fx/rates";
 import { createNotification } from "@/lib/notifications-service";
 
 export const runtime = "nodejs";
@@ -28,14 +30,20 @@ export async function POST(req: Request) {
 
     const serviceID = (body.serviceID || "").trim();
     const customerRef = (body.customerRef || body.customerId || "").trim();
-    const amount = Number(body.amount);
+    const localAmount = Number(body.amount);
 
-    if (!serviceID || !customerRef || !Number.isFinite(amount)) {
+    if (!serviceID || !customerRef || !Number.isFinite(localAmount)) {
       return NextResponse.json(
         { error: "Complete betting funding details" },
         { status: 400 },
       );
     }
+
+    const fx = await getDisplayFx(user.countryCode);
+    const ledgerAmount =
+      fx.to === "NGN"
+        ? localAmount
+        : convertLocalToNgn(localAmount, fx.localToNgn);
 
     const result = await fundBettingWallet({
       userId: user.id,
@@ -45,12 +53,12 @@ export async function POST(req: Request) {
       serviceName: body.serviceName,
       customerRef,
       customerName: body.customerName,
-      amount,
+      amount: ledgerAmount,
     });
 
-    const amountFormatted = formatBettingAmount(
-      result.amount,
-      result.wallet.currency,
+    const amountFormatted = formatCountryMoney(
+      convertNgnToLocal(result.amount, fx.ngnToLocal),
+      user.countryCode,
     );
 
     try {

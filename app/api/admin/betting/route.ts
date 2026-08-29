@@ -1,7 +1,10 @@
 import { desc } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { titleCaseStatus, withAdminApi } from "@/lib/admin/api";
-import { BETTING_PROVIDERS, isBettingDemoMode } from "@/lib/betting";
+import {
+  BETTING_PROVIDERS_BY_COUNTRY,
+  isBettingDemoMode,
+} from "@/lib/betting";
 import { db } from "@/lib/db";
 import { bettingOrders } from "@/lib/db/schema";
 import { ensureWalletSchema } from "@/lib/db/ensure-schema";
@@ -30,13 +33,16 @@ export async function GET() {
     return NextResponse.json({
       ok: true,
       demo: isBettingDemoMode(),
-      providers: BETTING_PROVIDERS.map((p) => ({
-        id: p.serviceID,
-        name: p.name,
-        status: "Active",
-        minAmount: p.minAmount,
-        maxAmount: p.maxAmount,
-      })),
+      providers: Object.entries(BETTING_PROVIDERS_BY_COUNTRY).flatMap(
+        ([country, list]) =>
+          list.map((p) => ({
+            id: `${country}:${p.serviceID}`,
+            name: `${p.name} (${country})`,
+            status: country === "NG" ? "Active" : "Catalog",
+            minAmount: p.minAmount,
+            maxAmount: p.maxAmount,
+          })),
+      ),
       recent: recent.map((r) => ({
         id: r.id,
         provider: r.providerName,

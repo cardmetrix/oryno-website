@@ -41,6 +41,9 @@ function demoCountries(): ReloadlyCountry[] {
     { isoName: "GB", name: "United Kingdom", currencyCode: "GBP" },
     { isoName: "CA", name: "Canada", currencyCode: "CAD" },
     { isoName: "NG", name: "Nigeria", currencyCode: "NGN" },
+    { isoName: "GH", name: "Ghana", currencyCode: "GHS" },
+    { isoName: "KE", name: "Kenya", currencyCode: "KES" },
+    { isoName: "ZA", name: "South Africa", currencyCode: "ZAR" },
     { isoName: "AU", name: "Australia", currencyCode: "AUD" },
   ];
 }

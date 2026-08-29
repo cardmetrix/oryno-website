@@ -9,6 +9,8 @@ import {
   Zap,
 } from "lucide-react";
 import { GiftCardIcon } from "@/components/icons/gift-card-icon";
+import { getCountryInfo, type SupportedCountryCode } from "@/lib/country";
+import { providersForBettingCountry } from "@/lib/betting/catalog";
 import { activeCountryConfig } from "@/lib/services-catalog";
 
 export type ServiceCategory =
@@ -96,7 +98,7 @@ export const servicesDirectory: ServiceDirectoryItem[] = [
     label: "Betting Funding",
     shortDescription: "Fund SportyBet, Bet9ja & more",
     longDescription:
-      "Verify a betting account ID and credit Bet9ja, SportyBet, 1xBet, BetKing, MelBet and other Nigerian bookmakers from your ORYNO wallet.",
+      "Verify a betting account ID and credit local bookmakers from your ORYNO wallet.",
     category: "Utilities",
     tags: ["Bet9ja", "SportyBet", "1xBet", "BetKing", "MelBet"],
     eta: "Instant",
@@ -170,7 +172,7 @@ export const servicesDirectory: ServiceDirectoryItem[] = [
     label: "Gift Cards",
     shortDescription: "Buy & sell gift cards",
     longDescription:
-      "Sell cards for Naira via live rates, or buy digital codes with your wallet.",
+      "Sell cards for wallet credit via live rates, or buy digital codes with your wallet.",
     category: "Lifestyle",
     tags: ["Amazon", "Apple", "Steam"],
     eta: "Form trade",
@@ -180,6 +182,66 @@ export const servicesDirectory: ServiceDirectoryItem[] = [
     stats: "50+ brands",
   },
 ];
+
+const BETTING_COPY: Record<
+  SupportedCountryCode,
+  { short: string; long: string; tags: string[] }
+> = {
+  NG: {
+    short: "Fund SportyBet, Bet9ja & more",
+    long: "Verify a betting account ID and credit Bet9ja, SportyBet, 1xBet, BetKing, MelBet and other Nigerian bookmakers from your ORYNO wallet.",
+    tags: ["Bet9ja", "SportyBet", "1xBet", "BetKing", "MelBet"],
+  },
+  GH: {
+    short: "Fund SportyBet, Betway & more",
+    long: "Verify a betting account ID and credit SportyBet, Betway, Premier Bet, 1xBet and other Ghana bookmakers from your ORYNO wallet.",
+    tags: ["SportyBet", "Betway", "Premier Bet", "1xBet", "MelBet"],
+  },
+  KE: {
+    short: "Fund SportPesa, Betika & more",
+    long: "Verify a betting account ID and credit SportPesa, Betika, Odibets, Betway and other Kenyan bookmakers from your ORYNO wallet.",
+    tags: ["SportPesa", "Betika", "Odibets", "Betway", "1xBet"],
+  },
+  ZA: {
+    short: "Fund Betway, Hollywoodbets & more",
+    long: "Verify a betting account ID and credit Betway, Hollywoodbets, SuperSportBet and other South African bookmakers from your ORYNO wallet.",
+    tags: ["Betway", "Hollywoodbets", "SuperSportBet", "Easybet"],
+  },
+};
+
+export function getServicesDirectory(countryCode?: string | null) {
+  const country = getCountryInfo(countryCode);
+  const betting = BETTING_COPY[country.code];
+  const bookies = providersForBettingCountry(country.code);
+  return servicesDirectory.map((item) => {
+    if (item.id === "airtime") {
+      return {
+        ...item,
+        stats: `From ${country.currencySymbol}50`,
+        longDescription:
+          country.code === "NG"
+            ? item.longDescription
+            : `Buy ${country.name} airtime for local networks from your wallet.`,
+      };
+    }
+    if (item.id === "betting") {
+      return {
+        ...item,
+        shortDescription: betting.short,
+        longDescription: betting.long,
+        tags: betting.tags,
+        stats: `${bookies.length} bookmakers`,
+      };
+    }
+    if (item.id === "gift-cards") {
+      return {
+        ...item,
+        longDescription: `Sell cards for ${country.currency} wallet credit via live rates, or buy digital codes with your wallet.`,
+      };
+    }
+    return item;
+  });
+}
 
 export const serviceCategories: Array<ServiceCategory | "All"> = [
   "All",

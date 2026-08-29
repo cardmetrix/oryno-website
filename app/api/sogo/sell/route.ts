@@ -3,7 +3,9 @@ import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
 import { createNotification } from "@/lib/notifications-service";
 import { sellGiftCard } from "@/lib/sogo";
-import { formatMoney } from "@/lib/transactions";
+import { formatCountryMoney } from "@/lib/country";
+import { getDisplayFx } from "@/lib/display-currency";
+import { convertNgnToLocal } from "@/lib/fx/rates";
 import { publicServiceError } from "@/lib/service-errors";
 
 export const runtime = "nodejs";
@@ -91,6 +93,11 @@ export async function POST(req: Request) {
       specificCountry: body.specificCountry,
       idempotencyKey: body.idempotencyKey || randomUUID(),
     });
+    const fx = await getDisplayFx(user.countryCode);
+    const amountFormatted = formatCountryMoney(
+      convertNgnToLocal(result.amount, fx.ngnToLocal),
+      user.countryCode,
+    );
 
     try {
       await createNotification({
@@ -101,7 +108,7 @@ export async function POST(req: Request) {
             : "Gift card submitted",
         body:
           result.status === "completed"
-            ? `${formatMoney(result.amount, result.currency)} credited to your wallet.`
+            ? `${amountFormatted} credited to your wallet.`
             : `Trade ${result.reference} is under review.`,
         type: "gift_card",
         metadata: {
@@ -125,8 +132,8 @@ export async function POST(req: Request) {
       localReference: result.localReference,
       transactionId: result.transactionId,
       amount: result.amount,
-      amountFormatted: formatMoney(result.amount, result.currency),
-      currency: result.currency,
+      amountFormatted,
+      currency: fx.to,
       wallet: result.wallet,
       message: result.message,
     });

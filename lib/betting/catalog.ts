@@ -1,3 +1,8 @@
+import {
+  resolveCountryCode,
+  type SupportedCountryCode,
+} from "@/lib/country";
+
 export type BettingProvider = {
   serviceID: string;
   name: string;
@@ -15,144 +20,96 @@ function logo(domain: string) {
   return `https://icons.duckduckgo.com/ip3/${domain}.ico`;
 }
 
+function bookie(
+  serviceID: string,
+  name: string,
+  domain: string,
+  popular = false,
+): BettingProvider {
+  return {
+    serviceID,
+    name,
+    domain,
+    image: logo(domain),
+    minAmount: MIN,
+    maxAmount: MAX,
+    popular,
+  };
+}
+
 /** Bookmakers VTU Africa (and similar NG aggregators) commonly fund. */
-export const BETTING_PROVIDERS: BettingProvider[] = [
-  {
-    serviceID: "bet9ja",
-    name: "Bet9ja",
-    domain: "bet9ja.com",
-    image: logo("bet9ja.com"),
-    minAmount: MIN,
-    maxAmount: MAX,
-    popular: true,
-  },
-  {
-    serviceID: "sportybet",
-    name: "SportyBet",
-    domain: "sportybet.com",
-    image: logo("sportybet.com"),
-    minAmount: MIN,
-    maxAmount: MAX,
-    popular: true,
-  },
-  {
-    serviceID: "1xbet",
-    name: "1xBet",
-    domain: "1xbet.com",
-    image: logo("1xbet.com"),
-    minAmount: MIN,
-    maxAmount: MAX,
-    popular: true,
-  },
-  {
-    serviceID: "betking",
-    name: "BetKing",
-    domain: "betking.com",
-    image: logo("betking.com"),
-    minAmount: MIN,
-    maxAmount: MAX,
-    popular: true,
-  },
-  {
-    serviceID: "melbet",
-    name: "MelBet",
-    domain: "melbet.com",
-    image: logo("melbet.com"),
-    minAmount: MIN,
-    maxAmount: MAX,
-    popular: true,
-  },
-  {
-    serviceID: "betway",
-    name: "Betway",
-    domain: "betway.com",
-    image: logo("betway.com"),
-    minAmount: MIN,
-    maxAmount: MAX,
-  },
-  {
-    serviceID: "nairabet",
-    name: "NairaBet",
-    domain: "nairabet.com",
-    image: logo("nairabet.com"),
-    minAmount: MIN,
-    maxAmount: MAX,
-  },
-  {
-    serviceID: "merrybet",
-    name: "MerryBet",
-    domain: "merrybet.com",
-    image: logo("merrybet.com"),
-    minAmount: MIN,
-    maxAmount: MAX,
-  },
-  {
-    serviceID: "naijabet",
-    name: "NaijaBet",
-    domain: "naijabet.com",
-    image: logo("naijabet.com"),
-    minAmount: MIN,
-    maxAmount: MAX,
-  },
-  {
-    serviceID: "bangbet",
-    name: "BangBet",
-    domain: "bangbet.com",
-    image: logo("bangbet.com"),
-    minAmount: MIN,
-    maxAmount: MAX,
-  },
-  {
-    serviceID: "livescorebet",
-    name: "LiveScoreBet",
-    domain: "livescorebet.com",
-    image: logo("livescorebet.com"),
-    minAmount: MIN,
-    maxAmount: MAX,
-  },
-  {
-    serviceID: "cloudbet",
-    name: "CloudBet",
-    domain: "cloudbet.com",
-    image: logo("cloudbet.com"),
-    minAmount: MIN,
-    maxAmount: MAX,
-  },
-  {
-    serviceID: "betbiga",
-    name: "BetBiga",
-    domain: "betbiga.com",
-    image: logo("betbiga.com"),
-    minAmount: MIN,
-    maxAmount: MAX,
-  },
-  {
-    serviceID: "paripesa",
-    name: "Paripesa",
-    domain: "paripesa.com",
-    image: logo("paripesa.com"),
-    minAmount: MIN,
-    maxAmount: MAX,
-  },
-  {
-    serviceID: "nairamillion",
-    name: "Naira Million",
-    domain: "nairamillion.com",
-    image: logo("nairamillion.com"),
-    minAmount: MIN,
-    maxAmount: MAX,
-  },
-  {
-    serviceID: "mylottohub",
-    name: "MyLottoHub",
-    domain: "mylottohub.com",
-    image: logo("mylottohub.com"),
-    minAmount: MIN,
-    maxAmount: MAX,
-  },
+export const BETTING_PROVIDERS_NG: BettingProvider[] = [
+  bookie("bet9ja", "Bet9ja", "bet9ja.com", true),
+  bookie("sportybet", "SportyBet", "sportybet.com", true),
+  bookie("1xbet", "1xBet", "1xbet.com", true),
+  bookie("betking", "BetKing", "betking.com", true),
+  bookie("melbet", "MelBet", "melbet.com", true),
+  bookie("betway", "Betway", "betway.com"),
+  bookie("nairabet", "NairaBet", "nairabet.com"),
+  bookie("merrybet", "MerryBet", "merrybet.com"),
+  bookie("naijabet", "NaijaBet", "naijabet.com"),
+  bookie("bangbet", "BangBet", "bangbet.com"),
+  bookie("livescorebet", "LiveScoreBet", "livescorebet.com"),
+  bookie("cloudbet", "CloudBet", "cloudbet.com"),
+  bookie("betbiga", "BetBiga", "betbiga.com"),
+  bookie("paripesa", "Paripesa", "paripesa.com"),
+  bookie("nairamillion", "Naira Million", "nairamillion.com"),
+  bookie("mylottohub", "MyLottoHub", "mylottohub.com"),
 ];
 
-export const BETTING_AMOUNT_PRESETS = ["500", "1000", "2000", "5000", "10000"];
+export const BETTING_PROVIDERS_GH: BettingProvider[] = [
+  bookie("sportybet", "SportyBet", "sportybet.com.gh", true),
+  bookie("betway", "Betway", "betway.com.gh", true),
+  bookie("premierbet", "Premier Bet", "premierbet.com.gh", true),
+  bookie("1xbet", "1xBet", "1xbet.com"),
+  bookie("melbet", "MelBet", "melbet.com"),
+  bookie("soccerbet", "Soccerbet", "soccerbet.com.gh"),
+  bookie("betika", "Betika", "betika.com.gh"),
+];
+
+export const BETTING_PROVIDERS_KE: BettingProvider[] = [
+  bookie("sportpesa", "SportPesa", "sportpesa.com", true),
+  bookie("betika", "Betika", "betika.com", true),
+  bookie("odibets", "Odibets", "odibets.com", true),
+  bookie("betway", "Betway", "betway.co.ke"),
+  bookie("1xbet", "1xBet", "1xbet.com"),
+  bookie("mozzart", "Mozzart Bet", "mozzartbet.co.ke"),
+  bookie("premierbet", "Premier Bet", "premierbet.co.ke"),
+];
+
+export const BETTING_PROVIDERS_ZA: BettingProvider[] = [
+  bookie("betway", "Betway", "betway.co.za", true),
+  bookie("hollywoodbets", "Hollywoodbets", "hollywoodbets.net", true),
+  bookie("supersportbet", "SuperSportBet", "supersportbet.com", true),
+  bookie("easybet", "Easybet", "easybet.co.za"),
+  bookie("gbets", "Gbets", "gbets.co.za"),
+  bookie("10bet", "10bet", "10bet.co.za"),
+];
+
+export const BETTING_PROVIDERS_BY_COUNTRY: Record<
+  SupportedCountryCode,
+  BettingProvider[]
+> = {
+  NG: BETTING_PROVIDERS_NG,
+  GH: BETTING_PROVIDERS_GH,
+  KE: BETTING_PROVIDERS_KE,
+  ZA: BETTING_PROVIDERS_ZA,
+};
+
+/** @deprecated Use providersForBettingCountry — kept as the Nigeria catalog. */
+export const BETTING_PROVIDERS = BETTING_PROVIDERS_NG;
+
+export const BETTING_AMOUNT_PRESETS_BY_COUNTRY: Record<
+  SupportedCountryCode,
+  string[]
+> = {
+  NG: ["500", "1000", "2000", "5000", "10000"],
+  GH: ["20", "50", "100", "200", "500"],
+  KE: ["200", "500", "1000", "2000", "5000"],
+  ZA: ["50", "100", "200", "500", "1000"],
+};
+
+export const BETTING_AMOUNT_PRESETS = BETTING_AMOUNT_PRESETS_BY_COUNTRY.NG;
 
 export const DEMO_BETTING_CUSTOMERS = [
   {
@@ -187,9 +144,31 @@ export const DEMO_BETTING_CUSTOMERS = [
   },
 ] as const;
 
-export function findBettingProvider(serviceID: string) {
+export function providersForBettingCountry(countryCode?: string | null) {
+  return BETTING_PROVIDERS_BY_COUNTRY[resolveCountryCode(countryCode)];
+}
+
+export function presetsForBettingCountry(countryCode?: string | null) {
+  return BETTING_AMOUNT_PRESETS_BY_COUNTRY[resolveCountryCode(countryCode)];
+}
+
+export function findBettingProvider(
+  serviceID: string,
+  countryCode?: string | null,
+) {
   const key = serviceID.trim().toLowerCase();
-  return BETTING_PROVIDERS.find((p) => p.serviceID === key) ?? null;
+  if (countryCode) {
+    return (
+      providersForBettingCountry(countryCode).find(
+        (p) => p.serviceID === key,
+      ) ?? null
+    );
+  }
+  for (const list of Object.values(BETTING_PROVIDERS_BY_COUNTRY)) {
+    const found = list.find((p) => p.serviceID === key);
+    if (found) return found;
+  }
+  return null;
 }
 
 export function normalizeBettingCustomerId(raw: string) {

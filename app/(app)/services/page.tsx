@@ -23,10 +23,11 @@ import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
 import { ServiceInstructions } from "@/components/app/service-instructions";
 import { ServicesSkeleton } from "@/components/app/services-skeleton";
+import { useCountry } from "@/components/providers/country-provider";
 import {
   filterServices,
+  getServicesDirectory,
   serviceCategories,
-  servicesDirectory,
   type ServiceDirectoryItem,
 } from "@/lib/services-directory";
 import { cn } from "@/lib/utils";
@@ -48,6 +49,7 @@ type ApiService = Omit<ServiceDirectoryItem, "icon"> & {
 };
 
 export default function ServicesPage() {
+  const { country } = useCountry();
   const [services, setServices] = useState<ServiceDirectoryItem[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
@@ -70,11 +72,11 @@ export default function ServicesPage() {
       );
     } catch {
       // Local fallback — still fast
-      setServices(servicesDirectory);
+      setServices(getServicesDirectory(country.code));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [country.code]);
 
   useEffect(() => {
     void load();

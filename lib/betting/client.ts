@@ -1,3 +1,4 @@
+import { resolveCountryCode } from "@/lib/country";
 import {
   DEMO_BETTING_CUSTOMERS,
   findBettingProvider,
@@ -24,8 +25,14 @@ export function hasBettingKeys() {
   return Boolean(bettingApiKey());
 }
 
-/** Demo when keys are missing or BETTING_DEMO is set. */
-export function isBettingDemoMode() {
+/** Live VTU Africa only works for Nigeria. Other markets stay demo until a local rail is keyed. */
+export function isBettingLiveCountry(countryCode?: string | null) {
+  return resolveCountryCode(countryCode) === "NG";
+}
+
+/** Demo when keys are missing, BETTING_DEMO is set, or the country has no live betting rail. */
+export function isBettingDemoMode(countryCode?: string | null) {
+  if (countryCode && !isBettingLiveCountry(countryCode)) return true;
   return isBettingDemoForced() || !hasBettingKeys();
 }
 
@@ -113,19 +120,25 @@ async function getJson<T>(url: string): Promise<T> {
 export async function verifyBettingCustomer(input: {
   serviceID: string;
   customerId: string;
+  countryCode?: string | null;
 }): Promise<{
   ok: boolean;
   demo: boolean;
   customerName: string | null;
   message?: string;
 }> {
-  const provider = findBettingProvider(input.serviceID);
+  const provider = findBettingProvider(input.serviceID, input.countryCode);
   if (!provider) {
-    return { ok: false, demo: isBettingDemoMode(), customerName: null, message: "Unknown betting provider" };
+    return {
+      ok: false,
+      demo: isBettingDemoMode(input.countryCode),
+      customerName: null,
+      message: "Unknown betting provider",
+    };
   }
   const customerId = normalizeBettingCustomerId(input.customerId);
 
-  if (isBettingDemoMode()) {
+  if (isBettingDemoMode(input.countryCode)) {
     const demo = demoVerifyName(customerId);
     return {
       ok: demo.ok,
@@ -165,19 +178,25 @@ export async function fundBettingAccount(input: {
   amount: number;
   reference: string;
   phone?: string | null;
+  countryCode?: string | null;
 }): Promise<{
   ok: boolean;
   demo: boolean;
   reference: string;
   message?: string;
 }> {
-  const provider = findBettingProvider(input.serviceID);
+  const provider = findBettingProvider(input.serviceID, input.countryCode);
   if (!provider) {
-    return { ok: false, demo: isBettingDemoMode(), reference: input.reference, message: "Unknown betting provider" };
+    return {
+      ok: false,
+      demo: isBettingDemoMode(input.countryCode),
+      reference: input.reference,
+      message: "Unknown betting provider",
+    };
   }
   const customerId = normalizeBettingCustomerId(input.customerId);
 
-  if (isBettingDemoMode()) {
+  if (isBettingDemoMode(input.countryCode)) {
     if (shouldDemoFundFail(customerId)) {
       return {
         ok: false,

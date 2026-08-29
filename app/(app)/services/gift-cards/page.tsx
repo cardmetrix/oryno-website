@@ -46,7 +46,9 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer";
 import { useUser } from "@clerk/nextjs";
+import { useCountry } from "@/components/providers/country-provider";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { formatCountryMoney } from "@/lib/country";
 import { cn } from "@/lib/utils";
 
 const MAX_CARD_IMAGE_BYTES = 2_500_000;
@@ -222,6 +224,13 @@ export default function GiftCardsPage() {
 function GiftCardsPageContent() {
   const router = useRouter();
   const { user } = useUser();
+  const { country, formatServiceMoney } = useCountry();
+  const formatSellRate = (ngn?: number | null) =>
+    ngn != null ? formatServiceMoney(ngn) : "—";
+  const formatBuyPay = (quote: BuyQuote) =>
+    quote.currency === "NGN"
+      ? formatServiceMoney(quote.local)
+      : formatCountryMoney(quote.local, country.code);
   const searchParams = useSearchParams();
   const slugParam = searchParams.get("slug");
   const productIdParam = searchParams.get("productId");
@@ -682,7 +691,7 @@ function GiftCardsPageContent() {
         title="Gift Cards"
         subtitle={
           mode === "sell"
-            ? "Sell gift cards for Naira wallet credit"
+            ? `Sell gift cards for ${country.currency} wallet credit`
             : "Buy digital gift cards with your wallet"
         }
         backHref="/services/gift-cards/live"
@@ -799,12 +808,11 @@ function GiftCardsPageContent() {
                     <div className="flex items-center gap-2">
                       <div className="text-right">
                         <p className="text-sm font-bold">
-                          ₦
-                          {(
+                          {formatSellRate(
                             rateMap[selectedSell.slug] ??
-                            sellQuote?.ratePerUnit ??
-                            0
-                          ).toLocaleString("en-NG")}
+                              sellQuote?.ratePerUnit ??
+                              0,
+                          )}
                         </p>
                         <p className="text-[11px] text-muted-foreground">
                           per $1
@@ -1009,17 +1017,14 @@ function GiftCardsPageContent() {
                         {sellQuoting
                           ? "…"
                           : sellQuote
-                            ? `₦${sellQuote.userPayout.toLocaleString("en-NG", {
-                                minimumFractionDigits: 2,
-                              })}`
+                            ? formatServiceMoney(sellQuote.userPayout)
                             : "—"}
                       </span>
                     </div>
                     {sellQuote ? (
                       <p className="mt-1 text-[11px] text-muted-foreground">
-                        Provider rate ₦
-                        {sellQuote.ratePerUnit.toLocaleString("en-NG")} per{" "}
-                        {cardCurrency} 1
+                        Provider rate {formatServiceMoney(sellQuote.ratePerUnit)}{" "}
+                        per {cardCurrency} 1
                       </p>
                     ) : null}
                     <button
@@ -1266,9 +1271,7 @@ function GiftCardsPageContent() {
                         {buyQuoting
                           ? "…"
                           : buyQuote
-                            ? `${buyQuote.currency === "NGN" ? "₦" : `${buyQuote.currency} `}${buyQuote.local.toLocaleString("en-NG", {
-                                minimumFractionDigits: 2,
-                              })}`
+                            ? formatBuyPay(buyQuote)
                             : "—"}
                       </span>
                     </div>
@@ -1342,7 +1345,7 @@ function GiftCardsPageContent() {
                   </p>
                 </div>
                 <p className="shrink-0 text-sm font-bold tabular-nums">
-                  {rate != null ? `₦${rate.toLocaleString("en-NG")}` : "—"}
+                  {formatSellRate(rate)}
                 </p>
               </button>
             );

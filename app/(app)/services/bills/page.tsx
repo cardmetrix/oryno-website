@@ -216,11 +216,15 @@ export default function BillsPage() {
         />
         <MotionSection className="rounded-2xl border border-border bg-background p-6 text-center shadow-[var(--shadow-soft)]">
           <Zap className="mx-auto h-10 w-10 text-primary" />
-          <h2 className="mt-4 text-lg font-bold">Bill payments for Nigeria</h2>
+          <h2 className="mt-4 text-lg font-bold">
+            {country.name} bills coming next
+          </h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            DSTV, GOtv, Startimes, Showmax and all electricity discos are
-            available when your account country is Nigeria. Switch country in
-            settings, or use international airtime/data for your market.
+            {country.code === "GH"
+              ? "Ghana TV and electricity will go live on Hubtel (ECG, DStv Ghana, Ghana Water). Airtime and data already work for Ghana."
+              : country.code === "KE"
+                ? "Kenya bills will use Africa's Talking / Reloadly utilities. Airtime and data already work for Kenya."
+                : "South Africa bills will use Reloadly utilities. Airtime and data already work for South Africa."}
           </p>
           <a href="/services/airtime" className="btn-primary mt-6 inline-flex h-12 items-center px-6">
             Buy airtime instead

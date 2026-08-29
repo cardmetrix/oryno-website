@@ -30,7 +30,7 @@ export async function POST(req: Request) {
     const customerRef = normalizeBettingCustomerId(
       body.customerRef || body.customerId || body.billersCode || "",
     );
-    const provider = findBettingProvider(serviceID);
+    const provider = findBettingProvider(serviceID, user.countryCode);
 
     if (!provider || customerRef.length < 6) {
       return NextResponse.json(
@@ -42,6 +42,7 @@ export async function POST(req: Request) {
     const result = await verifyBettingCustomer({
       serviceID: provider.serviceID,
       customerId: customerRef,
+      countryCode: user.countryCode,
     });
 
     if (!result.ok) {

@@ -7,12 +7,9 @@ import {
   transactions,
   wallets,
 } from "@/lib/db/schema";
-import { quoteLocalUsd, roundMoney } from "@/lib/fx/rates";
-import {
-  currencyForCountry,
-  ensurePrimaryWallet,
-  toWalletSummary,
-} from "@/lib/wallet";
+import { nigeriaServiceLedgerCurrency, getDisplayFx } from "@/lib/display-currency";
+import { convertNgnToLocal, quoteLocalUsd } from "@/lib/fx/rates";
+import { ensurePrimaryWallet, toWalletSummary } from "@/lib/wallet";
 import { categoryForSlug } from "@/lib/sogo/catalog";
 import {
   assertReloadlyReady,
@@ -73,7 +70,7 @@ async function debitWallet(input: {
     throw new Error("Enter a valid amount");
   }
 
-  const currency = currencyForCountry(input.countryCode);
+  const currency = nigeriaServiceLedgerCurrency();
   const wallet = await ensurePrimaryWallet(input.userId, currency);
 
   if (wallet.status === "frozen" || wallet.status === "closed") {
@@ -165,7 +162,6 @@ export async function quoteGiftCardBuy(input: {
   unitPrice: number;
   countryCode?: string | null;
 }) {
-  const currency = currencyForCountry(input.countryCode);
   const key = String(input.unitPrice);
   const mappedUsd = input.product.senderPriceMap[key];
   const usdFace =
@@ -173,8 +169,8 @@ export async function quoteGiftCardBuy(input: {
       ? mappedUsd
       : input.unitPrice;
 
-  // Treat mapped/sender amounts as USD face for local FX (common Reloadly account setup)
-  const quote = await quoteLocalUsd(currency);
+  // Ledger is always NGN; display converts to the account country.
+  const quote = await quoteLocalUsd(nigeriaServiceLedgerCurrency());
   const { priceUsdToLocal } = await import("@/lib/pricing/service-pricing");
   const priced = await priceUsdToLocal({
     provider: "reloadly",
@@ -182,11 +178,13 @@ export async function quoteGiftCardBuy(input: {
     usd: usdFace,
     buyRate: quote.buyRate,
   });
+  const displayFx = await getDisplayFx(input.countryCode);
 
   return {
     usdFace,
-    local: priced.local,
-    currency,
+    local: convertNgnToLocal(priced.local, displayFx.ngnToLocal),
+    currency: displayFx.to,
+    ledgerNgn: priced.local,
     rate: quote.buyRate,
     markup: priced.markup,
     demo: isReloadlyDemoMode(),
@@ -258,7 +256,7 @@ export async function buyGiftCard(input: {
   const debit = await debitWallet({
     userId: input.userId,
     countryCode: input.countryCode,
-    amount: price.local,
+    amount: price.ledgerNgn,
     title: `Bought ${product.brandName} gift card`,
     subtitle: `${product.recipientCurrency} ${input.unitPrice} · ${product.name}`,
     metadata: {
@@ -277,7 +275,7 @@ export async function buyGiftCard(input: {
       brandId: brand.id,
       side: "buy",
       amountUsd: input.unitPrice.toFixed(2),
-      localAmount: price.local.toFixed(2),
+      localAmount: price.ledgerNgn.toFixed(2),
       currency: debit.currency,
       cardImageUrl: product.image,
       cardCodeEncrypted: null,
@@ -361,7 +359,7 @@ export async function buyGiftCard(input: {
       providerTransactionId: providerOrder.transactionId,
       amount: debit.amount,
       currency: debit.currency,
-      wallet: toWalletSummary(debit.wallet),
+      wallet: toWalletSummary(debit.wallet, await getDisplayFx(input.countryCode)),
       cards: codePayload,
       product,
       simulated,

@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
-import { servicesDirectory } from "@/lib/services-directory";
+import { ensureAppUser } from "@/lib/auth/current-user";
+import { getServicesDirectory } from "@/lib/services-directory";
 
 export const runtime = "nodejs";
 
 /** Lightweight catalog for the All Services page (fast JSON, no DB). */
 export async function GET() {
-  const services = servicesDirectory.map((s) => ({
+  const user = await ensureAppUser();
+  const services = getServicesDirectory(user?.countryCode).map((s) => ({
     id: s.id,
     href: s.href,
     label: s.label,

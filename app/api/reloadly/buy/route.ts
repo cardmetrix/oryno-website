@@ -6,7 +6,9 @@ import {
   reloadlyBuyHttpStatus,
   reloadlyErrorToEnglish,
 } from "@/lib/reloadly";
-import { formatMoney } from "@/lib/transactions";
+import { formatCountryMoney } from "@/lib/country";
+import { getDisplayFx } from "@/lib/display-currency";
+import { convertNgnToLocal } from "@/lib/fx/rates";
 
 export const runtime = "nodejs";
 
@@ -50,12 +52,17 @@ export async function POST(req: Request) {
       unitPrice,
       quantity: body.quantity || 1,
     });
+    const fx = await getDisplayFx(user.countryCode);
+    const amountFormatted = formatCountryMoney(
+      convertNgnToLocal(result.amount, fx.ngnToLocal),
+      user.countryCode,
+    );
 
     try {
       await createNotification({
         userId: user.id,
         title: "Gift card purchased",
-        body: `${result.product.brandName} · ${formatMoney(result.amount, result.currency)}`,
+        body: `${result.product.brandName} · ${amountFormatted}`,
         type: "gift_card",
         metadata: {
           href: `/history/${result.transactionId}`,
@@ -74,8 +81,8 @@ export async function POST(req: Request) {
       transactionId: result.transactionId,
       providerTransactionId: result.providerTransactionId,
       amount: result.amount,
-      amountFormatted: formatMoney(result.amount, result.currency),
-      currency: result.currency,
+      amountFormatted,
+      currency: fx.to,
       wallet: result.wallet,
       cards: result.cards,
       product: result.product,

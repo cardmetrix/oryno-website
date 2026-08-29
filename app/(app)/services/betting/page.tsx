@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Search, Trophy, Wallet } from "lucide-react";
+import { Search, Wallet } from "lucide-react";
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
@@ -15,6 +15,7 @@ import {
 } from "@/components/app/vtpass-service-picker";
 import { SelectSheet } from "@/components/app/select-sheet";
 import { useCountry } from "@/components/providers/country-provider";
+import { formatCountryMoney } from "@/lib/country";
 import { cn } from "@/lib/utils";
 
 type DemoTest = {
@@ -27,8 +28,7 @@ type DemoTest = {
 const FALLBACK_PRESETS = ["500", "1000", "2000", "5000", "10000"];
 
 export default function BettingPage() {
-  const { country, formatServiceMoney } = useCountry();
-  const isNigeria = (country?.code || "NG") === "NG";
+  const { country } = useCountry();
 
   const [services, setServices] = useState<VtpassServiceOption[]>([]);
   const [presets, setPresets] = useState<string[]>(FALLBACK_PRESETS);
@@ -55,8 +55,7 @@ export default function BettingPage() {
     return (
       Boolean(serviceID && customerRef.trim().length >= 6 && customerName) &&
       amountNumber >= minAmount &&
-      !submitting &&
-      isNigeria
+      !submitting
     );
   }, [
     serviceID,
@@ -65,11 +64,9 @@ export default function BettingPage() {
     amountNumber,
     minAmount,
     submitting,
-    isNigeria,
   ]);
 
   useEffect(() => {
-    if (!isNigeria) return;
     let cancelled = false;
     (async () => {
       setLoadingServices(true);
@@ -80,10 +77,14 @@ export default function BettingPage() {
         if (cancelled) return;
         const next = (data.services ?? []) as VtpassServiceOption[];
         setServices(next);
-        setPresets(data.presets ?? FALLBACK_PRESETS);
+        const nextPresets = (data.presets ?? FALLBACK_PRESETS) as string[];
+        setPresets(nextPresets);
         setDemoTests(data.demoTests ?? []);
         setDemoMode(Boolean(data.demo));
         if (next[0]?.serviceID) setServiceID(next[0].serviceID);
+        if (nextPresets[1] || nextPresets[0]) {
+          setAmount(nextPresets[1] || nextPresets[0]);
+        }
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : "Failed to load bookmakers");
@@ -95,7 +96,7 @@ export default function BettingPage() {
     return () => {
       cancelled = true;
     };
-  }, [isNigeria]);
+  }, [country.code]);
 
   async function verifyCustomer() {
     if (!serviceID || customerRef.trim().length < 6) return;
@@ -158,39 +159,13 @@ export default function BettingPage() {
     setCustomerName(null);
   }
 
-  const money = (n: number) => formatServiceMoney(n);
-
-  if (!isNigeria) {
-    return (
-      <AppShell hideNav>
-        <PageHeader
-          title="Betting Funding"
-          subtitle="Fund SportyBet, Bet9ja & more"
-          backHref="/services"
-        />
-        <MotionSection className="rounded-2xl border border-border bg-background p-6 text-center shadow-[var(--shadow-soft)]">
-          <Trophy className="mx-auto h-10 w-10 text-primary" />
-          <h2 className="mt-4 text-lg font-bold">Betting funding for Nigeria</h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Fund Bet9ja, SportyBet, 1xBet, BetKing and other bookmakers when
-            your account country is Nigeria.
-          </p>
-          <a
-            href="/services/airtime"
-            className="btn-primary mt-6 inline-flex h-12 items-center px-6"
-          >
-            Buy airtime instead
-          </a>
-        </MotionSection>
-      </AppShell>
-    );
-  }
+  const money = (n: number) => formatCountryMoney(n, country.code);
 
   return (
     <AppShell hideNav>
       <PageHeader
         title="Betting Funding"
-        subtitle="Fund any bookmaker from your wallet"
+        subtitle={`Fund ${country.name} bookmakers from your wallet`}
         backHref="/services"
       />
 
@@ -330,7 +305,7 @@ export default function BettingPage() {
                       amount === p ? "bg-primary text-white" : "bg-muted",
                     )}
                   >
-                    ₦{p}
+                    {money(Number(p))}
                   </button>
                 ))}
               </div>
