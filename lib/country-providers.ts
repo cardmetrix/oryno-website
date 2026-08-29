@@ -109,9 +109,12 @@ export const SERVICE_PROVIDERS: CountryServiceProvider[] = [
     credentials: [
       { env: "HUBTEL_CLIENT_ID", label: "POS / API client ID" },
       { env: "HUBTEL_CLIENT_SECRET", label: "POS / API client secret" },
+      { env: "HUBTEL_POS_ACCOUNT_ID", label: "Prepaid deposit account ID" },
+      { env: "HUBTEL_SERVICE_ECG_PREPAID", label: "ECG prepaid commission service ID" },
+      { env: "HUBTEL_SERVICE_GWCL", label: "Ghana Water commission service ID" },
     ],
     notes:
-      "Apply for a merchant account, then create an app under Developers to get Client ID + Secret. Needed before Ghana electricity/TV can go live.",
+      "Register a merchant, create an app for Client ID + Secret, then copy the Prepaid Deposit Account ID from Money → Accounts. Subscribe to ECG, DStv, GOtv, and GWCL under Commission Services and paste any missing service IDs.",
   },
   {
     id: "africas-talking",

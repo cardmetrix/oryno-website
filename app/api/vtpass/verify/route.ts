@@ -20,7 +20,7 @@ export async function POST(req: Request) {
       billersCode?: string;
       serviceID?: string;
       type?: string;
-      category?: "electricity" | "tv";
+      category?: "electricity" | "tv" | "water";
     };
 
     if (!body.billersCode?.trim() || !body.serviceID) {
@@ -28,6 +28,35 @@ export async function POST(req: Request) {
         { error: "billersCode and serviceID are required" },
         { status: 400 },
       );
+    }
+
+    if ((user.countryCode || "NG") === "GH") {
+      const { verifyHubtelCustomer, isHubtelDemoMode, hubtelErrorToEnglish } =
+        await import("@/lib/hubtel");
+      const result = await verifyHubtelCustomer({
+        serviceID: body.serviceID,
+        customerRef: body.billersCode.trim(),
+        variationCode: body.type,
+      });
+      if (!result.ok) {
+        return NextResponse.json(
+          {
+            error: hubtelErrorToEnglish(
+              result.message || "Could not verify that account",
+            ),
+          },
+          { status: 422 },
+        );
+      }
+      return NextResponse.json({
+        ok: true,
+        demo: isHubtelDemoMode(),
+        customerName: result.customerName,
+        customerAddress: result.customerAddress,
+        meterNumber: body.billersCode,
+        currentBouquet: result.currentBouquet,
+        renewalAmount: result.renewalAmount,
+      });
     }
 
     const category =

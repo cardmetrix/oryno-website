@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  CheckCircle2,
+  Droplets,
   Search,
   Tv,
   Wallet,
@@ -14,16 +14,16 @@ import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
 import { ServiceSuccess } from "@/components/app/service-success";
 import { ErrorAlertModal } from "@/components/app/error-alert-modal";
-import { ServiceInstructions } from "@/components/app/service-instructions";
 import {
   VtpassServicePicker,
   type VtpassServiceOption,
 } from "@/components/app/vtpass-service-picker";
 import { SelectSheet } from "@/components/app/select-sheet";
 import { useCountry } from "@/components/providers/country-provider";
+import { formatCountryMoney } from "@/lib/country";
 import { cn } from "@/lib/utils";
 
-type BillCategory = "tv" | "electricity";
+type BillCategory = "tv" | "electricity" | "water";
 
 type Variation = {
   variationCode: string;
@@ -32,11 +32,14 @@ type Variation = {
   fixedPrice: boolean;
 };
 
-const amountPresets = ["1000", "2000", "5000", "10000"];
+const NG_PRESETS = ["1000", "2000", "5000", "10000"];
+const GH_PRESETS = ["20", "50", "100", "200", "500"];
 
 export default function BillsPage() {
   const { country, formatServiceMoney } = useCountry();
   const isNigeria = (country?.code || "NG") === "NG";
+  const isGhana = (country?.code || "NG") === "GH";
+  const billsLive = isNigeria || isGhana;
 
   const [category, setCategory] = useState<BillCategory>("tv");
   const [services, setServices] = useState<VtpassServiceOption[]>([]);
@@ -46,7 +49,7 @@ export default function BillsPage() {
   const [loadingPlans, setLoadingPlans] = useState(false);
   const [variationCode, setVariationCode] = useState("");
   const [customerRef, setCustomerRef] = useState("");
-  const [amount, setAmount] = useState("2000");
+  const [amount, setAmount] = useState(isGhana ? "50" : "2000");
   const [verifying, setVerifying] = useState(false);
   const [customerName, setCustomerName] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -70,14 +73,22 @@ export default function BillsPage() {
   const canSubmit = useMemo(() => {
     return (
       Boolean(serviceID && variationCode && customerRef.trim().length >= 6) &&
-      amountNumber >= 100 &&
+      amountNumber >= (isGhana ? 1 : 100) &&
       !submitting &&
-      isNigeria
+      billsLive
     );
-  }, [serviceID, variationCode, customerRef, amountNumber, submitting, isNigeria]);
+  }, [
+    serviceID,
+    variationCode,
+    customerRef,
+    amountNumber,
+    submitting,
+    isGhana,
+    billsLive,
+  ]);
 
   useEffect(() => {
-    if (!isNigeria) return;
+    if (!billsLive) return;
     let cancelled = false;
     (async () => {
       setLoadingServices(true);
@@ -87,7 +98,11 @@ export default function BillsPage() {
       setCustomerName(null);
       try {
         const identifier =
-          category === "tv" ? "tv-subscription" : "electricity-bill";
+          category === "tv"
+            ? "tv-subscription"
+            : category === "water"
+              ? "water-bill"
+              : "electricity-bill";
         const res = await fetch(
           `/api/vtpass/services?identifier=${identifier}`,
         );
@@ -111,7 +126,7 @@ export default function BillsPage() {
     return () => {
       cancelled = true;
     };
-  }, [category, isNigeria]);
+  }, [category, billsLive]);
 
   useEffect(() => {
     if (!serviceID) return;
@@ -122,7 +137,11 @@ export default function BillsPage() {
       try {
         const res = await fetch(
           `/api/vtpass/variations?serviceID=${encodeURIComponent(serviceID)}&identifier=${
-            category === "tv" ? "tv-subscription" : "electricity-bill"
+            category === "tv"
+              ? "tv-subscription"
+              : category === "water"
+                ? "water-bill"
+                : "electricity-bill"
           }`,
         );
         const data = await res.json();
@@ -204,9 +223,17 @@ export default function BillsPage() {
     }
   }
 
-  const money = (n: number) => formatServiceMoney(n);
+  const money = (n: number) =>
+    isGhana ? formatCountryMoney(n, "GH") : formatServiceMoney(n);
+  const amountPresets = isGhana ? GH_PRESETS : NG_PRESETS;
+  const customerLabel =
+    category === "tv"
+      ? "Smartcard / IUC"
+      : category === "water"
+        ? "Account number"
+        : "Meter number";
 
-  if (!isNigeria) {
+  if (!billsLive) {
     return (
       <AppShell hideNav>
         <PageHeader
@@ -238,7 +265,11 @@ export default function BillsPage() {
     <AppShell hideNav>
       <PageHeader
         title="Bill Payments"
-        subtitle="TV subscriptions & electricity"
+        subtitle={
+          isGhana
+            ? "DStv, ECG & Ghana Water"
+            : "TV subscriptions & electricity"
+        }
         backHref="/services"
       />
 
@@ -275,11 +306,17 @@ export default function BillsPage() {
         ) : (
           <form key="form" onSubmit={onSubmit} className="space-y-4 sm:space-y-5">
             <MotionSection className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6">
-              <div className="grid grid-cols-2 gap-2 rounded-[14px] bg-muted/70 p-1">
+              <div className={cn(
+                "grid gap-2 rounded-[14px] bg-muted/70 p-1",
+                isGhana ? "grid-cols-3" : "grid-cols-2",
+              )}>
                 {(
                   [
                     { id: "tv" as const, label: "TV", icon: Tv },
                     { id: "electricity" as const, label: "Electricity", icon: Zap },
+                    ...(isGhana
+                      ? [{ id: "water" as const, label: "Water", icon: Droplets }]
+                      : []),
                   ] as const
                 ).map((tab) => {
                   const active = category === tab.id;
@@ -316,7 +353,13 @@ export default function BillsPage() {
               className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6"
             >
               <h2 className="mb-3 text-base font-semibold">
-                {category === "tv" ? "TV providers" : "Electricity discos"}
+                {category === "tv"
+                  ? "TV providers"
+                  : category === "water"
+                    ? "Water"
+                    : isGhana
+                      ? "Electricity"
+                      : "Electricity discos"}
               </h2>
               <div className="md:hidden">
                 <SelectSheet
@@ -324,12 +367,22 @@ export default function BillsPage() {
                   title={
                     category === "tv"
                       ? "Select TV provider"
-                      : "Select electricity disco"
+                      : category === "water"
+                        ? "Select water utility"
+                        : isGhana
+                          ? "Select electricity provider"
+                          : "Select electricity disco"
                   }
                   subtitle={
                     category === "tv"
-                      ? "DSTV, GOtv, Startimes & more"
-                      : "Prepaid & postpaid discos"
+                      ? isGhana
+                        ? "DStv, GOtv, StarTimes"
+                        : "DSTV, GOtv, Startimes & more"
+                      : category === "water"
+                        ? "Ghana Water Company"
+                        : isGhana
+                          ? "ECG prepaid & postpaid"
+                          : "Prepaid & postpaid discos"
                   }
                   hint="Tap to choose a provider"
                   value={serviceID}
@@ -362,7 +415,7 @@ export default function BillsPage() {
               className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6"
             >
               <label className="mb-2 block text-sm font-medium">
-                {category === "tv" ? "Smartcard number" : "Meter number"}
+                {customerLabel}
               </label>
               <div className="flex flex-col gap-2 sm:flex-row">
                 <input
@@ -372,7 +425,7 @@ export default function BillsPage() {
                     setCustomerName(null);
                   }}
                   placeholder={
-                    category === "tv" ? "Smartcard / IUC" : "Meter number"
+                    customerLabel
                   }
                   className="h-12 w-full rounded-[14px] border border-border bg-background px-4 text-sm outline-none focus:border-primary"
                 />
@@ -400,7 +453,13 @@ export default function BillsPage() {
               className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6"
             >
               <SelectSheet
-                label={category === "tv" ? "Bouquet / plan" : "Meter type"}
+                label={
+                  category === "tv"
+                    ? "Plan"
+                    : category === "water"
+                      ? "Bill type"
+                      : "Meter type"
+                }
                 title={
                   category === "tv" ? "Select bouquet" : "Select meter type"
                 }
@@ -424,12 +483,13 @@ export default function BillsPage() {
               />
 
               {(category === "electricity" ||
+                category === "water" ||
                 (selectedVariation && !selectedVariation.fixedPrice)) && (
                 <div className="mt-4">
                   <label className="mb-2 block text-sm font-medium">Amount</label>
                   <input
                     type="number"
-                    min={100}
+                    min={isGhana ? 1 : 100}
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     className="h-12 w-full rounded-[14px] border border-border bg-background px-4 text-sm outline-none focus:border-primary"
@@ -447,7 +507,7 @@ export default function BillsPage() {
                             : "bg-muted",
                         )}
                       >
-                        ₦{p}
+                        {money(Number(p))}
                       </button>
                     ))}
                   </div>
@@ -463,7 +523,13 @@ export default function BillsPage() {
               <div className="mt-3 space-y-2 text-sm">
                 <Row label="Provider" value={selectedService?.name ?? "—"} />
                 <Row
-                  label={category === "tv" ? "Smartcard" : "Meter"}
+                  label={
+                    category === "tv"
+                      ? "Smartcard"
+                      : category === "water"
+                        ? "Account"
+                        : "Meter"
+                  }
                   value={customerRef || "—"}
                 />
                 <Row label="Plan" value={selectedVariation?.name ?? "—"} />

@@ -1,16 +1,22 @@
 import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
+import {
+  GHANA_BILL_PRESETS,
+  isHubtelDemoMode,
+  listHubtelBillServices,
+} from "@/lib/hubtel";
 import { isSogoDemoMode, listSogoBillServices } from "@/lib/sogo";
 import type { VtpassServiceCategory } from "@/lib/vtpass";
 
 export const runtime = "nodejs";
 
-const ALLOWED: VtpassServiceCategory[] = [
+const ALLOWED = [
   "airtime",
   "data",
   "tv-subscription",
   "electricity-bill",
-];
+  "water-bill",
+] as const;
 
 export async function GET(req: Request) {
   try {
@@ -21,16 +27,54 @@ export async function GET(req: Request) {
 
     const { searchParams } = new URL(req.url);
     const identifier = (searchParams.get("identifier") ||
-      "airtime") as VtpassServiceCategory;
+      "airtime") as VtpassServiceCategory | "water-bill";
 
-    if (!ALLOWED.includes(identifier)) {
+    if (!(ALLOWED as readonly string[]).includes(identifier)) {
       return NextResponse.json(
         { error: "Invalid service category" },
         { status: 400 },
       );
     }
 
-    const services = await listSogoBillServices(identifier);
+    if (
+      (user.countryCode || "NG") === "GH" &&
+      (identifier === "tv-subscription" ||
+        identifier === "electricity-bill" ||
+        identifier === "water-bill")
+    ) {
+      const services = listHubtelBillServices(identifier);
+      return NextResponse.json({
+        ok: true,
+        demo: isHubtelDemoMode(),
+        provider: "hubtel",
+        countryCode: "GH",
+        currency: "GHS",
+        presets: GHANA_BILL_PRESETS,
+        identifier,
+        services: services.map((s) => ({
+          serviceID: s.serviceID,
+          name: s.name,
+          image: s.image,
+          customerLabel: s.customerLabel,
+          minAmount: s.minAmount,
+          maxAmount: s.maxAmount,
+        })),
+      });
+    }
+
+    if (identifier === "water-bill") {
+      return NextResponse.json({
+        ok: true,
+        demo: false,
+        provider: "sogo",
+        identifier,
+        services: [],
+      });
+    }
+
+    const services = await listSogoBillServices(
+      identifier as VtpassServiceCategory,
+    );
 
     return NextResponse.json({
       ok: true,

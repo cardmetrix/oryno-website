@@ -40,13 +40,13 @@ export const SERVICE_INSTRUCTIONS: Record<
     ],
   },
   bills: {
-    subtitle: "Follow these steps to pay TV or electricity bills",
+    subtitle: "Follow these steps to pay TV, electricity, or water bills",
     steps: [
-      "Bill payments are available for Nigeria accounts.",
-      "Choose TV or electricity, then pick your provider (e.g. DStv, IKEDC).",
-      "Enter your smartcard / meter number and verify the customer name.",
-      "Select a package or amount, then pay from your wallet.",
-      "Keep the receipt from History in case you need a reference.",
+      "Nigeria: DStv, GOtv, and discos. Ghana: DStv, ECG, and Ghana Water.",
+      "Choose a category, then pick your provider.",
+      "Enter your smartcard, meter, or account number and verify the name.",
+      "Select a plan or amount, then pay from your wallet.",
+      "Keep the receipt from History — prepaid ECG includes a token.",
     ],
   },
   social: {

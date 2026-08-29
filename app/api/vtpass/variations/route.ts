@@ -33,7 +33,36 @@ export async function GET(req: Request) {
       | "data"
       | "tv-subscription"
       | "electricity-bill"
+      | "water-bill"
       | null;
+
+    if ((user.countryCode || "NG") === "GH") {
+      const {
+        findHubtelBillService,
+        listHubtelVariations,
+        isHubtelDemoMode,
+      } = await import("@/lib/hubtel");
+      if (findHubtelBillService(serviceID)) {
+        const live = listHubtelVariations(serviceID);
+        return NextResponse.json({
+          ok: true,
+          demo: isHubtelDemoMode(),
+          provider: "hubtel",
+          countryCode: "GH",
+          currency: "GHS",
+          serviceID,
+          serviceName: live.serviceName,
+          variations: live.variations.map((v) => ({
+            variationCode: v.variationCode,
+            name: v.name,
+            amount: v.amount,
+            listAmount: v.amount,
+            priceOverride: false,
+            fixedPrice: v.fixedPrice,
+          })),
+        });
+      }
+    }
 
     // International airtime/data still uses VTpass
     if (serviceID === "foreign-airtime" || operatorId || productTypeId) {

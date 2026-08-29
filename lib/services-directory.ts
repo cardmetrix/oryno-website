@@ -233,6 +233,18 @@ export function getServicesDirectory(countryCode?: string | null) {
         stats: `${bookies.length} bookmakers`,
       };
     }
+    if (item.id === "bills") {
+      if (country.code === "GH") {
+        return {
+          ...item,
+          shortDescription: "DStv, ECG & Ghana Water",
+          longDescription:
+            "Pay DStv Ghana, GOtv, ECG prepaid/postpaid, and Ghana Water from your wallet.",
+          tags: ["DStv", "ECG", "Ghana Water", "GOtv"],
+          stats: "Hubtel",
+        };
+      }
+    }
     if (item.id === "gift-cards") {
       return {
         ...item,

@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
 import { createNotification } from "@/lib/notifications-service";
-import { formatMoney } from "@/lib/transactions";
+import { formatCountryMoney } from "@/lib/country";
+import { getDisplayFx } from "@/lib/display-currency";
+import { convertNgnToLocal } from "@/lib/fx/rates";
+import { hubtelHttpStatus } from "@/lib/hubtel";
 import { purchaseBill } from "@/lib/vtpass";
 import { sogoHttpStatus } from "@/lib/sogo/errors";
 import { publicServiceError } from "@/lib/service-errors";
@@ -18,7 +21,7 @@ export async function POST(req: Request) {
     const body = (await req.json()) as {
       serviceID?: string;
       serviceName?: string;
-      category?: "electricity" | "tv";
+      category?: "electricity" | "tv" | "water";
       customerRef?: string;
       phone?: string;
       amount?: number | string;
@@ -53,9 +56,10 @@ export async function POST(req: Request) {
       quantity: body.quantity,
     });
 
-    const amountFormatted = formatMoney(
-      result.payment.amount,
-      result.wallet.currency,
+    const fx = await getDisplayFx(user.countryCode);
+    const amountFormatted = formatCountryMoney(
+      convertNgnToLocal(Number(result.payment.amount), fx.ngnToLocal),
+      user.countryCode,
     );
 
     try {
@@ -98,7 +102,7 @@ export async function POST(req: Request) {
           error instanceof Error ? error.message : "Bill payment failed",
         ),
       },
-      { status: sogoHttpStatus(error) },
+      { status: hubtelHttpStatus(error) || sogoHttpStatus(error) },
     );
   }
 }

@@ -733,7 +733,7 @@ export async function purchaseBill(input: {
   countryCode?: string | null;
   serviceID: string;
   serviceName: string;
-  category: "electricity" | "tv";
+  category: "electricity" | "tv" | "water";
   customerRef: string;
   phone: string;
   amount: number;
@@ -741,6 +741,26 @@ export async function purchaseBill(input: {
   subscriptionType?: string;
   quantity?: number;
 }) {
+  const country = (input.countryCode || "NG").toUpperCase();
+  if (country === "GH") {
+    const { purchaseHubtelBill } = await import("@/lib/hubtel");
+    return purchaseHubtelBill({
+      userId: input.userId,
+      countryCode: input.countryCode,
+      serviceID: input.serviceID,
+      serviceName: input.serviceName,
+      category: input.category,
+      customerRef: input.customerRef,
+      phone: input.phone,
+      amount: input.amount,
+      variationCode: input.variationCode,
+    });
+  }
+  if (input.category === "water") {
+    throw Object.assign(new Error("Water bills are available for Ghana accounts"), {
+      status: 400,
+    });
+  }
   return purchaseSogoBill({
     userId: input.userId,
     countryCode: input.countryCode,
