@@ -247,6 +247,17 @@ export function getServicesDirectory(countryCode?: string | null) {
         stats: "VTpass",
       };
     }
+    if (item.id === "data" && (country.code === "KE" || country.code === "GH")) {
+      return {
+        ...item,
+        shortDescription:
+          country.code === "KE"
+            ? "Safaricom, Airtel & Telkom Kenya"
+            : "MTN, Telecel & AirtelTigo",
+        longDescription: `Buy ${country.name} mobile data for local networks. Enter any amount in ${country.currency}.`,
+        stats: `From ${country.currencySymbol}${country.code === "KE" ? "50" : "5"}`,
+      };
+    }
     if (item.id === "betting") {
       return {
         ...item,

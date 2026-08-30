@@ -2,13 +2,12 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { CheckCircle2, Wallet, Wifi } from "lucide-react";
+import { Wallet, Wifi } from "lucide-react";
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
 import { ServiceSuccess } from "@/components/app/service-success";
 import { ErrorAlertModal } from "@/components/app/error-alert-modal";
-import { ServiceInstructions } from "@/components/app/service-instructions";
 import {
   VtpassServicePicker,
   type VtpassServiceOption,
@@ -17,7 +16,15 @@ import { SelectSheet } from "@/components/app/select-sheet";
 import { useCountry } from "@/components/providers/country-provider";
 import { useWalletBalance } from "@/hooks/use-wallet-balance";
 import { cleanNetworkName, inferDataPlanCategory } from "@/lib/vtpass/catalog";
+import {
+  defaultIntlDataAmount,
+  intlDataMinLocal,
+  intlDataPresets,
+  intlDataVariationLabel,
+  usesFlexibleIntlData,
+} from "@/lib/vtpass/intl-data";
 import { cn } from "@/lib/utils";
+import { formatCountryMoney } from "@/lib/country";
 
 type Variation = {
   variationCode: string;
@@ -29,15 +36,22 @@ type Variation = {
 const FILTERS = ["All", "Daily", "Weekly", "Monthly"] as const;
 
 export default function DataPage() {
-  const { country, loading: countryLoading, formatServiceMoney } = useCountry();
+  const {
+    country,
+    loading: countryLoading,
+    formatServiceMoney,
+    displayFx,
+  } = useCountry();
   const { canAfford, canAffordNgn, frozen } = useWalletBalance();
   const countryCode = country?.code || "NG";
   const isNigeria = countryCode === "NG";
+  const isFlexibleIntl = usesFlexibleIntlData(countryCode);
 
   const [networks, setNetworks] = useState<VtpassServiceOption[]>([]);
   const [loadingNetworks, setLoadingNetworks] = useState(true);
   const [networkId, setNetworkId] = useState("");
   const [phone, setPhone] = useState("");
+  const [amount, setAmount] = useState(defaultIntlDataAmount(countryCode));
   const [variations, setVariations] = useState<Variation[]>([]);
   const [loadingPlans, setLoadingPlans] = useState(false);
   const [variationCode, setVariationCode] = useState("");
@@ -46,6 +60,7 @@ export default function DataPage() {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [receipt, setReceipt] = useState("");
+  const [receiptLabel, setReceiptLabel] = useState("");
   const [productTypeId, setProductTypeId] = useState(4);
 
   const selected = variations.find((v) => v.variationCode === variationCode);
@@ -59,15 +74,45 @@ export default function DataPage() {
     });
   }, [variations, filter]);
 
+  const localAmount = Number(amount) || 0;
+  const minLocal = isFlexibleIntl ? intlDataMinLocal(countryCode) : 0;
+  const chargeAmount = isNigeria
+    ? selected?.amount || 0
+    : isFlexibleIntl
+      ? localAmount * (displayFx?.localToNgn ?? 1)
+      : selected?.amount || 0;
+
+  const affordable = isNigeria
+    ? canAfford(chargeAmount)
+    : canAffordNgn(chargeAmount);
+
   const canSubmit = useMemo(() => {
-    if (phone.replace(/\D/g, "").length < 10 || !selected || submitting) {
+    if (phone.replace(/\D/g, "").length < 10 || submitting || !networkId) {
       return false;
     }
-    if (frozen || !(isNigeria ? canAfford(selected.amount) : canAffordNgn(selected.amount))) {
-      return false;
+    if (frozen || !affordable) return false;
+    if (isNigeria || !isFlexibleIntl) {
+      return Boolean(selected && chargeAmount > 0);
     }
-    return Boolean(networkId);
-  }, [phone, selected, submitting, networkId, frozen, canAfford, canAffordNgn, isNigeria]);
+    return localAmount >= minLocal;
+  }, [
+    phone,
+    submitting,
+    networkId,
+    frozen,
+    affordable,
+    isNigeria,
+    isFlexibleIntl,
+    selected,
+    chargeAmount,
+    localAmount,
+    minLocal,
+  ]);
+
+  useEffect(() => {
+    if (countryLoading) return;
+    setAmount(defaultIntlDataAmount(countryCode));
+  }, [countryLoading, countryCode]);
 
   useEffect(() => {
     if (countryLoading) return;
@@ -145,7 +190,7 @@ export default function DataPage() {
   }, [countryLoading, isNigeria, countryCode]);
 
   useEffect(() => {
-    if (!networkId) return;
+    if (isFlexibleIntl || !networkId) return;
     let cancelled = false;
 
     (async () => {
@@ -175,44 +220,60 @@ export default function DataPage() {
     return () => {
       cancelled = true;
     };
-  }, [isNigeria, networkId, productTypeId]);
+  }, [isFlexibleIntl, isNigeria, networkId, productTypeId]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!canSubmit || !selected) return;
+    if (!canSubmit) return;
     setSubmitting(true);
     setError(null);
     try {
+      const planLabel = isFlexibleIntl
+        ? intlDataVariationLabel(countryCode, localAmount)
+        : selected!.name;
+
       const res = await fetch(
         isNigeria ? "/api/sogo/bills/data" : "/api/vtpass/purchase/data",
         {
           method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          isNigeria
-            ? {
-                mode: "local",
-                serviceID: networkId,
-                phone,
-                variationCode: selected.variationCode,
-                variationName: selected.name,
-                amount: selected.amount,
-              }
-            : {
-                mode: "international",
-                phone,
-                variationCode: selected.variationCode,
-                variationName: selected.name,
-                amount: selected.amount,
-                operatorId: networkId,
-                countryIso: countryCode,
-                productTypeId,
-              },
-        ),
-      });
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(
+            isNigeria
+              ? {
+                  mode: "local",
+                  serviceID: networkId,
+                  phone,
+                  variationCode: selected!.variationCode,
+                  variationName: selected!.name,
+                  amount: selected!.amount,
+                }
+              : isFlexibleIntl
+                ? {
+                    mode: "international",
+                    phone,
+                    amount: localAmount,
+                    operatorId: networkId,
+                    countryIso: countryCode,
+                    productTypeId,
+                    flexibleLocalAmount: true,
+                  }
+                : {
+                    mode: "international",
+                    phone,
+                    variationCode: selected!.variationCode,
+                    variationName: selected!.name,
+                    amount: selected!.amount,
+                    operatorId: networkId,
+                    countryIso: countryCode,
+                    productTypeId,
+                  },
+          ),
+        },
+      );
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Purchase failed");
       setReceipt(data.amountFormatted);
+      setReceiptLabel(planLabel);
       setSuccess(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Purchase failed");
@@ -222,6 +283,13 @@ export default function DataPage() {
   }
 
   const money = (n: number) => formatServiceMoney(n);
+  const amountLabel = isFlexibleIntl
+    ? formatCountryMoney(localAmount, countryCode)
+    : selected
+      ? money(selected.amount)
+      : money(0);
+  const currencyPrefix = country?.currencySymbol ?? "₦";
+  const amountPresets = isFlexibleIntl ? intlDataPresets(countryCode) : [];
 
   return (
     <AppShell hideNav>
@@ -230,19 +298,21 @@ export default function DataPage() {
         subtitle={
           countryCode === "ZA"
             ? "MTN, Vodacom, Cell C & Telkom"
-            : "Daily, weekly & monthly plans"
+            : isFlexibleIntl
+              ? "Enter amount in local currency"
+              : "Daily, weekly & monthly plans"
         }
         backHref="/dashboard"
       />
 
       <AnimatePresence mode="wait">
-        {success && selected ? (
+        {success ? (
           <MotionSection key="success">
             <ServiceSuccess
               title="Data sent!"
-              subtitle={`${selected.name} delivered to ${phone}`}
+              subtitle={`${receiptLabel || selected?.name || "Data"} delivered to ${phone}`}
               amountLabel="Amount charged"
-              amount={receipt || money(selected.amount)}
+              amount={receipt || amountLabel}
               onDismiss={() => setSuccess(false)}
               secondaryAction={{
                 label: "Back to Home",
@@ -316,52 +386,91 @@ export default function DataPage() {
                 type="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                placeholder="0803 000 0000"
+                placeholder={isNigeria ? "0803 000 0000" : "Recipient number"}
                 className="h-12 w-full rounded-[14px] border border-border bg-background px-4 text-sm outline-none focus:border-primary"
               />
             </MotionSection>
 
-            <MotionSection
-              delay={0.08}
-              className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6"
-            >
-              <SelectSheet
-                label="Data plan"
-                title="Select data plan"
-                subtitle="Daily, weekly & monthly bundles"
-                hint="Tap to choose a plan"
-                value={variationCode}
-                valueLabel={selected?.name}
-                onChange={setVariationCode}
-                loading={loadingPlans}
-                emptyText="No plans match this filter"
-                options={filtered.map((v) => ({
-                  id: v.variationCode,
-                  title: v.name,
-                  subtitle: inferDataPlanCategory(v.name),
-                  trailing: money(v.amount),
-                }))}
-                headerExtra={
-                  <div className="flex flex-wrap gap-1.5">
-                    {FILTERS.map((f) => (
-                      <button
-                        key={f}
-                        type="button"
-                        onClick={() => setFilter(f)}
-                        className={cn(
-                          "shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold",
-                          filter === f
-                            ? "bg-primary text-white"
-                            : "bg-muted text-foreground",
-                        )}
-                      >
-                        {f}
-                      </button>
-                    ))}
-                  </div>
-                }
-              />
-            </MotionSection>
+            {isFlexibleIntl ? (
+              <MotionSection
+                delay={0.08}
+                className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6"
+              >
+                <label className="mb-2 block text-sm font-medium">Amount</label>
+                <div className="relative">
+                  <span className="absolute top-1/2 left-4 -translate-y-1/2 text-sm font-semibold text-muted-foreground">
+                    {currencyPrefix}
+                  </span>
+                  <input
+                    type="number"
+                    min={minLocal}
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    className="h-12 w-full rounded-[14px] border border-border bg-background pr-4 pl-9 text-sm outline-none focus:border-primary"
+                  />
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {amountPresets.map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setAmount(preset)}
+                      className={cn(
+                        "rounded-full px-3.5 py-2 text-sm font-semibold",
+                        amount === preset
+                          ? "bg-primary text-white"
+                          : "bg-muted text-foreground",
+                      )}
+                    >
+                      {currencyPrefix}
+                      {preset}
+                    </button>
+                  ))}
+                </div>
+              </MotionSection>
+            ) : (
+              <MotionSection
+                delay={0.08}
+                className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6"
+              >
+                <SelectSheet
+                  label="Data plan"
+                  title="Select data plan"
+                  subtitle="Daily, weekly & monthly bundles"
+                  hint="Tap to choose a plan"
+                  value={variationCode}
+                  valueLabel={selected?.name}
+                  onChange={setVariationCode}
+                  loading={loadingPlans}
+                  emptyText="No plans match this filter"
+                  options={filtered.map((v) => ({
+                    id: v.variationCode,
+                    title: v.name,
+                    subtitle: inferDataPlanCategory(v.name),
+                    trailing: money(v.amount),
+                  }))}
+                  headerExtra={
+                    <div className="flex flex-wrap gap-1.5">
+                      {FILTERS.map((f) => (
+                        <button
+                          key={f}
+                          type="button"
+                          onClick={() => setFilter(f)}
+                          className={cn(
+                            "shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold",
+                            filter === f
+                              ? "bg-primary text-white"
+                              : "bg-muted text-foreground",
+                          )}
+                        >
+                          {f}
+                        </button>
+                      ))}
+                    </div>
+                  }
+                />
+              </MotionSection>
+            )}
 
             <MotionSection
               delay={0.1}
@@ -370,13 +479,11 @@ export default function DataPage() {
               <h2 className="text-base font-semibold">Order summary</h2>
               <div className="mt-3 space-y-2 text-sm">
                 <Row label="Network" value={selectedNetwork?.name ?? "—"} />
-                <Row label="Plan" value={selected?.name ?? "—"} />
+                {!isFlexibleIntl ? (
+                  <Row label="Plan" value={selected?.name ?? "—"} />
+                ) : null}
                 <Row label="Phone" value={phone || "—"} />
-                <Row
-                  label="Amount"
-                  value={selected ? money(selected.amount) : money(0)}
-                  accent
-                />
+                <Row label="Amount" value={amountLabel} accent />
                 <div className="flex items-center gap-2 border-t border-border pt-3 font-semibold">
                   <Wallet className="h-4 w-4 text-primary" />
                   Pay from wallet
@@ -394,13 +501,10 @@ export default function DataPage() {
                 ? "Processing…"
                 : frozen
                   ? "Wallet unavailable"
-                  : selected &&
-                      !(isNigeria
-                        ? canAfford(selected.amount)
-                        : canAffordNgn(selected.amount))
+                  : !affordable && chargeAmount > 0
                     ? "Insufficient balance"
-                    : selected
-                      ? `Buy data · ${money(selected.amount)}`
+                    : isFlexibleIntl || selected
+                      ? `Buy data · ${amountLabel}`
                       : "Select a plan"}
             </motion.button>
           </form>

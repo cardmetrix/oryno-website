@@ -29,6 +29,7 @@ export async function POST(req: Request) {
       countryIso?: string;
       productTypeId?: string | number;
       variationCode?: string;
+      flexibleLocalAmount?: boolean;
     };
 
     const amount = Number(body.amount);
@@ -49,20 +50,13 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
-    const flexibleZa =
+    const flexibleIntl =
       mode === "international" &&
-      (body.countryIso || "").toUpperCase() === "ZA" &&
-      !body.variationCode;
+      (Boolean(body.flexibleLocalAmount) || !body.variationCode);
     if (
       mode === "international" &&
       (!body.operatorId || !body.countryIso || !body.productTypeId)
     ) {
-      return NextResponse.json(
-        { error: "Complete international airtime selection" },
-        { status: 400 },
-      );
-    }
-    if (mode === "international" && !flexibleZa && !body.variationCode) {
       return NextResponse.json(
         { error: "Complete international airtime selection" },
         { status: 400 },
@@ -83,7 +77,7 @@ export async function POST(req: Request) {
       countryIso: body.countryIso,
       productTypeId: body.productTypeId,
       variationCode: body.variationCode,
-      flexibleLocalAmount: flexibleZa,
+      flexibleLocalAmount: flexibleIntl,
       }),
     );
 

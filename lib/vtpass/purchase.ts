@@ -40,7 +40,17 @@ import {
   inferDataPlanCategory,
 } from "./catalog";
 import {
-  ZA_AIRTIME_MIN_ZAR,
+  intlDataLocalCurrency,
+  intlDataMinError,
+  intlDataMinLocal,
+  intlDataVariationLabel,
+} from "./intl-data";
+import {
+  intlAirtimeLocalCurrency,
+  intlAirtimeMinLocal,
+  intlAirtimeMinError,
+} from "./intl-airtime";
+import {
   zaAirtimeOperatorName,
 } from "./za-airtime";
 import { findZaDataPlan } from "./za-data";
@@ -462,24 +472,25 @@ export async function purchaseAirtime(input: {
   }
 
   const market = resolveCountryCode(input.countryCode || input.countryIso);
-  const flexibleZa =
+  const flexibleIntl =
     Boolean(input.flexibleLocalAmount) ||
-    (market === "ZA" && !input.variationCode);
+    (input.mode === "international" && !input.variationCode);
 
   let faceAmount = input.amount;
   let variationCode = input.variationCode;
   let operatorId = input.operatorId;
 
-  if (flexibleZa) {
-    if (input.amount < ZA_AIRTIME_MIN_ZAR) {
-      throw new Error(`Minimum airtime amount is R${ZA_AIRTIME_MIN_ZAR}`);
+  if (flexibleIntl) {
+    const minLocal = intlAirtimeMinLocal(market);
+    if (input.amount < minLocal) {
+      throw new Error(intlAirtimeMinError(market));
     }
-    const fx = await getDisplayFx(input.countryCode || input.countryIso || "ZA");
+    const fx = await getDisplayFx(input.countryCode || input.countryIso || market);
     faceAmount = convertLocalToNgn(input.amount, fx.localToNgn);
     operatorId = await resolveIntlAirtimeOperator({
       operatorId: input.operatorId,
       productTypeId: input.productTypeId,
-      countryIso: input.countryIso || "ZA",
+      countryIso: input.countryIso || market,
     });
     variationCode =
       variationCode ||
@@ -522,8 +533,10 @@ export async function purchaseAirtime(input: {
       cashback,
       faceAmount: priced.face,
       serviceKey: priced.serviceKey,
-      localAmount: flexibleZa ? input.amount : undefined,
-      localCurrency: flexibleZa ? "ZAR" : undefined,
+      localAmount: flexibleIntl ? input.amount : undefined,
+      localCurrency: flexibleIntl
+        ? intlAirtimeLocalCurrency(market)
+        : undefined,
     },
   });
 
@@ -548,7 +561,7 @@ export async function purchaseAirtime(input: {
       serviceID: "foreign-airtime",
       billersCode: phone,
       ...(variationCode ? { variation_code: variationCode } : {}),
-      amount: flexibleZa ? input.amount : priced.face,
+      amount: flexibleIntl ? input.amount : priced.face,
       phone,
       operator_id: operatorId!,
       country_code: input.countryIso!,
@@ -623,48 +636,95 @@ export async function purchaseData(input: {
   countryCode?: string | null;
   serviceID: string;
   phone: string;
-  variationCode: string;
-  variationName: string;
+  variationCode?: string;
+  variationName?: string;
   amount: number;
   email?: string | null;
   mode?: "local" | "international";
   operatorId?: string;
   countryIso?: string;
   productTypeId?: string | number;
+  /** When true, `amount` is local currency for flexible VTpass data top-up. */
+  flexibleLocalAmount?: boolean;
 }) {
   if (input.mode !== "international") {
+    if (!input.variationCode) throw new Error("Select a data plan");
     return purchaseSogoData({
       userId: input.userId,
       countryCode: input.countryCode,
       serviceID: input.serviceID,
       phone: input.phone,
       variationCode: input.variationCode,
-      variationName: input.variationName,
+      variationName: input.variationName || input.variationCode,
       amount: input.amount,
     });
   }
 
   const phone = normalizePhone(input.phone);
   if (phone.length < 10) throw new Error("Enter a valid phone number");
-  if (!input.variationCode) throw new Error("Select a data plan");
+  if (!Number.isFinite(input.amount) || input.amount <= 0) {
+    throw new Error("Enter a valid amount");
+  }
 
-  const zaPlan = findZaDataPlan(input.variationCode);
+  const market = resolveCountryCode(input.countryCode || input.countryIso);
+  const flexibleIntl =
+    Boolean(input.flexibleLocalAmount) ||
+    (input.mode === "international" && !input.variationCode);
+
+  let faceAmount = input.amount;
+  let variationCode = input.variationCode;
+  let variationName =
+    input.variationName ||
+    (variationCode ? variationCode : intlDataVariationLabel(market, input.amount));
+  let operatorId = input.operatorId;
+
+  if (flexibleIntl) {
+    const minLocal = intlDataMinLocal(market);
+    if (input.amount < minLocal) {
+      throw new Error(intlDataMinError(market));
+    }
+    const fx = await getDisplayFx(input.countryCode || input.countryIso || market);
+    faceAmount = convertLocalToNgn(input.amount, fx.localToNgn);
+    operatorId = await resolveIntlAirtimeOperator({
+      operatorId: input.operatorId,
+      productTypeId: input.productTypeId,
+      countryIso: input.countryIso || market,
+    });
+    variationCode =
+      variationCode ||
+      (await resolveFlexibleIntlVariation({
+        operatorId: operatorId!,
+        productTypeId: input.productTypeId,
+        localAmount: input.amount,
+      }));
+    if (!variationCode) {
+      throw new Error(
+        "Flexible data is not available for this network right now. Try again later.",
+      );
+    }
+    variationName = intlDataVariationLabel(market, input.amount);
+  } else if (!variationCode) {
+    throw new Error("Select a data plan");
+  }
+
+  const zaPlan = findZaDataPlan(variationCode);
   if (zaPlan) {
     throw new Error(
       "South Africa data requires a live VTpass network. Refresh and select a live operator.",
     );
   }
-  let faceAmount = await lookupVariationFace({
-    serviceID:
-      input.mode === "international" ? "foreign-airtime" : input.serviceID,
-    variationCode: input.variationCode,
-    fallbackAmount: input.amount,
-    operatorId: input.operatorId,
-    productTypeId: input.productTypeId,
-  });
+  if (!flexibleIntl) {
+    faceAmount = await lookupVariationFace({
+      serviceID: "foreign-airtime",
+      variationCode,
+      fallbackAmount: input.amount,
+      operatorId: input.operatorId,
+      productTypeId: input.productTypeId,
+    });
+  }
   const priced = await resolveVtpassRetail({
     serviceID: input.serviceID,
-    variationCode: input.variationCode,
+    variationCode,
     faceAmount,
   });
 
@@ -672,13 +732,13 @@ export async function purchaseData(input: {
   const network = await ensureTelecomNetwork(
     country,
     input.mode === "international"
-      ? `foreign-${input.operatorId ?? "data"}`
+      ? `foreign-${operatorId ?? input.operatorId ?? "data"}`
       : input.serviceID,
   );
   const plan = await ensureDataPlan({
     networkId: network.id,
-    variationCode: input.variationCode,
-    name: input.variationName,
+    variationCode,
+    name: variationName,
     amount: priced.retail,
   });
 
@@ -688,12 +748,14 @@ export async function purchaseData(input: {
     amount: priced.retail,
     category: "data",
     title: `${network.name} Data`,
-    subtitle: `${input.variationName} · ${phone}`,
+    subtitle: `${variationName} · ${phone}`,
     metadata: {
       serviceID: input.serviceID,
-      variationCode: input.variationCode,
+      variationCode,
       faceAmount: priced.face,
       serviceKey: priced.serviceKey,
+      localAmount: flexibleIntl ? input.amount : undefined,
+      localCurrency: flexibleIntl ? intlDataLocalCurrency(market) : undefined,
     },
   });
 
@@ -718,10 +780,10 @@ export async function purchaseData(input: {
             request_id: prepared.requestId,
             serviceID: "foreign-airtime",
             billersCode: phone,
-            variation_code: input.variationCode,
+            variation_code: variationCode,
             amount: priced.face,
             phone,
-            operator_id: input.operatorId!,
+            operator_id: operatorId ?? input.operatorId!,
             country_code: input.countryIso!,
             product_type_id: input.productTypeId!,
             email: input.email || "support@oryno.app",

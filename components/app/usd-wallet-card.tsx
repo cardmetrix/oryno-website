@@ -30,7 +30,9 @@ type CardProps = {
 
 type ActionsProps = {
   localCurrency: string;
+  localBalance: number;
   localBalanceFormatted: string;
+  usdBalance?: number;
   fx?: FxQuote | null;
   panel: UsdPanel;
   onPanelChange: (panel: UsdPanel) => void;
@@ -135,7 +137,9 @@ export function UsdWalletCard({
 /** Fund / Convert form shown under the USD card (matches mobile UsdWalletActionsPanel). */
 export function UsdWalletActionsPanel({
   localCurrency,
+  localBalance,
   localBalanceFormatted,
+  usdBalance = 0,
   fx,
   panel,
   onPanelChange,
@@ -208,6 +212,61 @@ export function UsdWalletActionsPanel({
     }
     return null;
   }, [liveFx, amount, panel, direction, localCurrency]);
+
+  const usdAmount = Number(amount) || 0;
+  const localCost =
+    liveFx && usdAmount > 0 ? usdAmount * liveFx.buyRate : 0;
+
+  const needsLocalBalance =
+    (panel === "fund" && fundMethod === "convert") ||
+    (panel === "convert" && direction === "to_usd");
+  const needsUsdBalance = panel === "convert" && direction === "to_local";
+
+  const canSubmit = useMemo(() => {
+    if (busy || !amount || usdAmount <= 0) return false;
+    if (needsLocalBalance && localCost > localBalance) return false;
+    if (needsUsdBalance && usdAmount > usdBalance) return false;
+    return true;
+  }, [
+    busy,
+    amount,
+    usdAmount,
+    needsLocalBalance,
+    needsUsdBalance,
+    localCost,
+    localBalance,
+    usdBalance,
+  ]);
+
+  const submitLabel = useMemo(() => {
+    if (busy) return null;
+    if (needsLocalBalance && localCost > localBalance) {
+      return "Insufficient local balance";
+    }
+    if (needsUsdBalance && usdAmount > usdBalance) {
+      return "Insufficient USD balance";
+    }
+    if (panel === "fund") {
+      return fundMethod === "paystack"
+        ? "Pay with Paystack"
+        : `Convert from ${localCurrency}`;
+    }
+    return direction === "to_usd"
+      ? "Convert to USD"
+      : `Convert to ${localCurrency}`;
+  }, [
+    busy,
+    needsLocalBalance,
+    needsUsdBalance,
+    localCost,
+    localBalance,
+    usdAmount,
+    usdBalance,
+    panel,
+    fundMethod,
+    direction,
+    localCurrency,
+  ]);
 
   async function onFund() {
     setBusy(true);
@@ -432,7 +491,7 @@ export function UsdWalletActionsPanel({
           <div className="mt-auto pt-4">
           <button
             type="button"
-            disabled={busy || !amount || Number(amount) <= 0}
+            disabled={!canSubmit}
             onClick={() => void (panel === "fund" ? onFund() : onConvert())}
             className="btn-primary inline-flex h-12 w-full items-center justify-center gap-2 text-sm disabled:opacity-50"
           >
@@ -441,16 +500,8 @@ export function UsdWalletActionsPanel({
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Processing…
               </>
-            ) : panel === "fund" ? (
-              fundMethod === "paystack" ? (
-                "Pay with Paystack"
-              ) : (
-                `Convert from ${localCurrency}`
-              )
-            ) : direction === "to_usd" ? (
-              "Convert to USD"
             ) : (
-              `Convert to ${localCurrency}`
+              submitLabel
             )}
           </button>
           </div>

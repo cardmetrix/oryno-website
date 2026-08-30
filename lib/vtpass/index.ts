@@ -4,3 +4,5 @@ export * from "./types";
 export * from "./purchase";
 export * from "./za-data";
 export * from "./za-airtime";
+export * from "./intl-airtime";
+export * from "./intl-data";

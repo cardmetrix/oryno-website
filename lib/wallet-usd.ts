@@ -12,6 +12,8 @@ import {
   roundMoney,
   usdFromLocal,
 } from "@/lib/fx/rates";
+import { resolveCountryCode } from "@/lib/country";
+import { countryFromCurrency } from "@/lib/paystack/country";
 import { formatMoney } from "@/lib/transactions";
 import {
   generateWalletCardNumber,
@@ -357,12 +359,16 @@ type InitPaystackData = {
 export async function initiateUsdPaystackFund(input: {
   userId: string;
   email: string;
+  countryCode?: string | null;
   localCurrency: string;
   usdAmount: string | number;
   callbackUrl: string;
 }) {
   const usdAmount = parseAmount(input.usdAmount);
   const localCurrency = input.localCurrency.toUpperCase();
+  const countryCode = resolveCountryCode(
+    input.countryCode ?? countryFromCurrency(localCurrency),
+  );
   const quote = await quoteLocalUsd(localCurrency);
   const localAmount = localToBuyUsd(usdAmount, quote.buyRate);
   const usdWallet = await ensureUsdWallet(input.userId);
@@ -394,12 +400,10 @@ export async function initiateUsdPaystackFund(input: {
 
   if (hasPaystackKeys()) {
     try {
-      // Paystack NG settles in NGN for most accounts
-      const chargeCurrency = localCurrency === "NGN" ? "NGN" : "NGN";
-      const chargeAmount =
-        localCurrency === "NGN"
-          ? localAmount
-          : localToBuyUsd(usdAmount, (await quoteLocalUsd("NGN")).buyRate);
+      const channels =
+        countryCode === "GH" || countryCode === "KE"
+          ? ["card", "bank", "mobile_money"]
+          : ["card", "bank"];
 
       const res = await paystackFetch<InitPaystackData>(
         "/transaction/initialize",
@@ -407,13 +411,15 @@ export async function initiateUsdPaystackFund(input: {
           method: "POST",
           body: JSON.stringify({
             email: input.email,
-            amount: Math.round(chargeAmount * 100),
-            currency: chargeCurrency,
+            amount: Math.round(localAmount * 100),
+            currency: localCurrency,
             reference,
             callback_url: input.callbackUrl,
+            channels,
             metadata: {
               oryno_user_id: input.userId,
               purpose: "usd_fund",
+              country_code: countryCode,
               usd_amount: usdAmount,
               local_currency: localCurrency,
               local_amount: localAmount,

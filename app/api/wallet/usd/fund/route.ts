@@ -70,6 +70,7 @@ export async function POST(req: Request) {
     const result = await initiateUsdPaystackFund({
       userId: user.id,
       email,
+      countryCode: user.countryCode,
       localCurrency,
       usdAmount: body.amountUsd ?? 0,
       callbackUrl,

@@ -29,19 +29,41 @@ export async function POST(req: Request) {
       operatorId?: string;
       countryIso?: string;
       productTypeId?: string | number;
+      flexibleLocalAmount?: boolean;
     };
 
-    if (!body.phone || !body.variationCode) {
+    const mode = body.mode ?? "local";
+    const flexibleIntl =
+      mode === "international" &&
+      (Boolean(body.flexibleLocalAmount) || !body.variationCode);
+
+    if (!body.phone) {
+      return NextResponse.json(
+        { error: "Phone number is required" },
+        { status: 400 },
+      );
+    }
+
+    if (!flexibleIntl && !body.variationCode) {
       return NextResponse.json(
         { error: "Phone and data plan are required" },
         { status: 400 },
       );
     }
 
-    const mode = body.mode ?? "local";
     if (mode === "local" && !body.serviceID) {
       return NextResponse.json(
         { error: "Select a data network" },
+        { status: 400 },
+      );
+    }
+
+    if (
+      mode === "international" &&
+      (!body.operatorId || !body.countryIso || !body.productTypeId)
+    ) {
+      return NextResponse.json(
+        { error: "Complete international data selection" },
         { status: 400 },
       );
     }
@@ -60,6 +82,7 @@ export async function POST(req: Request) {
       operatorId: body.operatorId,
       countryIso: body.countryIso,
       productTypeId: body.productTypeId,
+      flexibleLocalAmount: flexibleIntl,
       }),
     );
 

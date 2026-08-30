@@ -292,6 +292,10 @@ function WalletPageContent() {
   }
 
   const currency = data?.totals.currency ?? "NGN";
+  const localBalance = Number(data?.primary.balance ?? 0);
+  const usdBalance = Number(
+    data?.usd?.balance ?? data?.totals.usdBalance ?? 0,
+  );
   const symbol =
     currency === "NGN"
       ? "₦"
@@ -519,7 +523,9 @@ function WalletPageContent() {
             <div className="mt-3 md:hidden">
               <UsdWalletActionsPanel
                 localCurrency={currency}
+                localBalance={localBalance}
                 localBalanceFormatted={data.primary.balanceFormatted}
+                usdBalance={usdBalance}
                 fx={data.fx}
                 panel={usdPanel}
                 onPanelChange={setUsdPanel}
@@ -598,7 +604,9 @@ function WalletPageContent() {
               />
               <UsdWalletActionsPanel
                 localCurrency={currency}
+                localBalance={localBalance}
                 localBalanceFormatted={data.primary.balanceFormatted}
+                usdBalance={usdBalance}
                 fx={data.fx}
                 panel={usdPanel}
                 onPanelChange={setUsdPanel}
