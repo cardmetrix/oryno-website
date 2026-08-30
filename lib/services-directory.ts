@@ -262,8 +262,9 @@ export function getServicesDirectory(countryCode?: string | null) {
         ...item,
         shortDescription: "MTN, Telecel & AirtelTigo",
         longDescription:
-          "Buy Ghana mobile data for MTN, Telecel and AirtelTigo. Enter any amount in GHS.",
-        stats: "From GH₵5",
+          "Buy Ghana mobile data bundles for MTN, Telecel and AirtelTigo from your wallet.",
+        tags: ["MTN", "Telecel", "AirtelTigo"],
+        stats: "Daily & monthly bundles",
       };
     }
     if (item.id === "betting") {

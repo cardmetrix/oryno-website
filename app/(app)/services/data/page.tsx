@@ -304,8 +304,8 @@ export default function DataPage() {
             ? "MTN, Vodacom, Cell C & Telkom"
             : countryCode === "KE"
               ? "Safaricom, Airtel & Telkom Kenya"
-              : isFlexibleIntl
-                ? "Enter amount in local currency"
+              : countryCode === "GH"
+                ? "MTN, Telecel & AirtelTigo"
                 : "Daily, weekly & monthly plans"
         }
         backHref="/dashboard"

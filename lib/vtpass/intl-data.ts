@@ -50,6 +50,6 @@ export function intlDataVariationLabel(
 }
 
 /** Markets that use flexible amount entry for international data (VTpass). */
-export function usesFlexibleIntlData(countryCode?: string | null) {
-  return resolveCountryCode(countryCode) === "GH";
+export function usesFlexibleIntlData(_countryCode?: string | null) {
+  return false;
 }

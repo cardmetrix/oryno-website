@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Mail,
@@ -49,6 +50,7 @@ type ApiService = Omit<ServiceDirectoryItem, "icon"> & {
 };
 
 export default function ServicesPage() {
+  const searchParams = useSearchParams();
   const { country } = useCountry();
   const [services, setServices] = useState<ServiceDirectoryItem[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -81,6 +83,11 @@ export default function ServicesPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    const q = searchParams.get("q");
+    if (q) setQuery(q);
+  }, [searchParams]);
 
   const visible = useMemo(
     () => filterServices(services ?? [], { query, category }),

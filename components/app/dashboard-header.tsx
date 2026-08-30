@@ -3,9 +3,10 @@
 import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Menu, Search } from "lucide-react";
+import { Menu } from "lucide-react";
 import { useProfileDisplay } from "@/hooks/use-profile-display";
 import { NotificationDropdown } from "./notification-dropdown";
+import { ServiceSearch } from "./service-search";
 import { useMobileNav } from "./mobile-nav-context";
 
 export function DashboardHeader() {
@@ -59,13 +60,7 @@ export function DashboardHeader() {
         </div>
 
         <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
-          <div className="relative hidden min-w-[180px] lg:block xl:min-w-[220px]">
-            <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              placeholder="Search services…"
-              className="h-10 w-full rounded-[14px] border border-border bg-background pr-3 pl-9 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
-            />
-          </div>
+          <ServiceSearch className="hidden min-w-[200px] md:block lg:min-w-[240px]" />
           <NotificationDropdown />
         </div>
       </div>
