@@ -24,6 +24,10 @@ import {
 } from "@/lib/vtpass/intl-airtime";
 import { cn } from "@/lib/utils";
 import { formatCountryMoney } from "@/lib/country";
+import {
+  CurrencyAmountInput,
+  CurrencyPresetButton,
+} from "@/components/app/currency-amount-input";
 
 export default function AirtimePage() {
   const { country, loading: countryLoading, formatServiceMoney, displayFx } =
@@ -332,34 +336,21 @@ export default function AirtimePage() {
               className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6"
             >
               <label className="mb-2 block text-sm font-medium">Amount</label>
-              <div className="relative">
-                <span className="absolute top-1/2 left-4 -translate-y-1/2 text-sm font-semibold text-muted-foreground">
-                  {currencyPrefix}
-                </span>
-                <input
-                  type="number"
-                  min={minLocal}
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  className="h-12 w-full rounded-[14px] border border-border bg-background pr-4 pl-9 text-sm outline-none focus:border-primary"
-                />
-              </div>
+              <CurrencyAmountInput
+                prefix={currencyPrefix}
+                value={amount}
+                onChange={setAmount}
+                min={minLocal}
+              />
               <div className="mt-3 flex flex-wrap gap-2">
                 {amountPresets.map((preset) => (
-                  <button
+                  <CurrencyPresetButton
                     key={preset}
-                    type="button"
+                    prefix={currencyPrefix}
+                    amount={preset}
+                    active={amount === preset}
                     onClick={() => setAmount(preset)}
-                    className={cn(
-                      "rounded-full px-3.5 py-2 text-sm font-semibold",
-                      amount === preset
-                        ? "bg-primary text-white"
-                        : "bg-muted text-foreground",
-                    )}
-                  >
-                    {currencyPrefix}
-                    {preset}
-                  </button>
+                  />
                 ))}
               </div>
               <p className="mt-3 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
