@@ -215,7 +215,7 @@ export default function BettingPage() {
           <form key="form" onSubmit={onSubmit} className="space-y-4 sm:space-y-5">
 
             <MotionSection className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6">
-              <h2 className="mb-3 text-base font-semibold">Bookmaker</h2>
+         
               <div className="md:hidden">
                 <SelectSheet
                   label="Bookmaker"
