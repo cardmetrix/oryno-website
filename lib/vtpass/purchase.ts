@@ -25,6 +25,7 @@ import {
 } from "@/lib/sogo/purchase";
 import {
   generateVtpassRequestId,
+  getIntlAirtimeOperators,
   getVtpassVariations,
   isVtpassDemoMode,
   isVtpassPendingCode,
@@ -33,10 +34,17 @@ import {
   payVtpass,
   requeryVtpass,
 } from "./client";
-import { fallbackVariationsFor, inferDataPlanCategory } from "./catalog";
-import { findZaAirtimePack } from "./za-airtime";
+import {
+  cleanNetworkName,
+  fallbackVariationsFor,
+  inferDataPlanCategory,
+} from "./catalog";
+import {
+  ZA_AIRTIME_MIN_ZAR,
+  zaAirtimeOperatorName,
+} from "./za-airtime";
 import { findZaDataPlan } from "./za-data";
-import type { VtpassPayResponse } from "./types";
+import type { VtpassPayPayload, VtpassPayResponse } from "./types";
 
 /** Face amount to provider; retail amount charged to wallet (admin markup/override). */
 async function resolveVtpassRetail(input: {
@@ -344,14 +352,6 @@ function mapVtpassOutcome(response: VtpassPayResponse) {
 }
 
 async function callProviderOrSimulate(payload: Parameters<typeof payVtpass>[0]) {
-  const operatorId = String(
-    (payload as { operator_id?: string }).operator_id || "",
-  );
-  if (operatorId.startsWith("za-")) {
-    throw new Error(
-      "South Africa airtime/data requires a live VTpass operator. Refresh networks and try again.",
-    );
-  }
   if (isVtpassDemoMode()) {
     throw new Error(
       "VTpass is not configured for live purchases. Set VTPASS_API_KEY, VTPASS_PUBLIC_KEY, and VTPASS_SECRET_KEY.",
@@ -360,6 +360,72 @@ async function callProviderOrSimulate(payload: Parameters<typeof payVtpass>[0]) 
 
   const response = await payVtpass(payload);
   return { response, simulated: false as const };
+}
+
+/** Map catalog za-* ids to a live VTpass operator when possible. */
+async function resolveIntlAirtimeOperator(input: {
+  operatorId?: string;
+  productTypeId?: string | number;
+  countryIso?: string;
+}) {
+  const raw = String(input.operatorId || "").trim();
+  if (!raw) throw new Error("Select a network");
+  if (!raw.startsWith("za-")) return raw;
+
+  const label = zaAirtimeOperatorName(raw);
+  if (!label) {
+    throw new Error("Unknown South Africa network");
+  }
+
+  const live = await getIntlAirtimeOperators(
+    input.countryIso || "ZA",
+    input.productTypeId ?? 1,
+  );
+  const needle = label.toLowerCase();
+  const match = live.find((op) => {
+    const name = cleanNetworkName(op.name).toLowerCase();
+    return name.includes(needle) || needle.includes(name);
+  });
+  if (!match) {
+    throw new Error(
+      `${label} airtime is not available from the live provider right now. Try again later.`,
+    );
+  }
+  return String(match.operator_id);
+}
+
+async function resolveFlexibleIntlVariation(input: {
+  operatorId: string;
+  productTypeId?: string | number;
+  localAmount: number;
+}) {
+  try {
+    const live = await getVtpassVariations("foreign-airtime", {
+      operator_id: input.operatorId,
+      product_type_id:
+        input.productTypeId != null ? String(input.productTypeId) : undefined,
+    });
+    const open = live.variations.find(
+      (v) => String(v.fixedPrice || "").toLowerCase() !== "yes",
+    );
+    if (open?.variation_code) return open.variation_code;
+
+    const closest = live.variations
+      .map((v) => ({
+        code: v.variation_code,
+        face: Number(v.charged_amount ?? v.variation_amount) || 0,
+      }))
+      .filter((v) => v.code && v.face > 0)
+      .sort(
+        (a, b) =>
+          Math.abs(a.face - input.localAmount) -
+          Math.abs(b.face - input.localAmount),
+      )[0];
+    if (closest?.code) return closest.code;
+    return live.variations[0]?.variation_code || undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export async function purchaseAirtime(input: {
@@ -375,6 +441,8 @@ export async function purchaseAirtime(input: {
   countryIso?: string;
   productTypeId?: string | number;
   variationCode?: string;
+  /** When true, `amount` is local currency (e.g. ZAR) for flexible top-up. */
+  flexibleLocalAmount?: boolean;
 }) {
   if (input.mode !== "international") {
     return purchaseSogoAirtime({
@@ -392,18 +460,35 @@ export async function purchaseAirtime(input: {
   if (!Number.isFinite(input.amount) || input.amount <= 0) {
     throw new Error("Enter a valid amount");
   }
-  if (input.amount < 50 && input.mode !== "international") {
-    throw new Error("Minimum airtime amount is ₦50");
-  }
+
+  const market = resolveCountryCode(input.countryCode || input.countryIso);
+  const flexibleZa =
+    Boolean(input.flexibleLocalAmount) ||
+    (market === "ZA" && !input.variationCode);
 
   let faceAmount = input.amount;
-  if (input.mode === "international" && input.variationCode) {
-    const zaPack = findZaAirtimePack(input.variationCode);
-    if (zaPack) {
-      throw new Error(
-        "South Africa airtime requires a live VTpass network. Refresh and select a live operator.",
-      );
+  let variationCode = input.variationCode;
+  let operatorId = input.operatorId;
+
+  if (flexibleZa) {
+    if (input.amount < ZA_AIRTIME_MIN_ZAR) {
+      throw new Error(`Minimum airtime amount is R${ZA_AIRTIME_MIN_ZAR}`);
     }
+    const fx = await getDisplayFx(input.countryCode || input.countryIso || "ZA");
+    faceAmount = convertLocalToNgn(input.amount, fx.localToNgn);
+    operatorId = await resolveIntlAirtimeOperator({
+      operatorId: input.operatorId,
+      productTypeId: input.productTypeId,
+      countryIso: input.countryIso || "ZA",
+    });
+    variationCode =
+      variationCode ||
+      (await resolveFlexibleIntlVariation({
+        operatorId,
+        productTypeId: input.productTypeId,
+        localAmount: input.amount,
+      }));
+  } else if (input.variationCode) {
     faceAmount = await lookupVariationFace({
       serviceID: "foreign-airtime",
       variationCode: input.variationCode,
@@ -415,16 +500,13 @@ export async function purchaseAirtime(input: {
 
   const priced = await resolveVtpassRetail({
     serviceID: input.serviceID,
-    variationCode: input.variationCode,
+    variationCode,
     faceAmount,
   });
   const cashback = estimateAirtimeCashback(priced.retail);
-  const market = resolveCountryCode(input.countryCode);
   const network = await ensureTelecomNetwork(
     market,
-    input.mode === "international"
-      ? `foreign-${input.operatorId ?? "airtime"}`
-      : input.serviceID,
+    `foreign-${operatorId ?? input.operatorId ?? "airtime"}`,
   );
 
   const prepared = await debitForPurchase({
@@ -440,6 +522,8 @@ export async function purchaseAirtime(input: {
       cashback,
       faceAmount: priced.face,
       serviceKey: priced.serviceKey,
+      localAmount: flexibleZa ? input.amount : undefined,
+      localCurrency: flexibleZa ? "ZAR" : undefined,
     },
   });
 
@@ -459,26 +543,18 @@ export async function purchaseAirtime(input: {
     .returning();
 
   try {
-    const payload =
-      input.mode === "international"
-        ? {
-            request_id: prepared.requestId,
-            serviceID: "foreign-airtime",
-            billersCode: phone,
-            variation_code: input.variationCode!,
-            amount: priced.face,
-            phone,
-            operator_id: input.operatorId!,
-            country_code: input.countryIso!,
-            product_type_id: input.productTypeId!,
-            email: input.email || "support@oryno.app",
-          }
-        : {
-            request_id: prepared.requestId,
-            serviceID: input.serviceID,
-            amount: priced.face,
-            phone,
-          };
+    const payload: VtpassPayPayload = {
+      request_id: prepared.requestId,
+      serviceID: "foreign-airtime",
+      billersCode: phone,
+      ...(variationCode ? { variation_code: variationCode } : {}),
+      amount: flexibleZa ? input.amount : priced.face,
+      phone,
+      operator_id: operatorId!,
+      country_code: input.countryIso!,
+      product_type_id: input.productTypeId!,
+      email: input.email || "support@oryno.app",
+    };
 
     const { response, simulated } = await callProviderOrSimulate(payload);
     const outcome = mapVtpassOutcome(response);

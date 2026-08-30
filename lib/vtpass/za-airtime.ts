@@ -28,6 +28,12 @@ export const ZA_AIRTIME_OPERATORS = [
   },
 ] as const;
 
+/** Suggested ZAR top-ups for flexible airtime entry. */
+export const ZA_AIRTIME_PRESETS = ["10", "20", "50", "100", "200", "500"] as const;
+
+/** Minimum face amount in ZAR for South Africa airtime. */
+export const ZA_AIRTIME_MIN_ZAR = 10;
+
 export type ZaAirtimePack = {
   variation_code: string;
   name: string;
@@ -81,4 +87,9 @@ export function findZaAirtimePack(variationCode: string) {
     if (match) return match;
   }
   return null;
+}
+
+export function zaAirtimeOperatorName(operatorId?: string | null) {
+  const id = (operatorId || "").trim().toLowerCase();
+  return ZA_AIRTIME_OPERATORS.find((o) => o.operator_id === id)?.name ?? null;
 }

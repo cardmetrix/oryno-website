@@ -18,7 +18,12 @@ import { useCountry } from "@/components/providers/country-provider";
 import { useWalletBalance } from "@/hooks/use-wallet-balance";
 import { airtimePresets, estimateAirtimeCashback } from "@/lib/telecom";
 import { cleanNetworkName } from "@/lib/vtpass/catalog";
+import {
+  ZA_AIRTIME_MIN_ZAR,
+  ZA_AIRTIME_PRESETS,
+} from "@/lib/vtpass/za-airtime";
 import { cn } from "@/lib/utils";
+import { formatCountryMoney } from "@/lib/country";
 
 type Variation = {
   variationCode: string;
@@ -28,16 +33,19 @@ type Variation = {
 };
 
 export default function AirtimePage() {
-  const { country, loading: countryLoading, formatServiceMoney } = useCountry();
+  const { country, loading: countryLoading, formatServiceMoney, displayFx } =
+    useCountry();
   const { canAfford, canAffordNgn, frozen } = useWalletBalance();
   const countryCode = country?.code || "NG";
   const isNigeria = countryCode === "NG";
+  const isSouthAfrica = countryCode === "ZA";
+  const flexibleAmount = isNigeria || isSouthAfrica;
 
   const [networks, setNetworks] = useState<VtpassServiceOption[]>([]);
   const [loadingNetworks, setLoadingNetworks] = useState(true);
   const [networkId, setNetworkId] = useState("");
   const [phone, setPhone] = useState("");
-  const [amount, setAmount] = useState("500");
+  const [amount, setAmount] = useState(isSouthAfrica ? "50" : "500");
   const [saveBeneficiary, setSaveBeneficiary] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -45,7 +53,7 @@ export default function AirtimePage() {
   const [walletLabel, setWalletLabel] = useState<string | null>(null);
   const [receiptAmount, setReceiptAmount] = useState("");
 
-  // Non-NG: package variations from foreign-airtime
+  // Non-NG package markets (GH/KE): package variations from foreign-airtime
   const [variations, setVariations] = useState<Variation[]>([]);
   const [variationCode, setVariationCode] = useState("");
   const [productTypeId, setProductTypeId] = useState(1);
@@ -56,9 +64,12 @@ export default function AirtimePage() {
     (v) => v.variationCode === variationCode,
   );
 
+  const localAmount = Number(amount) || 0;
   const amountNumber = isNigeria
-    ? Number(amount) || 0
-    : selectedVariation?.amount || 0;
+    ? localAmount
+    : isSouthAfrica
+      ? localAmount * (displayFx?.localToNgn ?? 1)
+      : selectedVariation?.amount || 0;
   const cashback = estimateAirtimeCashback(amountNumber);
 
   const affordable = isNigeria
@@ -68,13 +79,16 @@ export default function AirtimePage() {
     const digits = phone.replace(/\D/g, "").length >= 10;
     if (!digits || submitting || !networkId || frozen || !affordable) return false;
     if (isNigeria) return amountNumber >= 50;
+    if (isSouthAfrica) return localAmount >= ZA_AIRTIME_MIN_ZAR;
     return Boolean(variationCode && amountNumber > 0);
   }, [
     phone,
     submitting,
     networkId,
     isNigeria,
+    isSouthAfrica,
     amountNumber,
+    localAmount,
     variationCode,
     frozen,
     affordable,
@@ -159,9 +173,9 @@ export default function AirtimePage() {
     };
   }, [countryLoading, isNigeria, countryCode]);
 
-  // Non-NG packages for selected operator
+  // Package markets (GH/KE): load packages for selected operator
   useEffect(() => {
-    if (isNigeria || !networkId) return;
+    if (flexibleAmount || !networkId) return;
     let cancelled = false;
 
     (async () => {
@@ -190,7 +204,11 @@ export default function AirtimePage() {
     return () => {
       cancelled = true;
     };
-  }, [isNigeria, networkId, productTypeId]);
+  }, [flexibleAmount, networkId, productTypeId]);
+
+  useEffect(() => {
+    if (isSouthAfrica) setAmount((prev) => (prev === "500" ? "50" : prev));
+  }, [isSouthAfrica]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -209,19 +227,30 @@ export default function AirtimePage() {
                 mode: "local",
                 serviceID: networkId,
                 phone,
-                amount: amountNumber,
+                amount: localAmount,
                 saveBeneficiary,
               }
-            : {
-                mode: "international",
-                phone,
-                amount: amountNumber,
-                operatorId: networkId,
-                countryIso: countryCode,
-                productTypeId,
-                variationCode,
-                saveBeneficiary,
-              },
+            : isSouthAfrica
+              ? {
+                  mode: "international",
+                  phone,
+                  amount: localAmount,
+                  operatorId: networkId,
+                  countryIso: countryCode,
+                  productTypeId,
+                  saveBeneficiary,
+                  flexibleLocalAmount: true,
+                }
+              : {
+                  mode: "international",
+                  phone,
+                  amount: amountNumber,
+                  operatorId: networkId,
+                  countryIso: countryCode,
+                  productTypeId,
+                  variationCode,
+                  saveBeneficiary,
+                },
         ),
       });
       const data = await res.json();
@@ -237,6 +266,15 @@ export default function AirtimePage() {
   }
 
   const money = (n: number) => formatServiceMoney(n);
+  const amountLabel = isSouthAfrica
+    ? formatCountryMoney(localAmount, "ZA")
+    : money(amountNumber);
+  const amountPresets = isSouthAfrica ? ZA_AIRTIME_PRESETS : airtimePresets;
+  const currencyPrefix = isSouthAfrica
+    ? "R"
+    : isNigeria
+      ? "₦"
+      : "";
 
   return (
     <AppShell hideNav>
@@ -355,7 +393,7 @@ export default function AirtimePage() {
               </label>
             </MotionSection>
 
-            {isNigeria ? (
+            {flexibleAmount ? (
               <MotionSection
                 delay={0.08}
                 className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6"
@@ -363,18 +401,18 @@ export default function AirtimePage() {
                 <label className="mb-2 block text-sm font-medium">Amount</label>
                 <div className="relative">
                   <span className="absolute top-1/2 left-4 -translate-y-1/2 text-sm font-semibold text-muted-foreground">
-                    ₦
+                    {currencyPrefix}
                   </span>
                   <input
                     type="number"
-                    min={50}
+                    min={isSouthAfrica ? ZA_AIRTIME_MIN_ZAR : 50}
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     className="h-12 w-full rounded-[14px] border border-border bg-background pr-4 pl-9 text-sm outline-none focus:border-primary"
                   />
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {airtimePresets.map((preset) => (
+                  {amountPresets.map((preset) => (
                     <button
                       key={preset}
                       type="button"
@@ -386,7 +424,8 @@ export default function AirtimePage() {
                           : "bg-muted text-foreground",
                       )}
                     >
-                      ₦{preset}
+                      {currencyPrefix}
+                      {preset}
                     </button>
                   ))}
                 </div>
@@ -427,7 +466,7 @@ export default function AirtimePage() {
               <div className="mt-3 space-y-2 text-sm">
                 <Row label="Network" value={selectedNetwork?.name ?? "—"} />
                 <Row label="Phone" value={phone || "—"} />
-                <Row label="Amount" value={money(amountNumber)} accent />
+                <Row label="Amount" value={amountLabel} accent />
                 <div className="flex items-center justify-between border-t border-border pt-3">
                   <span className="inline-flex items-center gap-2 font-semibold">
                     <Wallet className="h-4 w-4 text-primary" />
@@ -449,7 +488,7 @@ export default function AirtimePage() {
                   ? "Wallet unavailable"
                   : !affordable && amountNumber > 0
                     ? "Insufficient balance"
-                    : `Buy airtime · ${money(amountNumber)}`}
+                    : `Buy airtime · ${amountLabel}`}
             </motion.button>
           </form>
         )}

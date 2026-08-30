@@ -49,13 +49,20 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
+    const flexibleZa =
+      mode === "international" &&
+      (body.countryIso || "").toUpperCase() === "ZA" &&
+      !body.variationCode;
     if (
       mode === "international" &&
-      (!body.operatorId ||
-        !body.countryIso ||
-        !body.productTypeId ||
-        !body.variationCode)
+      (!body.operatorId || !body.countryIso || !body.productTypeId)
     ) {
+      return NextResponse.json(
+        { error: "Complete international airtime selection" },
+        { status: 400 },
+      );
+    }
+    if (mode === "international" && !flexibleZa && !body.variationCode) {
       return NextResponse.json(
         { error: "Complete international airtime selection" },
         { status: 400 },
@@ -76,6 +83,7 @@ export async function POST(req: Request) {
       countryIso: body.countryIso,
       productTypeId: body.productTypeId,
       variationCode: body.variationCode,
+      flexibleLocalAmount: flexibleZa,
       }),
     );
 

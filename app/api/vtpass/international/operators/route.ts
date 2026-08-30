@@ -93,6 +93,10 @@ export async function GET(req: Request) {
           ? error
           : new Error("Failed to load live operators");
       }
+      // ZA airtime: keep local networks when VTpass returns none (flexible amount UX).
+      if (!operators.length && iso === "ZA" && !isIntlDataProductType(productTypeId)) {
+        operators = zaOperators(productTypeId);
+      }
     }
 
     return NextResponse.json({
