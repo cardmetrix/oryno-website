@@ -242,7 +242,7 @@ function ServiceCard({
         className="group flex h-full flex-col items-center justify-center gap-2.5 px-1 py-2 text-center sm:gap-3 sm:py-3"
       >
         <motion.span
-          className="flex h-14 w-14 items-center justify-center rounded-2xl text-white shadow-[0_10px_22px_rgba(0,0,0,0.16)] ring-1 ring-white/20 sm:h-16 sm:w-16"
+          className="flex h-14 w-14 items-center justify-center rounded-full text-white shadow-[0_10px_22px_rgba(0,0,0,0.16)] ring-1 ring-white/20 sm:h-16 sm:w-16"
           style={{
             background: `linear-gradient(145deg, ${item.accent}, #e85d00)`,
           }}
