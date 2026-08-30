@@ -15,6 +15,7 @@ import {
 } from "@/components/app/vtpass-service-picker";
 import { SelectSheet } from "@/components/app/select-sheet";
 import { useCountry } from "@/components/providers/country-provider";
+import { useWalletBalance } from "@/hooks/use-wallet-balance";
 import { formatCountryMoney } from "@/lib/country";
 import { cn } from "@/lib/utils";
 
@@ -29,6 +30,7 @@ const FALLBACK_PRESETS = ["500", "1000", "2000", "5000", "10000"];
 
 export default function BettingPage() {
   const { country } = useCountry();
+  const { canAfford, frozen } = useWalletBalance();
 
   const [services, setServices] = useState<VtpassServiceOption[]>([]);
   const [presets, setPresets] = useState<string[]>(FALLBACK_PRESETS);
@@ -55,7 +57,9 @@ export default function BettingPage() {
     return (
       Boolean(serviceID && customerRef.trim().length >= 6 && customerName) &&
       amountNumber >= minAmount &&
-      !submitting
+      !submitting &&
+      !frozen &&
+      canAfford(amountNumber)
     );
   }, [
     serviceID,
@@ -64,6 +68,8 @@ export default function BettingPage() {
     amountNumber,
     minAmount,
     submitting,
+    frozen,
+    canAfford,
   ]);
 
   useEffect(() => {
@@ -338,7 +344,11 @@ export default function BettingPage() {
             >
               {submitting
                 ? "Funding…"
-                : `Fund wallet · ${money(amountNumber)}`}
+                : frozen
+                  ? "Wallet unavailable"
+                  : amountNumber > 0 && !canAfford(amountNumber)
+                    ? "Insufficient balance"
+                    : `Fund wallet · ${money(amountNumber)}`}
             </motion.button>
           </form>
         )}

@@ -9,6 +9,10 @@ import { kenyaBillHttpStatus } from "@/lib/reloadly/utilities";
 import { purchaseBill } from "@/lib/vtpass";
 import { sogoHttpStatus } from "@/lib/sogo/errors";
 import { publicServiceError } from "@/lib/service-errors";
+import {
+  actionLockHttpStatus,
+  withUserActionLock,
+} from "@/lib/wallet/action-lock";
 
 export const runtime = "nodejs";
 
@@ -43,7 +47,8 @@ export async function POST(req: Request) {
       );
     }
 
-    const result = await purchaseBill({
+    const result = await withUserActionLock(user.id, () =>
+      purchaseBill({
       userId: user.id,
       countryCode: user.countryCode,
       serviceID: body.serviceID,
@@ -55,7 +60,8 @@ export async function POST(req: Request) {
       variationCode: body.variationCode,
       subscriptionType: body.subscriptionType,
       quantity: body.quantity,
-    });
+      }),
+    );
 
     const fx = await getDisplayFx(user.countryCode);
     const amountFormatted = formatCountryMoney(
@@ -103,7 +109,7 @@ export async function POST(req: Request) {
           error instanceof Error ? error.message : "Bill payment failed",
         ),
       },
-      { status: kenyaBillHttpStatus(error) || hubtelHttpStatus(error) || sogoHttpStatus(error) },
+      { status: actionLockHttpStatus(error) || kenyaBillHttpStatus(error) || hubtelHttpStatus(error) || sogoHttpStatus(error) },
     );
   }
 }

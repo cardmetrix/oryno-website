@@ -22,6 +22,7 @@ import {
   type NgnLocalQuote,
 } from "@/lib/fx/rates";
 import { getDisplayFx } from "@/lib/display-currency";
+import { refundFailedDebit } from "@/lib/wallet/ledger";
 import type {
   BankAccountSummary,
   FundingMethod,
@@ -543,39 +544,29 @@ export async function withdrawWallet(input: {
       countryCode,
     };
   } catch (error) {
-    // Reverse debit if Paystack transfer could not be started.
-    await db.transaction(async (tx) => {
-      const wallet = await tx.query.wallets.findFirst({
-        where: eq(wallets.id, prepared.wallet.id),
+    try {
+      await refundFailedDebit({
+        walletId: prepared.wallet.id,
+        transactionId: prepared.transaction.id,
+        amount: ledgerTotal,
+        reason:
+          error instanceof Error ? error.message : "Transfer failed",
+        userId: input.userId,
       });
-      if (wallet) {
-        const restored = (
-          Number(wallet.balance) +
-          ledgerNgn +
-          fee
-        ).toFixed(2);
-        await tx
-          .update(wallets)
-          .set({ balance: restored, updatedAt: new Date() })
-          .where(eq(wallets.id, wallet.id));
-      }
+    } catch (refundError) {
+      console.error("[withdraw-refund]", refundError);
+    }
 
-      await tx
-        .update(withdrawals)
-        .set({
-          status: "failed",
-          failureReason:
-            error instanceof Error ? error.message : "Transfer failed",
-          processedAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .where(eq(withdrawals.id, prepared.withdrawal.id));
-
-      await tx
-        .update(transactions)
-        .set({ status: "failed", updatedAt: new Date() })
-        .where(eq(transactions.id, prepared.transaction.id));
-    });
+    await db
+      .update(withdrawals)
+      .set({
+        status: "failed",
+        failureReason:
+          error instanceof Error ? error.message : "Transfer failed",
+        processedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(withdrawals.id, prepared.withdrawal.id));
 
     throw error instanceof Error
       ? error

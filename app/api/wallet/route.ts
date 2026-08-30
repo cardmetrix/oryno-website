@@ -95,6 +95,7 @@ export async function GET(req: Request) {
         recent,
         fx,
         displayFx,
+        ledgerNgn: Number(primary.balance).toFixed(2),
         totals: {
           balance: primarySummary.balance,
           balanceFormatted: primarySummary.balanceFormatted,

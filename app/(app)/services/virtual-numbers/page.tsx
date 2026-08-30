@@ -40,6 +40,7 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useWalletBalance } from "@/hooks/use-wallet-balance";
 import { formatUsd } from "@/lib/country";
 import { cn } from "@/lib/utils";
 
@@ -61,6 +62,7 @@ type HeroOffer = {
 
 export default function VirtualNumbersPage() {
   const isMobile = useIsMobile();
+  const { canAffordUsd, frozen } = useWalletBalance();
   const [services, setServices] = useState<HeroService[]>([]);
   const [service, setService] = useState("wa");
   const [offers, setOffers] = useState<HeroOffer[]>([]);
@@ -75,6 +77,21 @@ export default function VirtualNumbersPage() {
   const [selected, setSelected] = useState<HeroOffer | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const canBuyNumber = Boolean(
+    selected &&
+      !submitting &&
+      !frozen &&
+      canAffordUsd(selected.priceUsd),
+  );
+  const buyLabel = submitting
+    ? "Getting number…"
+    : frozen
+      ? "Wallet unavailable"
+      : selected && !canAffordUsd(selected.priceUsd)
+        ? "Insufficient USD balance"
+        : selected
+          ? `Get number · ${formatUsd(selected.priceUsd)}`
+          : "Select a country";
 
   const [success, setSuccess] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -195,7 +212,7 @@ export default function VirtualNumbersPage() {
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!selected || submitting) return;
+    if (!selected || submitting || !canBuyNumber) return;
     setSubmitting(true);
     setError(null);
     try {
@@ -504,15 +521,11 @@ export default function VirtualNumbersPage() {
             <div className="hidden pt-2 sm:block">
               <motion.button
                 type="submit"
-                disabled={!selected || submitting}
-                whileTap={selected ? { scale: 0.985 } : undefined}
+                disabled={!canBuyNumber}
+                whileTap={canBuyNumber ? { scale: 0.985 } : undefined}
                 className="btn-primary h-12 w-full text-base disabled:opacity-50 sm:max-w-md"
               >
-                {submitting
-                  ? "Getting number…"
-                  : selected
-                    ? `Get number · ${money(selected.priceUsd)}`
-                    : "Select a country"}
+                {buyLabel}
               </motion.button>
             </div>
 
@@ -524,14 +537,10 @@ export default function VirtualNumbersPage() {
             <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border/80 bg-[image:var(--header-surface)] px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur-xl sm:hidden">
               <button
                 type="submit"
-                disabled={!selected || submitting}
+                disabled={!canBuyNumber}
                 className="btn-primary h-12 w-full text-base disabled:opacity-50"
               >
-                {submitting
-                  ? "Getting number…"
-                  : selected
-                    ? `Get number · ${money(selected.priceUsd)}`
-                    : "Select a country"}
+                {buyLabel}
               </button>
             </div>
           </form>

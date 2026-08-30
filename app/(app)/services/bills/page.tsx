@@ -20,6 +20,7 @@ import {
 } from "@/components/app/vtpass-service-picker";
 import { SelectSheet } from "@/components/app/select-sheet";
 import { useCountry } from "@/components/providers/country-provider";
+import { useWalletBalance } from "@/hooks/use-wallet-balance";
 import { formatCountryMoney } from "@/lib/country";
 import { cn } from "@/lib/utils";
 
@@ -39,6 +40,7 @@ const ZA_PRESETS = ["50", "100", "200", "500", "1000"];
 
 export default function BillsPage() {
   const { country, formatServiceMoney } = useCountry();
+  const { canAfford, frozen } = useWalletBalance();
   const isNigeria = (country?.code || "NG") === "NG";
   const isGhana = (country?.code || "NG") === "GH";
   const isKenya = (country?.code || "NG") === "KE";
@@ -84,7 +86,9 @@ export default function BillsPage() {
       Boolean(serviceID && variationCode && customerRef.trim().length >= 6) &&
       amountNumber >= minBillAmount &&
       !submitting &&
-      billsLive
+      billsLive &&
+      !frozen &&
+      canAfford(amountNumber)
     );
   }, [
     serviceID,
@@ -94,6 +98,8 @@ export default function BillsPage() {
     submitting,
     minBillAmount,
     billsLive,
+    frozen,
+    canAfford,
   ]);
 
   useEffect(() => {
@@ -580,7 +586,11 @@ export default function BillsPage() {
             >
               {submitting
                 ? "Processing…"
-                : `Pay bill · ${money(amountNumber)}`}
+                : frozen
+                  ? "Wallet unavailable"
+                  : amountNumber > 0 && !canAfford(amountNumber)
+                    ? "Insufficient balance"
+                    : `Pay bill · ${money(amountNumber)}`}
             </motion.button>
           </form>
         )}

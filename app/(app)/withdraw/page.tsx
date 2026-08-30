@@ -351,7 +351,8 @@ export default function WithdrawPage() {
                     submitting ||
                     !bankAccountId ||
                     Number(amount) <= 0 ||
-                    banks.length === 0
+                    banks.length === 0 ||
+                    (wallet != null && Number(amount) > Number(wallet.balance) + 0.0001)
                   }
                   onClick={openPinModal}
                   className="btn-primary mt-6 inline-flex h-12 w-full items-center justify-center gap-2 text-base disabled:opacity-50 md:max-w-sm"
@@ -361,6 +362,9 @@ export default function WithdrawPage() {
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Sending…
                     </>
+                  ) : wallet != null &&
+                    Number(amount) > Number(wallet.balance) + 0.0001 ? (
+                    "Insufficient balance"
                   ) : (
                     "Withdraw Funds"
                   )}

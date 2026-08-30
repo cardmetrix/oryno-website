@@ -48,6 +48,7 @@ import {
 import { useUser } from "@clerk/nextjs";
 import { useCountry } from "@/components/providers/country-provider";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useWalletBalance } from "@/hooks/use-wallet-balance";
 import { formatCountryMoney } from "@/lib/country";
 import { cn } from "@/lib/utils";
 
@@ -225,6 +226,7 @@ function GiftCardsPageContent() {
   const router = useRouter();
   const { user } = useUser();
   const { country, formatServiceMoney } = useCountry();
+  const { canAfford, frozen } = useWalletBalance();
   const formatSellRate = (ngn?: number | null) =>
     ngn != null ? formatServiceMoney(ngn) : "—";
   const formatBuyPay = (quote: BuyQuote) =>
@@ -641,6 +643,7 @@ function GiftCardsPageContent() {
   async function onBuySubmit(e: FormEvent) {
     e.preventDefault();
     if (!selectedBuy) return;
+    if (frozen || (buyQuote && !canAfford(buyQuote.local))) return;
     setBuySubmitting(true);
     setError(null);
     try {
@@ -1277,11 +1280,23 @@ function GiftCardsPageContent() {
                     </div>
                     <button
                       type="submit"
-                      disabled={buySubmitting || !buyQuote || !buyEmail.trim()}
+                      disabled={
+                        buySubmitting ||
+                        !buyQuote ||
+                        !buyEmail.trim() ||
+                        frozen ||
+                        !canAfford(buyQuote.local)
+                      }
                       className="btn-primary mt-4 flex h-12 w-full items-center justify-center gap-2 disabled:opacity-60"
                     >
                       <ShoppingBag className="h-4 w-4" />
-                      {buySubmitting ? "Buying…" : "Buy gift card"}
+                      {buySubmitting
+                        ? "Buying…"
+                        : frozen
+                          ? "Wallet unavailable"
+                          : buyQuote && !canAfford(buyQuote.local)
+                            ? "Insufficient balance"
+                            : "Buy gift card"}
                     </button>
                   </MotionSection>
                 </form>

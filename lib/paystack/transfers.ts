@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { transactions, wallets, withdrawals } from "@/lib/db/schema";
+import { transactions, withdrawals } from "@/lib/db/schema";
 import { createNotification } from "@/lib/notifications-service";
 import { formatCountryMoney } from "@/lib/country";
 import { convertNgnToLocal } from "@/lib/fx/rates";
@@ -12,6 +12,11 @@ import {
 } from "@/lib/paystack/client";
 import { ensureBankRecipient } from "@/lib/paystack/banks";
 import type { BankAccountRow } from "@/lib/wallet";
+import {
+  refundFailedDebit,
+  reverseCompletedDebit,
+  ReverseFailedError,
+} from "@/lib/wallet/ledger";
 
 type TransferData = {
   reference: string;
@@ -132,11 +137,7 @@ export async function settlePaystackTransfer(input: {
     return { ok: false as const, reason: "not_found" as const };
   }
 
-  if (
-    withdrawal.status === "completed" ||
-    withdrawal.status === "failed" ||
-    withdrawal.status === "reversed"
-  ) {
+  if (withdrawal.status === "reversed") {
     return {
       ok: true as const,
       alreadySettled: true as const,
@@ -144,7 +145,26 @@ export async function settlePaystackTransfer(input: {
     };
   }
 
+  if (withdrawal.status === "failed" && input.status !== "reversed") {
+    return {
+      ok: true as const,
+      alreadySettled: true as const,
+      status: withdrawal.status,
+    };
+  }
+
+  const refundAmount =
+    Number(withdrawal.amount) + Number(withdrawal.fee || 0);
+
   if (input.status === "success") {
+    if (withdrawal.status === "completed") {
+      return {
+        ok: true as const,
+        alreadySettled: true as const,
+        status: "completed" as const,
+      };
+    }
+
     await db.transaction(async (tx) => {
       await tx
         .update(withdrawals)
@@ -194,53 +214,64 @@ export async function settlePaystackTransfer(input: {
     return { ok: true as const, status: "completed" as const };
   }
 
-  // failed / reversed — credit wallet back
-  await db.transaction(async (tx) => {
-    const wallet = await tx.query.wallets.findFirst({
-      where: eq(wallets.id, withdrawal.walletId),
-    });
-    if (wallet) {
-      const refund =
-        Number(wallet.balance) +
-        Number(withdrawal.amount) +
-        Number(withdrawal.fee);
-      await tx
-        .update(wallets)
-        .set({
-          balance: refund.toFixed(2),
-          updatedAt: new Date(),
-        })
-        .where(eq(wallets.id, wallet.id));
-    }
+  const nextStatus = input.status === "reversed" ? "reversed" : "failed";
+  const reason =
+    input.failureReason ||
+    (input.status === "reversed"
+      ? "Paystack reversed this withdrawal"
+      : "Transfer failed");
 
-    await tx
-      .update(withdrawals)
-      .set({
-        status: input.status === "reversed" ? "reversed" : "failed",
-        failureReason: input.failureReason ?? "Transfer failed",
-        processedAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .where(eq(withdrawals.id, withdrawal.id));
-
+  try {
     if (withdrawal.transactionId) {
-      await tx
-        .update(transactions)
+      const ledgerInput = {
+        walletId: withdrawal.walletId,
+        transactionId: withdrawal.transactionId,
+        amount: refundAmount,
+        reason,
+        userId: withdrawal.userId,
+      };
+      if (withdrawal.status === "completed" || input.status === "reversed") {
+        await reverseCompletedDebit(ledgerInput);
+      } else {
+        await refundFailedDebit(ledgerInput);
+      }
+    }
+  } catch (error) {
+    console.error("[paystack-transfer-reverse]", error);
+    if (error instanceof ReverseFailedError) {
+      await db
+        .update(withdrawals)
         .set({
-          status: input.status === "reversed" ? "reversed" : "failed",
+          failureReason: error.message,
           updatedAt: new Date(),
         })
-        .where(eq(transactions.id, withdrawal.transactionId));
+        .where(eq(withdrawals.id, withdrawal.id));
+      throw error;
     }
-  });
+    throw error;
+  }
+
+  await db
+    .update(withdrawals)
+    .set({
+      status: nextStatus,
+      failureReason: reason,
+      processedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(withdrawals.id, withdrawal.id));
 
   try {
     await createNotification({
       userId: withdrawal.userId,
-      title: "Withdrawal failed",
+      title:
+        nextStatus === "reversed"
+          ? "Withdrawal reversed"
+          : "Withdrawal failed",
       body:
-        input.failureReason ||
-        "Your withdrawal could not be completed. The amount was returned to your wallet.",
+        nextStatus === "reversed"
+          ? `${await formatWithdrawalAmount(withdrawal.amount, withdrawal.countryCode)} was reversed and returned to your wallet.`
+          : reason + " The amount was returned to your wallet.",
       type: "withdraw",
       metadata: {
         href: "/wallet",
@@ -254,6 +285,6 @@ export async function settlePaystackTransfer(input: {
 
   return {
     ok: true as const,
-    status: input.status === "reversed" ? "reversed" : ("failed" as const),
+    status: nextStatus,
   };
 }

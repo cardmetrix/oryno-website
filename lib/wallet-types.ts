@@ -57,7 +57,7 @@ export type WalletPayload = {
     subtitle: string;
     amount: string;
     type: "credit" | "debit";
-    status: "Completed" | "Pending" | "Failed";
+    status: "Completed" | "Pending" | "Failed" | "Reversed";
     category?: string;
     currency?: string;
     createdAt: string;

@@ -9,6 +9,10 @@ import {
 import { formatCountryMoney } from "@/lib/country";
 import { getDisplayFx } from "@/lib/display-currency";
 import { convertNgnToLocal } from "@/lib/fx/rates";
+import {
+  actionLockHttpStatus,
+  withUserActionLock,
+} from "@/lib/wallet/action-lock";
 
 export const runtime = "nodejs";
 
@@ -43,15 +47,17 @@ export async function POST(req: Request) {
       );
     }
 
-    const result = await buyGiftCard({
-      userId: user.id,
-      countryCode: user.countryCode,
-      email,
-      displayName: user.fullName || "ORYNO",
-      productId,
-      unitPrice,
-      quantity: body.quantity || 1,
-    });
+    const result = await withUserActionLock(user.id, () =>
+      buyGiftCard({
+        userId: user.id,
+        countryCode: user.countryCode,
+        email,
+        displayName: user.fullName || "ORYNO",
+        productId,
+        unitPrice,
+        quantity: body.quantity || 1,
+      }),
+    );
     const fx = await getDisplayFx(user.countryCode);
     const amountFormatted = formatCountryMoney(
       convertNgnToLocal(result.amount, fx.ngnToLocal),
@@ -95,7 +101,7 @@ export async function POST(req: Request) {
     );
     return NextResponse.json(
       { error: message },
-      { status: reloadlyBuyHttpStatus(message) },
+      { status: actionLockHttpStatus(error) || reloadlyBuyHttpStatus(message) },
     );
   }
 }

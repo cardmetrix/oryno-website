@@ -3,6 +3,7 @@ import { verifyPaystackSignature } from "@/lib/paystack/client";
 import {
   creditWalletFromDeposit,
   findUserIdForPaystackCharge,
+  reversePaystackDeposit,
 } from "@/lib/paystack/deposit-accounts";
 import { settlePaystackTransfer } from "@/lib/paystack/transfers";
 import { creditUsdWalletFromFunding } from "@/lib/wallet-usd";
@@ -97,6 +98,44 @@ export async function POST(req: Request) {
       });
 
       return NextResponse.json({ ok: true, ...result });
+    }
+
+    if (
+      event === "charge.refunded" ||
+      event === "charge.reversed" ||
+      event === "refund.processed"
+    ) {
+      const nested = data as {
+        transaction?: { reference?: string };
+      };
+      const reference =
+        data.reference || nested.transaction?.reference || null;
+      if (!reference) {
+        return NextResponse.json({ ok: true, ignored: true, reason: "no_reference" });
+      }
+
+      try {
+        const result = await reversePaystackDeposit({
+          reference,
+          reason:
+            data.reason ||
+            (event === "refund.processed"
+              ? "Paystack refund processed"
+              : "Paystack reversed this deposit"),
+        });
+        return NextResponse.json(result);
+      } catch (error) {
+        console.error("[paystack-webhook-deposit-reverse]", error);
+        return NextResponse.json(
+          {
+            error:
+              error instanceof Error
+                ? error.message
+                : "Deposit reverse failed",
+          },
+          { status: 500 },
+        );
+      }
     }
 
     if (

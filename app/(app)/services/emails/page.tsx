@@ -34,6 +34,7 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useWalletBalance } from "@/hooks/use-wallet-balance";
 import { formatUsd } from "@/lib/country";
 import { cn } from "@/lib/utils";
 
@@ -57,6 +58,7 @@ const SITES = [
 
 export default function EmailRentPage() {
   const isMobile = useIsMobile();
+  const { canAffordUsd, frozen } = useWalletBalance();
   const [domains, setDomains] = useState<Domain[]>([]);
   const [loading, setLoading] = useState(true);
   const [domain, setDomain] = useState("");
@@ -85,8 +87,16 @@ export default function EmailRentPage() {
   }, [domains, domainQuery]);
 
   const canSubmit = useMemo(
-    () => Boolean(domain && siteValue && selected && !submitting),
-    [domain, siteValue, selected, submitting],
+    () =>
+      Boolean(
+        domain &&
+          siteValue &&
+          selected &&
+          !submitting &&
+          !frozen &&
+          canAffordUsd(selected.costUsd),
+      ),
+    [domain, siteValue, selected, submitting, frozen, canAffordUsd],
   );
 
   useEffect(() => {
@@ -407,9 +417,13 @@ export default function EmailRentPage() {
               >
                 {submitting
                   ? "Reserving…"
-                  : selected
-                    ? `Rent email · ${money(selected.costUsd)}`
-                    : "Continue"}
+                  : frozen
+                    ? "Wallet unavailable"
+                    : selected && !canAffordUsd(selected.costUsd)
+                      ? "Insufficient USD balance"
+                      : selected
+                        ? `Rent email · ${money(selected.costUsd)}`
+                        : "Continue"}
               </motion.button>
             </div>
 
@@ -427,9 +441,13 @@ export default function EmailRentPage() {
               >
                 {submitting
                   ? "Reserving…"
-                  : selected
-                    ? `Rent · ${money(selected.costUsd)}`
-                    : "Continue"}
+                  : frozen
+                    ? "Wallet unavailable"
+                    : selected && !canAffordUsd(selected.costUsd)
+                      ? "Insufficient USD balance"
+                      : selected
+                        ? `Rent · ${money(selected.costUsd)}`
+                        : "Continue"}
               </button>
             </div>
           </form>

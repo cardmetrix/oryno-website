@@ -5,6 +5,10 @@ import { formatMoney } from "@/lib/transactions";
 import { purchaseAirtime } from "@/lib/vtpass";
 import { sogoHttpStatus } from "@/lib/sogo/errors";
 import { publicServiceError } from "@/lib/service-errors";
+import {
+  actionLockHttpStatus,
+  withUserActionLock,
+} from "@/lib/wallet/action-lock";
 
 export const runtime = "nodejs";
 
@@ -58,7 +62,8 @@ export async function POST(req: Request) {
       );
     }
 
-    const result = await purchaseAirtime({
+    const result = await withUserActionLock(user.id, () =>
+      purchaseAirtime({
       userId: user.id,
       countryCode: user.countryCode,
       serviceID: body.serviceID || "foreign-airtime",
@@ -71,7 +76,8 @@ export async function POST(req: Request) {
       countryIso: body.countryIso,
       productTypeId: body.productTypeId,
       variationCode: body.variationCode,
-    });
+      }),
+    );
 
     const amountFormatted = formatMoney(
       result.order.amount,
@@ -123,7 +129,7 @@ export async function POST(req: Request) {
           .replace(/VTpass/gi, "ORYNO")
           .replace(/vtpass/gi, "ORYNO"),
       },
-      { status: sogoHttpStatus(error) },
+      { status: actionLockHttpStatus(error) || sogoHttpStatus(error) },
     );
   }
 }

@@ -7,6 +7,7 @@ import {
   wallets,
 } from "@/lib/db/schema";
 import { quoteLocalUsd } from "@/lib/fx/rates";
+import { convertLocalToNgn } from "@/lib/fx/rates";
 import { usdFromLocalRetail } from "@/lib/pricing/service-pricing";
 import { debitUsdWallet } from "@/lib/wallet-usd";
 import {
@@ -14,6 +15,8 @@ import {
   ensurePrimaryWallet,
   toWalletSummary,
 } from "@/lib/wallet";
+import { getDisplayFx, nigeriaServiceLedgerCurrency } from "@/lib/display-currency";
+import { refundFailedDebit } from "@/lib/wallet/ledger";
 import {
   assertHerosmsReady,
   cancelHerosmsEmail,
@@ -45,25 +48,30 @@ async function debitWallet(input: {
     throw new Error("Enter a valid amount");
   }
 
-  const currency = currencyForCountry(input.countryCode);
-  const wallet = await ensurePrimaryWallet(input.userId, currency);
+  const ledgerCurrency = nigeriaServiceLedgerCurrency();
+  const wallet = await ensurePrimaryWallet(input.userId, ledgerCurrency);
+  const fx = await getDisplayFx(input.countryCode);
+  const ledgerAmount =
+    fx.to === "NGN"
+      ? input.amount
+      : convertLocalToNgn(input.amount, fx.localToNgn);
 
   if (wallet.status === "frozen" || wallet.status === "closed") {
     throw new Error("Wallet is not available for payments");
   }
 
-  const amountStr = input.amount.toFixed(2);
+  const amountStr = ledgerAmount.toFixed(2);
 
   return db.transaction(async (tx) => {
     const current = await tx.query.wallets.findFirst({
       where: eq(wallets.id, wallet.id),
     });
     if (!current) throw new Error("Wallet not found");
-    if (Number(current.balance) < input.amount) {
+    if (Number(current.balance) < ledgerAmount) {
       throw new Error("Insufficient wallet balance");
     }
 
-    const next = (Number(current.balance) - input.amount).toFixed(2);
+    const next = (Number(current.balance) - ledgerAmount).toFixed(2);
     const [updated] = await tx
       .update(wallets)
       .set({ balance: next, updatedAt: new Date() })
@@ -80,7 +88,7 @@ async function debitWallet(input: {
         title: input.title,
         subtitle: input.subtitle,
         amount: amountStr,
-        currency,
+        currency: ledgerCurrency,
         status: "processing",
         balanceAfter: next,
         metadata: {
@@ -93,8 +101,8 @@ async function debitWallet(input: {
     return {
       wallet: updated ?? { ...current, balance: next },
       transaction: txRow,
-      amount: input.amount,
-      currency,
+      amount: ledgerAmount,
+      currency: ledgerCurrency,
     };
   });
 }
@@ -105,26 +113,7 @@ async function refundDebit(input: {
   amount: number;
   reason: string;
 }) {
-  await db.transaction(async (tx) => {
-    const wallet = await tx.query.wallets.findFirst({
-      where: eq(wallets.id, input.walletId),
-    });
-    if (wallet) {
-      const restored = (Number(wallet.balance) + input.amount).toFixed(2);
-      await tx
-        .update(wallets)
-        .set({ balance: restored, updatedAt: new Date() })
-        .where(eq(wallets.id, wallet.id));
-    }
-    await tx
-      .update(transactions)
-      .set({
-        status: "failed",
-        updatedAt: new Date(),
-        metadata: { failureReason: input.reason },
-      })
-      .where(eq(transactions.id, input.transactionId));
-  });
+  await refundFailedDebit(input);
 }
 
 export async function usdToLocalPrice(

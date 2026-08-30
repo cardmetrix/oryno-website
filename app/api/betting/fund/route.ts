@@ -9,6 +9,10 @@ import { formatCountryMoney } from "@/lib/country";
 import { getDisplayFx } from "@/lib/display-currency";
 import { convertLocalToNgn, convertNgnToLocal } from "@/lib/fx/rates";
 import { createNotification } from "@/lib/notifications-service";
+import {
+  actionLockHttpStatus,
+  withUserActionLock,
+} from "@/lib/wallet/action-lock";
 
 export const runtime = "nodejs";
 
@@ -45,7 +49,8 @@ export async function POST(req: Request) {
         ? localAmount
         : convertLocalToNgn(localAmount, fx.localToNgn);
 
-    const result = await fundBettingWallet({
+    const result = await withUserActionLock(user.id, () =>
+      fundBettingWallet({
       userId: user.id,
       countryCode: user.countryCode,
       phone: user.phone,
@@ -54,7 +59,8 @@ export async function POST(req: Request) {
       customerRef,
       customerName: body.customerName,
       amount: ledgerAmount,
-    });
+      }),
+    );
 
     const amountFormatted = formatCountryMoney(
       convertNgnToLocal(result.amount, fx.ngnToLocal),
@@ -103,7 +109,7 @@ export async function POST(req: Request) {
           error instanceof Error ? error.message : "Betting funding failed",
         ),
       },
-      { status: bettingHttpStatus(error) },
+      { status: actionLockHttpStatus(error) || bettingHttpStatus(error) },
     );
   }
 }

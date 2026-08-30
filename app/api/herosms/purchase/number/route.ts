@@ -3,6 +3,10 @@ import { ensureAppUser } from "@/lib/auth/current-user";
 import { createNotification } from "@/lib/notifications-service";
 import { formatMoney } from "@/lib/transactions";
 import { purchaseVirtualNumber, herosmsErrorToEnglish } from "@/lib/herosms";
+import {
+  actionLockHttpStatus,
+  withUserActionLock,
+} from "@/lib/wallet/action-lock";
 
 export const runtime = "nodejs";
 
@@ -53,18 +57,20 @@ export async function POST(req: Request) {
       priceUsd,
     });
 
-    const result = await purchaseVirtualNumber({
-      userId: user.id,
-      countryCode: user.countryCode,
-      heroCountryId: Number(body.heroCountryId),
-      countryName: body.countryName,
-      iso: body.iso,
-      service: body.service,
-      serviceName: body.serviceName || body.service,
-      priceUsd,
-      costUsd: Number.isFinite(costUsd) && costUsd > 0 ? costUsd : undefined,
-      priceLocal: Number(body.priceLocal) || 0,
-    });
+    const result = await withUserActionLock(user.id, () =>
+      purchaseVirtualNumber({
+        userId: user.id,
+        countryCode: user.countryCode,
+        heroCountryId: Number(body.heroCountryId),
+        countryName: body.countryName,
+        iso: body.iso,
+        service: body.service,
+        serviceName: body.serviceName || body.service,
+        priceUsd,
+        costUsd: Number.isFinite(costUsd) && costUsd > 0 ? costUsd : undefined,
+        priceLocal: Number(body.priceLocal) || 0,
+      }),
+    );
 
     console.log("[herosms-purchase-number] ok", {
       simulated: result.simulated,
@@ -109,7 +115,7 @@ export async function POST(req: Request) {
           error instanceof Error ? error.message : "Failed to buy number",
         ),
       },
-      { status: 400 },
+      { status: actionLockHttpStatus(error) || 400 },
     );
   }
 }

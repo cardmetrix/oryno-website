@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { billPayments, billProviders, transactions, wallets } from "@/lib/db/schema";
 import { getDisplayFx, nigeriaServiceLedgerCurrency } from "@/lib/display-currency";
 import { convertLocalToNgn } from "@/lib/fx/rates";
-import { priceLocalAmount } from "@/lib/pricing/service-pricing";
+import { refundFailedDebit } from "@/lib/wallet/ledger";
 import { ensurePrimaryWallet, toWalletSummary } from "@/lib/wallet";
 import { findKenyaBillService } from "./catalog";
 import { isKenyaBillsDemoMode, payKenyaBill, verifyKenyaBillCustomer } from "./client";
@@ -120,33 +120,7 @@ async function refundDebit(input: {
   amount: number;
   reason: string;
 }) {
-  await db.transaction(async (tx) => {
-    const existing = await tx.query.transactions.findFirst({
-      where: eq(transactions.id, input.transactionId),
-    });
-    if (!existing || existing.status === "failed" || existing.status === "completed") {
-      return;
-    }
-    const wallet = await tx.query.wallets.findFirst({
-      where: eq(wallets.id, input.walletId),
-    });
-    if (wallet) {
-      const restored = (Number(wallet.balance) + input.amount).toFixed(2);
-      await tx
-        .update(wallets)
-        .set({ balance: restored, updatedAt: new Date() })
-        .where(eq(wallets.id, wallet.id));
-    }
-    const prev = (existing.metadata || {}) as Record<string, unknown>;
-    await tx
-      .update(transactions)
-      .set({
-        status: "failed",
-        updatedAt: new Date(),
-        metadata: { ...prev, failureReason: input.reason },
-      })
-      .where(eq(transactions.id, input.transactionId));
-  });
+  await refundFailedDebit(input);
 }
 
 export async function purchaseKenyaBill(input: {

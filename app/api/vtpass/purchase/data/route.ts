@@ -5,6 +5,10 @@ import { formatMoney } from "@/lib/transactions";
 import { purchaseData } from "@/lib/vtpass";
 import { sogoHttpStatus } from "@/lib/sogo/errors";
 import { publicServiceError } from "@/lib/service-errors";
+import {
+  actionLockHttpStatus,
+  withUserActionLock,
+} from "@/lib/wallet/action-lock";
 
 export const runtime = "nodejs";
 
@@ -42,7 +46,8 @@ export async function POST(req: Request) {
       );
     }
 
-    const result = await purchaseData({
+    const result = await withUserActionLock(user.id, () =>
+      purchaseData({
       userId: user.id,
       countryCode: user.countryCode,
       serviceID: body.serviceID || "foreign-airtime",
@@ -55,7 +60,8 @@ export async function POST(req: Request) {
       operatorId: body.operatorId,
       countryIso: body.countryIso,
       productTypeId: body.productTypeId,
-    });
+      }),
+    );
 
     const amountFormatted = formatMoney(
       result.order.amount,
@@ -101,7 +107,7 @@ export async function POST(req: Request) {
           error instanceof Error ? error.message : "Data purchase failed",
         ),
       },
-      { status: sogoHttpStatus(error) },
+      { status: actionLockHttpStatus(error) || sogoHttpStatus(error) },
     );
   }
 }

@@ -3,6 +3,10 @@ import { ensureAppUser } from "@/lib/auth/current-user";
 import { createNotification } from "@/lib/notifications-service";
 import { formatMoney } from "@/lib/transactions";
 import { japErrorToEnglish, purchaseJapBoost } from "@/lib/jap";
+import {
+  actionLockHttpStatus,
+  withUserActionLock,
+} from "@/lib/wallet/action-lock";
 
 export const runtime = "nodejs";
 
@@ -55,7 +59,8 @@ export async function POST(req: Request) {
       hasComments,
     });
 
-    const result = await purchaseJapBoost({
+    const result = await withUserActionLock(user.id, () =>
+      purchaseJapBoost({
       userId: user.id,
       countryCode: user.countryCode,
       serviceId: Number(body.serviceId),
@@ -67,7 +72,8 @@ export async function POST(req: Request) {
       rateUsd: Number(body.rateUsd) || 0,
       priceLocal: Number(body.priceLocal) || undefined,
       comments: body.comments,
-    });
+      }),
+    );
 
     console.log("[jap-purchase] ok", {
       simulated: result.simulated,
@@ -110,7 +116,7 @@ export async function POST(req: Request) {
       error instanceof Error ? error.message : "Failed to place boost";
     return NextResponse.json(
       { error: japErrorToEnglish(raw) },
-      { status: 400 },
+      { status: actionLockHttpStatus(error) || 400 },
     );
   }
 }

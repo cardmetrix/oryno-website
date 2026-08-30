@@ -15,6 +15,7 @@ import {
 } from "@/components/app/vtpass-service-picker";
 import { SelectSheet } from "@/components/app/select-sheet";
 import { useCountry } from "@/components/providers/country-provider";
+import { useWalletBalance } from "@/hooks/use-wallet-balance";
 import { airtimePresets, estimateAirtimeCashback } from "@/lib/telecom";
 import { cleanNetworkName } from "@/lib/vtpass/catalog";
 import { cn } from "@/lib/utils";
@@ -28,6 +29,7 @@ type Variation = {
 
 export default function AirtimePage() {
   const { country, loading: countryLoading, formatServiceMoney } = useCountry();
+  const { canAfford, canAffordNgn, frozen } = useWalletBalance();
   const countryCode = country?.code || "NG";
   const isNigeria = countryCode === "NG";
 
@@ -59,9 +61,12 @@ export default function AirtimePage() {
     : selectedVariation?.amount || 0;
   const cashback = estimateAirtimeCashback(amountNumber);
 
+  const affordable = isNigeria
+    ? canAfford(amountNumber)
+    : canAffordNgn(amountNumber);
   const canSubmit = useMemo(() => {
     const digits = phone.replace(/\D/g, "").length >= 10;
-    if (!digits || submitting || !networkId) return false;
+    if (!digits || submitting || !networkId || frozen || !affordable) return false;
     if (isNigeria) return amountNumber >= 50;
     return Boolean(variationCode && amountNumber > 0);
   }, [
@@ -71,6 +76,8 @@ export default function AirtimePage() {
     isNigeria,
     amountNumber,
     variationCode,
+    frozen,
+    affordable,
   ]);
 
   // Load networks: NG = local VTU; elsewhere = operators for user country
@@ -438,7 +445,11 @@ export default function AirtimePage() {
             >
               {submitting
                 ? "Processing…"
-                : `Buy airtime · ${money(amountNumber)}`}
+                : frozen
+                  ? "Wallet unavailable"
+                  : !affordable && amountNumber > 0
+                    ? "Insufficient balance"
+                    : `Buy airtime · ${money(amountNumber)}`}
             </motion.button>
           </form>
         )}

@@ -10,6 +10,7 @@ import {
 import { nigeriaServiceLedgerCurrency, getDisplayFx } from "@/lib/display-currency";
 import { convertNgnToLocal, quoteLocalUsd } from "@/lib/fx/rates";
 import { ensurePrimaryWallet, toWalletSummary } from "@/lib/wallet";
+import { refundFailedDebit } from "@/lib/wallet/ledger";
 import { categoryForSlug } from "@/lib/sogo/catalog";
 import {
   assertReloadlyReady,
@@ -131,30 +132,7 @@ async function refundDebit(input: {
   amount: number;
   reason: string;
 }) {
-  await db.transaction(async (tx) => {
-    const wallet = await tx.query.wallets.findFirst({
-      where: eq(wallets.id, input.walletId),
-    });
-    if (wallet) {
-      const restored = (Number(wallet.balance) + input.amount).toFixed(2);
-      await tx
-        .update(wallets)
-        .set({ balance: restored, updatedAt: new Date() })
-        .where(eq(wallets.id, wallet.id));
-    }
-    const existing = await tx.query.transactions.findFirst({
-      where: eq(transactions.id, input.transactionId),
-    });
-    const prev = (existing?.metadata || {}) as Record<string, unknown>;
-    await tx
-      .update(transactions)
-      .set({
-        status: "failed",
-        updatedAt: new Date(),
-        metadata: { ...prev, failureReason: input.reason },
-      })
-      .where(eq(transactions.id, input.transactionId));
-  });
+  await refundFailedDebit(input);
 }
 
 export async function quoteGiftCardBuy(input: {

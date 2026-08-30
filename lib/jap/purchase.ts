@@ -14,6 +14,7 @@ import {
   currencyForCountry,
   toWalletSummary,
 } from "@/lib/wallet";
+import { refundFailedDebit } from "@/lib/wallet/ledger";
 import {
   addJapOrder,
   assertJapReady,
@@ -38,26 +39,7 @@ async function refundDebit(input: {
   amount: number;
   reason: string;
 }) {
-  await db.transaction(async (tx) => {
-    const wallet = await tx.query.wallets.findFirst({
-      where: eq(wallets.id, input.walletId),
-    });
-    if (wallet) {
-      const restored = (Number(wallet.balance) + input.amount).toFixed(2);
-      await tx
-        .update(wallets)
-        .set({ balance: restored, updatedAt: new Date() })
-        .where(eq(wallets.id, wallet.id));
-    }
-    await tx
-      .update(transactions)
-      .set({
-        status: "failed",
-        updatedAt: new Date(),
-        metadata: { failureReason: input.reason },
-      })
-      .where(eq(transactions.id, input.transactionId));
-  });
+  await refundFailedDebit(input);
 }
 
 export async function usdToLocalJapPrice(

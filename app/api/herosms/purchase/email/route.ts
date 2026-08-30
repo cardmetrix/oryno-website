@@ -4,6 +4,10 @@ import { createNotification } from "@/lib/notifications-service";
 import { formatMoney } from "@/lib/transactions";
 import { herosmsErrorToEnglish, purchaseEmailActivation } from "@/lib/herosms";
 import { publicServiceError } from "@/lib/service-errors";
+import {
+  actionLockHttpStatus,
+  withUserActionLock,
+} from "@/lib/wallet/action-lock";
 
 export const runtime = "nodejs";
 
@@ -35,14 +39,16 @@ export async function POST(req: Request) {
       priceLocal: body.priceLocal,
     });
 
-    const result = await purchaseEmailActivation({
-      userId: user.id,
-      countryCode: user.countryCode,
-      site: body.site.trim(),
-      domain: body.domain.trim(),
-      priceUsd: Number(body.priceUsd) || 0.1,
-      priceLocal: Number(body.priceLocal) || undefined,
-    });
+    const result = await withUserActionLock(user.id, () =>
+      purchaseEmailActivation({
+        userId: user.id,
+        countryCode: user.countryCode,
+        site: body.site.trim(),
+        domain: body.domain.trim(),
+        priceUsd: Number(body.priceUsd) || 0.1,
+        priceLocal: Number(body.priceLocal) || undefined,
+      }),
+    );
 
     console.log("[herosms-purchase-email] ok", {
       simulated: result.simulated,
@@ -93,8 +99,8 @@ export async function POST(req: Request) {
         : "PURCHASE_FAILED";
 
     return NextResponse.json(
-      { error: errorMessage, code },
-      { status: 400 },
+      { error: errorMessage, code: actionLockHttpStatus(error) ? "action_in_progress" : code },
+      { status: actionLockHttpStatus(error) || 400 },
     );
   }
 }

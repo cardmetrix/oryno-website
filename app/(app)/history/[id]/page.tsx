@@ -7,6 +7,7 @@ import {
   Clock3,
   Download,
   Loader2,
+  RotateCcw,
   Share2,
   XCircle,
 } from "lucide-react";
@@ -262,11 +263,15 @@ export default function TransactionReceiptPage({
   );
 }
 
-function normalizeStatus(status: string): "Completed" | "Pending" | "Failed" {
+function normalizeStatus(status: string): "Completed" | "Pending" | "Failed" | "Reversed" {
   const s = status.toLowerCase();
+  if (s === "reversed") return "Reversed";
   if (s === "failed") return "Failed";
-  if (s === "pending") return "Pending";
+  if (s === "pending" || s === "processing") return "Pending";
+  if (s === "completed") return "Completed";
   return "Completed";
+}
+
 }
 
 function StatusHeroIcon({ status }: { status: string }) {
@@ -274,9 +279,11 @@ function StatusHeroIcon({ status }: { status: string }) {
   const Icon =
     label === "Failed"
       ? XCircle
-      : label === "Pending"
-        ? Clock3
-        : CheckCircle2;
+      : label === "Reversed"
+        ? RotateCcw
+        : label === "Pending"
+          ? Clock3
+          : CheckCircle2;
 
   return (
     <span className="mx-auto flex h-14 w-14 items-center justify-center">
@@ -323,9 +330,11 @@ function StatusPill({ status }: { status: string }) {
   const Icon =
     label === "Failed"
       ? XCircle
-      : label === "Pending"
-        ? Clock3
-        : CheckCircle2;
+      : label === "Reversed"
+        ? RotateCcw
+        : label === "Pending"
+          ? Clock3
+          : CheckCircle2;
   return (
     <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white">
       <Icon className="h-3.5 w-3.5" />
@@ -502,7 +511,7 @@ async function renderReceiptCanvas(tx: TransactionReceipt) {
 
 function drawStatusGlyph(
   ctx: CanvasRenderingContext2D,
-  status: "Completed" | "Pending" | "Failed" | string,
+  status: "Completed" | "Pending" | "Failed" | "Reversed" | string,
   cx: number,
   cy: number,
   radius = 28,
@@ -519,7 +528,7 @@ function drawStatusGlyph(
   ctx.arc(cx, cy, radius, 0, Math.PI * 2);
   ctx.stroke();
 
-  if (status === "Failed") {
+  if (status === "Failed" || status === "Reversed") {
     const s = radius * 0.38;
     ctx.beginPath();
     ctx.moveTo(cx - s, cy - s);

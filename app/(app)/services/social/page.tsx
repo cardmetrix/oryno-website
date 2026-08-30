@@ -26,6 +26,7 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useWalletBalance } from "@/hooks/use-wallet-balance";
 import { formatUsd } from "@/lib/country";
 import { isCustomCommentsService } from "@/lib/jap/catalog";
 import { cn } from "@/lib/utils";
@@ -145,6 +146,7 @@ const selectClassName = cn(authInputClassName, "appearance-none pr-10");
 
 export default function SocialBoostPage() {
   const isMobile = useIsMobile();
+  const { canAffordUsd, frozen } = useWalletBalance();
   const [platforms, setPlatforms] = useState<string[]>([]);
   const [platform, setPlatform] = useState("");
   const [metric, setMetric] = useState("");
@@ -364,15 +366,19 @@ export default function SocialBoostPage() {
   ]);
 
   const canSubmit = useMemo(() => {
-    if (!selected || submitting || !quantityValid || quantity == null) {
+    if (!selected || submitting || frozen || !quantityValid || quantity == null) {
       return false;
     }
+    if (amount > 0 && !canAffordUsd(amount)) return false;
     if (isCustomComments && filledComments.length !== quantity) return false;
     const link = profileUrl.trim();
     return link.length > 4 && /^(https?:\/\/|@|t\.me\/)/i.test(link);
   }, [
     selected,
     submitting,
+    frozen,
+    canAffordUsd,
+    amount,
     quantityValid,
     quantity,
     isCustomComments,
@@ -613,11 +619,15 @@ export default function SocialBoostPage() {
 
   const submitLabel = submitting
     ? "Processing…"
-    : selected && quantityValid && quantity != null
-      ? `Boost now · ${money(amount)}`
-      : isCustomComments
-        ? "Add custom comments to continue"
-        : "Enter quantity to continue";
+    : frozen
+      ? "Wallet unavailable"
+      : amount > 0 && !canAffordUsd(amount)
+        ? "Insufficient USD balance"
+        : selected && quantityValid && quantity != null
+          ? `Boost now · ${money(amount)}`
+          : isCustomComments
+            ? "Add custom comments to continue"
+            : "Enter quantity to continue";
 
   return (
     <AppShell hideNav>

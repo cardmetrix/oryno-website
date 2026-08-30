@@ -18,6 +18,7 @@ import {
   ensurePrimaryWallet,
   toWalletSummary,
 } from "@/lib/wallet";
+import { refundFailedDebit, reverseCompletedDebit } from "@/lib/wallet/ledger";
 import { priceLocalAmount } from "@/lib/pricing/service-pricing";
 import { inferDataPlanCategory } from "@/lib/vtpass/catalog";
 import {
@@ -289,34 +290,7 @@ async function refundDebit(input: {
   amount: number;
   reason: string;
 }) {
-  await db.transaction(async (tx) => {
-    const existing = await tx.query.transactions.findFirst({
-      where: eq(transactions.id, input.transactionId),
-    });
-    if (!existing || existing.status === "failed") return;
-    if (existing.status === "completed") return;
-
-    const wallet = await tx.query.wallets.findFirst({
-      where: eq(wallets.id, input.walletId),
-    });
-    if (wallet) {
-      const restored = (Number(wallet.balance) + input.amount).toFixed(2);
-      await tx
-        .update(wallets)
-        .set({ balance: restored, updatedAt: new Date() })
-        .where(eq(wallets.id, wallet.id));
-    }
-
-    const prev = (existing.metadata || {}) as Record<string, unknown>;
-    await tx
-      .update(transactions)
-      .set({
-        status: "failed",
-        updatedAt: new Date(),
-        metadata: { ...prev, failureReason: input.reason },
-      })
-      .where(eq(transactions.id, input.transactionId));
-  });
+  await refundFailedDebit(input);
 }
 
 async function finalizeTx(
@@ -852,7 +826,48 @@ export async function handleSogoBillsWebhook(event: SogoWebhookEvent) {
     event.data.status === "failed" ||
     event.data.status === "refunded"
   ) {
-    if (txRow.status !== "completed" && txRow.status !== "failed") {
+    if (txRow.status === "completed") {
+      await reverseCompletedDebit({
+        walletId: txRow.walletId,
+        transactionId: txRow.id,
+        amount: Number(txRow.amount),
+        reason: event.data.failure_reason || event.event || "Payment reversed",
+        userId: txRow.userId,
+      });
+      if (txRow.category === "airtime" && orderId) {
+        await db
+          .update(airtimeOrders)
+          .set({
+            status: "refunded",
+            failureReason: event.data.failure_reason || event.event,
+            updatedAt: new Date(),
+          })
+          .where(eq(airtimeOrders.id, orderId));
+      }
+      if (txRow.category === "data" && orderId) {
+        await db
+          .update(dataOrders)
+          .set({
+            status: "refunded",
+            failureReason: event.data.failure_reason || event.event,
+            updatedAt: new Date(),
+          })
+          .where(eq(dataOrders.id, orderId));
+      }
+      if (txRow.category === "bill" && orderId) {
+        await db
+          .update(billPayments)
+          .set({
+            status: "refunded",
+            failureReason: event.data.failure_reason || event.event,
+            updatedAt: new Date(),
+          })
+          .where(eq(billPayments.id, orderId));
+      }
+      return { ok: true, reversed: true };
+    }
+
+    if (txRow.status !== "failed" && txRow.status !== "reversed") {
       await refundDebit({
         walletId: txRow.walletId,
         transactionId: txRow.id,

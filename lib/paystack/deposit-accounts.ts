@@ -342,27 +342,109 @@ export async function getWalletFundOptions(user: typeof users.$inferSelect) {
   const currency = currencyForCountry(countryCode);
   const presets = fundPresetsForCountry(countryCode);
   const demoMode = isPaystackDemoMode();
-
-  if (countryCode === "NG") {
-    const account = await getOrCreateDepositAccount(user.id);
-    return {
-      method: "dva" as const,
-      countryCode,
-      currency,
-      presets,
-      account,
-      demoMode,
-    };
-  }
+  const account = await getOrCreateDepositAccount(user.id);
 
   return {
-    method: "checkout" as const,
+    method: "dva" as const,
     countryCode,
     currency,
     presets,
-    account: null,
+    account,
     demoMode,
   };
+}
+
+export async function reversePaystackDeposit(input: {
+  reference: string;
+  reason: string;
+}) {
+  if (!input.reference) {
+    return { ok: false as const, reason: "not_found" as const };
+  }
+
+  const funding = await db.query.walletFundings.findFirst({
+    where: eq(walletFundings.externalRef, input.reference),
+  });
+  if (!funding?.transactionId) {
+    return { ok: false as const, reason: "not_found" as const };
+  }
+  if (funding.status === "reversed" || funding.status === "failed") {
+    return {
+      ok: true as const,
+      already: true as const,
+      status: funding.status,
+    };
+  }
+
+  const { reverseCompletedCredit, ReverseFailedError } = await import(
+    "@/lib/wallet/ledger"
+  );
+
+  try {
+    const result = await reverseCompletedCredit({
+      walletId: funding.walletId,
+      transactionId: funding.transactionId,
+      amount: Number(funding.amount),
+      reason: input.reason,
+      userId: funding.userId,
+    });
+
+    await db
+      .update(walletFundings)
+      .set({
+        status: "reversed",
+        updatedAt: new Date(),
+        metadata: {
+          ...(funding.metadata ?? {}),
+          reversedAt: new Date().toISOString(),
+          reverseReason: input.reason,
+        },
+      })
+      .where(eq(walletFundings.id, funding.id));
+
+    try {
+      await createNotification({
+        userId: funding.userId,
+        title: result.already ? "Deposit already reversed" : "Deposit reversed",
+        body: result.already
+          ? "This Paystack deposit was already reversed."
+          : "A Paystack deposit was reversed and deducted from your wallet.",
+        type: "fund",
+        metadata: {
+          href: "/wallet",
+          fundingId: funding.id,
+          transactionId: funding.transactionId,
+        },
+      });
+    } catch (notifyError) {
+      console.error("[paystack-deposit-reverse-notify]", notifyError);
+    }
+
+    return {
+      ok: true as const,
+      already: result.already,
+      status: "reversed" as const,
+    };
+  } catch (error) {
+    console.error("[paystack-deposit-reverse]", error);
+    await db
+      .update(walletFundings)
+      .set({
+        updatedAt: new Date(),
+        metadata: {
+          ...(funding.metadata ?? {}),
+          reverseFailed: true,
+          reverseFailureReason:
+            error instanceof Error ? error.message : "Reverse failed",
+        },
+      })
+      .where(eq(walletFundings.id, funding.id));
+    throw error instanceof ReverseFailedError
+      ? error
+      : new ReverseFailedError(
+          error instanceof Error ? error.message : "Deposit reverse failed",
+        );
+  }
 }
 
 export async function findUserIdForPaystackCharge(data: {

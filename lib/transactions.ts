@@ -1,6 +1,6 @@
 import { convertNgnToLocal, type NgnLocalQuote } from "@/lib/fx/rates";
 
-export type TransactionStatus = "Completed" | "Pending" | "Failed";
+export type TransactionStatus = "Completed" | "Pending" | "Failed" | "Reversed";
 
 export type AppTransaction = {
   id: string;
@@ -150,7 +150,8 @@ export function mapDbStatus(
   status: string,
 ): TransactionStatus {
   if (status === "completed") return "Completed";
-  if (status === "failed" || status === "reversed" || status === "cancelled") {
+  if (status === "reversed") return "Reversed";
+  if (status === "failed" || status === "cancelled") {
     return "Failed";
   }
   return "Pending";
@@ -164,17 +165,17 @@ export function normalizeStatusLabel(
   if (raw === "completed" || raw === "successful" || raw === "success") {
     return "Completed";
   }
-  if (
-    raw === "failed" ||
-    raw === "reversed" ||
-    raw === "cancelled" ||
-    raw === "canceled"
-  ) {
+  if (raw === "reversed") return "Reversed";
+  if (raw === "failed" || raw === "cancelled" || raw === "canceled") {
     return "Failed";
   }
   if (raw === "pending" || raw === "processing") return "Pending";
-  // Already display-cased
-  if (status === "Completed" || status === "Pending" || status === "Failed") {
+  if (
+    status === "Completed" ||
+    status === "Pending" ||
+    status === "Failed" ||
+    status === "Reversed"
+  ) {
     return status;
   }
   return mapDbStatus(raw);

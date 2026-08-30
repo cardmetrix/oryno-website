@@ -6,6 +6,7 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   Clock3,
+  RotateCcw,
   XCircle,
   CheckCircle2,
 } from "lucide-react";
@@ -18,7 +19,7 @@ export type Transaction = {
   subtitle: string;
   amount: string;
   type: "credit" | "debit";
-  status?: "Completed" | "Pending" | "Failed";
+  status?: "Completed" | "Pending" | "Failed" | "Reversed";
 };
 
 type Props = {
@@ -43,6 +44,12 @@ export function TransactionRow({
           className: "bg-destructive/10 text-destructive",
           Icon: XCircle,
         }
+      : status === "Reversed"
+        ? {
+            label: "Reversed",
+            className: "bg-muted text-muted-foreground",
+            Icon: RotateCcw,
+          }
       : status === "Pending"
         ? {
             label: "Pending",

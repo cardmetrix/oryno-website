@@ -15,6 +15,7 @@ import {
 } from "@/components/app/vtpass-service-picker";
 import { SelectSheet } from "@/components/app/select-sheet";
 import { useCountry } from "@/components/providers/country-provider";
+import { useWalletBalance } from "@/hooks/use-wallet-balance";
 import { cleanNetworkName, inferDataPlanCategory } from "@/lib/vtpass/catalog";
 import { cn } from "@/lib/utils";
 
@@ -29,6 +30,7 @@ const FILTERS = ["All", "Daily", "Weekly", "Monthly"] as const;
 
 export default function DataPage() {
   const { country, loading: countryLoading, formatServiceMoney } = useCountry();
+  const { canAfford, canAffordNgn, frozen } = useWalletBalance();
   const countryCode = country?.code || "NG";
   const isNigeria = countryCode === "NG";
 
@@ -61,8 +63,11 @@ export default function DataPage() {
     if (phone.replace(/\D/g, "").length < 10 || !selected || submitting) {
       return false;
     }
+    if (frozen || !(isNigeria ? canAfford(selected.amount) : canAffordNgn(selected.amount))) {
+      return false;
+    }
     return Boolean(networkId);
-  }, [phone, selected, submitting, networkId]);
+  }, [phone, selected, submitting, networkId, frozen, canAfford, canAffordNgn, isNigeria]);
 
   useEffect(() => {
     if (countryLoading) return;
@@ -387,9 +392,16 @@ export default function DataPage() {
             >
               {submitting
                 ? "Processing…"
-                : selected
-                  ? `Buy data · ${money(selected.amount)}`
-                  : "Select a plan"}
+                : frozen
+                  ? "Wallet unavailable"
+                  : selected &&
+                      !(isNigeria
+                        ? canAfford(selected.amount)
+                        : canAffordNgn(selected.amount))
+                    ? "Insufficient balance"
+                    : selected
+                      ? `Buy data · ${money(selected.amount)}`
+                      : "Select a plan"}
             </motion.button>
           </form>
         )}

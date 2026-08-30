@@ -12,6 +12,10 @@ import {
 import { formatCountryMoney } from "@/lib/country";
 import { getDisplayFx } from "@/lib/display-currency";
 import { toWalletSummary, withdrawWallet } from "@/lib/wallet";
+import {
+  actionLockHttpStatus,
+  withUserActionLock,
+} from "@/lib/wallet/action-lock";
 
 export const runtime = "nodejs";
 
@@ -95,13 +99,15 @@ export async function POST(req: Request) {
       throw error;
     }
 
-    const result = await withdrawWallet({
-      userId: user.id,
-      amount: body.amount ?? 0,
-      bankAccountId: body.bankAccountId,
-      countryCode: user.countryCode ?? "NG",
-      fee: WITHDRAW_FEE,
-    });
+    const result = await withUserActionLock(user.id, () =>
+      withdrawWallet({
+        userId: user.id,
+        amount: body.amount ?? 0,
+        bankAccountId: body.bankAccountId,
+        countryCode: user.countryCode ?? "NG",
+        fee: WITHDRAW_FEE,
+      }),
+    );
 
     const amountFormatted = formatCountryMoney(
       result.localAmount,
@@ -147,6 +153,9 @@ export async function POST(req: Request) {
     const message =
       error instanceof Error ? error.message : "Failed to withdraw";
     console.error("[wallet-withdraw]", error);
-    return NextResponse.json({ error: message }, { status: 400 });
+    return NextResponse.json(
+      { error: message },
+      { status: actionLockHttpStatus(error) || 400 },
+    );
   }
 }
