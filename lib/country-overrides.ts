@@ -5,11 +5,11 @@ import {
 
 /** Force a market for specific accounts. Google / IP location cannot override these. */
 const USERNAME_COUNTRY: Record<string, SupportedCountryCode> = {
-  ziecozeno4: "KE",
+  ziecozeno4: "ZA",
 };
 
 const EMAIL_COUNTRY: Record<string, SupportedCountryCode> = {
-  "ziecozeno2@gmail.com": "KE",
+  "ziecozeno2@gmail.com": "ZA",
 };
 
 export function countryOverrideForUser(input: {
