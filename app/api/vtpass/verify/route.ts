@@ -30,6 +30,38 @@ export async function POST(req: Request) {
       );
     }
 
+    if ((user.countryCode || "NG") === "ZA") {
+      const {
+        verifyZaBillCustomer,
+        isZaBillsDemoMode,
+        zaBillErrorToEnglish,
+      } = await import("@/lib/reloadly/utilities");
+      const result = await verifyZaBillCustomer({
+        serviceID: body.serviceID,
+        customerRef: body.billersCode.trim(),
+        variationCode: body.type,
+      });
+      if (!result.ok) {
+        return NextResponse.json(
+          {
+            error: zaBillErrorToEnglish(
+              result.message || "Could not verify that account",
+            ),
+          },
+          { status: 422 },
+        );
+      }
+      return NextResponse.json({
+        ok: true,
+        demo: isZaBillsDemoMode(),
+        customerName: result.customerName,
+        customerAddress: result.customerAddress,
+        meterNumber: body.billersCode,
+        currentBouquet: result.currentBouquet,
+        renewalAmount: result.renewalAmount,
+      });
+    }
+
     if ((user.countryCode || "NG") === "KE") {
       const {
         verifyKenyaBillCustomer,

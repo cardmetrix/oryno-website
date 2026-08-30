@@ -63,6 +63,38 @@ export async function GET(req: Request) {
     }
 
     if (
+      (user.countryCode || "NG") === "ZA" &&
+      (identifier === "tv-subscription" ||
+        identifier === "electricity-bill" ||
+        identifier === "water-bill")
+    ) {
+      const {
+        ZA_BILL_PRESETS,
+        isZaBillsDemoMode,
+        listZaBillServices,
+      } = await import("@/lib/reloadly/utilities");
+      const services = listZaBillServices(identifier);
+      return NextResponse.json({
+        ok: true,
+        demo: isZaBillsDemoMode(),
+        provider: "reloadly-utilities",
+        countryCode: "ZA",
+        currency: "ZAR",
+        presets: ZA_BILL_PRESETS,
+        identifier,
+        services: services.map((s) => ({
+          serviceID: s.serviceID,
+          name: s.name,
+          image: s.image,
+          domain: s.domain,
+          customerLabel: s.customerLabel,
+          minAmount: s.minAmount,
+          maxAmount: s.maxAmount,
+        })),
+      });
+    }
+
+    if (
       (user.countryCode || "NG") === "KE" &&
       (identifier === "tv-subscription" ||
         identifier === "electricity-bill" ||

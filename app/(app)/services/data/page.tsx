@@ -114,11 +114,13 @@ export default function DataPage() {
               operator_id: string;
               name: string;
               operator_image?: string;
+              domain?: string;
             }[]
           ).map((op) => ({
             serviceID: String(op.operator_id),
             name: cleanNetworkName(op.name),
             image: op.operator_image ?? null,
+            domain: op.domain,
           }));
           setNetworks(list);
           if (list[0]?.serviceID) setNetworkId(list[0].serviceID);
@@ -220,7 +222,11 @@ export default function DataPage() {
     <AppShell hideNav>
       <PageHeader
         title="Buy Data"
-        subtitle="Daily, weekly & monthly plans"
+        subtitle={
+          countryCode === "ZA"
+            ? "MTN, Vodacom, Cell C & Telkom"
+            : "Daily, weekly & monthly plans"
+        }
         backHref="/dashboard"
       />
 

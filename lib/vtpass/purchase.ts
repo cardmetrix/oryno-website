@@ -10,7 +10,8 @@ import {
 } from "@/lib/db/schema";
 import { estimateAirtimeCashback } from "@/lib/telecom";
 import { resolveCountryCode } from "@/lib/country";
-import { nigeriaServiceLedgerCurrency } from "@/lib/display-currency";
+import { getDisplayFx, nigeriaServiceLedgerCurrency } from "@/lib/display-currency";
+import { convertLocalToNgn } from "@/lib/fx/rates";
 import {
   ensurePrimaryWallet,
   toWalletSummary,
@@ -32,6 +33,7 @@ import {
   requeryVtpass,
 } from "./client";
 import { fallbackVariationsFor, inferDataPlanCategory } from "./catalog";
+import { findZaDataPlan } from "./za-data";
 import type { VtpassPayResponse } from "./types";
 
 /** Face amount to provider; retail amount charged to wallet (admin markup/override). */
@@ -362,7 +364,10 @@ function mapVtpassOutcome(response: VtpassPayResponse) {
 }
 
 async function callProviderOrSimulate(payload: Parameters<typeof payVtpass>[0]) {
-  if (isVtpassDemoMode()) {
+  const catalogOnly = String(
+    (payload as { operator_id?: string }).operator_id || "",
+  ).startsWith("za-");
+  if (isVtpassDemoMode() || catalogOnly) {
     const simulated: VtpassPayResponse = {
       code: "000",
       response_description: "TRANSACTION SUCCESSFUL (demo)",
@@ -590,14 +595,21 @@ export async function purchaseData(input: {
   if (phone.length < 10) throw new Error("Enter a valid phone number");
   if (!input.variationCode) throw new Error("Select a data plan");
 
-  const faceAmount = await lookupVariationFace({
-    serviceID:
-      input.mode === "international" ? "foreign-airtime" : input.serviceID,
-    variationCode: input.variationCode,
-    fallbackAmount: input.amount,
-    operatorId: input.operatorId,
-    productTypeId: input.productTypeId,
-  });
+  const zaPlan = findZaDataPlan(input.variationCode);
+  let faceAmount = input.amount;
+  if (zaPlan) {
+    const fx = await getDisplayFx(input.countryCode || input.countryIso || "ZA");
+    faceAmount = convertLocalToNgn(zaPlan.zar, fx.localToNgn);
+  } else {
+    faceAmount = await lookupVariationFace({
+      serviceID:
+        input.mode === "international" ? "foreign-airtime" : input.serviceID,
+      variationCode: input.variationCode,
+      fallbackAmount: input.amount,
+      operatorId: input.operatorId,
+      productTypeId: input.productTypeId,
+    });
+  }
   const priced = await resolveVtpassRetail({
     serviceID: input.serviceID,
     variationCode: input.variationCode,
@@ -742,6 +754,20 @@ export async function purchaseBill(input: {
   quantity?: number;
 }) {
   const country = (input.countryCode || "NG").toUpperCase();
+  if (country === "ZA") {
+    const { purchaseZaBill } = await import("@/lib/reloadly/utilities");
+    return purchaseZaBill({
+      userId: input.userId,
+      countryCode: input.countryCode,
+      serviceID: input.serviceID,
+      serviceName: input.serviceName,
+      category: input.category,
+      customerRef: input.customerRef,
+      phone: input.phone,
+      amount: input.amount,
+      variationCode: input.variationCode,
+    });
+  }
   if (country === "KE") {
     const { purchaseKenyaBill } = await import("@/lib/reloadly/utilities");
     return purchaseKenyaBill({
@@ -771,9 +797,10 @@ export async function purchaseBill(input: {
     });
   }
   if (input.category === "water") {
-    throw Object.assign(new Error("Water bills are available for Ghana and Kenya accounts"), {
-      status: 400,
-    });
+    throw Object.assign(
+      new Error("Water bills are available for Ghana, Kenya, and South Africa accounts"),
+      { status: 400 },
+    );
   }
   return purchaseSogoBill({
     userId: input.userId,

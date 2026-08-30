@@ -11,6 +11,7 @@ import {
   reloadlyTypeForCategory,
   resolveKenyaBillerId,
 } from "./catalog";
+import { findZaBillService, resolveZaBillerId } from "./za-catalog";
 import type {
   KenyaBillPayResult,
   KenyaBillVerifyResult,
@@ -29,6 +30,8 @@ let cachedToken: { token: string; expiresAt: number; audience: string } | null =
 export function isKenyaBillsDemoMode() {
   return isReloadlyDemoForced() || !hasReloadlyKeys();
 }
+
+export const isZaBillsDemoMode = isKenyaBillsDemoMode;
 
 function utilitiesBase() {
   return isReloadlySandbox() ? SANDBOX_BASE : LIVE_BASE;
@@ -103,7 +106,10 @@ async function utilitiesFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return json;
 }
 
-export async function listKenyaReloadlyBillers(category?: "tv" | "electricity" | "water") {
+export async function listReloadlyBillers(
+  countryISOCode: "KE" | "ZA",
+  category?: "tv" | "electricity" | "water",
+) {
   if (isKenyaBillsDemoMode()) return [];
   try {
     const types = category
@@ -119,7 +125,7 @@ export async function listKenyaReloadlyBillers(category?: "tv" | "electricity" |
     const pages = await Promise.all(
       types.map(async (type) => {
         const params = new URLSearchParams({
-          countryISOCode: "KE",
+          countryISOCode,
           type,
           size: "50",
           page: "1",
@@ -132,9 +138,21 @@ export async function listKenyaReloadlyBillers(category?: "tv" | "electricity" |
     );
     return pages.flat();
   } catch (error) {
-    console.error("[kenya-bills-billers]", error);
+    console.error(`[${countryISOCode.toLowerCase()}-bills-billers]`, error);
     return [];
   }
+}
+
+export async function listKenyaReloadlyBillers(
+  category?: "tv" | "electricity" | "water",
+) {
+  return listReloadlyBillers("KE", category);
+}
+
+export async function listZaReloadlyBillers(
+  category?: "tv" | "electricity" | "water",
+) {
+  return listReloadlyBillers("ZA", category);
 }
 
 const DEMO_CUSTOMERS: Record<string, string> = {
@@ -237,6 +255,164 @@ export async function payKenyaBill(input: {
 
   const billers = await listKenyaReloadlyBillers(service.category);
   const billerId = resolveKenyaBillerId(service.serviceID, input.variationCode, billers);
+  if (!billerId) {
+    return {
+      ok: false,
+      demo: false,
+      pending: false,
+      reference: input.reference,
+      transactionId: null,
+      token: null,
+      message: kenyaBillErrorToEnglish("unknown biller"),
+    };
+  }
+
+  const paid = await utilitiesFetch<ReloadlyPayResponse>("/pay", {
+    method: "POST",
+    body: JSON.stringify({
+      subscriberAccountNumber: input.customerRef,
+      amount: input.amount,
+      billerId,
+      useLocalAmount: true,
+      referenceId: input.reference,
+    }),
+  });
+
+  const status = (paid.status || "SUCCESSFUL").toUpperCase();
+  const token =
+    paid.pinDetail?.pin ||
+    (typeof paid.additionalInfo?.token === "string"
+      ? paid.additionalInfo.token
+      : null);
+
+  return {
+    ok: status !== "FAILED",
+    demo: false,
+    pending: status === "PENDING" || status === "PROCESSING",
+    reference: paid.referenceId || input.reference,
+    transactionId: paid.id != null ? String(paid.id) : null,
+    token,
+    message: paid.message,
+    raw: paid as unknown as Record<string, unknown>,
+  };
+}
+
+const ZA_DEMO_CUSTOMERS: Record<string, string> = {
+  "12345678": "Thabo Mokoena",
+  "87654321": "Lerato Naidoo",
+  "4223568280": "Eskom Demo",
+};
+
+export async function verifyZaBillCustomer(input: {
+  serviceID: string;
+  customerRef: string;
+  variationCode?: string | null;
+}): Promise<KenyaBillVerifyResult> {
+  const service = findZaBillService(input.serviceID);
+  if (!service) {
+    return {
+      ok: false,
+      demo: true,
+      customerName: null,
+      message: "Unknown South Africa bill service",
+    };
+  }
+  const ref = input.customerRef.replace(/\s+/g, "").trim();
+  if (ref.length < 6) {
+    return {
+      ok: false,
+      demo: isZaBillsDemoMode(),
+      customerName: null,
+      message: `Enter a valid ${service.customerLabel.toLowerCase()}`,
+    };
+  }
+
+  if (isZaBillsDemoMode()) {
+    if (ref === "00000000") {
+      return {
+        ok: false,
+        demo: true,
+        customerName: null,
+        message: "Invalid account number",
+      };
+    }
+    return {
+      ok: true,
+      demo: true,
+      customerName: ZA_DEMO_CUSTOMERS[ref] || "ORYNO South Africa Demo Customer",
+      customerAddress: "Johannesburg, South Africa",
+      currentBouquet: service.category === "tv" ? service.name : undefined,
+    };
+  }
+
+  const billers = await listZaReloadlyBillers(service.category);
+  const billerId = resolveZaBillerId(service.serviceID, input.variationCode, billers);
+  if (billerId) {
+    try {
+      const json = await utilitiesFetch<{
+        subscriberName?: string;
+        name?: string;
+        address?: string;
+        amountDue?: number;
+      }>(`/billers/${billerId}/validate`, {
+        method: "POST",
+        body: JSON.stringify({ subscriberAccountNumber: ref }),
+      });
+      return {
+        ok: true,
+        demo: false,
+        customerName: json.subscriberName || json.name || "Verified customer",
+        customerAddress: json.address,
+        renewalAmount: json.amountDue,
+      };
+    } catch {
+      // Not every biller exposes validate — allow pay after a format check.
+    }
+  }
+
+  return {
+    ok: true,
+    demo: false,
+    customerName: "Verified customer",
+  };
+}
+
+export async function payZaBill(input: {
+  serviceID: string;
+  variationCode?: string | null;
+  customerRef: string;
+  amount: number;
+  reference: string;
+}): Promise<KenyaBillPayResult> {
+  const service = findZaBillService(input.serviceID);
+  if (!service) {
+    return {
+      ok: false,
+      demo: true,
+      pending: false,
+      reference: input.reference,
+      transactionId: null,
+      token: null,
+      message: "Unknown South Africa bill service",
+    };
+  }
+
+  if (isZaBillsDemoMode()) {
+    return {
+      ok: true,
+      demo: true,
+      pending: false,
+      reference: input.reference,
+      transactionId: `ZAB_DEMO_${input.reference}`,
+      token:
+        service.category === "electricity"
+          ? `TKN${Date.now().toString().slice(-8)}`
+          : null,
+    };
+  }
+
+  const billers = await listZaReloadlyBillers(service.category);
+  const billerId = resolveZaBillerId(service.serviceID, input.variationCode, billers);
   if (!billerId) {
     return {
       ok: false,

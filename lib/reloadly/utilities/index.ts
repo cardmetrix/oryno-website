@@ -11,12 +11,30 @@ export {
 } from "./catalog";
 export {
   isKenyaBillsDemoMode,
+  isZaBillsDemoMode,
   listKenyaReloadlyBillers,
+  listZaReloadlyBillers,
   payKenyaBill,
+  payZaBill,
   verifyKenyaBillCustomer,
+  verifyZaBillCustomer,
 } from "./client";
-export { kenyaBillErrorToEnglish, kenyaBillHttpStatus } from "./errors";
+export {
+  kenyaBillErrorToEnglish,
+  kenyaBillHttpStatus,
+  zaBillErrorToEnglish,
+  zaBillHttpStatus,
+} from "./errors";
 export { purchaseKenyaBill } from "./purchase";
+export { purchaseZaBill } from "./za-purchase";
+export {
+  findZaBillService,
+  listZaBillServices,
+  listZaVariations,
+  resolveZaBillerId,
+  ZA_BILL_PRESETS,
+  ZA_BILL_SERVICES,
+} from "./za-catalog";
 export type {
   KenyaBillCategory,
   KenyaBillPlan,

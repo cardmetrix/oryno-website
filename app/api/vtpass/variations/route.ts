@@ -2,10 +2,14 @@ import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
 import { priceLocalAmount } from "@/lib/pricing/service-pricing";
 import { isSogoDemoMode, listSogoVariations } from "@/lib/sogo";
+import { getDisplayFx } from "@/lib/display-currency";
+import { convertLocalToNgn } from "@/lib/fx/rates";
 import {
   fallbackVariationsFor,
   getVtpassVariations,
   isVtpassDemoMode,
+  isZaDataOperator,
+  zaDataPlansFor,
 } from "@/lib/vtpass";
 
 export const runtime = "nodejs";
@@ -35,6 +39,37 @@ export async function GET(req: Request) {
       | "electricity-bill"
       | "water-bill"
       | null;
+
+    if ((user.countryCode || "NG") === "ZA") {
+      const {
+        findZaBillService,
+        listZaVariations,
+        listZaReloadlyBillers,
+        isZaBillsDemoMode,
+      } = await import("@/lib/reloadly/utilities");
+      const service = findZaBillService(serviceID);
+      if (service) {
+        const billers = await listZaReloadlyBillers(service.category);
+        const live = listZaVariations(serviceID, billers);
+        return NextResponse.json({
+          ok: true,
+          demo: isZaBillsDemoMode(),
+          provider: "reloadly-utilities",
+          countryCode: "ZA",
+          currency: "ZAR",
+          serviceID,
+          serviceName: live.serviceName,
+          variations: live.variations.map((v) => ({
+            variationCode: v.variationCode,
+            name: v.name,
+            amount: v.amount,
+            listAmount: v.amount,
+            priceOverride: false,
+            fixedPrice: v.fixedPrice,
+          })),
+        });
+      }
+    }
 
     if ((user.countryCode || "NG") === "KE") {
       const {
@@ -97,18 +132,58 @@ export async function GET(req: Request) {
 
     // International airtime/data still uses VTpass
     if (serviceID === "foreign-airtime" || operatorId || productTypeId) {
+      if (isZaDataOperator(operatorId)) {
+        const fx = await getDisplayFx("ZA");
+        const plans = zaDataPlansFor(operatorId!);
+        const priced = await Promise.all(
+          plans.map(async (p) => {
+            const base = convertLocalToNgn(p.zar, fx.localToNgn);
+            const result = await priceLocalAmount({
+              provider: "vtpass",
+              serviceKey: `foreign-airtime:${p.variation_code}`,
+              amount: base,
+            });
+            return {
+              variationCode: p.variation_code,
+              name: p.name,
+              amount: result.local,
+              listAmount: result.listLocal,
+              priceOverride: result.overrideApplied,
+              fixedPrice: true,
+              variationAmount: String(base),
+              chargedAmount: base,
+            };
+          }),
+        );
+        return NextResponse.json({
+          ok: true,
+          demo: true,
+          provider: "vtpass",
+          countryCode: "ZA",
+          currency: "ZAR",
+          serviceID,
+          serviceName: operatorId,
+          variations: priced,
+        });
+      }
+
       let variations;
       let serviceName = serviceID;
 
       if (isVtpassDemoMode() && serviceID !== "foreign-airtime") {
         variations = fallbackVariationsFor(serviceID);
       } else {
-        const live = await getVtpassVariations(serviceID, {
-          operator_id: operatorId,
-          product_type_id: productTypeId,
-        });
-        variations = live.variations;
-        serviceName = live.serviceName;
+        try {
+          const live = await getVtpassVariations(serviceID, {
+            operator_id: operatorId,
+            product_type_id: productTypeId,
+          });
+          variations = live.variations;
+          serviceName = live.serviceName;
+        } catch (error) {
+          console.error("[vtpass-variations-live]", error);
+          variations = [];
+        }
       }
 
       const priced = await Promise.all(

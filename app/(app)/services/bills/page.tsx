@@ -35,16 +35,18 @@ type Variation = {
 const NG_PRESETS = ["1000", "2000", "5000", "10000"];
 const GH_PRESETS = ["20", "50", "100", "200", "500"];
 const KE_PRESETS = ["200", "500", "1000", "2000", "5000"];
+const ZA_PRESETS = ["50", "100", "200", "500", "1000"];
 
 export default function BillsPage() {
   const { country, formatServiceMoney } = useCountry();
   const isNigeria = (country?.code || "NG") === "NG";
   const isGhana = (country?.code || "NG") === "GH";
   const isKenya = (country?.code || "NG") === "KE";
-  const localCurrencyBills = isGhana || isKenya;
+  const isSouthAfrica = (country?.code || "NG") === "ZA";
+  const localCurrencyBills = isGhana || isKenya || isSouthAfrica;
   const billsLive = isNigeria || localCurrencyBills;
-  const hasWaterTab = isGhana || isKenya;
-  const minBillAmount = isKenya ? 50 : isGhana ? 1 : 100;
+  const hasWaterTab = isGhana || isKenya || isSouthAfrica;
+  const minBillAmount = isSouthAfrica ? 10 : isKenya ? 50 : isGhana ? 1 : 100;
 
   const [category, setCategory] = useState<BillCategory>("tv");
   const [services, setServices] = useState<VtpassServiceOption[]>([]);
@@ -54,7 +56,9 @@ export default function BillsPage() {
   const [loadingPlans, setLoadingPlans] = useState(false);
   const [variationCode, setVariationCode] = useState("");
   const [customerRef, setCustomerRef] = useState("");
-  const [amount, setAmount] = useState(isKenya ? "500" : isGhana ? "50" : "2000");
+  const [amount, setAmount] = useState(
+    isSouthAfrica ? "100" : isKenya ? "500" : isGhana ? "50" : "2000",
+  );
   const [verifying, setVerifying] = useState(false);
   const [customerName, setCustomerName] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -229,17 +233,27 @@ export default function BillsPage() {
   }
 
   const money = (n: number) =>
-    isKenya
-      ? formatCountryMoney(n, "KE")
+    isSouthAfrica
+      ? formatCountryMoney(n, "ZA")
+      : isKenya
+        ? formatCountryMoney(n, "KE")
+        : isGhana
+          ? formatCountryMoney(n, "GH")
+          : formatServiceMoney(n);
+  const amountPresets = isSouthAfrica
+    ? ZA_PRESETS
+    : isKenya
+      ? KE_PRESETS
       : isGhana
-        ? formatCountryMoney(n, "GH")
-        : formatServiceMoney(n);
-  const amountPresets = isKenya ? KE_PRESETS : isGhana ? GH_PRESETS : NG_PRESETS;
-  const billsSubtitle = isKenya
-    ? "DStv, KPLC & Nairobi Water"
-    : isGhana
-      ? "DStv, ECG & Ghana Water"
-      : "TV subscriptions & electricity";
+        ? GH_PRESETS
+        : NG_PRESETS;
+  const billsSubtitle = isSouthAfrica
+    ? "DStv, Eskom & Johannesburg Water"
+    : isKenya
+      ? "DStv, KPLC & Nairobi Water"
+      : isGhana
+        ? "DStv, ECG & Ghana Water"
+        : "TV subscriptions & electricity";
   const customerLabel =
     selectedService?.customerLabel ||
     (category === "tv"
@@ -262,9 +276,7 @@ export default function BillsPage() {
             {country.name} bills coming next
           </h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            {country.code === "ZA"
-              ? "South Africa bills will use Reloadly utilities. Airtime and data already work for South Africa."
-              : `${country.name} bills will go live next. Airtime and data already work.`}
+            {country.name} bills will go live next. Airtime and data already work.
           </p>
           <a href="/services/airtime" className="btn-primary mt-6 inline-flex h-12 items-center px-6">
             Buy airtime instead
@@ -384,20 +396,22 @@ export default function BillsPage() {
                   }
                   subtitle={
                     category === "tv"
-                      ? isKenya
-                        ? "DStv, GOtv, StarTimes, Zuku"
-                        : isGhana
-                          ? "DStv, GOtv, StarTimes"
-                          : "DSTV, GOtv, Startimes & more"
+                      ? isSouthAfrica || isKenya || isGhana
+                        ? "DStv, GOtv, StarTimes"
+                        : "DSTV, GOtv, Startimes & more"
                       : category === "water"
-                        ? isKenya
-                          ? "Nairobi Water"
-                          : "Ghana Water Company"
-                        : isKenya
-                          ? "KPLC prepaid & postpaid"
-                          : isGhana
-                            ? "ECG prepaid & postpaid"
-                            : "Prepaid & postpaid discos"
+                        ? isSouthAfrica
+                          ? "Johannesburg Water"
+                          : isKenya
+                            ? "Nairobi Water"
+                            : "Ghana Water Company"
+                        : isSouthAfrica
+                          ? "Eskom & City Power"
+                          : isKenya
+                            ? "KPLC prepaid & postpaid"
+                            : isGhana
+                              ? "ECG prepaid & postpaid"
+                              : "Prepaid & postpaid discos"
                   }
                   hint="Tap to choose a provider"
                   value={serviceID}

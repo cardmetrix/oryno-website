@@ -224,6 +224,16 @@ export function getServicesDirectory(countryCode?: string | null) {
             : `Buy ${country.name} airtime for local networks from your wallet.`,
       };
     }
+    if (item.id === "data" && country.code === "ZA") {
+      return {
+        ...item,
+        shortDescription: "MTN, Vodacom, Cell C & Telkom",
+        longDescription:
+          "Buy South Africa data bundles for MTN, Vodacom, Cell C and Telkom from your wallet.",
+        tags: ["MTN", "Vodacom", "Cell C", "Telkom"],
+        stats: "VTpass",
+      };
+    }
     if (item.id === "betting") {
       return {
         ...item,
@@ -251,6 +261,16 @@ export function getServicesDirectory(countryCode?: string | null) {
           longDescription:
             "Pay DStv Kenya, GOtv, StarTimes, Zuku, Kenya Power (KPLC), and Nairobi Water from your wallet.",
           tags: ["DStv", "KPLC", "Nairobi Water", "Zuku"],
+          stats: "Reloadly",
+        };
+      }
+      if (country.code === "ZA") {
+        return {
+          ...item,
+          shortDescription: "DStv, Eskom & Johannesburg Water",
+          longDescription:
+            "Pay DStv South Africa, GOtv, StarTimes, Eskom, City Power, and Johannesburg Water from your wallet.",
+          tags: ["DStv", "Eskom", "City Power", "Johannesburg Water"],
           stats: "Reloadly",
         };
       }

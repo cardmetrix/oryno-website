@@ -4,6 +4,7 @@ import {
   cleanNetworkName,
   getIntlAirtimeOperators,
   isVtpassDemoMode,
+  ZA_DATA_OPERATORS,
 } from "@/lib/vtpass";
 
 export const runtime = "nodejs";
@@ -31,6 +32,13 @@ const GH_OPERATORS = [
 
 function demoIntlOperators(code: string) {
   if (code === "GH") return GH_OPERATORS;
+  if (code === "ZA") {
+    return ZA_DATA_OPERATORS.map((op) => ({
+      operator_id: op.operator_id,
+      name: op.name,
+      operator_image: op.operator_image,
+    }));
+  }
   return [
     {
       operator_id: "5",
@@ -58,9 +66,16 @@ export async function GET(req: Request) {
       );
     }
 
-    const operators = isVtpassDemoMode()
-      ? demoIntlOperators(code.toUpperCase())
-      : await getIntlAirtimeOperators(code, productTypeId);
+    const iso = code.toUpperCase();
+    let operators = demoIntlOperators(iso);
+    if (!isVtpassDemoMode()) {
+      try {
+        const live = await getIntlAirtimeOperators(code, productTypeId);
+        if (live.length) operators = live;
+      } catch (error) {
+        console.error("[vtpass-intl-operators-live]", error);
+      }
+    }
 
     return NextResponse.json({
       ok: true,
@@ -70,6 +85,8 @@ export async function GET(req: Request) {
       operators: operators.map((op) => ({
         ...op,
         name: cleanNetworkName(op.name),
+        domain:
+          "domain" in op && typeof op.domain === "string" ? op.domain : undefined,
       })),
     });
   } catch (error) {

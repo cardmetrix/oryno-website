@@ -19,12 +19,19 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "code is required" }, { status: 400 });
     }
 
-    const productTypes = isVtpassDemoMode()
-      ? [
-          { product_type_id: 1, name: "Mobile Top Up" },
-          { product_type_id: 4, name: "Mobile Data" },
-        ]
-      : await getIntlAirtimeProductTypes(code);
+    const fallbackTypes = [
+      { product_type_id: 1, name: "Mobile Top Up" },
+      { product_type_id: 4, name: "Mobile Data" },
+    ];
+    let productTypes = fallbackTypes;
+    if (!isVtpassDemoMode()) {
+      try {
+        const live = await getIntlAirtimeProductTypes(code);
+        if (live?.length) productTypes = live;
+      } catch (error) {
+        console.error("[vtpass-intl-product-types-live]", error);
+      }
+    }
 
     return NextResponse.json({
       ok: true,
