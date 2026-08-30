@@ -272,8 +272,6 @@ function normalizeStatus(status: string): "Completed" | "Pending" | "Failed" | "
   return "Completed";
 }
 
-}
-
 function StatusHeroIcon({ status }: { status: string }) {
   const label = normalizeStatus(status);
   const Icon =
