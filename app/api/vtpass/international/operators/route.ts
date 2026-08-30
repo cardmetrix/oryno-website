@@ -3,7 +3,9 @@ import { ensureAppUser } from "@/lib/auth/current-user";
 import {
   cleanNetworkName,
   getIntlAirtimeOperators,
+  isIntlDataProductType,
   isVtpassDemoMode,
+  ZA_AIRTIME_OPERATORS,
   ZA_DATA_OPERATORS,
 } from "@/lib/vtpass";
 
@@ -30,15 +32,21 @@ const GH_OPERATORS = [
   },
 ];
 
-function demoIntlOperators(code: string) {
+function zaOperators(productTypeId: string) {
+  const list = isIntlDataProductType(productTypeId)
+    ? ZA_DATA_OPERATORS
+    : ZA_AIRTIME_OPERATORS;
+  return list.map((op) => ({
+    operator_id: op.operator_id,
+    name: op.name,
+    operator_image: op.operator_image,
+    domain: op.domain,
+  }));
+}
+
+function demoIntlOperators(code: string, productTypeId: string) {
   if (code === "GH") return GH_OPERATORS;
-  if (code === "ZA") {
-    return ZA_DATA_OPERATORS.map((op) => ({
-      operator_id: op.operator_id,
-      name: op.name,
-      operator_image: op.operator_image,
-    }));
-  }
+  if (code === "ZA") return zaOperators(productTypeId);
   return [
     {
       operator_id: "5",
@@ -67,7 +75,7 @@ export async function GET(req: Request) {
     }
 
     const iso = code.toUpperCase();
-    let operators = demoIntlOperators(iso);
+    let operators = demoIntlOperators(iso, productTypeId);
     if (!isVtpassDemoMode()) {
       try {
         const live = await getIntlAirtimeOperators(code, productTypeId);

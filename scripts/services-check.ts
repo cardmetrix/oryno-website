@@ -11,6 +11,10 @@ import {
   listZaBillServices,
 } from "../lib/reloadly/utilities";
 import { ZA_DATA_OPERATORS, ZA_DATA_PLANS } from "../lib/vtpass/za-data";
+import {
+  ZA_AIRTIME_OPERATORS,
+  ZA_AIRTIME_PACKS,
+} from "../lib/vtpass/za-airtime";
 import { refundFailedDebit, reverseCompletedDebit } from "../lib/wallet/ledger";
 import { withUserActionLock } from "../lib/wallet/action-lock";
 
@@ -75,6 +79,15 @@ function main() {
   assert(
     "ZA data plans",
     Object.values(ZA_DATA_PLANS).every((plans) => plans.length > 0),
+  );
+  assert(
+    "ZA airtime operators",
+    ZA_AIRTIME_OPERATORS.length === 4,
+    ZA_AIRTIME_OPERATORS.map((o) => o.name).join(", "),
+  );
+  assert(
+    "ZA airtime packs",
+    Object.values(ZA_AIRTIME_PACKS).every((packs) => packs.length >= 4),
   );
 
   assert(

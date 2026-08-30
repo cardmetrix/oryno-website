@@ -7,8 +7,11 @@ import { convertLocalToNgn } from "@/lib/fx/rates";
 import {
   fallbackVariationsFor,
   getVtpassVariations,
+  isIntlDataProductType,
   isVtpassDemoMode,
+  isZaAirtimeOperator,
   isZaDataOperator,
+  zaAirtimePacksFor,
   zaDataPlansFor,
 } from "@/lib/vtpass";
 
@@ -132,9 +135,16 @@ export async function GET(req: Request) {
 
     // International airtime/data still uses VTpass
     if (serviceID === "foreign-airtime" || operatorId || productTypeId) {
-      if (isZaDataOperator(operatorId)) {
+      const zaData =
+        isZaDataOperator(operatorId) && isIntlDataProductType(productTypeId);
+      const zaAirtime =
+        isZaAirtimeOperator(operatorId) && !isIntlDataProductType(productTypeId);
+
+      if (zaData || zaAirtime) {
         const fx = await getDisplayFx("ZA");
-        const plans = zaDataPlansFor(operatorId!);
+        const plans = zaData
+          ? zaDataPlansFor(operatorId!)
+          : zaAirtimePacksFor(operatorId!);
         const priced = await Promise.all(
           plans.map(async (p) => {
             const base = convertLocalToNgn(p.zar, fx.localToNgn);

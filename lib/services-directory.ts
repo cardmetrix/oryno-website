@@ -217,11 +217,24 @@ export function getServicesDirectory(countryCode?: string | null) {
     if (item.id === "airtime") {
       return {
         ...item,
-        stats: `From ${country.currencySymbol}50`,
+        stats:
+          country.code === "ZA"
+            ? "From R10"
+            : `From ${country.currencySymbol}50`,
+        shortDescription:
+          country.code === "ZA"
+            ? "MTN, Vodacom, Cell C & Telkom"
+            : item.shortDescription,
         longDescription:
           country.code === "NG"
             ? item.longDescription
-            : `Buy ${country.name} airtime for local networks from your wallet.`,
+            : country.code === "ZA"
+              ? "Buy South Africa airtime for MTN, Vodacom, Cell C and Telkom from your wallet."
+              : `Buy ${country.name} airtime for local networks from your wallet.`,
+        tags:
+          country.code === "ZA"
+            ? ["MTN", "Vodacom", "Cell C", "Telkom"]
+            : item.tags,
       };
     }
     if (item.id === "data" && country.code === "ZA") {

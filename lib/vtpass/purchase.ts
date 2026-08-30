@@ -12,6 +12,7 @@ import { estimateAirtimeCashback } from "@/lib/telecom";
 import { resolveCountryCode } from "@/lib/country";
 import { getDisplayFx, nigeriaServiceLedgerCurrency } from "@/lib/display-currency";
 import { convertLocalToNgn } from "@/lib/fx/rates";
+import { priceLocalAmount } from "@/lib/pricing/service-pricing";
 import {
   ensurePrimaryWallet,
   toWalletSummary,
@@ -33,6 +34,7 @@ import {
   requeryVtpass,
 } from "./client";
 import { fallbackVariationsFor, inferDataPlanCategory } from "./catalog";
+import { findZaAirtimePack } from "./za-airtime";
 import { findZaDataPlan } from "./za-data";
 import type { VtpassPayResponse } from "./types";
 
@@ -405,13 +407,21 @@ export async function purchaseAirtime(input: {
 
   let faceAmount = input.amount;
   if (input.mode === "international" && input.variationCode) {
-    faceAmount = await lookupVariationFace({
-      serviceID: "foreign-airtime",
-      variationCode: input.variationCode,
-      fallbackAmount: input.amount,
-      operatorId: input.operatorId,
-      productTypeId: input.productTypeId,
-    });
+    const zaPack = findZaAirtimePack(input.variationCode);
+    if (zaPack) {
+      const fx = await getDisplayFx(
+        input.countryCode || input.countryIso || "ZA",
+      );
+      faceAmount = convertLocalToNgn(zaPack.zar, fx.localToNgn);
+    } else {
+      faceAmount = await lookupVariationFace({
+        serviceID: "foreign-airtime",
+        variationCode: input.variationCode,
+        fallbackAmount: input.amount,
+        operatorId: input.operatorId,
+        productTypeId: input.productTypeId,
+      });
+    }
   }
 
   const priced = await resolveVtpassRetail({
