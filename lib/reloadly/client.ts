@@ -555,29 +555,9 @@ export async function placeReloadlyOrder(input: {
   recipientEmail: string;
 }): Promise<{ order: ReloadlyOrderResponse; simulated: boolean }> {
   if (isReloadlyDemoMode()) {
-    const product =
-      DEMO_RELOADLY_PRODUCTS.find((p) => p.productId === input.productId) ||
-      DEMO_RELOADLY_PRODUCTS[0];
-    const order: ReloadlyOrderResponse = {
-      transactionId: Date.now(),
-      amount: input.unitPrice,
-      currencyCode: "USD",
-      fee: 0,
-      recipientEmail: input.recipientEmail,
-      customIdentifier: input.customIdentifier,
-      status: "SUCCESSFUL",
-      product: {
-        productId: product.productId,
-        productName: product.productName,
-        countryCode: product.country?.isoName || "US",
-        quantity: input.quantity || 1,
-        unitPrice: input.unitPrice,
-        totalPrice: input.unitPrice * (input.quantity || 1),
-        currencyCode: product.recipientCurrencyCode,
-        brand: product.brand,
-      },
-    };
-    return { order, simulated: true };
+    throw new Error(
+      "Reloadly is not configured for live gift-card purchases. Set RELOADLY_CLIENT_ID / RELOADLY_CLIENT_SECRET and RELOADLY_DEMO=false.",
+    );
   }
 
   console.log(LOG_PREFIX, "place order LIVE", {

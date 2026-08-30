@@ -529,12 +529,9 @@ export async function verifySogoMeter(input: {
   meterType: "prepaid" | "postpaid";
 }) {
   if (isSogoDemoMode()) {
-    return {
-      customerName: "ORYNO Demo Customer",
-      customerAddress: "Lagos, Nigeria",
-      meterNumber: input.meterNumber,
-      meterType: input.meterType,
-    };
+    throw new Error(
+      "Sogo is not configured for live bill verification. Set SOGO_SECRET_KEY and ensure SOGO_DEMO is false.",
+    );
   }
 
   const json = await sogoRequest<SogoVerifyResult>(
@@ -568,11 +565,9 @@ export async function verifySogoSmartcard(input: {
   smartcardNumber: string;
 }) {
   if (isSogoDemoMode()) {
-    return {
-      customerName: "ORYNO Demo Customer",
-      currentBouquet: "DStv Compact",
-      renewalAmount: undefined as number | undefined,
-    };
+    throw new Error(
+      "Sogo is not configured for live bill verification. Set SOGO_SECRET_KEY and ensure SOGO_DEMO is false.",
+    );
   }
 
   const json = await sogoRequest<SogoVerifyResult>(
@@ -734,15 +729,9 @@ export async function submitSogoAirtime(input: {
   const network = normalizeSogoNetwork(input.network);
   const phone = toSogoPhone(input.phone);
   if (isSogoDemoMode()) {
-    return {
-      data: demoPurchase({
-        type: "airtime",
-        referenceHint: phone,
-        amount: input.amount,
-        extra: { network, phone },
-      }),
-      simulated: true,
-    };
+    throw new Error(
+      "Sogo is not configured for live purchases. Set SOGO_SECRET_KEY and ensure SOGO_DEMO is false.",
+    );
   }
   const json = await sogoRequest<unknown>("/bills/airtime", {
     method: "POST",
@@ -767,15 +756,9 @@ export async function submitSogoData(input: {
   const network = normalizeSogoNetwork(input.network);
   const phone = toSogoPhone(input.phone);
   if (isSogoDemoMode()) {
-    return {
-      data: demoPurchase({
-        type: "data",
-        referenceHint: phone,
-        amount: input.amount || 0,
-        extra: { network, phone, variation_code: input.variationCode },
-      }),
-      simulated: true,
-    };
+    throw new Error(
+      "Sogo is not configured for live purchases. Set SOGO_SECRET_KEY and ensure SOGO_DEMO is false.",
+    );
   }
   const json = await sogoRequest<unknown>("/bills/data", {
     method: "POST",
@@ -798,19 +781,9 @@ export async function submitSogoElectricity(input: {
 }): Promise<{ data: SogoBillPurchaseData; simulated: boolean }> {
   const disco = normalizeSogoDisco(input.discoSlug);
   if (isSogoDemoMode()) {
-    return {
-      data: demoPurchase({
-        type: "electricity",
-        referenceHint: input.meterNumber,
-        amount: input.amount,
-        extra: {
-          disco_slug: disco,
-          meter_number: input.meterNumber,
-          token: "DEMO-TOKEN-1234-5678",
-        },
-      }),
-      simulated: true,
-    };
+    throw new Error(
+      "Sogo is not configured for live purchases. Set SOGO_SECRET_KEY and ensure SOGO_DEMO is false.",
+    );
   }
   const json = await sogoRequest<unknown>("/bills/electricity", {
     method: "POST",
@@ -836,19 +809,9 @@ export async function submitSogoCableTv(input: {
 }): Promise<{ data: SogoBillPurchaseData; simulated: boolean }> {
   const provider = normalizeSogoTvProvider(input.provider);
   if (isSogoDemoMode()) {
-    return {
-      data: demoPurchase({
-        type: "cable_tv",
-        referenceHint: input.smartcardNumber,
-        amount: input.amount,
-        extra: {
-          provider,
-          smartcard_number: input.smartcardNumber,
-          variation_code: input.variationCode,
-        },
-      }),
-      simulated: true,
-    };
+    throw new Error(
+      "Sogo is not configured for live purchases. Set SOGO_SECRET_KEY and ensure SOGO_DEMO is false.",
+    );
   }
   const json = await sogoRequest<unknown>("/bills/cable-tv", {
     method: "POST",

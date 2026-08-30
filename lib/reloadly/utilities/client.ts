@@ -155,12 +155,6 @@ export async function listZaReloadlyBillers(
   return listReloadlyBillers("ZA", category);
 }
 
-const DEMO_CUSTOMERS: Record<string, string> = {
-  "12345678": "Wanjiku Mwangi",
-  "87654321": "Otieno Odhiambo",
-  "4223568280": "Kenya Power Demo",
-};
-
 export async function verifyKenyaBillCustomer(input: {
   serviceID: string;
   customerRef: string;
@@ -181,20 +175,12 @@ export async function verifyKenyaBillCustomer(input: {
   }
 
   if (isKenyaBillsDemoMode()) {
-    if (ref === "00000000") {
-      return {
-        ok: false,
-        demo: true,
-        customerName: null,
-        message: "Invalid account number",
-      };
-    }
     return {
-      ok: true,
-      demo: true,
-      customerName: DEMO_CUSTOMERS[ref] || "ORYNO Kenya Demo Customer",
-      customerAddress: "Nairobi, Kenya",
-      currentBouquet: service.category === "tv" ? service.name : undefined,
+      ok: false,
+      demo: false,
+      customerName: null,
+      message:
+        "Reloadly Utilities is not configured for live Kenya bills. Set Reloadly keys and RELOADLY_DEMO=false.",
     };
   }
 
@@ -243,14 +229,9 @@ export async function payKenyaBill(input: {
   }
 
   if (isKenyaBillsDemoMode()) {
-    return {
-      ok: true,
-      demo: true,
-      pending: false,
-      reference: input.reference,
-      transactionId: `KEB_DEMO_${input.reference}`,
-      token: service.category === "electricity" ? `TKN${Date.now().toString().slice(-8)}` : null,
-    };
+    throw new Error(
+      "Reloadly Utilities is not configured for live Kenya bills. Set Reloadly keys and RELOADLY_DEMO=false.",
+    );
   }
 
   const billers = await listKenyaReloadlyBillers(service.category);
@@ -297,12 +278,6 @@ export async function payKenyaBill(input: {
   };
 }
 
-const ZA_DEMO_CUSTOMERS: Record<string, string> = {
-  "12345678": "Thabo Mokoena",
-  "87654321": "Lerato Naidoo",
-  "4223568280": "Eskom Demo",
-};
-
 export async function verifyZaBillCustomer(input: {
   serviceID: string;
   customerRef: string;
@@ -328,20 +303,12 @@ export async function verifyZaBillCustomer(input: {
   }
 
   if (isZaBillsDemoMode()) {
-    if (ref === "00000000") {
-      return {
-        ok: false,
-        demo: true,
-        customerName: null,
-        message: "Invalid account number",
-      };
-    }
     return {
-      ok: true,
-      demo: true,
-      customerName: ZA_DEMO_CUSTOMERS[ref] || "ORYNO South Africa Demo Customer",
-      customerAddress: "Johannesburg, South Africa",
-      currentBouquet: service.category === "tv" ? service.name : undefined,
+      ok: false,
+      demo: false,
+      customerName: null,
+      message:
+        "Reloadly Utilities is not configured for live South Africa bills. Set Reloadly keys and RELOADLY_DEMO=false.",
     };
   }
 
@@ -398,17 +365,9 @@ export async function payZaBill(input: {
   }
 
   if (isZaBillsDemoMode()) {
-    return {
-      ok: true,
-      demo: true,
-      pending: false,
-      reference: input.reference,
-      transactionId: `ZAB_DEMO_${input.reference}`,
-      token:
-        service.category === "electricity"
-          ? `TKN${Date.now().toString().slice(-8)}`
-          : null,
-    };
+    throw new Error(
+      "Reloadly Utilities is not configured for live South Africa bills. Set Reloadly keys and RELOADLY_DEMO=false.",
+    );
   }
 
   const billers = await listZaReloadlyBillers(service.category);

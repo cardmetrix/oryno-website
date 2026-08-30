@@ -105,20 +105,6 @@ export async function sendPaystackWithdrawal(input: {
     });
     return { ok: true as const, transfer, recipientCode };
   } catch (error) {
-    // Test keys often lack transfer balance — finish locally in demo mode.
-    if (isPaystackDemoMode()) {
-      return {
-        ok: true as const,
-        transfer: {
-          reference: input.reference,
-          transferCode: `TRF_DEMO_${input.reference}`,
-          status: "success",
-          demoMode: true as const,
-        },
-        recipientCode,
-        simulated: true as const,
-      };
-    }
     throw error;
   }
 }

@@ -75,13 +75,23 @@ export async function GET(req: Request) {
     }
 
     const iso = code.toUpperCase();
-    let operators = demoIntlOperators(iso, productTypeId);
-    if (!isVtpassDemoMode()) {
+    let operators: Array<{
+      operator_id: string;
+      name: string;
+      operator_image?: string;
+      domain?: string;
+    }> = [];
+
+    if (isVtpassDemoMode()) {
+      operators = demoIntlOperators(iso, productTypeId);
+    } else {
       try {
-        const live = await getIntlAirtimeOperators(code, productTypeId);
-        if (live.length) operators = live;
+        operators = await getIntlAirtimeOperators(code, productTypeId);
       } catch (error) {
         console.error("[vtpass-intl-operators-live]", error);
+        throw error instanceof Error
+          ? error
+          : new Error("Failed to load live operators");
       }
     }
 

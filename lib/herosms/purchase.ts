@@ -268,31 +268,26 @@ export async function purchaseVirtualNumber(input: {
     let simulated = false;
 
     if (isHerosmsDemoMode()) {
-      simulated = true;
-      activationId = `demo_${Date.now()}`;
-      phoneNumber = `+23480${String(Date.now()).slice(-8)}`;
-      console.log(LOG_PREFIX, "purchase number DEMO", {
-        activationId,
-        phoneNumber,
-      });
-    } else {
-      const num = await getHerosmsNumber({
-        service: input.service,
-        country: input.heroCountryId,
-        maxPrice: wholesaleUsd * 1.25,
-      });
-      activationId = num.activationId;
-      phoneNumber = num.phoneNumber;
-      console.log(LOG_PREFIX, "purchase number LIVE", {
-        activationId,
-        phoneNumber,
-      });
-      // Mark ready to receive SMS
-      try {
-        await setHerosmsStatus(activationId, 1);
-      } catch (e) {
-        console.warn(LOG_PREFIX, "setStatus(1) non-fatal", e);
-      }
+      throw new Error(
+        "HeroSMS is not configured for live purchases. Set HEROSMS_API_KEY and HEROSMS_DEMO=false.",
+      );
+    }
+    const num = await getHerosmsNumber({
+      service: input.service,
+      country: input.heroCountryId,
+      maxPrice: wholesaleUsd * 1.25,
+    });
+    activationId = num.activationId;
+    phoneNumber = num.phoneNumber;
+    console.log(LOG_PREFIX, "purchase number LIVE", {
+      activationId,
+      phoneNumber,
+    });
+    // Mark ready to receive SMS
+    try {
+      await setHerosmsStatus(activationId, 1);
+    } catch (e) {
+      console.warn(LOG_PREFIX, "setStatus(1) non-fatal", e);
     }
 
     const [row] = await db
@@ -412,18 +407,15 @@ export async function purchaseEmailActivation(input: {
     let simulated = false;
 
     if (isHerosmsDemoMode()) {
-      simulated = true;
-      emailId = `demo_email_${Date.now()}`;
-      const localPart = `oryno${String(Date.now()).slice(-6)}`;
-      email = `${localPart}@${domain}`;
-      console.log(LOG_PREFIX, "purchase email DEMO", { emailId, email });
-    } else {
-      // OpenAPI: POST /emails body is { site, domain } only
-      const bought = await purchaseHerosmsEmail({ site, domain });
-      emailId = bought.emailId;
-      email = bought.email;
-      console.log(LOG_PREFIX, "purchase email LIVE", { emailId, email });
+      throw new Error(
+        "HeroSMS is not configured for live purchases. Set HEROSMS_API_KEY and HEROSMS_DEMO=false.",
+      );
     }
+    // OpenAPI: POST /emails body is { site, domain } only
+    const bought = await purchaseHerosmsEmail({ site, domain });
+    emailId = bought.emailId;
+    email = bought.email;
+    console.log(LOG_PREFIX, "purchase email LIVE", { emailId, email });
 
     await db
       .update(transactions)

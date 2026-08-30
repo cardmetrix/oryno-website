@@ -150,21 +150,12 @@ export async function verifyHubtelCustomer(input: {
   }
 
   if (isHubtelDemoMode()) {
-    if (customerRef === "00000000") {
-      return {
-        ok: false,
-        demo: true,
-        customerName: null,
-        message: "Invalid account number",
-      };
-    }
     return {
-      ok: true,
-      demo: true,
-      customerName: "ORYNO Ghana Demo",
-      customerAddress: "Accra, Ghana",
-      renewalAmount: service.category === "tv" ? 89 : null,
-      currentBouquet: service.category === "tv" ? `${service.name} Compact` : null,
+      ok: false,
+      demo: false,
+      customerName: null,
+      message:
+        "Hubtel is not configured for live Ghana bills. Set HUBTEL_CLIENT_ID, HUBTEL_CLIENT_SECRET, HUBTEL_POS_ACCOUNT_ID and HUBTEL_DEMO=false.",
     };
   }
 
@@ -237,29 +228,9 @@ export async function payHubtelBill(input: {
   }
 
   if (isHubtelDemoMode()) {
-    if (input.customerRef.trim() === "99999999") {
-      return {
-        ok: false,
-        demo: true,
-        pending: false,
-        reference: input.reference,
-        transactionId: null,
-        token: null,
-        message: "Demo provider declined this payment",
-      };
-    }
-    return {
-      ok: true,
-      demo: true,
-      pending: false,
-      reference: `DEMO-GH-${input.reference.slice(-10)}`,
-      transactionId: input.reference,
-      token:
-        service.category === "electricity" && input.variationCode === "prepaid"
-          ? "1234-5678-9012-3456"
-          : null,
-      message: "Demo Ghana bill paid",
-    };
+    throw new Error(
+      "Hubtel is not configured for live Ghana bills. Set HUBTEL_CLIENT_ID, HUBTEL_CLIENT_SECRET, HUBTEL_POS_ACCOUNT_ID and HUBTEL_DEMO=false.",
+    );
   }
 
   const hubtelId = resolveHubtelServiceId(input.serviceID, input.variationCode);

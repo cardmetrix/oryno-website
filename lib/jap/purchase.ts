@@ -255,20 +255,19 @@ export async function purchaseJapBoost(input: {
     let simulated = false;
 
     if (isJapDemoMode()) {
-      simulated = true;
-      orderId = `demo_jap_${Date.now()}`;
-      console.log(LOG_PREFIX, "purchase DEMO", { orderId });
-    } else {
-      const placed = await addJapOrder({
-        service: input.serviceId,
-        link,
-        ...(needsComments
-          ? { comments: commentsPayload }
-          : { quantity }),
-      });
-      orderId = placed.orderId;
-      console.log(LOG_PREFIX, "purchase LIVE", { orderId });
+      throw new Error(
+        "JustAnotherPanel is not configured for live purchases. Set JAP_API_KEY and JAP_DEMO=false.",
+      );
     }
+    const placed = await addJapOrder({
+      service: input.serviceId,
+      link,
+      ...(needsComments
+        ? { comments: commentsPayload }
+        : { quantity }),
+    });
+    orderId = placed.orderId;
+    console.log(LOG_PREFIX, "purchase LIVE", { orderId });
 
     const [order] = await db
       .insert(socialOrders)

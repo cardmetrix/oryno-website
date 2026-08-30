@@ -279,6 +279,15 @@ export async function fundWallet(input: {
   currency?: string;
   countryCode?: string | null;
 }) {
+  const allowSim =
+    (process.env.ALLOW_SIMULATED_FUND || "").trim().toLowerCase() === "true" ||
+    (process.env.ALLOW_SIMULATED_FUND || "").trim() === "1";
+  if (!allowSim) {
+    throw new Error(
+      "Direct wallet credit is disabled. Fund via Paystack deposit/checkout, or set ALLOW_SIMULATED_FUND=true for local testing only.",
+    );
+  }
+
   const currency =
     input.currency ?? currencyForCountry(input.countryCode);
   const amount = parseAmount(input.amount);

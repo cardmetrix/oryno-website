@@ -344,27 +344,18 @@ function mapVtpassOutcome(response: VtpassPayResponse) {
 }
 
 async function callProviderOrSimulate(payload: Parameters<typeof payVtpass>[0]) {
-  const catalogOnly = String(
+  const operatorId = String(
     (payload as { operator_id?: string }).operator_id || "",
-  ).startsWith("za-");
-  if (isVtpassDemoMode() || catalogOnly) {
-    const simulated: VtpassPayResponse = {
-      code: "000",
-      response_description: "TRANSACTION SUCCESSFUL (demo)",
-      requestId: payload.request_id,
-      amount: payload.amount,
-      purchased_code: "",
-      content: {
-        transactions: {
-          status: "delivered",
-          product_name: payload.serviceID,
-          unique_element: payload.billersCode || payload.phone,
-          amount: payload.amount,
-          transactionId: `demo_${payload.request_id}`,
-        },
-      },
-    };
-    return { response: simulated, simulated: true as const };
+  );
+  if (operatorId.startsWith("za-")) {
+    throw new Error(
+      "South Africa airtime/data requires a live VTpass operator. Refresh networks and try again.",
+    );
+  }
+  if (isVtpassDemoMode()) {
+    throw new Error(
+      "VTpass is not configured for live purchases. Set VTPASS_API_KEY, VTPASS_PUBLIC_KEY, and VTPASS_SECRET_KEY.",
+    );
   }
 
   const response = await payVtpass(payload);
@@ -409,19 +400,17 @@ export async function purchaseAirtime(input: {
   if (input.mode === "international" && input.variationCode) {
     const zaPack = findZaAirtimePack(input.variationCode);
     if (zaPack) {
-      const fx = await getDisplayFx(
-        input.countryCode || input.countryIso || "ZA",
+      throw new Error(
+        "South Africa airtime requires a live VTpass network. Refresh and select a live operator.",
       );
-      faceAmount = convertLocalToNgn(zaPack.zar, fx.localToNgn);
-    } else {
-      faceAmount = await lookupVariationFace({
-        serviceID: "foreign-airtime",
-        variationCode: input.variationCode,
-        fallbackAmount: input.amount,
-        operatorId: input.operatorId,
-        productTypeId: input.productTypeId,
-      });
     }
+    faceAmount = await lookupVariationFace({
+      serviceID: "foreign-airtime",
+      variationCode: input.variationCode,
+      fallbackAmount: input.amount,
+      operatorId: input.operatorId,
+      productTypeId: input.productTypeId,
+    });
   }
 
   const priced = await resolveVtpassRetail({
@@ -584,20 +573,19 @@ export async function purchaseData(input: {
   if (!input.variationCode) throw new Error("Select a data plan");
 
   const zaPlan = findZaDataPlan(input.variationCode);
-  let faceAmount = input.amount;
   if (zaPlan) {
-    const fx = await getDisplayFx(input.countryCode || input.countryIso || "ZA");
-    faceAmount = convertLocalToNgn(zaPlan.zar, fx.localToNgn);
-  } else {
-    faceAmount = await lookupVariationFace({
-      serviceID:
-        input.mode === "international" ? "foreign-airtime" : input.serviceID,
-      variationCode: input.variationCode,
-      fallbackAmount: input.amount,
-      operatorId: input.operatorId,
-      productTypeId: input.productTypeId,
-    });
+    throw new Error(
+      "South Africa data requires a live VTpass network. Refresh and select a live operator.",
+    );
   }
+  let faceAmount = await lookupVariationFace({
+    serviceID:
+      input.mode === "international" ? "foreign-airtime" : input.serviceID,
+    variationCode: input.variationCode,
+    fallbackAmount: input.amount,
+    operatorId: input.operatorId,
+    productTypeId: input.productTypeId,
+  });
   const priced = await resolveVtpassRetail({
     serviceID: input.serviceID,
     variationCode: input.variationCode,
@@ -806,12 +794,9 @@ export async function purchaseBill(input: {
 
 export async function requeryPurchase(requestId: string) {
   if (isVtpassDemoMode()) {
-    return {
-      code: "000",
-      response_description: "TRANSACTION SUCCESSFUL (demo)",
-      requestId,
-      content: { transactions: { status: "delivered" } },
-    } satisfies VtpassPayResponse;
+    throw new Error(
+      "VTpass is not configured for live requery. Set VTPASS_API_KEY, VTPASS_PUBLIC_KEY, and VTPASS_SECRET_KEY.",
+    );
   }
   return requeryVtpass(requestId);
 }

@@ -72,19 +72,13 @@ export async function initiateLocalWalletFund(input: {
         demoMode: isPaystackDemoMode(),
       };
     } catch (error) {
-      if (!isPaystackDemoMode()) throw error;
-      console.error("[local-fund-init]", error);
+      throw error;
     }
   }
 
-  return {
-    mode: "demo" as const,
-    reference,
-    amount,
-    currency,
-    countryCode,
-    demoMode: true as const,
-  };
+  throw new Error(
+    "Paystack is not configured for live wallet funding. Set PAYSTACK_SECRET_KEY.",
+  );
 }
 
 export async function verifyLocalWalletFund(input: {

@@ -435,29 +435,13 @@ export async function initiateUsdPaystackFund(input: {
         demoMode: isPaystackDemoMode(),
       };
     } catch (error) {
-      if (!isPaystackDemoMode()) throw error;
-      console.error("[usd-paystack-init-fallback]", error);
+      throw error;
     }
   }
 
-  // Demo credit path
-  const credited = await creditUsdWalletFromFunding({
-    userId: input.userId,
-    reference,
-    usdAmount,
-  });
-
-  return {
-    mode: "demo" as const,
-    reference,
-    usdAmount,
-    localAmount,
-    localCurrency,
-    quote,
-    demoMode: true as const,
-    transactionId: credited.transactionId,
-    usdWallet: credited.usdWallet,
-  };
+  throw new Error(
+    "Paystack is not configured for live USD funding. Set PAYSTACK_SECRET_KEY.",
+  );
 }
 
 export async function creditUsdWalletFromFunding(input: {

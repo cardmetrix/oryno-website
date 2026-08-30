@@ -17,7 +17,13 @@ export function bettingBaseUrl() {
 }
 
 export function isBettingDemoForced() {
-  const flag = (process.env.BETTING_DEMO || "").trim().toLowerCase();
+  const flag = (
+    process.env.BETTING_DEMO ||
+    process.env.VTU_AFRICA_DEMO ||
+    ""
+  )
+    .trim()
+    .toLowerCase();
   return flag === "true" || flag === "1" || flag === "yes";
 }
 
@@ -139,12 +145,20 @@ export async function verifyBettingCustomer(input: {
   const customerId = normalizeBettingCustomerId(input.customerId);
 
   if (isBettingDemoMode(input.countryCode)) {
-    const demo = demoVerifyName(customerId);
+    if (!isBettingLiveCountry(input.countryCode)) {
+      return {
+        ok: false,
+        demo: false,
+        customerName: null,
+        message: "Live betting is only available in Nigeria.",
+      };
+    }
     return {
-      ok: demo.ok,
-      demo: true,
-      customerName: demo.name,
-      message: demo.message,
+      ok: false,
+      demo: false,
+      customerName: null,
+      message:
+        "Betting is not configured for live use. Set VTU_AFRICA_API_KEY and BETTING_DEMO=false.",
     };
   }
 
@@ -197,29 +211,12 @@ export async function fundBettingAccount(input: {
   const customerId = normalizeBettingCustomerId(input.customerId);
 
   if (isBettingDemoMode(input.countryCode)) {
-    if (shouldDemoFundFail(customerId)) {
-      return {
-        ok: false,
-        demo: true,
-        reference: input.reference,
-        message: "Demo provider declined this funding (99999999)",
-      };
+    if (!isBettingLiveCountry(input.countryCode)) {
+      throw new Error("Live betting funding is only available in Nigeria.");
     }
-    const verified = demoVerifyName(customerId);
-    if (!verified.ok) {
-      return {
-        ok: false,
-        demo: true,
-        reference: input.reference,
-        message: verified.message || "Invalid betting account ID",
-      };
-    }
-    return {
-      ok: true,
-      demo: true,
-      reference: `DEMO-BET-${input.reference.slice(-10)}`,
-      message: "Demo betting wallet funded",
-    };
+    throw new Error(
+      "Betting is not configured for live purchases. Set VTU_AFRICA_API_KEY and BETTING_DEMO=false.",
+    );
   }
 
   const params = new URLSearchParams({

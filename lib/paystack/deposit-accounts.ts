@@ -178,8 +178,9 @@ async function createPaystackDepositAccount(user: typeof users.$inferSelect) {
     return existing;
   } catch (error) {
     console.error("[paystack-dva-create]", error);
-    // Test accounts / unfinished compliance often fail — fall back to demo DVA
-    return createDemoDepositAccount(user);
+    throw error instanceof Error
+      ? error
+      : new Error("Failed to create Paystack deposit account");
   }
 }
 
@@ -189,15 +190,26 @@ export async function getOrCreateDepositAccount(userId: string) {
   });
   if (!user) throw new Error("User not found");
 
+  if (!hasPaystackKeys()) {
+    throw new Error(
+      "Paystack is not configured for live deposit accounts. Set PAYSTACK_SECRET_KEY.",
+    );
+  }
+
   const existing = await db.query.userDepositAccounts.findFirst({
     where: eq(userDepositAccounts.userId, userId),
   });
-  if (existing) return toDto(existing);
+  if (existing) {
+    if (existing.provider === "paystack_demo") {
+      await db
+        .delete(userDepositAccounts)
+        .where(eq(userDepositAccounts.id, existing.id));
+    } else {
+      return toDto(existing);
+    }
+  }
 
-  const created = hasPaystackKeys()
-    ? await createPaystackDepositAccount(user)
-    : await createDemoDepositAccount(user);
-
+  const created = await createPaystackDepositAccount(user);
   return toDto(created);
 }
 

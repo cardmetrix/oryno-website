@@ -141,6 +141,15 @@ export async function GET(req: Request) {
         isZaAirtimeOperator(operatorId) && !isIntlDataProductType(productTypeId);
 
       if (zaData || zaAirtime) {
+        if (!isVtpassDemoMode()) {
+          return NextResponse.json(
+            {
+              error:
+                "Live VTpass operators are required for South Africa. Catalog packs are demo-only.",
+            },
+            { status: 400 },
+          );
+        }
         const fx = await getDisplayFx("ZA");
         const plans = zaData
           ? zaDataPlansFor(operatorId!)

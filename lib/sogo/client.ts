@@ -406,40 +406,9 @@ export async function submitSogoGiftCardSell(input: {
   idempotencyKey: string;
 }): Promise<{ data: SogoSellResponse; simulated: boolean }> {
   if (isSogoDemoMode()) {
-    const code = (input.additionalInfo || input.images?.[0]?.filename || "1234")
-      .slice(-4)
-      .toLowerCase();
-    let status = "completed";
-    if (code === "0000") status = "cancelled";
-    else if (code === "9999") status = "pending";
-
-    const rate =
-      FALLBACK_DEMO_RATES_NGN[input.slug] ??
-      FALLBACK_DEMO_RATES_NGN.amazon ??
-      1400;
-    const raw = Math.round(input.cardAmount * rate * 100) / 100;
-    const brand =
-      FALLBACK_GIFT_CARD_CATALOG.find((b) => b.slug === input.slug)?.name ||
-      input.slug;
-
-    const data: SogoSellResponse = {
-      id: `demo-${input.idempotencyKey.slice(0, 8)}`,
-      reference: `DEMOGC${Date.now().toString(36).toUpperCase()}`.slice(0, 20),
-      card_name: `${brand} Gift Card`,
-      card_country: input.cardCountry,
-      card_type: input.cardType,
-      sub_type: input.subType ?? null,
-      card_amount: input.cardAmount,
-      card_currency: input.cardCurrency,
-      payout_amount: {
-        raw,
-        formatted: `NGN ${raw.toLocaleString("en-NG", { minimumFractionDigits: 2 })}`,
-        currency: "NGN",
-      },
-      status,
-      created_at: new Date().toISOString(),
-    };
-    return { data, simulated: true };
+    throw new Error(
+      "Sogo is not configured for live gift-card sales. Set SOGO_SECRET_KEY and ensure SOGO_DEMO is false.",
+    );
   }
 
   const cardAmount = Number.parseFloat(String(input.cardAmount));
