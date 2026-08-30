@@ -9,7 +9,7 @@ const USERNAME_COUNTRY: Record<string, SupportedCountryCode> = {
 };
 
 const EMAIL_COUNTRY: Record<string, SupportedCountryCode> = {
-  "ziecozeno2@gmail.com": "ZA",
+  "ziecozeno2@gmail.com": "KE",
 };
 
 export function countryOverrideForUser(input: {
