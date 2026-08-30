@@ -244,6 +244,16 @@ export function getServicesDirectory(countryCode?: string | null) {
           stats: "Hubtel",
         };
       }
+      if (country.code === "KE") {
+        return {
+          ...item,
+          shortDescription: "DStv, KPLC & Nairobi Water",
+          longDescription:
+            "Pay DStv Kenya, GOtv, StarTimes, Zuku, Kenya Power (KPLC), and Nairobi Water from your wallet.",
+          tags: ["DStv", "KPLC", "Nairobi Water", "Zuku"],
+          stats: "Reloadly",
+        };
+      }
     }
     if (item.id === "gift-cards") {
       return {

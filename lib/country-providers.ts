@@ -66,7 +66,7 @@ export const SERVICE_PROVIDERS: CountryServiceProvider[] = [
   {
     id: "reloadly",
     name: "Reloadly",
-    role: "Gift-card buy in every market; optional airtime/utilities backup",
+    role: "Gift-card buy in every market; Kenya bills via Utilities",
     services: ["gift-cards-buy", "airtime", "data", "bills"],
     countries: ["NG", "GH", "KE", "ZA"],
     signupUrl: "https://www.reloadly.com/signup",
@@ -74,12 +74,20 @@ export const SERVICE_PROVIDERS: CountryServiceProvider[] = [
     apiKeysUrl: "https://www.reloadly.com/developers",
     docsUrl: "https://docs.reloadly.com",
     credentials: [
-      { env: "RELOADLY_CLIENT_ID", label: "Gift Cards client ID" },
-      { env: "RELOADLY_CLIENT_SECRET", label: "Gift Cards client secret" },
+      { env: "RELOADLY_CLIENT_ID", label: "Client ID (Gift Cards + Utilities)" },
+      { env: "RELOADLY_CLIENT_SECRET", label: "Client secret" },
       { env: "RELOADLY_SANDBOX", label: "true for sandbox, false for live" },
+      { env: "RELOADLY_DEMO", label: "true to force demo Kenya bills / gift cards" },
+      { env: "RELOADLY_BILLER_DSTV_KE", label: "Optional DStv Kenya biller ID" },
+      { env: "RELOADLY_BILLER_GOTV_KE", label: "Optional GOtv Kenya biller ID" },
+      { env: "RELOADLY_BILLER_STARTIMES_KE", label: "Optional StarTimes Kenya biller ID" },
+      { env: "RELOADLY_BILLER_ZUKU_KE", label: "Optional Zuku biller ID" },
+      { env: "RELOADLY_BILLER_KPLC_PREPAID", label: "Optional KPLC prepaid biller ID" },
+      { env: "RELOADLY_BILLER_KPLC_POSTPAID", label: "Optional KPLC postpaid biller ID" },
+      { env: "RELOADLY_BILLER_NAIROBI_WATER", label: "Optional Nairobi Water biller ID" },
     ],
     notes:
-      "One Reloadly account covers all 4 countries. Developers → API credentials, then toggle Sandbox / Live. Airtime uses a separate audience (https://topups.reloadly.com) if you enable it later.",
+      "One Reloadly account covers all 4 countries. Developers → API credentials, then toggle Sandbox / Live. Kenya bills use the Utilities product (audience https://utilities.reloadly.com) — enable Utility Payments on the same keys. Gift cards use a different audience. Airtime uses https://topups.reloadly.com if you enable it later.",
   },
   {
     id: "vtu-africa",
@@ -207,7 +215,7 @@ export const BEST_PROVIDER_BY_SERVICE: Record<
   KE: {
     airtime: "vtpass",
     data: "vtpass",
-    bills: "africas-talking",
+    bills: "reloadly",
     betting: "demo",
     "gift-cards-buy": "reloadly",
     "gift-cards-sell": "sogo",

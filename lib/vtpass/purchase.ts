@@ -742,6 +742,20 @@ export async function purchaseBill(input: {
   quantity?: number;
 }) {
   const country = (input.countryCode || "NG").toUpperCase();
+  if (country === "KE") {
+    const { purchaseKenyaBill } = await import("@/lib/reloadly/utilities");
+    return purchaseKenyaBill({
+      userId: input.userId,
+      countryCode: input.countryCode,
+      serviceID: input.serviceID,
+      serviceName: input.serviceName,
+      category: input.category,
+      customerRef: input.customerRef,
+      phone: input.phone,
+      amount: input.amount,
+      variationCode: input.variationCode,
+    });
+  }
   if (country === "GH") {
     const { purchaseHubtelBill } = await import("@/lib/hubtel");
     return purchaseHubtelBill({
@@ -757,7 +771,7 @@ export async function purchaseBill(input: {
     });
   }
   if (input.category === "water") {
-    throw Object.assign(new Error("Water bills are available for Ghana accounts"), {
+    throw Object.assign(new Error("Water bills are available for Ghana and Kenya accounts"), {
       status: 400,
     });
   }

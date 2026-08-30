@@ -30,6 +30,38 @@ export async function POST(req: Request) {
       );
     }
 
+    if ((user.countryCode || "NG") === "KE") {
+      const {
+        verifyKenyaBillCustomer,
+        isKenyaBillsDemoMode,
+        kenyaBillErrorToEnglish,
+      } = await import("@/lib/reloadly/utilities");
+      const result = await verifyKenyaBillCustomer({
+        serviceID: body.serviceID,
+        customerRef: body.billersCode.trim(),
+        variationCode: body.type,
+      });
+      if (!result.ok) {
+        return NextResponse.json(
+          {
+            error: kenyaBillErrorToEnglish(
+              result.message || "Could not verify that account",
+            ),
+          },
+          { status: 422 },
+        );
+      }
+      return NextResponse.json({
+        ok: true,
+        demo: isKenyaBillsDemoMode(),
+        customerName: result.customerName,
+        customerAddress: result.customerAddress,
+        meterNumber: body.billersCode,
+        currentBouquet: result.currentBouquet,
+        renewalAmount: result.renewalAmount,
+      });
+    }
+
     if ((user.countryCode || "NG") === "GH") {
       const { verifyHubtelCustomer, isHubtelDemoMode, hubtelErrorToEnglish } =
         await import("@/lib/hubtel");

@@ -36,6 +36,37 @@ export async function GET(req: Request) {
       | "water-bill"
       | null;
 
+    if ((user.countryCode || "NG") === "KE") {
+      const {
+        findKenyaBillService,
+        listKenyaVariations,
+        listKenyaReloadlyBillers,
+        isKenyaBillsDemoMode,
+      } = await import("@/lib/reloadly/utilities");
+      const service = findKenyaBillService(serviceID);
+      if (service) {
+        const billers = await listKenyaReloadlyBillers(service.category);
+        const live = listKenyaVariations(serviceID, billers);
+        return NextResponse.json({
+          ok: true,
+          demo: isKenyaBillsDemoMode(),
+          provider: "reloadly-utilities",
+          countryCode: "KE",
+          currency: "KES",
+          serviceID,
+          serviceName: live.serviceName,
+          variations: live.variations.map((v) => ({
+            variationCode: v.variationCode,
+            name: v.name,
+            amount: v.amount,
+            listAmount: v.amount,
+            priceOverride: false,
+            fixedPrice: v.fixedPrice,
+          })),
+        });
+      }
+    }
+
     if ((user.countryCode || "NG") === "GH") {
       const {
         findHubtelBillService,

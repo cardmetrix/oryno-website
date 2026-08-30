@@ -13,6 +13,7 @@ export type VtpassServiceOption = {
   imageFallbacks?: string[] | null;
   minAmount?: number;
   maxAmount?: number;
+  customerLabel?: string;
 };
 
 type Props = {

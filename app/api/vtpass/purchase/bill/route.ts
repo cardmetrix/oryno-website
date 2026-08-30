@@ -5,6 +5,7 @@ import { formatCountryMoney } from "@/lib/country";
 import { getDisplayFx } from "@/lib/display-currency";
 import { convertNgnToLocal } from "@/lib/fx/rates";
 import { hubtelHttpStatus } from "@/lib/hubtel";
+import { kenyaBillHttpStatus } from "@/lib/reloadly/utilities";
 import { purchaseBill } from "@/lib/vtpass";
 import { sogoHttpStatus } from "@/lib/sogo/errors";
 import { publicServiceError } from "@/lib/service-errors";
@@ -102,7 +103,7 @@ export async function POST(req: Request) {
           error instanceof Error ? error.message : "Bill payment failed",
         ),
       },
-      { status: hubtelHttpStatus(error) || sogoHttpStatus(error) },
+      { status: kenyaBillHttpStatus(error) || hubtelHttpStatus(error) || sogoHttpStatus(error) },
     );
   }
 }

@@ -34,12 +34,17 @@ type Variation = {
 
 const NG_PRESETS = ["1000", "2000", "5000", "10000"];
 const GH_PRESETS = ["20", "50", "100", "200", "500"];
+const KE_PRESETS = ["200", "500", "1000", "2000", "5000"];
 
 export default function BillsPage() {
   const { country, formatServiceMoney } = useCountry();
   const isNigeria = (country?.code || "NG") === "NG";
   const isGhana = (country?.code || "NG") === "GH";
-  const billsLive = isNigeria || isGhana;
+  const isKenya = (country?.code || "NG") === "KE";
+  const localCurrencyBills = isGhana || isKenya;
+  const billsLive = isNigeria || localCurrencyBills;
+  const hasWaterTab = isGhana || isKenya;
+  const minBillAmount = isKenya ? 50 : isGhana ? 1 : 100;
 
   const [category, setCategory] = useState<BillCategory>("tv");
   const [services, setServices] = useState<VtpassServiceOption[]>([]);
@@ -49,7 +54,7 @@ export default function BillsPage() {
   const [loadingPlans, setLoadingPlans] = useState(false);
   const [variationCode, setVariationCode] = useState("");
   const [customerRef, setCustomerRef] = useState("");
-  const [amount, setAmount] = useState(isGhana ? "50" : "2000");
+  const [amount, setAmount] = useState(isKenya ? "500" : isGhana ? "50" : "2000");
   const [verifying, setVerifying] = useState(false);
   const [customerName, setCustomerName] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -73,7 +78,7 @@ export default function BillsPage() {
   const canSubmit = useMemo(() => {
     return (
       Boolean(serviceID && variationCode && customerRef.trim().length >= 6) &&
-      amountNumber >= (isGhana ? 1 : 100) &&
+      amountNumber >= minBillAmount &&
       !submitting &&
       billsLive
     );
@@ -83,7 +88,7 @@ export default function BillsPage() {
     customerRef,
     amountNumber,
     submitting,
-    isGhana,
+    minBillAmount,
     billsLive,
   ]);
 
@@ -176,7 +181,7 @@ export default function BillsPage() {
           billersCode: customerRef.trim(),
           serviceID,
           category,
-          type: category === "electricity" ? variationCode : undefined,
+          type: variationCode || undefined,
         }),
       });
       const data = await res.json();
@@ -224,14 +229,24 @@ export default function BillsPage() {
   }
 
   const money = (n: number) =>
-    isGhana ? formatCountryMoney(n, "GH") : formatServiceMoney(n);
-  const amountPresets = isGhana ? GH_PRESETS : NG_PRESETS;
+    isKenya
+      ? formatCountryMoney(n, "KE")
+      : isGhana
+        ? formatCountryMoney(n, "GH")
+        : formatServiceMoney(n);
+  const amountPresets = isKenya ? KE_PRESETS : isGhana ? GH_PRESETS : NG_PRESETS;
+  const billsSubtitle = isKenya
+    ? "DStv, KPLC & Nairobi Water"
+    : isGhana
+      ? "DStv, ECG & Ghana Water"
+      : "TV subscriptions & electricity";
   const customerLabel =
-    category === "tv"
+    selectedService?.customerLabel ||
+    (category === "tv"
       ? "Smartcard / IUC"
       : category === "water"
         ? "Account number"
-        : "Meter number";
+        : "Meter number");
 
   if (!billsLive) {
     return (
@@ -247,11 +262,9 @@ export default function BillsPage() {
             {country.name} bills coming next
           </h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            {country.code === "GH"
-              ? "Ghana TV and electricity will go live on Hubtel (ECG, DStv Ghana, Ghana Water). Airtime and data already work for Ghana."
-              : country.code === "KE"
-                ? "Kenya bills will use Africa's Talking / Reloadly utilities. Airtime and data already work for Kenya."
-                : "South Africa bills will use Reloadly utilities. Airtime and data already work for South Africa."}
+            {country.code === "ZA"
+              ? "South Africa bills will use Reloadly utilities. Airtime and data already work for South Africa."
+              : `${country.name} bills will go live next. Airtime and data already work.`}
           </p>
           <a href="/services/airtime" className="btn-primary mt-6 inline-flex h-12 items-center px-6">
             Buy airtime instead
@@ -265,11 +278,7 @@ export default function BillsPage() {
     <AppShell hideNav>
       <PageHeader
         title="Bill Payments"
-        subtitle={
-          isGhana
-            ? "DStv, ECG & Ghana Water"
-            : "TV subscriptions & electricity"
-        }
+        subtitle={billsSubtitle}
         backHref="/services"
       />
 
@@ -308,13 +317,13 @@ export default function BillsPage() {
             <MotionSection className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6">
               <div className={cn(
                 "grid gap-2 rounded-[14px] bg-muted/70 p-1",
-                isGhana ? "grid-cols-3" : "grid-cols-2",
+                hasWaterTab ? "grid-cols-3" : "grid-cols-2",
               )}>
                 {(
                   [
                     { id: "tv" as const, label: "TV", icon: Tv },
                     { id: "electricity" as const, label: "Electricity", icon: Zap },
-                    ...(isGhana
+                    ...(hasWaterTab
                       ? [{ id: "water" as const, label: "Water", icon: Droplets }]
                       : []),
                   ] as const
@@ -357,7 +366,7 @@ export default function BillsPage() {
                   ? "TV providers"
                   : category === "water"
                     ? "Water"
-                    : isGhana
+                    : localCurrencyBills
                       ? "Electricity"
                       : "Electricity discos"}
               </h2>
@@ -369,20 +378,26 @@ export default function BillsPage() {
                       ? "Select TV provider"
                       : category === "water"
                         ? "Select water utility"
-                        : isGhana
+                        : localCurrencyBills
                           ? "Select electricity provider"
                           : "Select electricity disco"
                   }
                   subtitle={
                     category === "tv"
-                      ? isGhana
-                        ? "DStv, GOtv, StarTimes"
-                        : "DSTV, GOtv, Startimes & more"
-                      : category === "water"
-                        ? "Ghana Water Company"
+                      ? isKenya
+                        ? "DStv, GOtv, StarTimes, Zuku"
                         : isGhana
-                          ? "ECG prepaid & postpaid"
-                          : "Prepaid & postpaid discos"
+                          ? "DStv, GOtv, StarTimes"
+                          : "DSTV, GOtv, Startimes & more"
+                      : category === "water"
+                        ? isKenya
+                          ? "Nairobi Water"
+                          : "Ghana Water Company"
+                        : isKenya
+                          ? "KPLC prepaid & postpaid"
+                          : isGhana
+                            ? "ECG prepaid & postpaid"
+                            : "Prepaid & postpaid discos"
                   }
                   hint="Tap to choose a provider"
                   value={serviceID}
@@ -491,7 +506,7 @@ export default function BillsPage() {
                   <label className="mb-2 block text-sm font-medium">Amount</label>
                   <input
                     type="number"
-                    min={isGhana ? 1 : 100}
+                    min={minBillAmount}
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     className="h-12 w-full rounded-[14px] border border-border bg-background px-4 text-sm outline-none focus:border-primary"
