@@ -28,7 +28,7 @@
   --muted: var(--oryno-gray-light);
   --muted-foreground: var(--oryno-gray-medium);
   --border: var(--oryno-gray-divider);
-  --primary: var(--oryno-orange);
+  --primary: #ff6a00;
   --primary-foreground: var(--oryno-white);
   --secondary: var(--oryno-white);
   --secondary-foreground: var(--oryno-orange);
@@ -39,7 +39,7 @@
   --input: var(--oryno-gray-divider);
   --destructive: var(--oryno-error);
   --destructive-foreground: var(--oryno-white);
-  --ring: var(--oryno-orange);
+  --ring: #ff6a00;
   --app-shell-gradient: linear-gradient(
     180deg,
     var(--background) 0%,
@@ -115,6 +115,8 @@
   --muted: #17171b;
   --muted-foreground: #a1a1aa;
   --border: #2a2a2e;
+  --primary: #ff6a00;
+  --primary-foreground: #ffffff;
   --secondary: #17171b;
   --secondary-foreground: var(--oryno-orange-soft);
   --accent: #1c1c1f;
@@ -122,6 +124,7 @@
   --popover: #141416;
   --popover-foreground: #f4f4f5;
   --input: #2a2a2e;
+  --ring: #ff6a00;
 
   --oryno-shadow-soft: 0 4px 16px rgba(0, 0, 0, 0.28);
   --oryno-shadow-md: 0 8px 24px rgba(0, 0, 0, 0.36);
@@ -162,8 +165,8 @@
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-border: var(--border);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: #ff6a00;
+  --color-primary-foreground: #ffffff;
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-accent: var(--accent);
