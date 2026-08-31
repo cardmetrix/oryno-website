@@ -18,6 +18,7 @@ import { HistoryEmpty } from "@/components/app/history-states";
 import { MotionSection } from "@/components/app/motion-section";
 import { TransactionRow } from "@/components/app/transaction-row";
 import { WalletCard } from "@/components/app/wallet-card";
+import { ServiceActionCard } from "@/components/app/service-action-card";
 import { GiftCardIcon } from "@/components/icons/gift-card-icon";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { AppTransaction } from "@/lib/transactions";
@@ -87,32 +88,16 @@ export default function DashboardPage() {
               </Link>
             </div>
 
-            <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
-              {quickActions.map((action, index) => {
-                const Icon = action.icon;
-                return (
-                  <motion.div
-                    key={action.label}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.12 + index * 0.03 }}
-                    whileHover={{ y: -4 }}
-                    whileTap={{ scale: 0.96 }}
-                  >
-                    <Link
-                      href={action.href}
-                      className="group flex flex-col items-center gap-2 rounded-[18px] border border-transparent bg-muted/60 px-1.5 py-3 transition-all hover:border-primary/20 hover:bg-oryno-orange-muted hover:shadow-[var(--shadow-soft)] sm:px-2 sm:py-3.5"
-                    >
-                      <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-background text-primary shadow-[var(--shadow-soft)] transition-transform group-hover:scale-110 group-hover:bg-primary group-hover:text-white sm:h-12 sm:w-12">
-                        <Icon className="h-5 w-5" strokeWidth={1.75} />
-                      </span>
-                      <span className="text-center text-[11px] font-semibold text-foreground sm:text-xs">
-                        {action.label}
-                      </span>
-                    </Link>
-                  </motion.div>
-                );
-              })}
+            <div className="grid grid-cols-3 gap-3 sm:grid-cols-3 sm:gap-4">
+              {quickActions.map((action, index) => (
+                <ServiceActionCard
+                  key={action.label}
+                  href={action.href}
+                  label={action.label}
+                  icon={action.icon}
+                  index={index}
+                />
+              ))}
             </div>
           </MotionSection>
         </div>

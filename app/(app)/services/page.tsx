@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
@@ -24,6 +23,7 @@ import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
 import { ServicesSkeleton } from "@/components/app/services-skeleton";
+import { ServiceActionCard } from "@/components/app/service-action-card";
 import { useCountry } from "@/components/providers/country-provider";
 import {
   filterServices,
@@ -225,40 +225,13 @@ function ServiceCard({
   item: ServiceDirectoryItem;
   index: number;
 }) {
-  const Icon = item.icon;
-
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 16, scale: 0.94 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{
-        delay: Math.min(index * 0.045, 0.35),
-        duration: 0.4,
-        ease: [0.22, 1, 0.36, 1],
-      }}
-      whileHover={{ y: -4, scale: 1.02 }}
-      whileTap={{ scale: 0.97 }}
-      className="h-full"
-    >
-      <Link
-        href={item.href}
-        className="group flex h-full flex-col items-center justify-center gap-2.5 px-1 py-2 text-center sm:gap-3 sm:py-3"
-      >
-        <motion.span
-          className="flex h-14 w-14 items-center justify-center rounded-full text-white shadow-[0_10px_22px_rgba(0,0,0,0.16)] ring-1 ring-white/20 sm:h-16 sm:w-16"
-          style={{
-            background: `linear-gradient(145deg, ${item.accent}, #e85d00)`,
-          }}
-          whileHover={{ rotate: [-2, 2, 0] }}
-          transition={{ duration: 0.45 }}
-        >
-          <Icon className="h-6 w-6 sm:h-7 sm:w-7" strokeWidth={1.75} />
-        </motion.span>
-
-        <p className="text-[13px] leading-tight font-bold tracking-tight text-foreground sm:text-sm">
-          {item.label}
-        </p>
-      </Link>
-    </motion.div>
+    <ServiceActionCard
+      href={item.href}
+      label={item.label}
+      icon={item.icon}
+      index={index}
+      accent={item.accent}
+    />
   );
 }
