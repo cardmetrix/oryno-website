@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  Activity,
   Mail,
   Phone,
   Search,
@@ -40,6 +41,7 @@ const ICON_MAP: Record<string, LucideIcon | typeof GiftCardIcon> = {
   social: TrendingUp,
   "virtual-numbers": Phone,
   emails: Mail,
+  "gift-cards-live": Activity,
   "gift-cards": GiftCardIcon,
 };
 

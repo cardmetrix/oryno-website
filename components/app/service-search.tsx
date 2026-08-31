@@ -10,6 +10,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import {
+  Activity,
   Mail,
   Phone,
   Search,
@@ -39,7 +40,7 @@ const ICON_MAP: Record<string, LucideIcon | typeof GiftCardIcon> = {
   "virtual-numbers": Phone,
   emails: Mail,
   "gift-cards": GiftCardIcon,
-  "gift-cards-live": GiftCardIcon,
+  "gift-cards-live": Activity,
 };
 
 type ApiService = Omit<ServiceDirectoryItem, "icon"> & {

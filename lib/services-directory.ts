@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import {
+  Activity,
   Mail,
   Phone,
   Smartphone,
@@ -163,7 +164,7 @@ export const servicesDirectory: ServiceDirectoryItem[] = [
     eta: "Live rates",
     accent: "#FF6A00",
     popular: true,
-    icon: GiftCardIcon,
+    icon: Activity,
     stats: "Live board",
   },
   {

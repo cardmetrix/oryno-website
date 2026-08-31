@@ -96,12 +96,7 @@ export function TransactionRow({
             <p className="truncate text-sm font-semibold text-foreground">
               {transaction.title}
             </p>
-            <p
-              className={cn(
-                "shrink-0 text-sm font-bold tabular-nums",
-                credit ? "text-oryno-success" : "text-foreground",
-              )}
-            >
+            <p className="shrink-0 text-sm font-bold tabular-nums text-foreground">
               {transaction.amount}
             </p>
           </div>
