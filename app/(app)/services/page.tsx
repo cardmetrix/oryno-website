@@ -22,7 +22,6 @@ import { AdCarousel } from "@/components/app/ad-carousel";
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
-import { ServiceInstructions } from "@/components/app/service-instructions";
 import { ServicesSkeleton } from "@/components/app/services-skeleton";
 import { useCountry } from "@/components/providers/country-provider";
 import {
@@ -108,53 +107,48 @@ export default function ServicesPage() {
         <ServicesSkeleton />
       ) : (
         <>
-          <MotionSection className="overflow-hidden rounded-[28px] border border-border bg-background shadow-[var(--shadow-soft)]">
-            <div className="relative overflow-hidden bg-gradient-to-br from-[#ff8124] via-oryno-orange to-[#e85d00] px-5 py-5 text-white sm:px-6 sm:py-6">
+          <MotionSection className="overflow-hidden rounded-[20px] border border-border bg-background shadow-[var(--shadow-soft)]">
+            <div className="relative overflow-hidden bg-gradient-to-br from-[#ff8124] via-oryno-orange to-[#e85d00] px-3.5 py-2.5 text-white sm:px-4 sm:py-3">
               <div
                 aria-hidden="true"
-                className="pointer-events-none absolute -top-10 -right-8 h-36 w-36 rounded-full bg-white/15 blur-2xl"
+                className="pointer-events-none absolute -top-8 -right-6 h-24 w-24 rounded-full bg-white/15 blur-2xl"
               />
-              <div className="relative flex items-start justify-between gap-3">
-                <div>
-                  <p className="inline-flex items-center gap-1.5 text-[11px] font-bold tracking-[0.16em] text-white/80 uppercase">
-                  
-                    Catalog
+              <div className="relative flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold tracking-[0.12em] text-white/75 uppercase">
+                    Catalog · {services.length} services
                   </p>
-                  <h2 className="mt-1 text-xl font-bold tracking-tight sm:text-2xl">
-                    {services.length} services ready
-                  </h2>
-                  <p className="mt-1 max-w-md text-sm text-white/85">
-                    Airtime, data, bills, betting, boosting, numbers — search or
-                    filter to jump in fast.
+                  <p className="truncate text-xs text-white/85">
+                    Airtime, data, bills, betting, boosting, numbers
                   </p>
                 </div>
-                <span className="rounded-full bg-black/20 px-2.5 py-1 text-[11px] font-bold text-[#ffd29a] ring-1 ring-white/20">
+                <span className="shrink-0 rounded-full bg-black/20 px-2 py-0.5 text-[10px] font-bold text-[#ffd29a] ring-1 ring-white/20">
                   {popularCount} popular
                 </span>
               </div>
             </div>
 
-            <div className="p-4 sm:p-5">
+            <div className="p-3 sm:p-3.5">
               <div className="relative">
-                <Search className="pointer-events-none absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search airtime, Bet9ja, DStv, Instagram…"
-                  className="h-12 w-full rounded-[16px] border border-border bg-muted/40 pr-4 pl-10 text-sm outline-none transition focus:border-primary focus:bg-background focus:ring-2 focus:ring-primary/15"
+                  placeholder="Search airtime, Bet9ja, DStv…"
+                  className="h-9 w-full rounded-[12px] border border-border bg-muted/40 pr-3 pl-9 text-sm outline-none transition focus:border-primary focus:bg-background focus:ring-2 focus:ring-primary/15"
                 />
               </div>
 
-              <div className="mt-3.5 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div className="mt-2 flex gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {serviceCategories.map((item) => (
                   <button
                     key={item}
                     type="button"
                     onClick={() => setCategory(item)}
                     className={cn(
-                      "shrink-0 rounded-full px-3.5 py-2 text-xs font-semibold transition sm:text-sm",
+                      "shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold transition sm:text-xs",
                       category === item
-                        ? "bg-oryno-charcoal text-white shadow-[var(--shadow-soft)]"
+                        ? "bg-oryno-charcoal text-white"
                         : "bg-muted text-muted-foreground hover:bg-oryno-orange-muted hover:text-primary",
                     )}
                   >
@@ -165,7 +159,7 @@ export default function ServicesPage() {
             </div>
           </MotionSection>
 
-          <div className="mt-5 sm:mt-6">
+          <div className="mt-3 sm:mt-4">
             <AnimatePresence mode="wait">
               {visible.length === 0 ? (
                 <motion.div
