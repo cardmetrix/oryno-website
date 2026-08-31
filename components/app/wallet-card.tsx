@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowUpRight, Eye, EyeOff, Plus } from "lucide-react";
 import { WalletCardSkeleton } from "@/components/app/wallet-skeleton";
+import { WalletBalanceAmount } from "@/components/app/wallet-balance-amount";
 import { BRAND_LOGO_SRC } from "@/components/brand-logo";
 import { useCountry } from "@/components/providers/country-provider";
 import type { WalletPayload } from "@/lib/wallet-types";
@@ -57,9 +58,11 @@ export function WalletCard({
   }
 
   const balance =
-    balanceProp ?? payload?.primary.balanceFormatted ?? "₦0.00";
+    balanceProp ?? payload?.primary.balance ?? "0";
+  const balanceCurrency =
+    payload?.primary.currency ?? currencyCode;
   const walletLabel =
-    currency ?? `${payload?.primary.currency ?? currencyCode} Wallet`;
+    currency ?? `${balanceCurrency} Wallet`;
 
   return (
     <div className={cn("space-y-3", className)}>
@@ -105,7 +108,7 @@ export function WalletCard({
                     Available balance
                   </p>
                   <AnimatePresence mode="wait">
-                    <motion.p
+                    <motion.div
                       key={hidden ? "hidden" : balance}
                       initial={{ opacity: 0, y: 6, filter: "blur(4px)" }}
                       animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
@@ -113,8 +116,13 @@ export function WalletCard({
                       transition={{ duration: 0.22 }}
                       className="mt-0.5 truncate text-xl font-bold tracking-tight text-white sm:text-2xl"
                     >
-                      {hidden ? "••••••••" : balance}
-                    </motion.p>
+                      <WalletBalanceAmount
+                        balance={balance}
+                        currency={balanceCurrency}
+                        countryCode={country.code}
+                        hidden={hidden}
+                      />
+                    </motion.div>
                   </AnimatePresence>
                 </div>
 

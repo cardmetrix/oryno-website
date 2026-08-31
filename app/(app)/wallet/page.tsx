@@ -26,6 +26,7 @@ import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
 import { UsdWalletActionsPanel, UsdWalletCard, type UsdPanel } from "@/components/app/usd-wallet-card";
 import { WalletSkeleton } from "@/components/app/wallet-skeleton";
+import { WalletBalanceAmount } from "@/components/app/wallet-balance-amount";
 import type { BankOption, WalletPayload } from "@/lib/wallet-types";
 import { cn } from "@/lib/utils";
 
@@ -389,15 +390,20 @@ function WalletPageContent() {
                           Primary · {currency}
                         </p>
                         <AnimatePresence mode="wait">
-                          <motion.p
-                            key={hidden ? "h" : data.primary.balanceFormatted}
+                          <motion.div
+                            key={hidden ? "h" : data.primary.balance}
                             initial={{ opacity: 0, y: 8, filter: "blur(4px)" }}
                             animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
                             exit={{ opacity: 0, y: -6 }}
                             className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl"
                           >
-                            {hidden ? "••••••••" : data.primary.balanceFormatted}
-                          </motion.p>
+                            <WalletBalanceAmount
+                              balance={data.primary.balance}
+                              currency={data.primary.currency}
+                              countryCode={data.user.countryCode}
+                              hidden={hidden}
+                            />
+                          </motion.div>
                         </AnimatePresence>
                         <p className="mt-1.5 text-sm text-white/85">
                          {data.user.countryCode} wallet
