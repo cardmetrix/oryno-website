@@ -297,16 +297,6 @@ function WalletPageContent() {
   const usdBalance = Number(
     data?.usd?.balance ?? data?.totals.usdBalance ?? 0,
   );
-  const symbol =
-    currency === "NGN"
-      ? "₦"
-      : currency === "GHS"
-        ? "GH₵"
-        : currency === "KES"
-          ? "KSh"
-          : currency === "ZAR"
-            ? "R"
-            : `${currency} `;
 
   return (
     <AppShell>
@@ -317,7 +307,7 @@ function WalletPageContent() {
         actions={
           <Link
             href="/history"
-            className="inline-flex h-10 items-center justify-center rounded-[14px] bg-primary px-3.5 text-sm font-bold text-white shadow-[var(--shadow-orange)] transition hover:bg-primary/90"
+            className="inline-flex h-10 items-center justify-center  px-3.5 text-sm font-bold text-primary "
             aria-label="Transaction history"
           >
             <History className="mr-1.5 h-4 w-4" strokeWidth={1.75} />
@@ -546,9 +536,14 @@ function WalletPageContent() {
               {[
                 {
                   label: "Balance",
-                  value: hidden
-                    ? "••••"
-                    : `${symbol}${Number(data.totals.balance).toLocaleString("en-NG", { maximumFractionDigits: 0 })}`,
+                  value: (
+                    <WalletBalanceAmount
+                      balance={data.primary.balance}
+                      currency={data.primary.currency}
+                      countryCode={data.user.countryCode}
+                      hidden={hidden}
+                    />
+                  ),
                   icon: Wallet,
                 },
                 {
@@ -633,9 +628,14 @@ function WalletPageContent() {
               {[
                 {
                   label: "Balance",
-                  value: hidden
-                    ? "••••"
-                    : `${symbol}${Number(data.totals.balance).toLocaleString("en-NG", { maximumFractionDigits: 0 })}`,
+                  value: (
+                    <WalletBalanceAmount
+                      balance={data.primary.balance}
+                      currency={data.primary.currency}
+                      countryCode={data.user.countryCode}
+                      hidden={hidden}
+                    />
+                  ),
                   icon: Wallet,
                 },
                 {
