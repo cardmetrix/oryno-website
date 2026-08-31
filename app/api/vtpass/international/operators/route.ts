@@ -96,6 +96,9 @@ export async function GET(req: Request) {
 
     if (isVtpassDemoMode()) {
       operators = demoIntlOperators(iso, productTypeId);
+    } else if (iso === "KE" && isIntlDataProductType(productTypeId)) {
+      // VTpass live KE data only exposes flexible top-up — use bundle catalog.
+      operators = keOperators(productTypeId);
     } else {
       try {
         operators = await getIntlAirtimeOperators(code, productTypeId);
@@ -108,9 +111,6 @@ export async function GET(req: Request) {
       // ZA airtime: keep local networks when VTpass returns none (flexible amount UX).
       if (!operators.length && iso === "ZA" && !isIntlDataProductType(productTypeId)) {
         operators = zaOperators(productTypeId);
-      }
-      if (!operators.length && iso === "KE" && isIntlDataProductType(productTypeId)) {
-        operators = keOperators(productTypeId);
       }
     }
 

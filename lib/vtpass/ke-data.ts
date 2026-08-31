@@ -82,3 +82,26 @@ export function keDataOperatorName(operatorId?: string | null) {
   const id = (operatorId || "").trim().toLowerCase();
   return KE_DATA_OPERATORS.find((o) => o.operator_id === id)?.name ?? null;
 }
+
+/** Map a live VTpass operator id/name to a catalog network when possible. */
+export function resolveKeDataOperatorId(input?: {
+  operatorId?: string | null;
+  operatorName?: string | null;
+}) {
+  const rawId = (input?.operatorId || "").trim().toLowerCase();
+  if (isKeDataOperator(rawId)) return rawId;
+
+  const hay = `${input?.operatorName || ""} ${rawId}`.toLowerCase();
+  if (/safaricom/.test(hay)) return "ke-safaricom";
+  if (/airtel/.test(hay)) return "ke-airtel";
+  if (/telkom|jamii/.test(hay)) return "ke-telkom";
+  return null;
+}
+
+export function keDataOperatorForPlan(variationCode: string) {
+  const key = variationCode.trim().toLowerCase();
+  for (const [operatorId, plans] of Object.entries(KE_DATA_PLANS)) {
+    if (plans.some((p) => p.variation_code === key)) return operatorId;
+  }
+  return null;
+}

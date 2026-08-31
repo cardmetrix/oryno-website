@@ -13,11 +13,47 @@ import {
   isZaAirtimeOperator,
   isZaDataOperator,
   keDataPlansFor,
+  resolveKeDataOperatorId,
   zaAirtimePacksFor,
   zaDataPlansFor,
 } from "@/lib/vtpass";
 
 export const runtime = "nodejs";
+
+async function keDataCatalogResponse(serviceID: string, operatorId: string) {
+  const fx = await getDisplayFx("KE");
+  const plans = keDataPlansFor(operatorId);
+  const priced = await Promise.all(
+    plans.map(async (p) => {
+      const base = convertLocalToNgn(p.kes, fx.localToNgn);
+      const result = await priceLocalAmount({
+        provider: "vtpass",
+        serviceKey: `foreign-airtime:${p.variation_code}`,
+        amount: base,
+      });
+      return {
+        variationCode: p.variation_code,
+        name: p.name,
+        amount: result.local,
+        listAmount: result.listLocal,
+        priceOverride: result.overrideApplied,
+        fixedPrice: true,
+        variationAmount: String(base),
+        chargedAmount: base,
+      };
+    }),
+  );
+  return NextResponse.json({
+    ok: true,
+    demo: isVtpassDemoMode(),
+    provider: "vtpass",
+    countryCode: "KE",
+    currency: "KES",
+    serviceID,
+    serviceName: operatorId,
+    variations: priced,
+  });
+}
 
 export async function GET(req: Request) {
   try {
@@ -137,46 +173,20 @@ export async function GET(req: Request) {
 
     // International airtime/data still uses VTpass
     if (serviceID === "foreign-airtime" || operatorId || productTypeId) {
+      const userCountry = (user.countryCode || "NG").toUpperCase();
       const zaData =
         isZaDataOperator(operatorId) && isIntlDataProductType(productTypeId);
-      const keData =
-        isKeDataOperator(operatorId) && isIntlDataProductType(productTypeId);
+      const keCatalogId =
+        isKeDataOperator(operatorId)
+          ? operatorId!
+          : userCountry === "KE" && isIntlDataProductType(productTypeId)
+            ? resolveKeDataOperatorId({ operatorId })
+            : null;
       const zaAirtime =
         isZaAirtimeOperator(operatorId) && !isIntlDataProductType(productTypeId);
 
-      if (keData) {
-        const fx = await getDisplayFx("KE");
-        const plans = keDataPlansFor(operatorId!);
-        const priced = await Promise.all(
-          plans.map(async (p) => {
-            const base = convertLocalToNgn(p.kes, fx.localToNgn);
-            const result = await priceLocalAmount({
-              provider: "vtpass",
-              serviceKey: `foreign-airtime:${p.variation_code}`,
-              amount: base,
-            });
-            return {
-              variationCode: p.variation_code,
-              name: p.name,
-              amount: result.local,
-              listAmount: result.listLocal,
-              priceOverride: result.overrideApplied,
-              fixedPrice: true,
-              variationAmount: String(base),
-              chargedAmount: base,
-            };
-          }),
-        );
-        return NextResponse.json({
-          ok: true,
-          demo: isVtpassDemoMode(),
-          provider: "vtpass",
-          countryCode: "KE",
-          currency: "KES",
-          serviceID,
-          serviceName: operatorId,
-          variations: priced,
-        });
+      if (keCatalogId && isIntlDataProductType(productTypeId)) {
+        return keDataCatalogResponse(serviceID, keCatalogId);
       }
 
       if (zaData || zaAirtime) {
@@ -266,6 +276,26 @@ export async function GET(req: Request) {
           };
         }),
       );
+
+      const onlyFlexible =
+        priced.length > 0 &&
+        priced.every(
+          (v) =>
+            !v.fixedPrice || /flexible|enter amount|enter flexible/i.test(v.name),
+        );
+      if (
+        userCountry === "KE" &&
+        isIntlDataProductType(productTypeId) &&
+        onlyFlexible
+      ) {
+        const mapped = resolveKeDataOperatorId({
+          operatorId,
+          operatorName: serviceName,
+        });
+        if (mapped) {
+          return keDataCatalogResponse(serviceID, mapped);
+        }
+      }
 
       return NextResponse.json({
         ok: true,

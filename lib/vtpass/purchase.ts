@@ -53,7 +53,7 @@ import {
 import {
   zaAirtimeOperatorName,
 } from "./za-airtime";
-import { findKeDataPlan, keDataOperatorName } from "./ke-data";
+import { findKeDataPlan, keDataOperatorForPlan, keDataOperatorName, resolveKeDataOperatorId } from "./ke-data";
 import { findZaDataPlan } from "./za-data";
 import type { VtpassPayPayload, VtpassPayResponse } from "./types";
 
@@ -729,8 +729,12 @@ export async function purchaseData(input: {
     const fx = await getDisplayFx(input.countryCode || input.countryIso || market);
     faceAmount = convertLocalToNgn(kePlan.kes, fx.localToNgn);
     variationName = kePlan.name;
+    const catalogOperator =
+      keDataOperatorForPlan(variationCode!) ||
+      resolveKeDataOperatorId({ operatorId: input.operatorId }) ||
+      input.operatorId;
     operatorId = await resolveIntlAirtimeOperator({
-      operatorId: input.operatorId,
+      operatorId: catalogOperator,
       productTypeId: input.productTypeId,
       countryIso: input.countryIso || market,
     });
