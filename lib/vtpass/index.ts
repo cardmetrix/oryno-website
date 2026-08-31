@@ -3,6 +3,7 @@ export * from "./catalog";
 export * from "./types";
 export * from "./purchase";
 export * from "./za-data";
+export * from "./ke-data";
 export * from "./za-airtime";
 export * from "./intl-airtime";
 export * from "./intl-data";

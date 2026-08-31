@@ -5,6 +5,7 @@ import {
   getIntlAirtimeOperators,
   isIntlDataProductType,
   isVtpassDemoMode,
+  KE_DATA_OPERATORS,
   ZA_AIRTIME_OPERATORS,
   ZA_DATA_OPERATORS,
 } from "@/lib/vtpass";
@@ -32,6 +33,16 @@ const GH_OPERATORS = [
   },
 ];
 
+function keOperators(productTypeId: string) {
+  if (!isIntlDataProductType(productTypeId)) return [];
+  return KE_DATA_OPERATORS.map((op) => ({
+    operator_id: op.operator_id,
+    name: op.name,
+    operator_image: op.operator_image,
+    domain: op.domain,
+  }));
+}
+
 function zaOperators(productTypeId: string) {
   const list = isIntlDataProductType(productTypeId)
     ? ZA_DATA_OPERATORS
@@ -46,6 +57,7 @@ function zaOperators(productTypeId: string) {
 
 function demoIntlOperators(code: string, productTypeId: string) {
   if (code === "GH") return GH_OPERATORS;
+  if (code === "KE") return keOperators(productTypeId);
   if (code === "ZA") return zaOperators(productTypeId);
   return [
     {
@@ -96,6 +108,9 @@ export async function GET(req: Request) {
       // ZA airtime: keep local networks when VTpass returns none (flexible amount UX).
       if (!operators.length && iso === "ZA" && !isIntlDataProductType(productTypeId)) {
         operators = zaOperators(productTypeId);
+      }
+      if (!operators.length && iso === "KE" && isIntlDataProductType(productTypeId)) {
+        operators = keOperators(productTypeId);
       }
     }
 

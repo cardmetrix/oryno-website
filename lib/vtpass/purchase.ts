@@ -53,6 +53,7 @@ import {
 import {
   zaAirtimeOperatorName,
 } from "./za-airtime";
+import { findKeDataPlan, keDataOperatorName } from "./ke-data";
 import { findZaDataPlan } from "./za-data";
 import type { VtpassPayPayload, VtpassPayResponse } from "./types";
 
@@ -380,15 +381,24 @@ async function resolveIntlAirtimeOperator(input: {
 }) {
   const raw = String(input.operatorId || "").trim();
   if (!raw) throw new Error("Select a network");
-  if (!raw.startsWith("za-")) return raw;
+  if (!raw.startsWith("za-") && !raw.startsWith("ke-")) return raw;
 
-  const label = zaAirtimeOperatorName(raw);
+  const label =
+    raw.startsWith("ke-")
+      ? keDataOperatorName(raw)
+      : zaAirtimeOperatorName(raw);
   if (!label) {
-    throw new Error("Unknown South Africa network");
+    throw new Error(
+      raw.startsWith("ke-")
+        ? "Unknown Kenya network"
+        : "Unknown South Africa network",
+    );
   }
 
+  const country =
+    input.countryIso || (raw.startsWith("ke-") ? "KE" : "ZA");
   const live = await getIntlAirtimeOperators(
-    input.countryIso || "ZA",
+    country,
     input.productTypeId ?? 1,
   );
   const needle = label.toLowerCase();
@@ -398,7 +408,7 @@ async function resolveIntlAirtimeOperator(input: {
   });
   if (!match) {
     throw new Error(
-      `${label} airtime is not available from the live provider right now. Try again later.`,
+      `${label} is not available from the live provider right now. Try again later.`,
     );
   }
   return String(match.operator_id);
@@ -713,7 +723,24 @@ export async function purchaseData(input: {
       "South Africa data requires a live VTpass network. Refresh and select a live operator.",
     );
   }
-  if (!flexibleIntl) {
+
+  const kePlan = findKeDataPlan(variationCode!);
+  if (kePlan) {
+    const fx = await getDisplayFx(input.countryCode || input.countryIso || market);
+    faceAmount = convertLocalToNgn(kePlan.kes, fx.localToNgn);
+    variationName = kePlan.name;
+    operatorId = await resolveIntlAirtimeOperator({
+      operatorId: input.operatorId,
+      productTypeId: input.productTypeId,
+      countryIso: input.countryIso || market,
+    });
+    const liveCode = await resolveFlexibleIntlVariation({
+      operatorId: operatorId!,
+      productTypeId: input.productTypeId,
+      localAmount: kePlan.kes,
+    });
+    if (liveCode) variationCode = liveCode;
+  } else if (!flexibleIntl) {
     faceAmount = await lookupVariationFace({
       serviceID: "foreign-airtime",
       variationCode,
@@ -721,6 +748,13 @@ export async function purchaseData(input: {
       operatorId: input.operatorId,
       productTypeId: input.productTypeId,
     });
+    if (input.operatorId?.startsWith("ke-")) {
+      operatorId = await resolveIntlAirtimeOperator({
+        operatorId: input.operatorId,
+        productTypeId: input.productTypeId,
+        countryIso: input.countryIso || market,
+      });
+    }
   }
   const priced = await resolveVtpassRetail({
     serviceID: input.serviceID,

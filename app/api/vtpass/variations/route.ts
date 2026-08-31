@@ -8,9 +8,11 @@ import {
   fallbackVariationsFor,
   getVtpassVariations,
   isIntlDataProductType,
+  isKeDataOperator,
   isVtpassDemoMode,
   isZaAirtimeOperator,
   isZaDataOperator,
+  keDataPlansFor,
   zaAirtimePacksFor,
   zaDataPlansFor,
 } from "@/lib/vtpass";
@@ -137,8 +139,45 @@ export async function GET(req: Request) {
     if (serviceID === "foreign-airtime" || operatorId || productTypeId) {
       const zaData =
         isZaDataOperator(operatorId) && isIntlDataProductType(productTypeId);
+      const keData =
+        isKeDataOperator(operatorId) && isIntlDataProductType(productTypeId);
       const zaAirtime =
         isZaAirtimeOperator(operatorId) && !isIntlDataProductType(productTypeId);
+
+      if (keData) {
+        const fx = await getDisplayFx("KE");
+        const plans = keDataPlansFor(operatorId!);
+        const priced = await Promise.all(
+          plans.map(async (p) => {
+            const base = convertLocalToNgn(p.kes, fx.localToNgn);
+            const result = await priceLocalAmount({
+              provider: "vtpass",
+              serviceKey: `foreign-airtime:${p.variation_code}`,
+              amount: base,
+            });
+            return {
+              variationCode: p.variation_code,
+              name: p.name,
+              amount: result.local,
+              listAmount: result.listLocal,
+              priceOverride: result.overrideApplied,
+              fixedPrice: true,
+              variationAmount: String(base),
+              chargedAmount: base,
+            };
+          }),
+        );
+        return NextResponse.json({
+          ok: true,
+          demo: isVtpassDemoMode(),
+          provider: "vtpass",
+          countryCode: "KE",
+          currency: "KES",
+          serviceID,
+          serviceName: operatorId,
+          variations: priced,
+        });
+      }
 
       if (zaData || zaAirtime) {
         if (!isVtpassDemoMode()) {
