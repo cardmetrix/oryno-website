@@ -27,8 +27,18 @@ import { PageHeader } from "@/components/app/page-header";
 import { UsdWalletActionsPanel, UsdWalletCard, type UsdPanel } from "@/components/app/usd-wallet-card";
 import { WalletSkeleton } from "@/components/app/wallet-skeleton";
 import { WalletBalanceAmount } from "@/components/app/wallet-balance-amount";
-import type { BankOption, WalletPayload } from "@/lib/wallet-types";
+import type { BankAccountSummary, BankOption, WalletPayload } from "@/lib/wallet-types";
 import { cn } from "@/lib/utils";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const DEFAULT_ACCOUNT_RULES = {
   min: 10,
@@ -76,6 +86,7 @@ function WalletPageContent() {
   const [nameEditable, setNameEditable] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
   const [bankError, setBankError] = useState<string | null>(null);
+  const [removingBankId, setRemovingBankId] = useState<string | null>(null);
   /** Mobile wallet pager: only one currency card is in view at a time */
   const [walletView, setWalletView] = useState<"local" | "usd">("local");
   const [usdPanel, setUsdPanel] = useState<UsdPanel>("fund");
@@ -286,10 +297,48 @@ function WalletPageContent() {
   }
 
   async function removeAccount(id: string) {
-    await fetch(`/api/wallet/banks?id=${encodeURIComponent(id)}`, {
-      method: "DELETE",
-    });
-    await load({ soft: true });
+    setRemovingBankId(id);
+    setBankError(null);
+    try {
+      const res = await fetch(`/api/wallet/banks?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+      const json = (await res.json()) as {
+        error?: string;
+        banks?: BankAccountSummary[];
+      };
+      if (!res.ok) {
+        throw new Error(json.error || "Failed to remove bank account");
+      }
+
+      if (json.banks) {
+        setData((current) =>
+          current
+            ? {
+                ...current,
+                banks: json.banks!,
+                totals: {
+                  ...current.totals,
+                  bankCount: json.banks!.length,
+                },
+              }
+            : current,
+        );
+      } else {
+        await load({ soft: true });
+      }
+
+      setFlash("Bank account removed");
+      window.setTimeout(() => setFlash(null), 2200);
+      toast.success("Bank account removed");
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to remove bank account";
+      setBankError(message);
+      toast.error(message);
+    } finally {
+      setRemovingBankId(null);
+    }
   }
 
   const currency = data?.totals.currency ?? "NGN";
@@ -602,6 +651,7 @@ function WalletPageContent() {
                 onAddAccount={onAddAccount}
                 setPrimary={setPrimary}
                 removeAccount={removeAccount}
+                removingBankId={removingBankId}
                 className="h-full"
               />
               <UsdWalletActionsPanel
@@ -694,6 +744,7 @@ function WalletPageContent() {
                 onAddAccount={onAddAccount}
                 setPrimary={setPrimary}
                 removeAccount={removeAccount}
+                removingBankId={removingBankId}
               />
             </div>
           </div>
@@ -723,6 +774,7 @@ function BankAccountsSection({
   onAddAccount,
   setPrimary,
   removeAccount,
+  removingBankId,
   className,
 }: {
   data: WalletPayload;
@@ -744,8 +796,12 @@ function BankAccountsSection({
   onAddAccount: (e: FormEvent) => void | Promise<void>;
   setPrimary: (id: string) => void | Promise<void>;
   removeAccount: (id: string) => void | Promise<void>;
+  removingBankId: string | null;
   className?: string;
 }) {
+  const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
+  const accountToRemove = data.banks.find((b) => b.id === confirmRemoveId);
+
   return (
     <MotionSection
       delay={0.1}
@@ -940,11 +996,16 @@ function BankAccountsSection({
                 ) : null}
                 <button
                   type="button"
-                  onClick={() => void removeAccount(account.id)}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-[10px] bg-muted text-muted-foreground transition hover:bg-destructive/10 hover:text-[var(--oryno-error)]"
-                  aria-label="Remove bank account"
+                  onClick={() => setConfirmRemoveId(account.id)}
+                  disabled={removingBankId === account.id}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-[10px] bg-muted text-muted-foreground transition hover:bg-destructive/10 hover:text-[var(--oryno-error)] disabled:opacity-50"
+                  aria-label={`Remove ${account.bankName} account`}
                 >
-                  <Trash2 className="h-3.5 w-3.5" />
+                  {removingBankId === account.id ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-3.5 w-3.5" />
+                  )}
                 </button>
               </div>
             </div>
@@ -969,6 +1030,42 @@ function BankAccountsSection({
           </div>
         ) : null}
       </div>
+
+      <AlertDialog
+        open={Boolean(confirmRemoveId)}
+        onOpenChange={(open) => {
+          if (!open && !removingBankId) setConfirmRemoveId(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove bank account?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {accountToRemove
+                ? `This will remove ${accountToRemove.bankName} · ${accountToRemove.maskedNumber || accountToRemove.accountNumber} from your payout accounts.`
+                : "This bank account will be removed from your payout accounts."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={Boolean(removingBankId)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={Boolean(removingBankId)}
+              className="bg-destructive text-white hover:bg-destructive/90"
+              onClick={(e) => {
+                e.preventDefault();
+                if (!confirmRemoveId) return;
+                void Promise.resolve(removeAccount(confirmRemoveId)).finally(() => {
+                  setConfirmRemoveId(null);
+                });
+              }}
+            >
+              {removingBankId ? "Removing…" : "Remove account"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </MotionSection>
   );
 }
