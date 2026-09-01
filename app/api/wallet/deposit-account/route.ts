@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
 import { ensureWalletSchema } from "@/lib/db/ensure-schema";
-import { getWalletFundOptions } from "@/lib/flutterwave/deposit-accounts";
+import {
+  getWalletFundOptions,
+  saveDepositIdentity,
+} from "@/lib/flutterwave/deposit-accounts";
 
 export const runtime = "nodejs";
 
@@ -14,6 +17,13 @@ export async function GET() {
     }
 
     const options = await getWalletFundOptions(user);
+    if (!options.account && options.error) {
+      return NextResponse.json(
+        { error: options.error, ...options },
+        { status: 500 },
+      );
+    }
+
     return NextResponse.json(options);
   } catch (error) {
     console.error("[deposit-account-get]", error);
@@ -29,7 +39,7 @@ export async function GET() {
   }
 }
 
-export async function POST() {
+export async function POST(req: Request) {
   try {
     await ensureWalletSchema();
     const user = await ensureAppUser();
@@ -37,7 +47,36 @@ export async function POST() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const body = (await req.json().catch(() => ({}))) as {
+      idType?: string;
+      idNumber?: string;
+    };
+
+    const idType = body.idType?.trim().toUpperCase();
+    if (idType === "BVN" || idType === "NIN") {
+      if (!body.idNumber?.trim()) {
+        return NextResponse.json(
+          { error: `${idType} is required.` },
+          { status: 400 },
+        );
+      }
+      await saveDepositIdentity(user.id, {
+        idType,
+        idNumber: body.idNumber,
+      });
+    }
+
     const options = await getWalletFundOptions(user);
+    if (!options.account && options.identityRequired) {
+      return NextResponse.json(
+        {
+          error: options.identityRequired.message,
+          ...options,
+        },
+        { status: 400 },
+      );
+    }
+
     return NextResponse.json({
       ok: true,
       ...options,

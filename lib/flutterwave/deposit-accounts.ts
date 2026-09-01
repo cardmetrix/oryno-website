@@ -1,13 +1,19 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
-  kycSubmissions,
   transactions,
   userDepositAccounts,
   users,
   walletFundings,
   wallets,
 } from "@/lib/db/schema";
+import {
+  buildDepositIdentityRequired,
+  getUserDepositIdentity,
+  nigerianDepositIdentityRequired,
+  saveDepositIdentity,
+  type DepositIdentityRequired,
+} from "@/lib/flutterwave/deposit-identity";
 import { createNotification } from "@/lib/notifications-service";
 import {
   currencyForCountry,
@@ -111,36 +117,10 @@ async function createDemoDepositAccount(user: typeof users.$inferSelect) {
 }
 
 async function identityForVirtualAccount(user: typeof users.$inferSelect) {
-  const rows = await db.query.kycSubmissions.findMany({
-    where: and(
-      eq(kycSubmissions.userId, user.id),
-      eq(kycSubmissions.status, "verified"),
-    ),
-  });
-
-  let bvn: string | undefined;
-  let nin: string | undefined;
-  for (const row of rows) {
-    const type = (row.idType || "").toLowerCase();
-    const number = (row.idNumber || "").replace(/\D/g, "");
-    if (!number) continue;
-    if (type.includes("bvn") && number.length === 11) bvn = number;
-    if (
-      (type.includes("nin") || type.includes("national")) &&
-      number.length === 11
-    ) {
-      nin = number;
-    }
-    if (!bvn && number.length === 11) bvn = number;
-  }
-
-  const envBvn = process.env.FLUTTERWAVE_DVA_BVN?.replace(/\D/g, "");
-  const envNin = process.env.FLUTTERWAVE_DVA_NIN?.replace(/\D/g, "");
-  if (!bvn && envBvn?.length === 11) bvn = envBvn;
-  if (!nin && envNin?.length === 11) nin = envNin;
-
-  return { bvn, nin };
+  return getUserDepositIdentity(user.id);
 }
+
+export { saveDepositIdentity, type DepositIdentityRequired };
 
 type FlutterwaveVirtualAccount = {
   id?: number | string;
@@ -249,6 +229,11 @@ async function createFlutterwaveDepositAccount(
     if (identity.bvn) payload.bvn = identity.bvn;
     else if (identity.nin) payload.nin = identity.nin;
     else if (isFlutterwaveDemoMode()) payload.bvn = "22222222280";
+    else {
+      throw new Error(
+        "Add your BVN or NIN to get a dedicated account number.",
+      );
+    }
     const bankCode = process.env.FLUTTERWAVE_DVA_BANK_CODE?.trim();
     if (bankCode) payload.bank_code = bankCode;
   }
@@ -501,7 +486,45 @@ export async function getWalletFundOptions(user: typeof users.$inferSelect) {
   const presets = fundPresetsForCountry(countryCode);
   const demoMode = isFlutterwaveDemoMode();
 
-  const account = await getOrCreateDepositAccount(user.id);
+  const existing = await db.query.userDepositAccounts.findFirst({
+    where: eq(userDepositAccounts.userId, user.id),
+  });
+
+  const hasLiveAccount =
+    existing?.accountNumber &&
+    !isDemoProvider(existing.provider) &&
+    (existing.provider === "flutterwave" || existing.provider === "paystack");
+
+  let identityRequired: DepositIdentityRequired | null = null;
+  let account: DepositAccountDto | null = null;
+  let loadError: string | null = null;
+
+  if (hasLiveAccount) {
+    account = toDto(existing);
+  } else if (
+    nigerianDepositIdentityRequired(countryCode) &&
+    flutterwaveSupportsVirtualAccount(countryCode) &&
+    hasFlutterwaveKeys()
+  ) {
+    const identity = await getUserDepositIdentity(user.id);
+    if (!identity.bvn && !identity.nin) {
+      identityRequired = await buildDepositIdentityRequired(user);
+    }
+  }
+
+  if (!account && !identityRequired) {
+    try {
+      account = await getOrCreateDepositAccount(user.id);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Could not load deposit account";
+      if (/bvn|nin/i.test(message)) {
+        identityRequired = await buildDepositIdentityRequired(user);
+      } else {
+        loadError = message;
+      }
+    }
+  }
 
   return {
     method: "dva" as WalletFundMethod,
@@ -511,6 +534,8 @@ export async function getWalletFundOptions(user: typeof users.$inferSelect) {
     currency,
     presets,
     account,
+    identityRequired,
+    error: loadError,
     demoMode,
   };
 }

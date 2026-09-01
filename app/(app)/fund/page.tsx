@@ -1,13 +1,15 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Check, Copy, Loader2, RefreshCw } from "lucide-react";
+import { Check, Copy, Loader2, RefreshCw, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
+import { AuthField, authInputClassName } from "@/components/auth/auth-field";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { WalletSummary } from "@/lib/wallet-types";
 import { cn } from "@/lib/utils";
@@ -23,6 +25,15 @@ type DepositAccount = {
   status: string;
   demoMode: boolean;
   instructions: string;
+};
+
+type IdentityRequired = {
+  required: true;
+  idTypes: Array<"BVN" | "NIN">;
+  message: string;
+  kycStatus: string;
+  kycLevel: number;
+  hasPendingKyc: boolean;
 };
 
 export default function FundPage() {
@@ -47,10 +58,15 @@ function FundPageContent() {
   const router = useRouter();
   const [wallet, setWallet] = useState<WalletSummary | null>(null);
   const [deposit, setDeposit] = useState<DepositAccount | null>(null);
+  const [identityRequired, setIdentityRequired] =
+    useState<IdentityRequired | null>(null);
   const [loading, setLoading] = useState(true);
   const [checking, setChecking] = useState(false);
+  const [submittingIdentity, setSubmittingIdentity] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<"number" | "name" | null>(null);
+  const [idType, setIdType] = useState<"BVN" | "NIN">("BVN");
+  const [idNumber, setIdNumber] = useState("");
   const lastBalanceRef = useRef<string | null>(null);
   const redirectedRef = useRef(false);
 
@@ -118,18 +134,21 @@ function FundPageContent() {
         setWallet(json.primary);
       }
 
+      const json = (await depositRes.json().catch(() => ({}))) as {
+        account?: DepositAccount | null;
+        identityRequired?: IdentityRequired | null;
+        error?: string;
+      };
+
       if (depositRes.ok) {
-        const json = (await depositRes.json()) as {
-          account?: DepositAccount | null;
-        };
         setDeposit(json.account ?? null);
-        if (!json.account) {
+        setIdentityRequired(json.identityRequired ?? null);
+        if (!json.account && !json.identityRequired) {
           setError("Could not load your dedicated account. Try refresh.");
         }
       } else {
-        const json = (await depositRes.json().catch(() => ({}))) as {
-          error?: string;
-        };
+        setDeposit(json.account ?? null);
+        setIdentityRequired(json.identityRequired ?? null);
         setError(json.error || "Could not load your dedicated account");
       }
     } catch {
@@ -173,6 +192,45 @@ function FundPageContent() {
     setChecking(false);
   }
 
+  async function onSubmitIdentity(event: React.FormEvent) {
+    event.preventDefault();
+    const digits = idNumber.replace(/\D/g, "");
+    if (digits.length !== 11) {
+      setError(`${idType} must be exactly 11 digits.`);
+      return;
+    }
+
+    setSubmittingIdentity(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/wallet/deposit-account", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idType, idNumber: digits }),
+      });
+      const json = (await res.json().catch(() => ({}))) as {
+        account?: DepositAccount | null;
+        identityRequired?: IdentityRequired | null;
+        error?: string;
+      };
+
+      if (json.account) {
+        setDeposit(json.account);
+        setIdentityRequired(null);
+        setIdNumber("");
+        toast.success("Your fund account is ready");
+        return;
+      }
+
+      setIdentityRequired(json.identityRequired ?? null);
+      setError(json.error || "Could not create your fund account. Try again.");
+    } catch {
+      setError("Could not save your details. Try again.");
+    } finally {
+      setSubmittingIdentity(false);
+    }
+  }
+
   return (
     <AppShell hideNav>
       <PageHeader
@@ -208,54 +266,148 @@ function FundPageContent() {
             </MotionSection>
           ) : null}
 
-          <MotionSection
-            delay={0.04}
-            className="rounded-[22px] border border-border bg-background p-5 shadow-[var(--shadow-soft)]"
-          >
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <h2 className="text-base font-semibold text-foreground">
-                Bank details
-              </h2>
-              <button
-                type="button"
-                onClick={() => {
-                  void load();
-                  void refreshWallet();
-                }}
-                className="inline-flex items-center gap-1 text-xs font-semibold text-primary"
-              >
-                <RefreshCw className="h-3.5 w-3.5" />
-                Refresh
-              </button>
-            </div>
-
-            {deposit ? (
-              <div className="space-y-3 rounded-[18px] bg-muted/40 p-4">
-                <DetailRow label="Bank" value={deposit.bankName} />
-                <DetailRow
-                  label="Account name"
-                  value={deposit.accountName}
-                  onCopy={() => void copyText(deposit.accountName, "name")}
-                  copied={copied === "name"}
-                />
-                <DetailRow
-                  label="Account number"
-                  value={deposit.accountNumber}
-                  mono
-                  emphasize
-                  onCopy={() => void copyText(deposit.accountNumber, "number")}
-                  copied={copied === "number"}
-                />
-                <p className="text-xs leading-relaxed text-muted-foreground">
-                  {deposit.instructions}
-                </p>
+          {identityRequired ? (
+            <MotionSection
+              delay={0.04}
+              className="rounded-[22px] border border-border bg-background p-5 shadow-[var(--shadow-soft)]"
+            >
+              <div className="mb-4 flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <ShieldCheck className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-semibold text-foreground">
+                    Verify to get your account number
+                  </h2>
+                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                    {identityRequired.message}
+                  </p>
+                </div>
               </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Deposit account unavailable. Try refresh.
+
+              <form onSubmit={(event) => void onSubmitIdentity(event)}>
+                <div className="mb-4 flex gap-2">
+                  {identityRequired.idTypes.map((type) => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => {
+                        setIdType(type);
+                        setError(null);
+                      }}
+                      className={cn(
+                        "flex-1 rounded-full px-3 py-2 text-sm font-semibold transition-colors",
+                        idType === type
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted text-muted-foreground",
+                      )}
+                    >
+                      {type}
+                    </button>
+                  ))}
+                </div>
+
+                <AuthField
+                  label={idType === "BVN" ? "Bank Verification Number" : "National ID Number"}
+                >
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    maxLength={11}
+                    value={idNumber}
+                    onChange={(event) => {
+                      setIdNumber(event.target.value.replace(/\D/g, ""));
+                      setError(null);
+                    }}
+                    placeholder={`11-digit ${idType}`}
+                    className={authInputClassName}
+                  />
+                </AuthField>
+
+                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                  We use your {idType} only to create your personal fund account.
+                  It must match your name on ORYNO.
+                </p>
+
+                <button
+                  type="submit"
+                  disabled={submittingIdentity || idNumber.length !== 11}
+                  className="btn-primary mt-5 inline-flex h-12 w-full items-center justify-center gap-2 text-base disabled:opacity-50"
+                >
+                  {submittingIdentity ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Creating account…
+                    </>
+                  ) : (
+                    "Get my account number"
+                  )}
+                </button>
+              </form>
+
+              <p className="mt-4 text-center text-xs text-muted-foreground">
+                Already started verification?{" "}
+                <Link
+                  href="/settings/kyc"
+                  className="font-semibold text-primary underline-offset-2 hover:underline"
+                >
+                  View KYC status
+                </Link>
               </p>
-            )}
-          </MotionSection>
+            </MotionSection>
+          ) : (
+            <MotionSection
+              delay={0.04}
+              className="rounded-[22px] border border-border bg-background p-5 shadow-[var(--shadow-soft)]"
+            >
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <h2 className="text-base font-semibold text-foreground">
+                  Bank details
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void load();
+                    void refreshWallet();
+                  }}
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-primary"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  Refresh
+                </button>
+              </div>
+
+              {deposit ? (
+                <div className="space-y-3 rounded-[18px] bg-muted/40 p-4">
+                  <DetailRow label="Bank" value={deposit.bankName} />
+                  <DetailRow
+                    label="Account name"
+                    value={deposit.accountName}
+                    onCopy={() => void copyText(deposit.accountName, "name")}
+                    copied={copied === "name"}
+                  />
+                  <DetailRow
+                    label="Account number"
+                    value={deposit.accountNumber}
+                    mono
+                    emphasize
+                    onCopy={() =>
+                      void copyText(deposit.accountNumber, "number")
+                    }
+                    copied={copied === "number"}
+                  />
+                  <p className="text-xs leading-relaxed text-muted-foreground">
+                    {deposit.instructions}
+                  </p>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Deposit account unavailable. Try refresh.
+                </p>
+              )}
+            </MotionSection>
+          )}
 
           {deposit ? (
             <MotionSection delay={0.12} className="mt-5 md:max-w-sm">
