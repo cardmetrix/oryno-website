@@ -172,6 +172,7 @@ export default function HistoryPage() {
             type="button"
             onClick={() => setSheet("statement")}
             disabled={downloading || loading}
+            style={{ color: "#ff6a00" }}
          className="inline-flex h-10 items-center justify-center gap-1.5 px-3.5 text-sm font-bold transition hover:opacity-80"
           >
             {downloading ? (
