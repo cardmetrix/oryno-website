@@ -14,6 +14,7 @@ import {
   saveDepositIdentity,
   type DepositIdentityRequired,
 } from "@/lib/flutterwave/deposit-identity";
+import { notifyWalletFunded } from "@/lib/notify/fund-events";
 import { createNotification } from "@/lib/notifications-service";
 import {
   currencyForCountry,
@@ -453,16 +454,13 @@ export async function creditWalletFromDeposit(input: {
   const fx = await getDisplayFx(paidCountry);
 
   try {
-    await createNotification({
+    await notifyWalletFunded({
       userId: input.userId,
-      title: "Wallet funded",
-      body: `${amountFormatted} received. Ref ${input.reference}`,
-      type: "fund",
-      metadata: {
-        href: "/wallet",
-        fundingId: result.funding.id,
-        transactionId: result.transaction.id,
-      },
+      amountFormatted,
+      reference: input.reference,
+      transactionId: result.transaction.id,
+      fundingId: result.funding.id,
+      href: "/wallet",
     });
   } catch (notifyError) {
     console.error("[flutterwave-deposit-notify]", notifyError);

@@ -84,6 +84,7 @@ export async function createNotification(input: CreateNotificationInput) {
         body: input.body,
         type: input.type,
         href,
+        metadata: input.metadata ?? null,
         force: input.forceEmail === true,
       }).catch((error) => {
         console.error("[notify-email]", error);

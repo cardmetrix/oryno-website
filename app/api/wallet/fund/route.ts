@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
-import { createNotification } from "@/lib/notifications-service";
+import { notifyWalletFunded } from "@/lib/notify/fund-events";
 import { formatMoney } from "@/lib/transactions";
 import {
   currencyForCountry,
@@ -53,16 +53,13 @@ export async function POST(req: Request) {
     );
 
     try {
-      await createNotification({
+      await notifyWalletFunded({
         userId: user.id,
-        title: "Wallet funded",
-        body: `${amountFormatted} was added to your wallet. Ref ${result.funding.externalRef ?? "—"}`,
-        type: "fund",
-        metadata: {
-          href: "/wallet",
-          fundingId: result.funding.id,
-          transactionId: result.transaction.id,
-        },
+        amountFormatted,
+        reference: result.funding.externalRef ?? result.transaction.id,
+        transactionId: result.transaction.id,
+        fundingId: result.funding.id,
+        href: "/wallet",
       });
     } catch (notifyError) {
       console.error("[wallet-fund-notify]", notifyError);
