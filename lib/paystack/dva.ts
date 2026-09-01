@@ -54,8 +54,9 @@ export async function createPaystackDepositAccount(
   }
 
   const customerCode = await ensurePaystackCustomer(user);
-  const preferredBank =
-    process.env.PAYSTACK_DVA_BANK?.trim() || "wema-bank";
+  const preferredBank = isPaystackDemoMode()
+    ? process.env.PAYSTACK_DVA_BANK?.trim() || "test-bank"
+    : process.env.PAYSTACK_DVA_BANK?.trim() || "wema-bank";
 
   try {
     const created = await paystackFetch<PaystackDedicatedAccount>(

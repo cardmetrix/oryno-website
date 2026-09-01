@@ -65,12 +65,29 @@ export async function flutterwaveFetch<T>(
     cache: "no-store",
   });
 
-  const json = (await res.json()) as FlutterwaveResponse<T>;
+  let json: FlutterwaveResponse<T> & { data?: T & { message?: string } };
+  try {
+    json = (await res.json()) as FlutterwaveResponse<T> & {
+      data?: T & { message?: string };
+    };
+  } catch {
+    throw new Error(`Flutterwave error (${res.status})`);
+  }
   const okStatus =
     String(json.status || "").toLowerCase() === "success" ||
     String(json.status || "").toLowerCase() === "successful";
   if (!res.ok || !okStatus) {
-    throw new Error(json.message || `Flutterwave error (${res.status})`);
+    const nested =
+      json.data && typeof json.data === "object"
+        ? String(
+            (json.data as { message?: string }).message ||
+              (json.data as { response_message?: string }).response_message ||
+              "",
+          ).trim()
+        : "";
+    throw new Error(
+      nested || json.message || `Flutterwave error (${res.status})`,
+    );
   }
   return json;
 }

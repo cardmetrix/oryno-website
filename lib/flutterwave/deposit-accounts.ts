@@ -125,8 +125,13 @@ async function identityForVirtualAccount(user: typeof users.$inferSelect) {
     const number = (row.idNumber || "").replace(/\D/g, "");
     if (!number) continue;
     if (type.includes("bvn") && number.length === 11) bvn = number;
-    if (type.includes("nin") && number.length === 11) nin = number;
-    if (!bvn && row.targetLevel >= 2 && number.length === 11) bvn = number;
+    if (
+      (type.includes("nin") || type.includes("national")) &&
+      number.length === 11
+    ) {
+      nin = number;
+    }
+    if (!bvn && number.length === 11) bvn = number;
   }
 
   const envBvn = process.env.FLUTTERWAVE_DVA_BVN?.replace(/\D/g, "");
@@ -148,6 +153,78 @@ type FlutterwaveVirtualAccount = {
   created_at?: string;
 };
 
+function digitsPhone(phone?: string | null) {
+  const digits = (phone || "").replace(/\D/g, "");
+  if (digits.length >= 10) return digits.slice(-11).padStart(11, "0");
+  return "08100000000";
+}
+
+async function saveDepositAccount(
+  user: typeof users.$inferSelect,
+  values: {
+    provider: string;
+    currency: string;
+    accountNumber: string;
+    accountName: string;
+    bankName: string;
+    bankSlug: string;
+    paystackCustomerCode?: string | null;
+    paystackAccountId?: string | null;
+    metadata?: Record<string, unknown>;
+  },
+) {
+  const existing = await db.query.userDepositAccounts.findFirst({
+    where: eq(userDepositAccounts.userId, user.id),
+  });
+
+  if (existing) {
+    const [updated] = await db
+      .update(userDepositAccounts)
+      .set({
+        provider: values.provider,
+        currency: values.currency,
+        accountNumber: values.accountNumber,
+        accountName: values.accountName,
+        bankName: values.bankName,
+        bankSlug: values.bankSlug,
+        paystackCustomerCode: values.paystackCustomerCode ?? existing.paystackCustomerCode,
+        paystackAccountId: values.paystackAccountId ?? existing.paystackAccountId,
+        status: "active",
+        metadata: values.metadata ?? existing.metadata,
+        updatedAt: new Date(),
+      })
+      .where(eq(userDepositAccounts.id, existing.id))
+      .returning();
+    return updated ?? existing;
+  }
+
+  const [created] = await db
+    .insert(userDepositAccounts)
+    .values({
+      userId: user.id,
+      provider: values.provider,
+      currency: values.currency,
+      accountNumber: values.accountNumber,
+      accountName: values.accountName,
+      bankName: values.bankName,
+      bankSlug: values.bankSlug,
+      paystackCustomerCode: values.paystackCustomerCode,
+      paystackAccountId: values.paystackAccountId,
+      status: "active",
+      metadata: values.metadata,
+    })
+    .onConflictDoNothing()
+    .returning();
+
+  if (created) return created;
+
+  const row = await db.query.userDepositAccounts.findFirst({
+    where: eq(userDepositAccounts.userId, user.id),
+  });
+  if (!row) throw new Error("Unable to save deposit account");
+  return row;
+}
+
 async function createFlutterwaveDepositAccount(
   user: typeof users.$inferSelect,
 ) {
@@ -155,14 +232,15 @@ async function createFlutterwaveDepositAccount(
   const currency = currencyForCountry(country);
   const firstName = user.fullName.split(" ")[0] || "ORYNO";
   const lastName = user.fullName.split(" ").slice(1).join(" ") || "User";
+  const txRef = vaReferenceForUser(user.id);
   const payload: Record<string, unknown> = {
     email: user.email,
     is_permanent: true,
-    tx_ref: vaReferenceForUser(user.id),
-    narration: user.fullName.slice(0, 35) || "ORYNO User",
-    phonenumber: user.phone || undefined,
+    tx_ref: txRef,
+    narration: (user.fullName || "ORYNO User").slice(0, 35),
+    phonenumber: digitsPhone(user.phone),
     firstname: firstName,
-    lastname: lastName,
+    lastname: lastName || "User",
     currency,
   };
 
@@ -170,55 +248,50 @@ async function createFlutterwaveDepositAccount(
     const identity = await identityForVirtualAccount(user);
     if (identity.bvn) payload.bvn = identity.bvn;
     else if (identity.nin) payload.nin = identity.nin;
-    else {
-      throw new Error(
-        "Complete KYC with a verified BVN or NIN to get a dedicated account, or fund with card or mobile money.",
-      );
-    }
+    else if (isFlutterwaveDemoMode()) payload.bvn = "22222222280";
+    const bankCode = process.env.FLUTTERWAVE_DVA_BANK_CODE?.trim();
+    if (bankCode) payload.bank_code = bankCode;
   }
 
-  const created = await flutterwaveFetch<FlutterwaveVirtualAccount>(
-    "/virtual-account-numbers",
-    {
-      method: "POST",
-      body: JSON.stringify(payload),
-    },
-  );
+  let created: { data: FlutterwaveVirtualAccount };
+  try {
+    created = await flutterwaveFetch<FlutterwaveVirtualAccount>(
+      "/virtual-account-numbers",
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/bvn|nin/i.test(message)) {
+      throw new Error(
+        "Complete KYC with your BVN or NIN to get a dedicated account number.",
+      );
+    }
+    throw error instanceof Error ? error : new Error(message);
+  }
 
   const data = created.data;
   if (!data?.account_number) {
     throw new Error("Could not create your dedicated deposit account.");
   }
 
-  const [row] = await db
-    .insert(userDepositAccounts)
-    .values({
-      userId: user.id,
-      provider: "flutterwave",
-      currency,
-      accountNumber: data.account_number,
-      accountName: user.fullName.toUpperCase(),
-      bankName: data.bank_name || "Flutterwave",
-      bankSlug: "flutterwave",
-      paystackCustomerCode: data.order_ref || vaReferenceForUser(user.id),
-      paystackAccountId: String(data.flw_ref || data.id || ""),
-      status: "active",
-      metadata: {
-        mode: isFlutterwaveDemoMode() ? "test" : "live",
-        tx_ref: vaReferenceForUser(user.id),
-        raw: data,
-      },
-    })
-    .onConflictDoNothing()
-    .returning();
-
-  if (row) return row;
-
-  const existing = await db.query.userDepositAccounts.findFirst({
-    where: eq(userDepositAccounts.userId, user.id),
+  return saveDepositAccount(user, {
+    provider: "flutterwave",
+    currency,
+    accountNumber: data.account_number,
+    accountName: user.fullName.toUpperCase(),
+    bankName: data.bank_name || "Flutterwave",
+    bankSlug: "flutterwave",
+    paystackCustomerCode: data.order_ref || txRef,
+    paystackAccountId: String(data.flw_ref || data.id || ""),
+    metadata: {
+      mode: isFlutterwaveDemoMode() ? "test" : "live",
+      tx_ref: txRef,
+      raw: data,
+    },
   });
-  if (!existing) throw new Error("Unable to save Flutterwave deposit account");
-  return existing;
 }
 
 function isDemoProvider(provider: string) {
@@ -236,64 +309,49 @@ export async function getOrCreateDepositAccount(userId: string) {
     where: eq(userDepositAccounts.userId, userId),
   });
 
-  const shouldRecreate =
+  const liveFlutterwave =
     existing &&
-    (isDemoProvider(existing.provider) ||
-      (existing.provider.startsWith("paystack") &&
-        flutterwaveSupportsVirtualAccount(country) &&
-        hasFlutterwaveKeys()));
+    existing.provider === "flutterwave" &&
+    existing.accountNumber &&
+    !isDemoProvider(existing.provider);
 
-  if (existing && !shouldRecreate) {
+  if (liveFlutterwave) {
     return toDto(existing);
   }
 
-  if (existing && shouldRecreate) {
-    await db
-      .delete(userDepositAccounts)
-      .where(eq(userDepositAccounts.id, existing.id));
-  }
+  let lastError: Error | null = null;
 
-  if (flutterwaveSupportsVirtualAccount(country)) {
-    if (!hasFlutterwaveKeys()) {
-      if (hasPaystackKeys()) {
-        const { createPaystackDepositAccount } = await import(
-          "@/lib/paystack/dva"
-        );
-        const created = await createPaystackDepositAccount(user);
-        return toDto(created);
-      }
-      const demo = await createDemoDepositAccount(user);
-      return toDto(demo);
-    }
+  if (flutterwaveSupportsVirtualAccount(country) && hasFlutterwaveKeys()) {
     try {
       const created = await createFlutterwaveDepositAccount(user);
       return toDto(created);
     } catch (error) {
-      console.error("[wallet-fund-flw-dva]", error);
-      if (hasPaystackKeys()) {
-        const { createPaystackDepositAccount } = await import(
-          "@/lib/paystack/dva"
-        );
-        const created = await createPaystackDepositAccount(user);
-        return toDto(created);
-      }
-      throw error instanceof Error
-        ? error
-        : new Error(
-            "Could not create your dedicated account. Use card or mobile money to fund.",
-          );
+      lastError = error instanceof Error ? error : new Error(String(error));
+      console.error("[wallet-fund-flw-dva]", lastError);
     }
   }
 
   if (hasPaystackKeys()) {
-    const { createPaystackDepositAccount } = await import("@/lib/paystack/dva");
-    const created = await createPaystackDepositAccount(user);
-    return toDto(created);
+    try {
+      const { createPaystackDepositAccount } = await import("@/lib/paystack/dva");
+      const created = await createPaystackDepositAccount(user);
+      return toDto(created);
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      console.error("[wallet-fund-paystack-dva]", lastError);
+    }
   }
 
-  throw new Error(
-    "Dedicated bank accounts are not available in your country yet. Use card or mobile money to fund.",
-  );
+  if (existing?.accountNumber) {
+    return toDto(existing);
+  }
+
+  if (!hasFlutterwaveKeys() && !hasPaystackKeys()) {
+    const demo = await createDemoDepositAccount(user);
+    return toDto(demo);
+  }
+
+  throw lastError ?? new Error("Could not create your dedicated deposit account.");
 }
 
 export async function creditWalletFromDeposit(input: {
@@ -442,22 +500,13 @@ export async function getWalletFundOptions(user: typeof users.$inferSelect) {
   const currency = currencyForCountry(countryCode);
   const presets = fundPresetsForCountry(countryCode);
   const demoMode = isFlutterwaveDemoMode();
-  const dvaSupported =
-    flutterwaveSupportsVirtualAccount(countryCode) || hasPaystackKeys();
 
-  let account: DepositAccountDto | null = null;
-  if (dvaSupported) {
-    try {
-      account = await getOrCreateDepositAccount(user.id);
-    } catch (error) {
-      console.error("[wallet-fund-dva]", error);
-    }
-  }
+  const account = await getOrCreateDepositAccount(user.id);
 
   return {
-    method: (account ? "dva" : "checkout") as WalletFundMethod,
-    checkoutAvailable: true,
-    dvaAvailable: Boolean(account),
+    method: "dva" as WalletFundMethod,
+    checkoutAvailable: false,
+    dvaAvailable: true,
     countryCode,
     currency,
     presets,
