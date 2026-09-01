@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Check, Copy, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
@@ -25,24 +25,16 @@ type DepositAccount = {
   instructions: string;
 };
 
-type FundMethod = "dva" | "checkout";
-
-function currencySymbol(currency?: string) {
-  return currency === "GHS"
-    ? "GH₵"
-    : currency === "KES"
-      ? "KSh"
-      : currency === "ZAR"
-        ? "R"
-        : "₦";
-}
-
 export default function FundPage() {
   return (
     <Suspense
       fallback={
         <AppShell hideNav>
-          <PageHeader title="Fund Wallet" subtitle="Add money to your wallet" backHref="/wallet" />
+          <PageHeader
+            title="Fund Wallet"
+            subtitle="Transfer to your dedicated account"
+            backHref="/wallet"
+          />
         </AppShell>
       }
     >
@@ -53,20 +45,14 @@ export default function FundPage() {
 
 function FundPageContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [wallet, setWallet] = useState<WalletSummary | null>(null);
   const [deposit, setDeposit] = useState<DepositAccount | null>(null);
-  const [method, setMethod] = useState<FundMethod>("dva");
-  const [presets, setPresets] = useState<string[]>(["1000", "2000", "5000", "10000"]);
-  const [demoMode, setDemoMode] = useState(true);
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
+  const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<"number" | "name" | null>(null);
-  const [amount, setAmount] = useState("5000");
   const lastBalanceRef = useRef<string | null>(null);
   const redirectedRef = useRef(false);
-  const verifyingRef = useRef(false);
 
   const goToLatestFundReceipt = useCallback(async () => {
     if (redirectedRef.current) return;
@@ -91,7 +77,7 @@ function FundPageContent() {
     }
   }, [router]);
 
-  const refreshWallet = useCallback(async (opts?: { silent?: boolean }) => {
+  const refreshWallet = useCallback(async () => {
     try {
       const res = await fetch("/api/wallet", { cache: "no-store" });
       if (!res.ok) return;
@@ -113,9 +99,7 @@ function FundPageContent() {
       lastBalanceRef.current = next.balance;
       setWallet(next);
     } catch {
-      if (!opts?.silent) {
-        // keep existing balance on soft poll failures
-      }
+      // keep existing balance on soft poll failures
     }
   }, [goToLatestFundReceipt]);
 
@@ -136,30 +120,20 @@ function FundPageContent() {
 
       if (depositRes.ok) {
         const json = (await depositRes.json()) as {
-          method?: FundMethod;
           account?: DepositAccount | null;
-          demoMode?: boolean;
-          presets?: string[];
-          checkoutAvailable?: boolean;
-          dvaAvailable?: boolean;
         };
-        setMethod(json.method === "checkout" ? "checkout" : "dva");
         setDeposit(json.account ?? null);
-        setDemoMode(Boolean(json.demoMode ?? json.account?.demoMode));
-        if (json.presets?.length) {
-          setPresets(json.presets);
-          setAmount((prev) =>
-            json.presets!.includes(prev) ? prev : json.presets![0],
-          );
+        if (!json.account) {
+          setError("Could not load your dedicated account. Try refresh.");
         }
       } else {
         const json = (await depositRes.json().catch(() => ({}))) as {
           error?: string;
         };
-        setError(json.error || "Could not load funding details");
+        setError(json.error || "Could not load your dedicated account");
       }
     } catch {
-      setError("Could not load funding details");
+      setError("Could not load your dedicated account");
     } finally {
       setLoading(false);
     }
@@ -171,58 +145,10 @@ function FundPageContent() {
 
   useEffect(() => {
     const id = window.setInterval(() => {
-      void refreshWallet({ silent: true });
+      void refreshWallet();
     }, 8000);
     return () => window.clearInterval(id);
   }, [refreshWallet]);
-
-  useEffect(() => {
-    const reference =
-      searchParams.get("tx_ref") ||
-      searchParams.get("reference") ||
-      searchParams.get("trxref");
-    const transactionId =
-      searchParams.get("transaction_id") || searchParams.get("transactionId");
-    if ((!reference && !transactionId) || verifyingRef.current) return;
-    verifyingRef.current = true;
-
-    (async () => {
-      try {
-        const res = await fetch("/api/wallet/fund/verify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            reference,
-            transactionId,
-          }),
-        });
-        const json = (await res.json()) as {
-          error?: string;
-          amountFormatted?: string;
-          transactionId?: string;
-          wallet?: WalletSummary;
-        };
-        if (!res.ok) throw new Error(json.error || "Could not verify payment");
-        if (json.wallet) {
-          lastBalanceRef.current = json.wallet.balance;
-          setWallet(json.wallet);
-        }
-        toast.success("Wallet funded", {
-          description: json.amountFormatted,
-        });
-        if (json.transactionId) {
-          redirectedRef.current = true;
-          router.replace(`/history/${json.transactionId}`);
-          return;
-        }
-        await goToLatestFundReceipt();
-      } catch (err) {
-        toast.error(
-          err instanceof Error ? err.message : "Payment verification failed",
-        );
-      }
-    })();
-  }, [searchParams, router, goToLatestFundReceipt]);
 
   async function copyText(value: string, kind: "number" | "name") {
     try {
@@ -237,122 +163,21 @@ function FundPageContent() {
     }
   }
 
-  async function onPayWithCheckout() {
-    const value = Number(amount);
-    if (!Number.isFinite(value) || value <= 0) {
-      setError("Enter a valid amount");
-      return;
-    }
-    setSubmitting(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/wallet/fund/initialize", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          amount: value,
-          callbackUrl: `${window.location.origin}/fund?local_fund=1`,
-        }),
-      });
-      const json = (await res.json()) as {
-        error?: string;
-        mode?: string;
-        authorizationUrl?: string;
-      };
-      if (!res.ok) throw new Error(json.error || "Could not start payment");
-      if (json.authorizationUrl) {
-        window.location.href = json.authorizationUrl;
-        return;
-      }
-      if (json.mode === "demo") {
-        await onSimulate();
-        return;
-      }
-      throw new Error("Online payment is not available");
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Could not start payment";
-      setError(message);
-      toast.error(message);
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  async function onSimulate() {
-    const value = Number(amount);
-    if (!Number.isFinite(value) || value <= 0) {
-      setError("Enter a valid demo amount");
-      return;
-    }
-
-    setSubmitting(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/wallet/fund/simulate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: value }),
-      });
-      const json = (await res.json()) as {
-        error?: string;
-        amountFormatted?: string;
-        wallet?: WalletSummary;
-        reference?: string;
-        transactionId?: string;
-      };
-      if (!res.ok) throw new Error(json.error || "Could not process demo funding");
-
-      if (json.wallet) {
-        lastBalanceRef.current = json.wallet.balance;
-        setWallet(json.wallet);
-      } else {
-        await refreshWallet({ silent: true });
-      }
-
-      if (json.transactionId) {
-        redirectedRef.current = true;
-        router.replace(`/history/${json.transactionId}`);
-        return;
-      }
-
-      toast.success("Demo funding successful", {
-        description: json.amountFormatted ?? "Wallet credited",
-      });
-      await goToLatestFundReceipt();
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Could not process demo funding";
-      setError(message);
-      toast.error(message);
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
   async function onIHaveFunded() {
-    if (!demoMode) {
-      toast.message("Waiting for payment", {
-        description:
-          "Complete the transfer. Your balance updates when payment is confirmed.",
-      });
-      void refreshWallet({ silent: true });
-      return;
-    }
-    await onSimulate();
+    setChecking(true);
+    toast.message("Checking your wallet", {
+      description:
+        "Complete the transfer. Your balance updates when payment is confirmed.",
+    });
+    await refreshWallet();
+    setChecking(false);
   }
-
-  const symbol = currencySymbol(wallet?.currency);
 
   return (
     <AppShell hideNav>
       <PageHeader
         title="Fund Wallet"
-        subtitle={
-          method === "checkout"
-            ? "Pay with card, bank, or mobile money"
-            : "Transfer to your personal ORYNO account number"
-        }
+        subtitle="Transfer to your dedicated account"
         backHref="/wallet"
       />
 
@@ -383,201 +208,71 @@ function FundPageContent() {
             </MotionSection>
           ) : null}
 
-          {deposit ? (
-            <div className="mb-4 grid grid-cols-2 gap-2">
+          <MotionSection
+            delay={0.04}
+            className="rounded-[22px] border border-border bg-background p-5 shadow-[var(--shadow-soft)]"
+          >
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <h2 className="text-base font-semibold text-foreground">
+                Bank details
+              </h2>
               <button
                 type="button"
-                onClick={() => setMethod("dva")}
-                className={cn(
-                  "rounded-[14px] border px-3 py-2.5 text-xs font-semibold",
-                  method === "dva"
-                    ? "border-primary bg-oryno-orange-muted text-primary"
-                    : "border-border text-muted-foreground",
-                )}
+                onClick={() => {
+                  void load();
+                  void refreshWallet();
+                }}
+                className="inline-flex items-center gap-1 text-xs font-semibold text-primary"
               >
-                Bank transfer
-              </button>
-              <button
-                type="button"
-                onClick={() => setMethod("checkout")}
-                className={cn(
-                  "rounded-[14px] border px-3 py-2.5 text-xs font-semibold",
-                  method === "checkout"
-                    ? "border-primary bg-oryno-orange-muted text-primary"
-                    : "border-border text-muted-foreground",
-                )}
-              >
-                Card / MoMo
+                <RefreshCw className="h-3.5 w-3.5" />
+                Refresh
               </button>
             </div>
-          ) : null}
 
-          {method === "dva" ? (
-            <MotionSection
-              delay={0.04}
-              className="rounded-[22px] border border-border bg-background p-5 shadow-[var(--shadow-soft)]"
-            >
-              <div className="mb-3 flex items-center justify-between gap-2">
-                <h2 className="text-base font-semibold text-foreground">
-                  Bank details
-                </h2>
-                <button
-                  type="button"
-                  onClick={() => {
-                    void load();
-                    void refreshWallet({ silent: true });
-                  }}
-                  className="inline-flex items-center gap-1 text-xs font-semibold text-primary"
-                >
-                  <RefreshCw className="h-3.5 w-3.5" />
-                  Refresh
-                </button>
-              </div>
-
-              {deposit ? (
-                <div className="space-y-3 rounded-[18px] bg-muted/40 p-4">
-                  <DetailRow label="Bank" value={deposit.bankName} />
-                  <DetailRow
-                    label="Account name"
-                    value={deposit.accountName}
-                    onCopy={() => void copyText(deposit.accountName, "name")}
-                    copied={copied === "name"}
-                  />
-                  <DetailRow
-                    label="Account number"
-                    value={deposit.accountNumber}
-                    mono
-                    emphasize
-                    onCopy={() => void copyText(deposit.accountNumber, "number")}
-                    copied={copied === "number"}
-                  />
-                  <p className="text-xs leading-relaxed text-muted-foreground">
-                    {deposit.instructions}
-                  </p>
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Deposit account unavailable. Try refresh.
-                </p>
-              )}
-            </MotionSection>
-          ) : (
-            <MotionSection
-              delay={0.04}
-              className="rounded-[22px] border border-border bg-background p-5 shadow-[var(--shadow-soft)]"
-            >
-              <h2 className="text-base font-semibold text-foreground">
-                Amount to fund
-              </h2>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Pay with card, bank, or mobile money in {wallet?.currency ?? "your local currency"}.
-                Your ORYNO wallet is credited after payment.
-              </p>
-              <label className="mt-4 block">
-                <span className="text-sm font-medium text-foreground">
-                  Amount ({symbol})
-                </span>
-                <input
-                  inputMode="decimal"
-                  value={amount}
-                  onChange={(e) =>
-                    setAmount(e.target.value.replace(/[^\d.]/g, ""))
-                  }
-                  className="mt-2 h-12 w-full rounded-[14px] border border-border bg-muted/40 px-4 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+            {deposit ? (
+              <div className="space-y-3 rounded-[18px] bg-muted/40 p-4">
+                <DetailRow label="Bank" value={deposit.bankName} />
+                <DetailRow
+                  label="Account name"
+                  value={deposit.accountName}
+                  onCopy={() => void copyText(deposit.accountName, "name")}
+                  copied={copied === "name"}
                 />
-              </label>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {presets.map((preset) => (
-                  <button
-                    key={preset}
-                    type="button"
-                    onClick={() => setAmount(preset)}
-                    className={cn(
-                      "rounded-full px-3.5 py-1.5 text-xs font-semibold transition",
-                      amount === preset
-                        ? "bg-oryno-charcoal text-white"
-                        : "bg-muted text-muted-foreground hover:bg-oryno-orange-muted hover:text-primary",
-                    )}
-                  >
-                    {symbol}
-                    {Number(preset).toLocaleString()}
-                  </button>
-                ))}
+                <DetailRow
+                  label="Account number"
+                  value={deposit.accountNumber}
+                  mono
+                  emphasize
+                  onCopy={() => void copyText(deposit.accountNumber, "number")}
+                  copied={copied === "number"}
+                />
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  {deposit.instructions}
+                </p>
               </div>
-              <button
-                type="button"
-                disabled={submitting}
-                onClick={() => void onPayWithCheckout()}
-                className="btn-primary mt-4 inline-flex h-12 w-full items-center justify-center gap-2 text-base disabled:opacity-50 md:max-w-sm"
-              >
-                {submitting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Opening payment…
-                  </>
-                ) : (
-                  `Fund ${symbol}${Number(amount || 0).toLocaleString()}`
-                )}
-              </button>
-            </MotionSection>
-          )}
-
-          {demoMode ? (
-            <MotionSection
-              delay={0.12}
-              className="mt-5 rounded-[22px] border border-border bg-background p-5 shadow-[var(--shadow-soft)]"
-            >
-              <h2 className="text-base font-semibold text-foreground">
-                I have funded
-              </h2>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Demo only — simulates a bank deposit and credits your wallet now.
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Deposit account unavailable. Try refresh.
               </p>
+            )}
+          </MotionSection>
 
-              <div className="mt-4 flex flex-wrap gap-2">
-                {presets.map((preset) => (
-                  <button
-                    key={preset}
-                    type="button"
-                    onClick={() => setAmount(preset)}
-                    className={cn(
-                      "rounded-full px-3.5 py-1.5 text-xs font-semibold transition",
-                      amount === preset
-                        ? "bg-oryno-charcoal text-white"
-                        : "bg-muted text-muted-foreground hover:bg-oryno-orange-muted hover:text-primary",
-                    )}
-                  >
-                    {symbol}
-                    {Number(preset).toLocaleString()}
-                  </button>
-                ))}
-              </div>
-
-              <button
-                type="button"
-                disabled={submitting || (method === "dva" && !deposit)}
-                onClick={() => void onIHaveFunded()}
-                className="btn-primary mt-4 inline-flex h-12 w-full items-center justify-center gap-2 text-base disabled:opacity-50 md:max-w-sm"
-              >
-                {submitting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Processing…
-                  </>
-                ) : (
-                  "I’ve funded"
-                )}
-              </button>
-            </MotionSection>
-          ) : method === "dva" ? (
+          {deposit ? (
             <MotionSection delay={0.12} className="mt-5 md:max-w-sm">
               <button
                 type="button"
-                disabled={submitting}
+                disabled={checking}
                 onClick={() => void onIHaveFunded()}
                 className="btn-primary inline-flex h-12 w-full items-center justify-center gap-2 text-base disabled:opacity-50"
               >
-                I’ve funded — check balance
+                {checking ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Checking…
+                  </>
+                ) : (
+                  "I’ve funded — check balance"
+                )}
               </button>
             </MotionSection>
           ) : null}
