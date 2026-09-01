@@ -141,6 +141,13 @@
       "when": 1786900000000,
       "tag": "0020_betting_funding",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1788287115277,
+      "tag": "0020_melodic_crystal",
+      "breakpoints": true
     }
   ]
 }
