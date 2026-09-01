@@ -178,7 +178,7 @@ export default function WithdrawPage() {
     <AppShell hideNav>
       <PageHeader
         title="Withdraw"
-        subtitle="Send funds to your bank or mobile money"
+        subtitle="Send funds to your bank"
         backHref="/wallet"
       />
 
