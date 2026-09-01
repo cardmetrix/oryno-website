@@ -3,7 +3,10 @@ import { currentUser } from "@clerk/nextjs/server";
 import { desc, eq } from "drizzle-orm";
 import {
   getLevelDef,
+  isBvnIdType,
+  isNinIdType,
   isValidIdTypeForLevel,
+  kycRulesForSubmission,
   nextKycLevel,
   normalizeKycLevel,
   type AccountLevelId,
@@ -176,6 +179,7 @@ export async function POST(req: Request) {
     };
 
     if (body.submit) {
+      const rules = kycRulesForSubmission(requested, payload.idType || "");
       if (!isValidIdTypeForLevel(requested, payload.idType)) {
         return NextResponse.json(
           {
@@ -184,27 +188,42 @@ export async function POST(req: Request) {
           { status: 400 },
         );
       }
-      if (levelDef.kyc.numberRequired && !payload.idNumber) {
+      if (rules.numberRequired && !payload.idNumber) {
         return NextResponse.json(
-          { error: `${levelDef.kyc.numberLabel} is required.` },
+          { error: `${rules.numberLabel} is required.` },
           { status: 400 },
         );
       }
-      if (requested === 2 && payload.idNumber && !/^\d{11}$/.test(payload.idNumber)) {
+      if (
+        isBvnIdType(payload.idType) &&
+        payload.idNumber &&
+        !/^\d{11}$/.test(payload.idNumber)
+      ) {
         return NextResponse.json(
           { error: "BVN must be exactly 11 digits." },
           { status: 400 },
         );
       }
-      if (levelDef.kyc.frontRequired && !payload.idFrontUrl) {
+      if (
+        isNinIdType(payload.idType) &&
+        requested === 1 &&
+        payload.idNumber &&
+        !/^\d{11}$/.test(payload.idNumber)
+      ) {
         return NextResponse.json(
-          { error: `${levelDef.kyc.frontLabel} is required.` },
+          { error: "NIN must be exactly 11 digits." },
           { status: 400 },
         );
       }
-      if (levelDef.kyc.selfieRequired && !payload.selfieUrl) {
+      if (rules.frontRequired && !payload.idFrontUrl) {
         return NextResponse.json(
-          { error: "Selfie is required for Level 1." },
+          { error: `${rules.frontLabel} is required.` },
+          { status: 400 },
+        );
+      }
+      if (rules.selfieRequired && !payload.selfieUrl) {
+        return NextResponse.json(
+          { error: "Selfie is required for this document type." },
           { status: 400 },
         );
       }

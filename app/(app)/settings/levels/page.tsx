@@ -265,9 +265,9 @@ export default function AccountLevelsPage() {
                 Raise your limit with KYC
               </p>
               <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                Level 1 needs NIN, passport, or driver license. Level 2 needs
-                BVN (₦500k/day). Level 3 needs a utility bill for unlimited
-                limits.
+                Level 1 needs NIN, BVN, passport, or driver license. Level 2
+                adds BVN if you used another ID at Level 1 (₦500k/day). Level 3
+                needs a utility bill for unlimited limits.
               </p>
             </div>
           </div>

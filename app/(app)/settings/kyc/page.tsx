@@ -22,6 +22,9 @@ import { AuthField, authInputClassName } from "@/components/auth/auth-field";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   getLevelDef,
+  isBvnIdType,
+  isNinIdType,
+  kycRulesForSubmission,
   nextKycLevel,
   normalizeKycLevel,
   type AccountLevelId,
@@ -221,12 +224,17 @@ export default function KycPage() {
     }
   }
 
+  const activeKycRules = useMemo(() => {
+    if (!levelDef || !targetLevel) return null;
+    return kycRulesForSubmission(targetLevel as AccountLevelId, idType);
+  }, [levelDef, targetLevel, idType]);
+
   const locked = kycStatus === "pending" || kycLevel >= 3;
   const canSubmit = Boolean(
-    levelDef &&
-      (!levelDef.kyc.numberRequired || idNumber.trim()) &&
-      (!levelDef.kyc.frontRequired || idFrontUrl) &&
-      (!levelDef.kyc.selfieRequired || selfieUrl),
+    activeKycRules &&
+      (!activeKycRules.numberRequired || idNumber.trim()) &&
+      (!activeKycRules.frontRequired || idFrontUrl) &&
+      (!activeKycRules.selfieRequired || selfieUrl),
   );
   const submittedLabel = formatSubmittedAt(
     submission?.submittedAt || submission?.createdAt,
@@ -321,7 +329,7 @@ export default function KycPage() {
                     L{id}
                   </p>
                   <p className="mt-0.5 text-[11px] font-semibold text-foreground">
-                    {id === 1 ? "ID" : id === 2 ? "BVN" : "Address"}
+                    {id === 1 ? "ID / BVN" : id === 2 ? "BVN" : "Address"}
                   </p>
                 </div>
               ))}
@@ -338,7 +346,7 @@ export default function KycPage() {
                   Level {targetLevel} · {levelDef.shortName}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {levelDef.kyc.helpText}
+                  {activeKycRules?.helpText || levelDef.kyc.helpText}
                 </p>
               </div>
 
@@ -357,39 +365,51 @@ export default function KycPage() {
                 </select>
               </AuthField>
 
-              {(levelDef.kyc.numberRequired || targetLevel === 3) && (
-                <AuthField label={levelDef.kyc.numberLabel}>
+              {(activeKycRules?.numberRequired || targetLevel === 3) && (
+                <AuthField label={activeKycRules?.numberLabel || "ID number"}>
                   <input
                     value={idNumber}
-                    onChange={(e) => setIdNumber(e.target.value)}
-                    placeholder={levelDef.kyc.numberPlaceholder}
-                    inputMode={targetLevel === 2 ? "numeric" : "text"}
-                    maxLength={targetLevel === 2 ? 11 : 64}
+                    onChange={(e) =>
+                      setIdNumber(
+                        isBvnIdType(idType) || isNinIdType(idType)
+                          ? e.target.value.replace(/\D/g, "")
+                          : e.target.value,
+                      )
+                    }
+                    placeholder={activeKycRules?.numberPlaceholder}
+                    inputMode={
+                      isBvnIdType(idType) || isNinIdType(idType)
+                        ? "numeric"
+                        : "text"
+                    }
+                    maxLength={
+                      isBvnIdType(idType) || isNinIdType(idType) ? 11 : 64
+                    }
                     className={authInputClassName}
                   />
                 </AuthField>
               )}
 
-              {(levelDef.kyc.frontRequired ||
-                levelDef.kyc.frontLabel.includes("optional")) && (
+              {(activeKycRules?.frontRequired ||
+                activeKycRules?.frontLabel.includes("optional")) && (
                 <UploadTile
-                  label={levelDef.kyc.frontLabel}
+                  label={activeKycRules.frontLabel}
                   url={idFrontUrl}
                   uploading={isUploading && uploadTarget === "front"}
                   onClick={() => pickFile("front")}
                 />
               )}
 
-              {levelDef.kyc.backLabel ? (
+              {activeKycRules?.backLabel ? (
                 <UploadTile
-                  label={levelDef.kyc.backLabel}
+                  label={activeKycRules.backLabel}
                   url={idBackUrl}
                   uploading={isUploading && uploadTarget === "back"}
                   onClick={() => pickFile("back")}
                 />
               ) : null}
 
-              {levelDef.kyc.selfieRequired ? (
+              {activeKycRules?.selfieRequired ? (
                 <UploadTile
                   label="Selfie"
                   url={selfieUrl}

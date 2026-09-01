@@ -42,9 +42,9 @@ export const ACCOUNT_LEVELS: AccountLevelDef[] = [
     description:
       "Verify with a government-issued ID to unlock your starter daily limit.",
     dailyLimitAmount: 50_000,
-    requirement: "NIN, Passport, or Driver License",
+    requirement: "NIN, BVN, Passport, or Driver License",
     kyc: {
-      idTypes: ["NIN", "Passport", "Driver License"],
+      idTypes: ["NIN", "BVN", "Passport", "Driver License"],
       numberLabel: "ID number",
       numberRequired: true,
       numberPlaceholder: "e.g. 12345678901",
@@ -54,12 +54,12 @@ export const ACCOUNT_LEVELS: AccountLevelDef[] = [
       backRequired: false,
       selfieRequired: true,
       helpText:
-        "Upload a clear photo of your NIN slip, international passport, or driver license, plus a selfie.",
+        "Verify with NIN, BVN, passport, or driver license. BVN only needs your 11-digit number; other IDs need a photo and selfie.",
     },
     features: [
       "Browse all digital services",
       "Buy airtime, data & bills",
-      "Fund your wallet",
+      "Fund your wallet with a dedicated account",
       "₦50,000 daily limit",
       "Standard support response",
     ],
@@ -68,7 +68,7 @@ export const ACCOUNT_LEVELS: AccountLevelDef[] = [
     id: 2,
     name: "Level 2 · BVN",
     shortName: "BVN",
-    description: "Add your BVN to raise your daily limit to ₦500,000.",
+    description: "Add your BVN if you verified with NIN, passport, or license at Level 1.",
     dailyLimitAmount: 500_000,
     requirement: "Bank Verification Number (BVN)",
     kyc: {
@@ -186,6 +186,50 @@ export function isValidIdTypeForLevel(
   return def.kyc.idTypes.some(
     (t) => t.toLowerCase() === idType.trim().toLowerCase(),
   );
+}
+
+export function isBvnIdType(idType?: string | null) {
+  return (idType || "").trim().toLowerCase() === "bvn";
+}
+
+export function isNinIdType(idType?: string | null) {
+  return (idType || "").trim().toLowerCase() === "nin";
+}
+
+/** Document rules vary by ID type at Level 1 (e.g. BVN is number-only). */
+export function kycRulesForSubmission(
+  level: AccountLevelId,
+  idType: string,
+): KycDocRules {
+  const def = getLevelDef(level);
+  if (!def) return ACCOUNT_LEVELS[0].kyc;
+
+  if (level === 1 && isBvnIdType(idType)) {
+    return {
+      ...def.kyc,
+      numberLabel: "BVN",
+      numberRequired: true,
+      numberPlaceholder: "11-digit BVN",
+      frontLabel: "BVN slip (optional)",
+      frontRequired: false,
+      backRequired: false,
+      selfieRequired: false,
+      helpText: "Enter the 11-digit BVN linked to your bank accounts.",
+    };
+  }
+
+  if (level === 1 && isNinIdType(idType)) {
+    return {
+      ...def.kyc,
+      numberLabel: "NIN",
+      numberRequired: true,
+      numberPlaceholder: "11-digit NIN",
+      helpText:
+        "Upload a clear photo of your NIN slip plus a selfie, and enter your 11-digit NIN.",
+    };
+  }
+
+  return def.kyc;
 }
 
 export function levelCta(input: {

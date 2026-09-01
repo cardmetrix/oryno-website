@@ -95,13 +95,13 @@ export async function buildDepositIdentityRequired(
     kycStatus === "pending" || latest?.status === "pending";
 
   let message =
-    "Enter your BVN or NIN to generate your dedicated bank account number.";
+    "Enter your BVN or NIN to generate your dedicated bank account number. You can also add BVN in Settings → KYC.";
   if (hasPendingKyc) {
     message =
-      "We need your BVN or NIN on file to create your fund account. Add it below or complete verification in Settings.";
+      "We need your BVN or NIN on file to create your fund account. Add it below or complete verification in Settings → KYC.";
   } else if (kycLevel === 0) {
     message =
-      "Verify your identity with BVN or NIN to get your dedicated fund account.";
+      "Verify with BVN or NIN in Settings → KYC, or enter it below to get your dedicated fund account.";
   }
 
   return {
@@ -127,7 +127,7 @@ export async function saveDepositIdentity(
     );
   }
 
-  const targetLevel = input.idType === "BVN" ? 2 : 1;
+  const targetLevel = 1;
   const latest = await db.query.kycSubmissions.findFirst({
     where: eq(kycSubmissions.userId, userId),
     orderBy: [desc(kycSubmissions.createdAt)],
