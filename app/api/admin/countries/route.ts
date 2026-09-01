@@ -61,7 +61,7 @@ export async function GET() {
         flagEmoji: c.flagEmoji,
         services: c.enabledServices || [],
         servicesLabel: (c.enabledServices || []).join(", ") || "—",
-        gateway: gatewayByCountry.get(c.code) || "Paystack",
+        gateway: gatewayByCountry.get(c.code) || "Flutterwave",
         status: c.status,
         statusLabel: countryStatusLabel(c.status),
         giftCardsEnabled: c.giftCardsEnabled,

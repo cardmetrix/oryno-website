@@ -4,9 +4,9 @@ import { withAdminApi, titleCaseStatus } from "@/lib/admin/api";
 import { db } from "@/lib/db";
 import { countryGateways, paymentGateways } from "@/lib/db/schema";
 import {
-  hasPaystackKeys,
-  isPaystackDemoMode,
-} from "@/lib/paystack/client";
+  hasFlutterwaveKeys,
+  isFlutterwaveDemoMode,
+} from "@/lib/flutterwave/client";
 
 export const runtime = "nodejs";
 
@@ -33,9 +33,9 @@ export async function GET() {
       let status = titleCaseStatus(g.status);
       let mode = titleCaseStatus(g.mode);
 
-      if (g.slug === "paystack") {
-        status = hasPaystackKeys() ? "Connected" : "Available";
-        mode = isPaystackDemoMode() ? "Test" : "Live";
+      if (g.slug === "flutterwave" || g.slug === "paystack") {
+        status = hasFlutterwaveKeys() ? "Connected" : "Available";
+        mode = isFlutterwaveDemoMode() ? "Test" : "Live";
       }
 
       return {
@@ -47,14 +47,17 @@ export async function GET() {
       };
     });
 
-    // Ensure Paystack appears even if gateways table is empty
-    if (!fromDb.some((g) => g.name.toLowerCase().includes("paystack"))) {
+    if (
+      !fromDb.some((g) =>
+        /flutterwave|paystack/i.test(g.name),
+      )
+    ) {
       fromDb.unshift({
-        id: "paystack-runtime",
-        name: "Paystack",
-        countries: "NG",
-        status: hasPaystackKeys() ? "Connected" : "Available",
-        mode: isPaystackDemoMode() ? "Test" : "Live",
+        id: "flutterwave-runtime",
+        name: "Flutterwave",
+        countries: "NG, GH, KE, ZA",
+        status: hasFlutterwaveKeys() ? "Connected" : "Available",
+        mode: isFlutterwaveDemoMode() ? "Test" : "Live",
       });
     }
 

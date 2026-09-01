@@ -135,7 +135,7 @@ export async function GET() {
         name: c.name,
         currency: c.currency,
         services: (c.enabledServices || []).join(", ") || "—",
-        gateway: "Paystack",
+        gateway: "Flutterwave",
         status: countryStatusLabel(c.status),
       })),
     });

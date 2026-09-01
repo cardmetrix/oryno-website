@@ -150,7 +150,7 @@ export async function reverseCompletedDebit(input: {
   }
 }
 
-/** Paystack (or other) clawed back a wallet credit (fund). */
+/** Provider (or other) clawed back a wallet credit (fund). */
 export async function reverseCompletedCredit(input: {
   walletId: string;
   transactionId: string;

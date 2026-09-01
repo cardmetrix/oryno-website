@@ -42,7 +42,7 @@ export default function FundPage() {
     <Suspense
       fallback={
         <AppShell hideNav>
-          <PageHeader title="Fund Wallet" subtitle="Paystack" backHref="/wallet" />
+          <PageHeader title="Fund Wallet" subtitle="Flutterwave" backHref="/wallet" />
         </AppShell>
       }
     >
@@ -140,6 +140,8 @@ function FundPageContent() {
           account?: DepositAccount | null;
           demoMode?: boolean;
           presets?: string[];
+          checkoutAvailable?: boolean;
+          dvaAvailable?: boolean;
         };
         setMethod(json.method === "checkout" ? "checkout" : "dva");
         setDeposit(json.account ?? null);
@@ -176,8 +178,12 @@ function FundPageContent() {
 
   useEffect(() => {
     const reference =
-      searchParams.get("reference") || searchParams.get("trxref");
-    if (!reference || verifyingRef.current) return;
+      searchParams.get("tx_ref") ||
+      searchParams.get("reference") ||
+      searchParams.get("trxref");
+    const transactionId =
+      searchParams.get("transaction_id") || searchParams.get("transactionId");
+    if ((!reference && !transactionId) || verifyingRef.current) return;
     verifyingRef.current = true;
 
     (async () => {
@@ -185,7 +191,10 @@ function FundPageContent() {
         const res = await fetch("/api/wallet/fund/verify", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ reference }),
+          body: JSON.stringify({
+            reference,
+            transactionId,
+          }),
         });
         const json = (await res.json()) as {
           error?: string;
@@ -228,7 +237,7 @@ function FundPageContent() {
     }
   }
 
-  async function onPayWithPaystack() {
+  async function onPayWithFlutterwave() {
     const value = Number(amount);
     if (!Number.isFinite(value) || value <= 0) {
       setError("Enter a valid amount");
@@ -250,7 +259,7 @@ function FundPageContent() {
         mode?: string;
         authorizationUrl?: string;
       };
-      if (!res.ok) throw new Error(json.error || "Could not start Paystack");
+      if (!res.ok) throw new Error(json.error || "Could not start Flutterwave");
       if (json.authorizationUrl) {
         window.location.href = json.authorizationUrl;
         return;
@@ -259,10 +268,10 @@ function FundPageContent() {
         await onSimulate();
         return;
       }
-      throw new Error("Paystack checkout is not available");
+      throw new Error("Flutterwave checkout is not available");
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : "Could not start Paystack";
+        err instanceof Error ? err.message : "Could not start Flutterwave";
       setError(message);
       toast.error(message);
     } finally {
@@ -323,7 +332,7 @@ function FundPageContent() {
 
   async function onIHaveFunded() {
     if (!demoMode) {
-      toast.message("Waiting for Paystack", {
+      toast.message("Waiting for Flutterwave", {
         description:
           "Complete the transfer. Your balance updates when payment is confirmed.",
       });
@@ -341,7 +350,7 @@ function FundPageContent() {
         title="Fund Wallet"
         subtitle={
           method === "checkout"
-            ? "Pay with Paystack card, bank, or mobile money"
+            ? "Pay with Flutterwave card, bank, or mobile money"
             : "Transfer to your personal ORYNO account number"
         }
         backHref="/wallet"
@@ -372,6 +381,35 @@ function FundPageContent() {
                 {wallet.balanceFormatted}
               </span>
             </MotionSection>
+          ) : null}
+
+          {deposit ? (
+            <div className="mb-4 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setMethod("dva")}
+                className={cn(
+                  "rounded-[14px] border px-3 py-2.5 text-xs font-semibold",
+                  method === "dva"
+                    ? "border-primary bg-oryno-orange-muted text-primary"
+                    : "border-border text-muted-foreground",
+                )}
+              >
+                Bank transfer
+              </button>
+              <button
+                type="button"
+                onClick={() => setMethod("checkout")}
+                className={cn(
+                  "rounded-[14px] border px-3 py-2.5 text-xs font-semibold",
+                  method === "checkout"
+                    ? "border-primary bg-oryno-orange-muted text-primary"
+                    : "border-border text-muted-foreground",
+                )}
+              >
+                Card / MoMo
+              </button>
+            </div>
           ) : null}
 
           {method === "dva" ? (
@@ -429,7 +467,7 @@ function FundPageContent() {
                 Amount to fund
               </h2>
               <p className="mt-1 text-xs text-muted-foreground">
-                Paystack checkout for {wallet?.currency ?? "your local currency"}.
+                Flutterwave checkout for {wallet?.currency ?? "your local currency"}.
                 Your ORYNO wallet is credited after payment.
               </p>
               <label className="mt-4 block">
@@ -466,16 +504,16 @@ function FundPageContent() {
               <button
                 type="button"
                 disabled={submitting}
-                onClick={() => void onPayWithPaystack()}
+                onClick={() => void onPayWithFlutterwave()}
                 className="btn-primary mt-4 inline-flex h-12 w-full items-center justify-center gap-2 text-base disabled:opacity-50 md:max-w-sm"
               >
                 {submitting ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Opening Paystack…
+                    Opening Flutterwave…
                   </>
                 ) : (
-                  `Pay ${symbol}${Number(amount || 0).toLocaleString()} with Paystack`
+                  `Pay ${symbol}${Number(amount || 0).toLocaleString()} with Flutterwave`
                 )}
               </button>
             </MotionSection>
@@ -490,7 +528,7 @@ function FundPageContent() {
                 I have funded
               </h2>
               <p className="mt-1 text-xs text-muted-foreground">
-                Demo only — confirms a Paystack-style deposit and credits your
+                Demo only — confirms a Flutterwave-style deposit and credits your
                 wallet now.
               </p>
 

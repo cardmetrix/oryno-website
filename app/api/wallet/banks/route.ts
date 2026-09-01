@@ -7,14 +7,14 @@ import { ensureWalletSchema } from "@/lib/db/ensure-schema";
 import { userBankAccounts } from "@/lib/db/schema";
 import {
   createOrReuseTransferRecipient,
-  listPaystackBanks,
+  listFlutterwaveBanks,
   resolveBankAccount,
-} from "@/lib/paystack/banks";
-import { isPaystackDemoMode } from "@/lib/paystack/client";
+} from "@/lib/flutterwave/banks";
+import { isFlutterwaveDemoMode } from "@/lib/flutterwave/client";
 import {
   accountNumberRules,
   addBankInstructions,
-} from "@/lib/paystack/country";
+} from "@/lib/payments/country";
 import { listBankAccounts, toBankSummary } from "@/lib/wallet";
 
 export const runtime = "nodejs";
@@ -30,7 +30,7 @@ export async function GET() {
     const countryCode = resolveCountryCode(user.countryCode);
     const [banks, options] = await Promise.all([
       listBankAccounts(user.id),
-      listPaystackBanks(countryCode),
+      listFlutterwaveBanks(countryCode),
     ]);
 
     return NextResponse.json({
@@ -44,7 +44,7 @@ export async function GET() {
       currency: currencyForCountry(countryCode),
       accountRules: accountNumberRules(countryCode),
       instructions: addBankInstructions(countryCode),
-      demoMode: isPaystackDemoMode(),
+      demoMode: isFlutterwaveDemoMode(),
     });
   } catch (error) {
     console.error("[wallet-banks-get]", error);
@@ -152,7 +152,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       ok: true,
       bank: toBankSummary(created),
-      demoMode: isPaystackDemoMode(),
+      demoMode: isFlutterwaveDemoMode(),
     });
   } catch (error) {
     const message =

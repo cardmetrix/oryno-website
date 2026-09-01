@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
-import { initiateLocalWalletFund } from "@/lib/paystack/local-fund";
+import { initiateLocalWalletFund } from "@/lib/flutterwave/local-fund";
 
 export const runtime = "nodejs";
 
@@ -23,6 +23,8 @@ export async function POST(req: Request) {
     const result = await initiateLocalWalletFund({
       userId: user.id,
       email: user.email,
+      name: user.fullName,
+      phone: user.phone,
       countryCode: user.countryCode,
       localAmount: body.amount ?? 0,
       callbackUrl,
@@ -36,7 +38,7 @@ export async function POST(req: Request) {
         error:
           error instanceof Error
             ? error.message
-            : "Failed to start Paystack checkout",
+            : "Failed to start Flutterwave checkout",
       },
       { status: 400 },
     );

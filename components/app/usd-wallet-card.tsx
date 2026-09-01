@@ -147,8 +147,8 @@ export function UsdWalletActionsPanel({
   className,
 }: ActionsProps) {
   const router = useRouter();
-  const [fundMethod, setFundMethod] = useState<"paystack" | "convert">(
-    "paystack",
+  const [fundMethod, setFundMethod] = useState<"flutterwave" | "convert">(
+    "flutterwave",
   );
   const [direction, setDirection] = useState<"to_usd" | "to_local">("to_usd");
   const [amount, setAmount] = useState("10");
@@ -161,7 +161,7 @@ export function UsdWalletActionsPanel({
   }, [fx]);
 
   useEffect(() => {
-    if (panel === "fund") setFundMethod("paystack");
+    if (panel === "fund") setFundMethod("flutterwave");
     setError(null);
   }, [panel]);
 
@@ -247,8 +247,8 @@ export function UsdWalletActionsPanel({
       return "Insufficient USD balance";
     }
     if (panel === "fund") {
-      return fundMethod === "paystack"
-        ? "Pay with Paystack"
+      return fundMethod === "flutterwave"
+        ? "Pay with Flutterwave"
         : `Convert from ${localCurrency}`;
     }
     return direction === "to_usd"
@@ -371,21 +371,21 @@ export function UsdWalletActionsPanel({
                 Fund USD wallet
               </h3>
               <p className="mt-1 text-xs text-muted-foreground">
-                Pay with Paystack (local currency) or convert from your{" "}
+                Pay with Flutterwave (local currency) or convert from your{" "}
                 {localCurrency} balance ({localBalanceFormatted}).
               </p>
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <button
                   type="button"
-                  onClick={() => setFundMethod("paystack")}
+                  onClick={() => setFundMethod("flutterwave")}
                   className={cn(
                     "rounded-[14px] border px-3 py-2.5 text-xs font-semibold",
-                    fundMethod === "paystack"
+                    fundMethod === "flutterwave"
                       ? "border-primary bg-oryno-orange-muted text-primary"
                       : "border-border text-muted-foreground",
                   )}
                 >
-                  Paystack
+                  Flutterwave
                 </button>
                 <button
                   type="button"

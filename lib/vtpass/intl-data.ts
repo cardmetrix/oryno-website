@@ -4,7 +4,7 @@ import {
   resolveCountryCode,
   type SupportedCountryCode,
 } from "@/lib/country";
-import { fundPresetsForCountry } from "@/lib/paystack/country";
+import { fundPresetsForCountry } from "@/lib/payments/country";
 
 /** Minimum face amount in local currency for flexible international data. */
 const INTL_DATA_MIN: Partial<Record<SupportedCountryCode, number>> = {

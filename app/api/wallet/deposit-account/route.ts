@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
 import { ensureWalletSchema } from "@/lib/db/ensure-schema";
-import { getWalletFundOptions } from "@/lib/paystack/deposit-accounts";
+import { getWalletFundOptions } from "@/lib/flutterwave/deposit-accounts";
 
 export const runtime = "nodejs";
 

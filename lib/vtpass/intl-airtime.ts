@@ -4,7 +4,7 @@ import {
   resolveCountryCode,
   type SupportedCountryCode,
 } from "@/lib/country";
-import { fundPresetsForCountry } from "@/lib/paystack/country";
+import { fundPresetsForCountry } from "@/lib/payments/country";
 import { ZA_AIRTIME_MIN_ZAR, ZA_AIRTIME_PRESETS } from "./za-airtime";
 
 /** Minimum face amount in local currency for international airtime top-up. */

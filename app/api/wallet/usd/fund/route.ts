@@ -3,7 +3,7 @@ import { ensureAppUser } from "@/lib/auth/current-user";
 import { currencyForCountry } from "@/lib/wallet";
 import {
   convertWalletCurrency,
-  initiateUsdPaystackFund,
+  initiateUsdWalletFund,
 } from "@/lib/wallet-usd";
 import { formatMoney } from "@/lib/transactions";
 
@@ -18,16 +18,15 @@ export async function POST(req: Request) {
 
     const body = (await req.json()) as {
       amountUsd?: string | number;
-      method?: "paystack" | "convert";
+      method?: "flutterwave" | "paystack" | "convert";
       callbackUrl?: string;
     };
 
-    const method = body.method ?? "paystack";
+    const method =
+      body.method === "convert" ? "convert" : "flutterwave";
     const localCurrency = currencyForCountry(user.countryCode);
 
     if (method === "convert") {
-      // Convert local → USD using local amount derived from desired USD
-      // Client sends USD amount; we convert by debiting the local cost.
       const { localToBuyUsd, quoteLocalUsd } = await import("@/lib/fx/rates");
       const quote = await quoteLocalUsd(localCurrency);
       const usd = Number(body.amountUsd);
@@ -67,9 +66,11 @@ export async function POST(req: Request) {
       user.email ||
       `${user.id.replace(/-/g, "").slice(0, 12)}@oryno.users`;
 
-    const result = await initiateUsdPaystackFund({
+    const result = await initiateUsdWalletFund({
       userId: user.id,
       email,
+      name: user.fullName,
+      phone: user.phone,
       countryCode: user.countryCode,
       localCurrency,
       usdAmount: body.amountUsd ?? 0,
@@ -78,7 +79,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       ok: true,
-      method: "paystack",
+      method: "flutterwave",
       ...result,
       localFormatted: formatMoney(result.localAmount, result.localCurrency),
       usdFormatted: formatMoney(result.usdAmount, "USD"),

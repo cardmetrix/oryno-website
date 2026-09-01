@@ -284,7 +284,7 @@ export async function fundWallet(input: {
     (process.env.ALLOW_SIMULATED_FUND || "").trim() === "1";
   if (!allowSim) {
     throw new Error(
-      "Direct wallet credit is disabled. Fund via Paystack deposit/checkout, or set ALLOW_SIMULATED_FUND=true for local testing only.",
+      "Direct wallet credit is disabled. Fund via Flutterwave deposit/checkout, or set ALLOW_SIMULATED_FUND=true for local testing only.",
     );
   }
 
@@ -388,7 +388,7 @@ export async function withdrawWallet(input: {
   currency?: string;
   fee?: number;
 }) {
-  const { sendPaystackWithdrawal } = await import("@/lib/paystack/transfers");
+  const { sendFlutterwaveWithdrawal } = await import("@/lib/flutterwave/transfers");
   const { ensureWalletSchema } = await import("@/lib/db/ensure-schema");
   await ensureWalletSchema();
 
@@ -415,8 +415,8 @@ export async function withdrawWallet(input: {
       ),
     });
     if (!bank) throw new Error("Bank account not found.");
-    if (!bank.bankCode && !bank.paystackRecipientCode) {
-      throw new Error("Re-add this bank account so Paystack can verify it.");
+    if (!bank.bankCode) {
+      throw new Error("Re-add this bank account so Flutterwave can verify it.");
     }
 
     const wallet = await tx.query.wallets.findFirst({
@@ -493,7 +493,7 @@ export async function withdrawWallet(input: {
   });
 
   try {
-    const payout = await sendPaystackWithdrawal({
+    const payout = await sendFlutterwaveWithdrawal({
       bank: prepared.bank,
       amount: localAmount,
       currency: payoutCurrency,
@@ -502,7 +502,7 @@ export async function withdrawWallet(input: {
     });
 
     const transferStatus = payout.transfer.status;
-    // success/demo → completed; pending/otp/received → await webhook.
+    // success/demo → completed; pending → await webhook.
     const nextWithdrawalStatus =
       transferStatus === "success" || payout.simulated
         ? ("completed" as const)
@@ -532,7 +532,7 @@ export async function withdrawWallet(input: {
           fee: feeStr,
           bankAccountId: prepared.bank.id,
           reference,
-          paystackTransferCode: payout.transfer.transferCode,
+          flutterwaveTransferId: payout.transfer.transferCode,
           simulated: Boolean(payout.simulated),
           localAmount: localAmountStr,
           payoutCurrency,

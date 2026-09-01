@@ -30,7 +30,7 @@ export async function ensureWalletSchema() {
         CREATE TABLE IF NOT EXISTS "user_deposit_accounts" (
           "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
           "user_id" uuid NOT NULL UNIQUE REFERENCES "users"("id") ON DELETE cascade,
-          "provider" varchar(40) DEFAULT 'paystack' NOT NULL,
+          "provider" varchar(40) DEFAULT 'flutterwave' NOT NULL,
           "currency" varchar(3) DEFAULT 'NGN' NOT NULL,
           "account_number" varchar(32) NOT NULL,
           "account_name" varchar(160) NOT NULL,

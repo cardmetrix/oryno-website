@@ -24,9 +24,9 @@ import { cn } from "@/lib/utils";
 const WITHDRAW_INSTRUCTIONS = [
   "Add and verify a payout bank on Wallet if you haven’t already.",
   "Enter the amount you want to withdraw from your ORYNO wallet.",
-  "Select the bank account Paystack should pay into.",
-  "Confirm with your transaction PIN. We debit your wallet and send the transfer via Paystack.",
-  "When Paystack confirms delivery, the withdrawal is marked complete.",
+  "Select the bank account Flutterwave should pay into.",
+  "Confirm with your transaction PIN. We debit your wallet and send the transfer via Flutterwave.",
+  "When Flutterwave confirms delivery, the withdrawal is marked complete.",
 ];
 
 export default function WithdrawPage() {
@@ -178,7 +178,7 @@ export default function WithdrawPage() {
     <AppShell hideNav>
       <PageHeader
         title="Withdraw"
-        subtitle="Send funds to your bank or mobile money via Paystack"
+        subtitle="Send funds to your bank or mobile money via Flutterwave"
         backHref="/wallet"
       />
 
@@ -217,7 +217,7 @@ export default function WithdrawPage() {
               ) : null}
               {success.pending ? (
                 <p className="mt-3 text-xs text-muted-foreground">
-                  Paystack is delivering this transfer. You’ll get a
+                  Flutterwave is delivering this transfer. You’ll get a
                   notification when it lands.
                 </p>
               ) : null}
@@ -284,7 +284,7 @@ export default function WithdrawPage() {
                         No bank account saved
                       </p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        Add a Paystack-verified payout account before
+                        Add a verified payout account before
                         withdrawing.
                       </p>
                       <Link

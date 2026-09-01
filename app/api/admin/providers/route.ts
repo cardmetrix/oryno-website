@@ -3,9 +3,9 @@ import { withAdminApi } from "@/lib/admin/api";
 import { isHerosmsDemoMode, isHerosmsLive } from "@/lib/herosms/client";
 import { isJapDemoMode, isJapLive } from "@/lib/jap/client";
 import {
-  hasPaystackKeys,
-  isPaystackDemoMode,
-} from "@/lib/paystack/client";
+  hasFlutterwaveKeys,
+  isFlutterwaveDemoMode,
+} from "@/lib/flutterwave/client";
 import {
   hasReloadlyKeys,
   isReloadlyDemoMode,
@@ -92,13 +92,13 @@ export async function GET() {
         }),
       },
       {
-        id: "paystack",
-        name: "Paystack",
+        id: "flutterwave",
+        name: "Flutterwave",
         type: "Wallet funding / withdrawals",
-        country: "Nigeria",
+        country: "NG, GH, KE, ZA",
         status: modeLabel({
-          configured: hasPaystackKeys(),
-          demo: isPaystackDemoMode(),
+          configured: hasFlutterwaveKeys(),
+          demo: isFlutterwaveDemoMode(),
         }),
       },
     ];

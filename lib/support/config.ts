@@ -24,7 +24,7 @@ export const SUPPORT_TOPICS = [
 export const SUPPORT_FAQS = [
   {
     q: "How do I fund my ORYNO wallet?",
-    a: "Go to Wallet → Fund, pay with card or bank transfer via Paystack, or use your dedicated virtual account. Funds usually appear within seconds after a successful payment.",
+    a: "Go to Wallet → Fund, pay with card or bank transfer via Flutterwave, or use your dedicated virtual account. Funds usually appear within seconds after a successful payment.",
   },
   {
     q: "Why is my airtime or data purchase delayed?",
@@ -32,7 +32,7 @@ export const SUPPORT_FAQS = [
   },
   {
     q: "How do withdrawals work?",
-    a: "Open Wallet → Withdraw, enter the amount, choose a payout bank, then confirm with your transaction PIN. We debit your wallet and send the transfer via Paystack. Typical timing is a few minutes.",
+    a: "Open Wallet → Withdraw, enter the amount, choose a payout bank, then confirm with your transaction PIN. We debit your wallet and send the transfer via Flutterwave. Typical timing is a few minutes.",
   },
   {
     q: "When will USD virtual cards launch?",

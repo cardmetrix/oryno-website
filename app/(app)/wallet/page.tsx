@@ -126,12 +126,16 @@ function WalletPageContent() {
     void load();
   }, [load]);
 
-  // Paystack local wallet funding callback: /wallet?local_fund=1&reference=...
+  // Flutterwave local wallet funding callback: /wallet?local_fund=1&tx_ref=...
   useEffect(() => {
     const localFund = searchParams.get("local_fund");
     const reference =
-      searchParams.get("reference") || searchParams.get("trxref");
-    if (!localFund || !reference) return;
+      searchParams.get("tx_ref") ||
+      searchParams.get("reference") ||
+      searchParams.get("trxref");
+    const transactionId =
+      searchParams.get("transaction_id") || searchParams.get("transactionId");
+    if (!localFund || (!reference && !transactionId)) return;
 
     let cancelled = false;
     (async () => {
@@ -139,7 +143,7 @@ function WalletPageContent() {
         const res = await fetch("/api/wallet/fund/verify", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ reference }),
+          body: JSON.stringify({ reference, transactionId }),
         });
         const json = (await res.json()) as {
           error?: string;
@@ -171,12 +175,16 @@ function WalletPageContent() {
     };
   }, [searchParams, load, router]);
 
-  // Paystack USD funding callback: /wallet?usd_fund=1&reference=...
+  // Flutterwave USD funding callback: /wallet?usd_fund=1&tx_ref=...
   useEffect(() => {
     const usdFund = searchParams.get("usd_fund");
     const reference =
-      searchParams.get("reference") || searchParams.get("trxref");
-    if (!usdFund || !reference) return;
+      searchParams.get("tx_ref") ||
+      searchParams.get("reference") ||
+      searchParams.get("trxref");
+    const flwTransactionId =
+      searchParams.get("transaction_id") || searchParams.get("transactionId");
+    if (!usdFund || (!reference && !flwTransactionId)) return;
 
     let cancelled = false;
     (async () => {
@@ -184,7 +192,10 @@ function WalletPageContent() {
         const res = await fetch("/api/wallet/usd/verify", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ reference }),
+          body: JSON.stringify({
+            reference,
+            transactionId: flwTransactionId,
+          }),
         });
         const json = (await res.json()) as {
           error?: string;
@@ -916,7 +927,7 @@ function BankAccountsSection({
                     onChange={(e) => setAccountName(e.target.value)}
                     placeholder={
                       resolving
-                        ? "Verifying with Paystack…"
+                        ? "Verifying account…"
                         : nameEditable
                           ? "Type the name on the account"
                           : "Resolved after account number"
@@ -1018,7 +1029,7 @@ function BankAccountsSection({
               No bank accounts yet
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Add a Paystack-verified bank to withdraw from your wallet.
+              Add a verified bank to withdraw from your wallet.
             </p>
             <button
               type="button"

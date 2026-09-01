@@ -150,21 +150,39 @@ export const SERVICE_PROVIDERS: CountryServiceProvider[] = [
       "Create an app, then copy the API key from Settings. Live keys are on the production app, not sandbox.",
   },
   {
-    id: "paystack",
-    name: "Paystack",
-    role: "Wallet funding (cards / bank / MoMo where available)",
+    id: "flutterwave",
+    name: "Flutterwave",
+    role: "Wallet funding (cards / bank / MoMo) and payouts",
     services: ["wallet"],
     countries: ["NG", "GH", "KE", "ZA"],
+    signupUrl: "https://dashboard.flutterwave.com/signup",
+    dashboardUrl: "https://dashboard.flutterwave.com",
+    apiKeysUrl: "https://dashboard.flutterwave.com/dashboard/settings/apis",
+    docsUrl: "https://developer.flutterwave.com/docs",
+    credentials: [
+      { env: "FLUTTERWAVE_SECRET_KEY", label: "Secret key" },
+      { env: "FLUTTERWAVE_PUBLIC_KEY", label: "Public key" },
+      { env: "FLUTTERWAVE_WEBHOOK_HASH", label: "Webhook secret hash" },
+    ],
+    notes:
+      "Primary wallet rail for Nigeria, Ghana, Kenya, and South Africa. Dedicated virtual accounts are Flutterwave on NG/GH; Paystack is used only if Flutterwave cannot issue an account (KE/ZA). Point your Flutterwave webhook to /api/webhooks/flutterwave and set the secret hash.",
+  },
+  {
+    id: "paystack",
+    name: "Paystack",
+    role: "Fallback dedicated virtual accounts (Kenya / South Africa)",
+    services: ["wallet"],
+    countries: ["KE", "ZA"],
     signupUrl: "https://dashboard.paystack.com/#/signup",
     dashboardUrl: "https://dashboard.paystack.com",
     apiKeysUrl: "https://dashboard.paystack.com/#/settings/developer",
     docsUrl: "https://paystack.com/docs/api",
     credentials: [
-      { env: "PAYSTACK_SECRET_KEY", label: "Secret key" },
-      { env: "PAYSTACK_PUBLIC_KEY", label: "Public key" },
+      { env: "PAYSTACK_SECRET_KEY", label: "Secret key (optional fallback)" },
+      { env: "PAYSTACK_PUBLIC_KEY", label: "Public key (optional fallback)" },
     ],
     notes:
-      "Same dashboard for Nigeria, Ghana, Kenya, and South Africa — pick the country when you create the business.",
+      "Only used when Flutterwave cannot create a dedicated deposit account. Keep /api/webhooks/paystack configured if you enable this fallback.",
   },
   {
     id: "jap",
@@ -206,7 +224,7 @@ export const BEST_PROVIDER_BY_SERVICE: Record<
     social: "jap",
     "virtual-numbers": "herosms",
     emails: "herosms",
-    wallet: "paystack",
+    wallet: "flutterwave",
   },
   GH: {
     airtime: "vtpass",
@@ -218,7 +236,7 @@ export const BEST_PROVIDER_BY_SERVICE: Record<
     social: "jap",
     "virtual-numbers": "herosms",
     emails: "herosms",
-    wallet: "paystack",
+    wallet: "flutterwave",
   },
   KE: {
     airtime: "vtpass",
@@ -230,7 +248,7 @@ export const BEST_PROVIDER_BY_SERVICE: Record<
     social: "jap",
     "virtual-numbers": "herosms",
     emails: "herosms",
-    wallet: "paystack",
+    wallet: "flutterwave",
   },
   ZA: {
     airtime: "vtpass",
@@ -242,7 +260,7 @@ export const BEST_PROVIDER_BY_SERVICE: Record<
     social: "jap",
     "virtual-numbers": "herosms",
     emails: "herosms",
-    wallet: "paystack",
+    wallet: "flutterwave",
   },
 };
 

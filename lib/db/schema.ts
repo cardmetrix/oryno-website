@@ -406,7 +406,7 @@ export const userBankAccounts = pgTable(
   ],
 );
 
-/** Paystack Dedicated Virtual Account for wallet deposits */
+/** Dedicated virtual account for wallet deposits (Flutterwave; Paystack fallback for KE/ZA) */
 export const userDepositAccounts = pgTable(
   "user_deposit_accounts",
   {
@@ -415,7 +415,7 @@ export const userDepositAccounts = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" })
       .unique(),
-    provider: varchar("provider", { length: 40 }).notNull().default("paystack"),
+    provider: varchar("provider", { length: 40 }).notNull().default("flutterwave"),
     currency: varchar("currency", { length: 3 }).notNull().default("NGN"),
     accountNumber: varchar("account_number", { length: 32 }).notNull(),
     accountName: varchar("account_name", { length: 160 }).notNull(),

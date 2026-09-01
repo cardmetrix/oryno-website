@@ -13,7 +13,7 @@ import {
   usdFromLocal,
 } from "@/lib/fx/rates";
 import { resolveCountryCode } from "@/lib/country";
-import { countryFromCurrency } from "@/lib/paystack/country";
+import { countryFromCurrency, flutterwavePaymentOptions } from "@/lib/payments/country";
 import { formatMoney } from "@/lib/transactions";
 import {
   generateWalletCardNumber,
@@ -21,10 +21,12 @@ import {
   type WalletRow,
 } from "@/lib/wallet";
 import {
-  hasPaystackKeys,
-  isPaystackDemoMode,
-  paystackFetch,
-} from "@/lib/paystack/client";
+  flutterwaveFetch,
+  hasFlutterwaveKeys,
+  isFlutterwaveDemoMode,
+  isPaymentSuccessful,
+  normalizeFlutterwaveMeta,
+} from "@/lib/flutterwave/client";
 
 export async function ensureUsdWallet(userId: string): Promise<WalletRow> {
   const existing = await db.query.wallets.findFirst({
@@ -350,15 +352,16 @@ export async function convertWalletCurrency(input: {
   });
 }
 
-type InitPaystackData = {
-  authorization_url: string;
-  access_code: string;
-  reference: string;
+type InitCheckoutData = {
+  link?: string;
+  authorization_url?: string;
 };
 
-export async function initiateUsdPaystackFund(input: {
+export async function initiateUsdWalletFund(input: {
   userId: string;
   email: string;
+  name?: string | null;
+  phone?: string | null;
   countryCode?: string | null;
   localCurrency: string;
   usdAmount: string | number;
@@ -393,62 +396,59 @@ export async function initiateUsdPaystackFund(input: {
     },
   });
 
-  // Demo / no keys: credit immediately
-  if (!hasPaystackKeys() || isPaystackDemoMode()) {
-    // Still try real Paystack in test mode; if it fails, fall through to demo credit below after initialize attempt
+  if (!hasFlutterwaveKeys()) {
+    throw new Error(
+      "Flutterwave is not configured for live USD funding. Set FLUTTERWAVE_SECRET_KEY.",
+    );
   }
 
-  if (hasPaystackKeys()) {
-    try {
-      const channels =
-        countryCode === "GH" || countryCode === "KE"
-          ? ["card", "bank", "mobile_money"]
-          : ["card", "bank"];
+  const res = await flutterwaveFetch<InitCheckoutData>("/payments", {
+    method: "POST",
+    body: JSON.stringify({
+      tx_ref: reference,
+      amount: localAmount,
+      currency: localCurrency,
+      redirect_url: input.callbackUrl,
+      payment_options: flutterwavePaymentOptions(countryCode),
+      customer: {
+        email: input.email,
+        name: input.name || "ORYNO User",
+        phonenumber: input.phone || undefined,
+      },
+      customizations: {
+        title: "ORYNO",
+        description: "USD wallet funding",
+      },
+      meta: {
+        oryno_user_id: input.userId,
+        purpose: "usd_fund",
+        country_code: countryCode,
+        usd_amount: usdAmount,
+        local_currency: localCurrency,
+        local_amount: localAmount,
+        buy_rate: quote.buyRate,
+      },
+    }),
+  });
 
-      const res = await paystackFetch<InitPaystackData>(
-        "/transaction/initialize",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            email: input.email,
-            amount: Math.round(localAmount * 100),
-            currency: localCurrency,
-            reference,
-            callback_url: input.callbackUrl,
-            channels,
-            metadata: {
-              oryno_user_id: input.userId,
-              purpose: "usd_fund",
-              country_code: countryCode,
-              usd_amount: usdAmount,
-              local_currency: localCurrency,
-              local_amount: localAmount,
-              buy_rate: quote.buyRate,
-            },
-          }),
-        },
-      );
-
-      return {
-        mode: "paystack" as const,
-        reference,
-        authorizationUrl: res.data.authorization_url,
-        accessCode: res.data.access_code,
-        usdAmount,
-        localAmount,
-        localCurrency,
-        quote,
-        demoMode: isPaystackDemoMode(),
-      };
-    } catch (error) {
-      throw error;
-    }
+  const authorizationUrl = res.data.link || res.data.authorization_url;
+  if (!authorizationUrl) {
+    throw new Error("Flutterwave did not return a checkout link");
   }
 
-  throw new Error(
-    "Paystack is not configured for live USD funding. Set PAYSTACK_SECRET_KEY.",
-  );
+  return {
+    mode: "flutterwave" as const,
+    reference,
+    authorizationUrl,
+    usdAmount,
+    localAmount,
+    localCurrency,
+    quote,
+    demoMode: isFlutterwaveDemoMode(),
+  };
 }
+
+export const initiateUsdPaystackFund = initiateUsdWalletFund;
 
 export async function creditUsdWalletFromFunding(input: {
   userId: string;
@@ -485,8 +485,8 @@ export async function creditUsdWalletFromFunding(input: {
         category: "fund",
         title: "Fund USD wallet",
         subtitle: funding.metadata
-          ? `Paystack · ${String((funding.metadata as { localCurrency?: string }).localCurrency ?? "NGN")}`
-          : "Paystack USD fund",
+          ? `Flutterwave · ${String((funding.metadata as { localCurrency?: string }).localCurrency ?? "NGN")}`
+          : "Flutterwave USD fund",
         amount: usdAmount.toFixed(2),
         currency: "USD",
         status: "completed",
@@ -524,38 +524,45 @@ export async function creditUsdWalletFromFunding(input: {
   };
 }
 
-export async function verifyUsdPaystackFund(input: {
+export async function verifyUsdWalletFund(input: {
   userId: string;
   reference: string;
+  transactionId?: string | number | null;
 }) {
-  if (!hasPaystackKeys()) {
+  if (!hasFlutterwaveKeys()) {
     return creditUsdWalletFromFunding(input);
   }
 
   type VerifyData = {
     status: string;
-    reference: string;
+    tx_ref?: string;
     amount: number;
     currency: string;
+    meta?: Record<string, unknown> | null;
     metadata?: Record<string, unknown> | null;
   };
 
-  const res = await paystackFetch<VerifyData>(
-    `/transaction/verify/${encodeURIComponent(input.reference)}`,
-  );
+  const res = input.transactionId
+    ? await flutterwaveFetch<VerifyData>(
+        `/transactions/${encodeURIComponent(String(input.transactionId))}/verify`,
+      )
+    : await flutterwaveFetch<VerifyData>(
+        `/transactions/verify_by_reference?tx_ref=${encodeURIComponent(input.reference)}`,
+      );
 
-  if (res.data.status !== "success") {
+  if (!isPaymentSuccessful(res.data.status)) {
     throw new Error("Payment not successful yet.");
   }
 
-  const meta = res.data.metadata ?? {};
+  const meta = normalizeFlutterwaveMeta(res.data.meta ?? res.data.metadata) ?? {};
   const purpose = meta.purpose ?? meta.Purpose;
   if (purpose && purpose !== "usd_fund") {
     throw new Error("This payment is not a USD wallet funding.");
   }
 
+  const txRef = res.data.tx_ref || input.reference;
   const funding = await db.query.walletFundings.findFirst({
-    where: eq(walletFundings.externalRef, input.reference),
+    where: eq(walletFundings.externalRef, txRef),
   });
   const usdAmount = funding
     ? Number(funding.amount)
@@ -567,7 +574,9 @@ export async function verifyUsdPaystackFund(input: {
 
   return creditUsdWalletFromFunding({
     userId: input.userId,
-    reference: input.reference,
+    reference: txRef,
     usdAmount,
   });
 }
+
+export const verifyUsdPaystackFund = verifyUsdWalletFund;
