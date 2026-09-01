@@ -116,9 +116,9 @@ export function addBankInstructions(countryCode?: string | null) {
   return [
     `Select a ${market} bank from the list.`,
     `Enter your ${rules.label.toLowerCase()}.`,
-    "We verify the account with Flutterwave before saving.",
+    "We verify the account before saving.",
     "Confirm the name matches your bank or wallet records.",
-    "Save the account — Flutterwave uses it for withdrawals.",
+    "Save the account — we use it for withdrawals.",
   ];
 }
 

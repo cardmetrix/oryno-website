@@ -43,9 +43,7 @@ export async function initiateLocalWalletFund(input: {
   const reference = `FND_${Date.now().toString(36).toUpperCase()}_${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
 
   if (!hasFlutterwaveKeys()) {
-    throw new Error(
-      "Flutterwave is not configured for live wallet funding. Set FLUTTERWAVE_SECRET_KEY.",
-    );
+    throw new Error("Online wallet funding is not available right now.");
   }
 
   const res = await flutterwaveFetch<InitPaymentData>("/payments", {
@@ -77,11 +75,11 @@ export async function initiateLocalWalletFund(input: {
 
   const authorizationUrl = res.data.link || res.data.authorization_url;
   if (!authorizationUrl) {
-    throw new Error("Flutterwave did not return a checkout link");
+    throw new Error("Could not open the payment page. Try again.");
   }
 
   return {
-    mode: "flutterwave" as const,
+    mode: "checkout" as const,
     reference,
     authorizationUrl,
     amount,
@@ -97,7 +95,7 @@ export async function verifyLocalWalletFund(input: {
   transactionId?: string | number | null;
 }) {
   if (!hasFlutterwaveKeys()) {
-    throw new Error("Flutterwave is not configured");
+    throw new Error("Payment verification is not available");
   }
 
   type VerifyData = {

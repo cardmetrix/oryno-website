@@ -147,7 +147,7 @@ export async function POST(req: Request) {
       try {
         const result = await reverseDeposit({
           reference,
-          reason: data.complete_message || "Flutterwave reversed this deposit",
+          reason: data.complete_message || "This deposit was reversed",
         });
         return NextResponse.json(result);
       } catch (error) {

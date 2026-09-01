@@ -38,7 +38,7 @@ export async function POST(req: Request) {
         error:
           error instanceof Error
             ? error.message
-            : "Failed to start Flutterwave checkout",
+            : "Failed to start payment",
       },
       { status: 400 },
     );

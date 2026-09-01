@@ -18,12 +18,12 @@ export async function POST(req: Request) {
 
     const body = (await req.json()) as {
       amountUsd?: string | number;
-      method?: "flutterwave" | "paystack" | "convert";
+      method?: "checkout" | "convert";
       callbackUrl?: string;
     };
 
     const method =
-      body.method === "convert" ? "convert" : "flutterwave";
+      body.method === "convert" ? "convert" : "checkout";
     const localCurrency = currencyForCountry(user.countryCode);
 
     if (method === "convert") {
@@ -79,7 +79,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       ok: true,
-      method: "flutterwave",
+      method: "checkout",
       ...result,
       localFormatted: formatMoney(result.localAmount, result.localCurrency),
       usdFormatted: formatMoney(result.usdAmount, "USD"),

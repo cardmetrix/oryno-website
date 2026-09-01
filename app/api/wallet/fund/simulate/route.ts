@@ -15,7 +15,7 @@ export async function POST(req: Request) {
   try {
     if (!isFlutterwaveDemoMode()) {
       return NextResponse.json(
-        { error: "Simulate deposit is only available in Flutterwave test/demo mode" },
+        { error: "Simulate deposit is only available in test/demo mode" },
         { status: 403 },
       );
     }

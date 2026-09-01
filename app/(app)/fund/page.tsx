@@ -42,7 +42,7 @@ export default function FundPage() {
     <Suspense
       fallback={
         <AppShell hideNav>
-          <PageHeader title="Fund Wallet" subtitle="Flutterwave" backHref="/wallet" />
+          <PageHeader title="Fund Wallet" subtitle="Add money to your wallet" backHref="/wallet" />
         </AppShell>
       }
     >
@@ -237,7 +237,7 @@ function FundPageContent() {
     }
   }
 
-  async function onPayWithFlutterwave() {
+  async function onPayWithCheckout() {
     const value = Number(amount);
     if (!Number.isFinite(value) || value <= 0) {
       setError("Enter a valid amount");
@@ -259,7 +259,7 @@ function FundPageContent() {
         mode?: string;
         authorizationUrl?: string;
       };
-      if (!res.ok) throw new Error(json.error || "Could not start Flutterwave");
+      if (!res.ok) throw new Error(json.error || "Could not start payment");
       if (json.authorizationUrl) {
         window.location.href = json.authorizationUrl;
         return;
@@ -268,10 +268,10 @@ function FundPageContent() {
         await onSimulate();
         return;
       }
-      throw new Error("Flutterwave checkout is not available");
+      throw new Error("Online payment is not available");
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : "Could not start Flutterwave";
+        err instanceof Error ? err.message : "Could not start payment";
       setError(message);
       toast.error(message);
     } finally {
@@ -332,7 +332,7 @@ function FundPageContent() {
 
   async function onIHaveFunded() {
     if (!demoMode) {
-      toast.message("Waiting for Flutterwave", {
+      toast.message("Waiting for payment", {
         description:
           "Complete the transfer. Your balance updates when payment is confirmed.",
       });
@@ -350,7 +350,7 @@ function FundPageContent() {
         title="Fund Wallet"
         subtitle={
           method === "checkout"
-            ? "Pay with Flutterwave card, bank, or mobile money"
+            ? "Pay with card, bank, or mobile money"
             : "Transfer to your personal ORYNO account number"
         }
         backHref="/wallet"
@@ -451,6 +451,9 @@ function FundPageContent() {
                     onCopy={() => void copyText(deposit.accountNumber, "number")}
                     copied={copied === "number"}
                   />
+                  <p className="text-xs leading-relaxed text-muted-foreground">
+                    {deposit.instructions}
+                  </p>
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">
@@ -467,7 +470,7 @@ function FundPageContent() {
                 Amount to fund
               </h2>
               <p className="mt-1 text-xs text-muted-foreground">
-                Flutterwave checkout for {wallet?.currency ?? "your local currency"}.
+                Pay with card, bank, or mobile money in {wallet?.currency ?? "your local currency"}.
                 Your ORYNO wallet is credited after payment.
               </p>
               <label className="mt-4 block">
@@ -504,16 +507,16 @@ function FundPageContent() {
               <button
                 type="button"
                 disabled={submitting}
-                onClick={() => void onPayWithFlutterwave()}
+                onClick={() => void onPayWithCheckout()}
                 className="btn-primary mt-4 inline-flex h-12 w-full items-center justify-center gap-2 text-base disabled:opacity-50 md:max-w-sm"
               >
                 {submitting ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Opening Flutterwave…
+                    Opening payment…
                   </>
                 ) : (
-                  `Pay ${symbol}${Number(amount || 0).toLocaleString()} with Flutterwave`
+                  `Fund ${symbol}${Number(amount || 0).toLocaleString()}`
                 )}
               </button>
             </MotionSection>
@@ -528,8 +531,7 @@ function FundPageContent() {
                 I have funded
               </h2>
               <p className="mt-1 text-xs text-muted-foreground">
-                Demo only — confirms a Flutterwave-style deposit and credits your
-                wallet now.
+                Demo only — simulates a bank deposit and credits your wallet now.
               </p>
 
               <div className="mt-4 flex flex-wrap gap-2">

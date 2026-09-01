@@ -45,9 +45,8 @@ function toDto(
   row: typeof userDepositAccounts.$inferSelect,
 ): DepositAccountDto {
   const demoMode =
-    row.provider.endsWith("_demo") || isFlutterwaveDemoMode();
-  const via =
-    row.provider.startsWith("paystack") ? "Paystack" : "Flutterwave";
+    row.provider.endsWith("_demo") ||
+    (isFlutterwaveDemoMode() && !hasPaystackKeys());
   return {
     id: row.id,
     accountNumber: row.accountNumber,
@@ -58,7 +57,8 @@ function toDto(
     provider: row.provider,
     status: row.status,
     demoMode,
-    instructions: `Transfer any amount to this account. Your ORYNO wallet is credited automatically after ${via} confirms the payment.`,
+    instructions:
+      "Transfer any amount to this account. Your ORYNO wallet is credited automatically after payment is confirmed.",
   };
 }
 
@@ -92,8 +92,8 @@ async function createDemoDepositAccount(user: typeof users.$inferSelect) {
       currency,
       accountNumber: demoAccountNumber(user.id),
       accountName: user.fullName.toUpperCase(),
-      bankName: "Flutterwave Bank",
-      bankSlug: "flutterwave",
+      bankName: "ORYNO Bank",
+      bankSlug: "oryno",
       paystackCustomerCode: `DEMO_${user.id.slice(0, 8)}`,
       status: "active",
       metadata: { mode: "demo", source: "local_fallback" },
@@ -172,7 +172,7 @@ async function createFlutterwaveDepositAccount(
     else if (identity.nin) payload.nin = identity.nin;
     else {
       throw new Error(
-        "Nigerian dedicated accounts need a verified BVN or NIN. Complete KYC, or fund with Flutterwave checkout.",
+        "Complete KYC with a verified BVN or NIN to get a dedicated account, or fund with card or mobile money.",
       );
     }
   }
@@ -187,7 +187,7 @@ async function createFlutterwaveDepositAccount(
 
   const data = created.data;
   if (!data?.account_number) {
-    throw new Error("Flutterwave did not return a deposit account number");
+    throw new Error("Could not create your dedicated deposit account.");
   }
 
   const [row] = await db
@@ -255,11 +255,34 @@ export async function getOrCreateDepositAccount(userId: string) {
 
   if (flutterwaveSupportsVirtualAccount(country)) {
     if (!hasFlutterwaveKeys()) {
+      if (hasPaystackKeys()) {
+        const { createPaystackDepositAccount } = await import(
+          "@/lib/paystack/dva"
+        );
+        const created = await createPaystackDepositAccount(user);
+        return toDto(created);
+      }
       const demo = await createDemoDepositAccount(user);
       return toDto(demo);
     }
-    const created = await createFlutterwaveDepositAccount(user);
-    return toDto(created);
+    try {
+      const created = await createFlutterwaveDepositAccount(user);
+      return toDto(created);
+    } catch (error) {
+      console.error("[wallet-fund-flw-dva]", error);
+      if (hasPaystackKeys()) {
+        const { createPaystackDepositAccount } = await import(
+          "@/lib/paystack/dva"
+        );
+        const created = await createPaystackDepositAccount(user);
+        return toDto(created);
+      }
+      throw error instanceof Error
+        ? error
+        : new Error(
+            "Could not create your dedicated account. Use card or mobile money to fund.",
+          );
+    }
   }
 
   if (hasPaystackKeys()) {
@@ -269,7 +292,7 @@ export async function getOrCreateDepositAccount(userId: string) {
   }
 
   throw new Error(
-    "Dedicated bank accounts are not available in your country yet. Use Flutterwave checkout to fund.",
+    "Dedicated bank accounts are not available in your country yet. Use card or mobile money to fund.",
   );
 }
 
@@ -329,7 +352,7 @@ export async function creditWalletFromDeposit(input: {
         type: "credit",
         category: "fund",
         title: "Wallet funded",
-        subtitle: provider === "paystack" ? "Paystack deposit" : "Flutterwave deposit",
+        subtitle: "Bank transfer",
         amount,
         currency,
         status: "completed",
@@ -390,7 +413,7 @@ export async function creditWalletFromDeposit(input: {
     await createNotification({
       userId: input.userId,
       title: "Wallet funded",
-      body: `${amountFormatted} received via ${provider === "paystack" ? "Paystack" : "Flutterwave"}. Ref ${input.reference}`,
+      body: `${amountFormatted} received. Ref ${input.reference}`,
       type: "fund",
       metadata: {
         href: "/wallet",
@@ -440,7 +463,6 @@ export async function getWalletFundOptions(user: typeof users.$inferSelect) {
     presets,
     account,
     demoMode,
-    provider: "flutterwave",
   };
 }
 

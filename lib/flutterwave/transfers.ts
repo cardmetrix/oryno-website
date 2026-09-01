@@ -102,7 +102,7 @@ export async function sendFlutterwaveWithdrawal(input: {
   countryCode?: string | null;
 }) {
   if (!input.bank.bankCode) {
-    throw new Error("Re-add this bank account so Flutterwave can verify it.");
+    throw new Error("Re-add this bank account so we can verify it.");
   }
 
   const transfer = await initiateFlutterwaveTransfer({
@@ -218,7 +218,7 @@ export async function settlePayoutTransfer(input: {
   const reason =
     input.failureReason ||
     (input.status === "reversed"
-      ? "Flutterwave reversed this withdrawal"
+      ? "This withdrawal was reversed"
       : "Transfer failed");
 
   try {

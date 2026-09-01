@@ -397,9 +397,7 @@ export async function initiateUsdWalletFund(input: {
   });
 
   if (!hasFlutterwaveKeys()) {
-    throw new Error(
-      "Flutterwave is not configured for live USD funding. Set FLUTTERWAVE_SECRET_KEY.",
-    );
+    throw new Error("Online USD funding is not available right now.");
   }
 
   const res = await flutterwaveFetch<InitCheckoutData>("/payments", {
@@ -433,11 +431,11 @@ export async function initiateUsdWalletFund(input: {
 
   const authorizationUrl = res.data.link || res.data.authorization_url;
   if (!authorizationUrl) {
-    throw new Error("Flutterwave did not return a checkout link");
+    throw new Error("Could not open the payment page. Try again.");
   }
 
   return {
-    mode: "flutterwave" as const,
+    mode: "checkout" as const,
     reference,
     authorizationUrl,
     usdAmount,
@@ -485,8 +483,8 @@ export async function creditUsdWalletFromFunding(input: {
         category: "fund",
         title: "Fund USD wallet",
         subtitle: funding.metadata
-          ? `Flutterwave · ${String((funding.metadata as { localCurrency?: string }).localCurrency ?? "NGN")}`
-          : "Flutterwave USD fund",
+          ? `${String((funding.metadata as { localCurrency?: string }).localCurrency ?? "NGN")} payment`
+          : "USD wallet fund",
         amount: usdAmount.toFixed(2),
         currency: "USD",
         status: "completed",

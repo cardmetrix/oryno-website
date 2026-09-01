@@ -284,7 +284,7 @@ export async function fundWallet(input: {
     (process.env.ALLOW_SIMULATED_FUND || "").trim() === "1";
   if (!allowSim) {
     throw new Error(
-      "Direct wallet credit is disabled. Fund via Flutterwave deposit/checkout, or set ALLOW_SIMULATED_FUND=true for local testing only.",
+      "Direct wallet credit is disabled. Fund via deposit or checkout, or set ALLOW_SIMULATED_FUND=true for local testing only.",
     );
   }
 
@@ -416,7 +416,7 @@ export async function withdrawWallet(input: {
     });
     if (!bank) throw new Error("Bank account not found.");
     if (!bank.bankCode) {
-      throw new Error("Re-add this bank account so Flutterwave can verify it.");
+      throw new Error("Re-add this bank account so we can verify it.");
     }
 
     const wallet = await tx.query.wallets.findFirst({
