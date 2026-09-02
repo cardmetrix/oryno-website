@@ -1,10 +1,11 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
+import { userDepositAccounts, users } from "@/lib/db/schema";
 import {
   creditWalletFromDeposit,
   findUserIdForDepositCharge,
 } from "@/lib/flutterwave/deposit-accounts";
+import { flutterwaveDepositRefs, vaReferenceForUser } from "@/lib/flutterwave/deposit-refs";
 import {
   flutterwaveFetch,
   hasFlutterwaveKeys,
@@ -26,6 +27,7 @@ type FlutterwaveTransaction = {
   payment_type?: string;
   created_at?: string;
   customer?: { email?: string };
+  account_number?: string;
   meta?: unknown;
   metadata?: unknown;
 };
@@ -35,6 +37,29 @@ function transactionList(data: unknown): FlutterwaveTransaction[] {
   const record = data as { transactions?: FlutterwaveTransaction[] };
   if (Array.isArray(record.transactions)) return record.transactions;
   return [];
+}
+
+async function fetchTransactionPages(path: string, maxPages = 3) {
+  const seen = new Map<string, FlutterwaveTransaction>();
+  for (let page = 1; page <= maxPages; page += 1) {
+    const separator = path.includes("?") ? "&" : "?";
+    try {
+      const res = await flutterwaveFetch<unknown>(`${path}${separator}page=${page}`);
+      const rows = transactionList(res.data);
+      if (rows.length === 0) break;
+      for (const tx of rows) {
+        const key =
+          flutterwaveDepositRefs(tx).primary ||
+          String(tx.id ?? tx.flw_ref ?? `${tx.tx_ref}-${tx.created_at}`);
+        if (!seen.has(key)) seen.set(key, tx);
+      }
+      if (rows.length < 10) break;
+    } catch (error) {
+      console.error("[deposit-reconcile] fetch failed", path, error);
+      break;
+    }
+  }
+  return [...seen.values()];
 }
 
 export async function reconcileUserDeposits(userId: string) {
@@ -60,35 +85,45 @@ export async function reconcileUserDeposits(userId: string) {
     };
   }
 
+  const deposit = await db.query.userDepositAccounts.findFirst({
+    where: eq(userDepositAccounts.userId, userId),
+  });
+
   const to = new Date().toISOString().slice(0, 10);
   const from = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
     .toISOString()
     .slice(0, 10);
-
-  const res = await flutterwaveFetch<unknown>(
-    `/transactions?from=${from}&to=${to}&page=1`,
-  );
-
+  const vaRef = vaReferenceForUser(userId);
   const email = user.email.trim().toLowerCase();
+
+  const queries = [
+    `/transactions?from=${from}&to=${to}&tx_ref=${encodeURIComponent(vaRef)}`,
+    `/transactions?from=${from}&to=${to}&customer_email=${encodeURIComponent(email)}`,
+  ];
+
+  const merged = new Map<string, FlutterwaveTransaction>();
+  for (const query of queries) {
+    const rows = await fetchTransactionPages(query);
+    for (const tx of rows) {
+      const key =
+        flutterwaveDepositRefs(tx).primary ||
+        String(tx.id ?? tx.flw_ref ?? `${tx.tx_ref}-${tx.created_at}`);
+      if (!merged.has(key)) merged.set(key, tx);
+    }
+  }
+
   let credited = 0;
   let checked = 0;
 
-  for (const tx of transactionList(res.data)) {
+  for (const tx of merged.values()) {
     if (!isPaymentSuccessful(tx.status)) continue;
 
-    const txEmail = tx.customer?.email?.trim().toLowerCase();
-    if (txEmail && txEmail !== email) continue;
-
-    const reference =
-      tx.tx_ref?.trim() ||
-      tx.flw_ref?.trim() ||
-      (tx.id != null ? `FLW_${tx.id}` : null);
+    const refs = flutterwaveDepositRefs(tx);
+    const reference = refs.primary;
     const amountMajor = Number(tx.charged_amount ?? tx.amount);
     if (!reference || !Number.isFinite(amountMajor) || amountMajor <= 0) {
       continue;
     }
-
-    checked += 1;
 
     const meta =
       parseFlutterwaveWebhook({
@@ -96,16 +131,27 @@ export async function reconcileUserDeposits(userId: string) {
         data: tx as Record<string, unknown>,
       }).meta ?? null;
 
-    const matchedUserId = await findUserIdForDepositCharge(
-      chargePayloadForLookup(tx as Record<string, unknown>, meta),
-    );
-    if (matchedUserId !== userId) continue;
+    const lookup = chargePayloadForLookup(tx as Record<string, unknown>, meta);
+    if (deposit?.accountNumber && !lookup.account_number) {
+      lookup.account_number = deposit.accountNumber;
+    }
+    lookup.tx_ref = lookup.tx_ref || tx.tx_ref || vaRef;
+
+    const matchedUserId = await findUserIdForDepositCharge(lookup);
+    if (matchedUserId && matchedUserId !== userId) continue;
+    if (!matchedUserId) {
+      const txEmail = tx.customer?.email?.trim().toLowerCase();
+      if (txEmail && txEmail !== email) continue;
+    }
+
+    checked += 1;
 
     const result = await creditWalletFromDeposit({
       userId,
       amountKobo: Math.round(amountMajor * 100),
       currency: tx.currency,
       reference,
+      alternateRefs: refs.aliases,
       channel: tx.payment_type,
       paidAt: tx.created_at,
       raw: {

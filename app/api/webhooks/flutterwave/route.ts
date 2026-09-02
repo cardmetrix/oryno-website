@@ -64,7 +64,7 @@ export async function POST(req: Request) {
         const usdAmount = Number(meta?.usd_amount ?? 0);
         const result = await creditUsdWalletFromFunding({
           userId,
-          reference,
+          reference: lookupPayload.tx_ref || reference,
           usdAmount: usdAmount > 0 ? usdAmount : undefined,
         });
         return NextResponse.json({ ok: true, purpose: "usd_fund", ...result });
@@ -95,6 +95,13 @@ export async function POST(req: Request) {
           typeof data.created_at === "string" ? data.created_at : undefined,
         raw: data,
       });
+
+      if (result.duplicated) {
+        console.info("[flutterwave-webhook] deposit already credited", {
+          reference,
+          fundingId: result.fundingId,
+        });
+      }
 
       return NextResponse.json({ ok: true, ...result });
     }

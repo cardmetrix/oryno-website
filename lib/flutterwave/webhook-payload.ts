@@ -1,3 +1,4 @@
+import { flutterwaveDepositRefs } from "@/lib/flutterwave/deposit-refs";
 import {
   isPaymentSuccessful,
   normalizeFlutterwaveMeta,
@@ -40,11 +41,13 @@ export function parseFlutterwaveWebhook(body: JsonRecord): ParsedFlutterwaveWebh
     normalizeFlutterwaveMeta(body.meta_data) ??
     normalizeFlutterwaveMeta(body.meta);
 
-  const reference =
-    stringField(data.tx_ref) ||
-    stringField(data.reference) ||
-    stringField(data.flw_ref) ||
-    (data.id != null ? `FLW_${String(data.id)}` : null);
+  const refs = flutterwaveDepositRefs({
+    tx_ref: data.tx_ref,
+    flw_ref: data.flw_ref,
+    id: data.id,
+    reference: data.reference,
+  });
+  const reference = refs.primary;
 
   const amountMajor = Number(data.charged_amount ?? data.amount ?? 0);
   const status = stringField(data.status);
@@ -52,7 +55,10 @@ export function parseFlutterwaveWebhook(body: JsonRecord): ParsedFlutterwaveWebh
   const isChargeSuccess =
     eventName === "charge.completed" ||
     eventName === "charge.success" ||
-    (eventName.includes("bank_transfer") && isPaymentSuccessful(status));
+    ((eventName.includes("bank_transfer") ||
+      eventName.includes("virtualaccount") ||
+      eventName.includes("virtual_account")) &&
+      isPaymentSuccessful(status));
 
   return {
     eventName,
@@ -71,6 +77,7 @@ export function chargePayloadForLookup(
 ) {
   const customer = asRecord(data.customer);
   const authorization = asRecord(data.authorization);
+  const account = asRecord(data.account);
 
   return {
     customer: customer
@@ -88,6 +95,7 @@ export function chargePayloadForLookup(
       : undefined,
     account_number:
       stringField(data.account_number) ||
+      stringField(account?.account_number) ||
       stringField(meta?.account_number) ||
       stringField(meta?.accountnumber) ||
       undefined,

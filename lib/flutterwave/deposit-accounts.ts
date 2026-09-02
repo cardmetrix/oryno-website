@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   transactions,
@@ -37,6 +37,14 @@ import {
   isFlutterwaveDemoMode,
 } from "@/lib/flutterwave/client";
 import { hasPaystackKeys } from "@/lib/paystack/client";
+import {
+  flutterwaveDepositRefs,
+  isReusableVaTxRef,
+  userIdFromVaReference,
+  vaReferenceForUser,
+} from "@/lib/flutterwave/deposit-refs";
+
+export { userIdFromVaReference, vaReferenceForUser };
 
 export type DepositAccountDto = {
   id: string;
@@ -78,17 +86,6 @@ function demoAccountNumber(userId: string) {
     hash = (Math.imul(hash, 131) + userId.charCodeAt(i)) >>> 0;
   }
   return String(1_000_000_000 + (hash % 900_000_000)).slice(0, 10);
-}
-
-function vaReferenceForUser(userId: string) {
-  return `VA_${userId.replace(/-/g, "")}`;
-}
-
-export function userIdFromVaReference(txRef?: string | null) {
-  if (!txRef) return null;
-  const raw = txRef.replace(/^VA_/i, "");
-  if (raw.length !== 32 || !/^[0-9a-f]+$/i.test(raw)) return null;
-  return `${raw.slice(0, 8)}-${raw.slice(8, 12)}-${raw.slice(12, 16)}-${raw.slice(16, 20)}-${raw.slice(20)}`;
 }
 
 async function createDemoDepositAccount(user: typeof users.$inferSelect) {
@@ -348,11 +345,32 @@ export async function creditWalletFromDeposit(input: {
   amountKobo: number;
   currency?: string;
   reference: string;
+  alternateRefs?: string[];
   channel?: string;
   paidAt?: string;
   raw?: Record<string, unknown>;
 }) {
-  if (!input.reference) throw new Error("Missing payment reference");
+  const refs = flutterwaveDepositRefs({
+    ...(input.raw ?? {}),
+    tx_ref: input.raw?.tx_ref,
+    flw_ref: input.raw?.flw_ref,
+    id: input.raw?.id,
+    reference: input.reference,
+  });
+  const lookupRefs = Array.from(
+    new Set(
+      [refs.primary, ...(input.alternateRefs ?? []), ...refs.aliases]
+        .map((value) => value?.trim())
+        .filter((value): value is string => Boolean(value) && !isReusableVaTxRef(value)),
+    ),
+  );
+  const reference =
+    lookupRefs[0] ||
+    (isReusableVaTxRef(input.reference)
+      ? `${input.reference}_${input.paidAt || "unknown"}_${input.amountKobo}`
+      : input.reference.trim());
+  if (!reference) throw new Error("Missing payment reference");
+  if (!lookupRefs.includes(reference)) lookupRefs.unshift(reference);
   if (!Number.isFinite(input.amountKobo) || input.amountKobo <= 0) {
     throw new Error("Invalid deposit amount");
   }
@@ -370,7 +388,7 @@ export async function creditWalletFromDeposit(input: {
   const currency = "NGN";
 
   const already = await db.query.walletFundings.findFirst({
-    where: eq(walletFundings.externalRef, input.reference),
+    where: inArray(walletFundings.externalRef, lookupRefs),
   });
   if (already) {
     return { duplicated: true as const, fundingId: already.id };
@@ -404,13 +422,14 @@ export async function creditWalletFromDeposit(input: {
         currency,
         status: "completed",
         balanceAfter: nextBalance,
-        externalRef: input.reference,
+        externalRef: reference,
         metadata: {
           channel: input.channel ?? "bank_transfer",
           provider,
           paidAt: input.paidAt,
           paidLocal,
           paidCurrency,
+          depositRefs: lookupRefs,
         },
       })
       .returning();
@@ -430,13 +449,14 @@ export async function creditWalletFromDeposit(input: {
         currency,
         method: "bank_transfer",
         status: "completed",
-        externalRef: input.reference,
+        externalRef: reference,
         transactionId: txRow.id,
         metadata: {
           provider,
           channel: input.channel ?? "virtual_account",
           paidLocal,
           paidCurrency,
+          depositRefs: lookupRefs,
           raw: input.raw ?? null,
         },
       })
@@ -460,7 +480,7 @@ export async function creditWalletFromDeposit(input: {
     void notifyWalletFunded({
       userId: input.userId,
       amountFormatted,
-      reference: input.reference,
+      reference,
       transactionId: result.transaction.id,
       fundingId: result.funding.id,
       href: "/wallet",

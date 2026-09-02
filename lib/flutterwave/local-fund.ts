@@ -6,9 +6,8 @@ import {
   isPaymentSuccessful,
   normalizeFlutterwaveMeta,
 } from "@/lib/flutterwave/client";
-import {
-  flutterwavePaymentOptions,
-} from "@/lib/payments/country";
+import { flutterwaveDepositRefs } from "@/lib/flutterwave/deposit-refs";
+import { flutterwavePaymentOptions } from "@/lib/payments/country";
 import { resolveCountryCode, currencyForCountry } from "@/lib/country";
 
 type InitPaymentData = {
@@ -130,13 +129,15 @@ export async function verifyLocalWalletFund(input: {
   }
 
   const amountMajor = Number(res.data.charged_amount ?? res.data.amount);
-  const reference = res.data.tx_ref || input.reference;
+  const refs = flutterwaveDepositRefs(res.data);
+  const reference = refs.primary || res.data.tx_ref || input.reference;
 
   return creditWalletFromDeposit({
     userId: input.userId,
     amountKobo: Math.round(amountMajor * 100),
     currency: res.data.currency,
     reference,
+    alternateRefs: refs.aliases,
     channel: res.data.payment_type,
     paidAt: res.data.created_at,
     raw: res.data as unknown as Record<string, unknown>,
