@@ -64,6 +64,7 @@ function FundPageContent() {
   const [checking, setChecking] = useState(false);
   const [submittingIdentity, setSubmittingIdentity] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [setupHint, setSetupHint] = useState<string | null>(null);
   const [copied, setCopied] = useState<"number" | "name" | null>(null);
   const [idType, setIdType] = useState<"BVN" | "NIN">("BVN");
   const [idNumber, setIdNumber] = useState("");
@@ -122,6 +123,7 @@ function FundPageContent() {
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setSetupHint(null);
     try {
       const [walletRes, depositRes] = await Promise.all([
         fetch("/api/wallet", { cache: "no-store" }),
@@ -138,17 +140,20 @@ function FundPageContent() {
         account?: DepositAccount | null;
         identityRequired?: IdentityRequired | null;
         error?: string;
+        setupHint?: string | null;
       };
 
       if (depositRes.ok) {
         setDeposit(json.account ?? null);
         setIdentityRequired(json.identityRequired ?? null);
+        setSetupHint(json.setupHint ?? null);
         if (!json.account && !json.identityRequired) {
-          setError("Could not load your dedicated account. Try refresh.");
+          setError(json.error || "Could not load your dedicated account. Try refresh.");
         }
       } else {
         setDeposit(json.account ?? null);
         setIdentityRequired(json.identityRequired ?? null);
+        setSetupHint(json.setupHint ?? null);
         setError(json.error || "Could not load your dedicated account");
       }
     } catch {
@@ -458,6 +463,11 @@ function FundPageContent() {
 
           {error ? (
             <p className="mt-4 text-sm font-medium text-destructive">{error}</p>
+          ) : null}
+          {setupHint ? (
+            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+              {setupHint}
+            </p>
           ) : null}
         </motion.div>
       )}

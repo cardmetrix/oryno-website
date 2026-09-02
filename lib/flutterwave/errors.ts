@@ -14,7 +14,20 @@ export function isProviderConfigError(message?: string | null) {
   return isFlutterwaveIpWhitelistError(message);
 }
 
-export function humanizeWalletRefundReason(message?: string | null) {
+export function flutterwaveIpWhitelistSetupHint(egressIp?: string | null) {
+  const ipLine = egressIp
+    ? `Add this server IP in Flutterwave → Settings → Whitelisted IP addresses: ${egressIp}`
+    : "Add your production server outbound IP in Flutterwave → Settings → Whitelisted IP addresses.";
+  return `${ipLine} Do not use 0.0.0.0 unless Flutterwave support confirms it for your account. If you host on Vercel, enable Static IPs and whitelist those addresses. Also set FLUTTERWAVE_WEBHOOK_HASH so deposits credit automatically.`;
+}
+
+export function humanizeFlutterwaveSetupError(
+  message?: string | null,
+  egressIp?: string | null,
+) {
+  if (!isFlutterwaveIpWhitelistError(message)) return message || null;
+  return flutterwaveIpWhitelistSetupHint(egressIp);
+}
   if (isFlutterwaveIpWhitelistError(message)) {
     return "Payment provider blocked the transfer from our server. Your money was returned to your ORYNO wallet — not to your bank account.";
   }
