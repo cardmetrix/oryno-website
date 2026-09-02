@@ -5,7 +5,8 @@ export function isFlutterwaveIpWhitelistError(message?: string | null) {
   return (
     value.includes("ip whitelist") ||
     value.includes("whitelisting") ||
-    value.includes("enable ip whitelisting")
+    value.includes("enable ip whitelisting") ||
+    value.includes("contact your account administrator")
   );
 }
 
@@ -27,6 +28,13 @@ export function humanizeFlutterwaveSetupError(
 ) {
   if (!isFlutterwaveIpWhitelistError(message)) return message || null;
   return flutterwaveIpWhitelistSetupHint(egressIp);
+}
+
+export function humanizeFlutterwaveTransferError(message?: string | null) {
+  if (isFlutterwaveIpWhitelistError(message)) {
+    return "Flutterwave blocked this withdrawal because our server IP is not allowed. The amount was returned to your ORYNO wallet. In Flutterwave, add a real outbound server IP (0.0.0.0 is not reliable). Vercel Hobby has no static IP — you need a VPS, Railway, or a static-IP proxy.";
+  }
+  return (message || "").trim() || "Withdrawal could not be sent to your bank.";
 }
 
 export function humanizeWalletRefundReason(message?: string | null) {

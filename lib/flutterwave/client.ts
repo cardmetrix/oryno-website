@@ -87,10 +87,11 @@ export async function flutterwaveFetch<T>(
               "",
           ).trim()
         : "";
+    const combined = nested || json.message || `Flutterwave error (${res.status})`;
     throw new Error(
-      isFlutterwaveIpWhitelistError(nested || json.message)
+      isFlutterwaveIpWhitelistError(combined)
         ? "Please enable IP whitelisting on your Flutterwave dashboard for this server."
-        : nested || json.message || `Flutterwave error (${res.status})`,
+        : combined,
     );
   }
   return json;

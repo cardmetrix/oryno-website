@@ -23,7 +23,7 @@ import {
 } from "@/lib/fx/rates";
 import { getDisplayFx } from "@/lib/display-currency";
 import { refundFailedDebit } from "@/lib/wallet/ledger";
-import { humanizeWalletRefundReason } from "@/lib/flutterwave/errors";
+import { humanizeFlutterwaveTransferError, humanizeWalletRefundReason } from "@/lib/flutterwave/errors";
 import type {
   BankAccountSummary,
   FundingMethod,
@@ -579,8 +579,10 @@ export async function withdrawWallet(input: {
       })
       .where(eq(withdrawals.id, prepared.withdrawal.id));
 
-    throw error instanceof Error
-      ? error
-      : new Error("Withdrawal transfer failed");
+    throw new Error(
+      humanizeFlutterwaveTransferError(
+        error instanceof Error ? error.message : "Withdrawal transfer failed",
+      ),
+    );
   }
 }
