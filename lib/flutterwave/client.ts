@@ -1,4 +1,5 @@
 import { isFlutterwaveIpWhitelistError } from "@/lib/flutterwave/errors";
+import { flutterwaveHttp, hasFlutterwaveProxy } from "@/lib/flutterwave/http";
 
 const FLUTTERWAVE_BASE = "https://api.flutterwave.com/v3";
 
@@ -56,7 +57,7 @@ export async function flutterwaveFetch<T>(
     throw new Error("FLUTTERWAVE_SECRET_KEY is not configured");
   }
 
-  const res = await fetch(`${FLUTTERWAVE_BASE}${path}`, {
+  const res = await flutterwaveHttp(`${FLUTTERWAVE_BASE}${path}`, {
     ...init,
     headers: {
       Authorization: `Bearer ${key}`,
@@ -64,7 +65,6 @@ export async function flutterwaveFetch<T>(
       Accept: "application/json",
       ...(init?.headers ?? {}),
     },
-    cache: "no-store",
   });
 
   let json: FlutterwaveResponse<T> & { data?: T & { message?: string } };
@@ -87,12 +87,28 @@ export async function flutterwaveFetch<T>(
               "",
           ).trim()
         : "";
-    const combined = nested || json.message || `Flutterwave error (${res.status})`;
-    throw new Error(
-      isFlutterwaveIpWhitelistError(combined)
-        ? "Please enable IP whitelisting on your Flutterwave dashboard for this server."
-        : combined,
-    );
+    const combined =
+      nested || json.message || `Flutterwave error (${res.status})`;
+    if (isFlutterwaveIpWhitelistError(combined)) {
+      let egressHint = "";
+      try {
+        const { getServerEgressIp } = await import(
+          "@/lib/flutterwave/egress-ip"
+        );
+        const ip = await getServerEgressIp();
+        if (ip) {
+          egressHint = hasFlutterwaveProxy()
+            ? ` Whitelist this proxy IP in Flutterwave: ${ip}.`
+            : ` This request came from ${ip}. On Vercel Hobby that IP changes — set FLUTTERWAVE_HTTPS_PROXY to a static-IP proxy and whitelist that proxy IP instead.`;
+        }
+      } catch {
+        // ignore lookup failures
+      }
+      throw new Error(
+        `Please enable IP whitelisting on your Flutterwave dashboard for this server.${egressHint}`,
+      );
+    }
+    throw new Error(combined);
   }
   return json;
 }

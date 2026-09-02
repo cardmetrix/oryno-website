@@ -40,6 +40,8 @@ export async function GET(req: Request) {
       });
 
     const displayFx = await getDisplayFx(user.countryCode);
+    const { getWithdrawMinimum } = await import("@/lib/wallet/withdraw-limits");
+    const withdrawMinimum = await getWithdrawMinimum(user.countryCode);
     const currency = displayFx.to;
 
     let primary: WalletRow;
@@ -99,6 +101,13 @@ export async function GET(req: Request) {
         wallets: walletsSummary,
         banks: bankRows.map(toBankSummary),
         recent,
+        withdrawMinimum: {
+          minNgn: withdrawMinimum.minNgn,
+          minLocal: withdrawMinimum.minLocal,
+          currency: withdrawMinimum.currency,
+          formatted: withdrawMinimum.formatted,
+          message: withdrawMinimum.message,
+        },
         fx,
         displayFx,
         ledgerNgn: Number(primary.balance).toFixed(2),

@@ -396,6 +396,16 @@ export async function withdrawWallet(input: {
   const countryCode = resolveCountryCode(input.countryCode);
   const payoutCurrency = currencyForCountry(countryCode);
   const localAmount = parseAmount(input.amount);
+  const {
+    assertWithdrawMinimum,
+    getWithdrawMinimum,
+  } = await import("@/lib/wallet/withdraw-limits");
+  const minWithdraw = await getWithdrawMinimum(countryCode);
+  assertWithdrawMinimum({
+    localAmount,
+    minLocal: minWithdraw.minLocal,
+    message: minWithdraw.message,
+  });
   const fx = await getDisplayFx(countryCode);
   const ledgerNgn =
     payoutCurrency === "NGN"

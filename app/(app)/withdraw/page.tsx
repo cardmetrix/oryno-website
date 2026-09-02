@@ -29,10 +29,17 @@ const WITHDRAW_INSTRUCTIONS = [
   "When the transfer is confirmed, the withdrawal is marked complete.",
 ];
 
+type WithdrawMinimum = {
+  minLocal: number;
+  formatted: string;
+  message: string;
+};
+
 export default function WithdrawPage() {
   const router = useRouter();
   const [wallet, setWallet] = useState<WalletSummary | null>(null);
   const [banks, setBanks] = useState<BankAccountSummary[]>([]);
+  const [minWithdraw, setMinWithdraw] = useState<WithdrawMinimum | null>(null);
   const [loading, setLoading] = useState(true);
   const [amount, setAmount] = useState("");
   const [bankAccountId, setBankAccountId] = useState<string>("");
@@ -61,6 +68,7 @@ export default function WithdrawPage() {
         const json = (await walletRes.json()) as {
           primary: WalletSummary;
           banks: BankAccountSummary[];
+          withdrawMinimum?: WithdrawMinimum;
         };
         if (cancelled) return;
         setWallet(json.primary);
@@ -68,13 +76,24 @@ export default function WithdrawPage() {
         const primary =
           json.banks.find((b) => b.isPrimary) ?? json.banks[0];
         if (primary) setBankAccountId(primary.id);
-        const currency = json.primary.currency;
+
+        const nextMin = json.withdrawMinimum
+          ? {
+              minLocal: json.withdrawMinimum.minLocal,
+              formatted: json.withdrawMinimum.formatted,
+              message: json.withdrawMinimum.message,
+            }
+          : null;
+        setMinWithdraw(nextMin);
+
         setAmount((prev) => {
           if (prev) return prev;
+          if (nextMin) return String(nextMin.minLocal);
+          const currency = json.primary.currency;
           if (currency === "GHS") return "50";
           if (currency === "KES") return "500";
           if (currency === "ZAR") return "100";
-          return "5000";
+          return "100";
         });
 
         if (settingsRes.ok) {
@@ -100,6 +119,15 @@ export default function WithdrawPage() {
   function openPinModal() {
     setError(null);
     setPinError(null);
+    const value = Number(amount);
+    if (!Number.isFinite(value) || value <= 0) {
+      setError("Enter a valid amount greater than zero.");
+      return;
+    }
+    if (minWithdraw && value + 1e-9 < minWithdraw.minLocal) {
+      setError(minWithdraw.message);
+      return;
+    }
     setPinMode(hasPin ? "confirm" : "create");
     setPinModalOpen(true);
   }
@@ -263,6 +291,12 @@ export default function WithdrawPage() {
                     className="mt-2 h-12 w-full rounded-[14px] border border-border bg-muted/40 px-4 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
                   />
                 </label>
+                {minWithdraw ? (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Minimum withdrawal · {minWithdraw.formatted} (₦100
+                    equivalent)
+                  </p>
+                ) : null}
 
                 <div className="mt-4">
                   <div className="mb-2 flex items-center justify-between">
