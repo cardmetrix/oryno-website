@@ -28,6 +28,8 @@ export function humanizeFlutterwaveSetupError(
   if (!isFlutterwaveIpWhitelistError(message)) return message || null;
   return flutterwaveIpWhitelistSetupHint(egressIp);
 }
+
+export function humanizeWalletRefundReason(message?: string | null) {
   if (isFlutterwaveIpWhitelistError(message)) {
     return "Payment provider blocked the transfer from our server. Your money was returned to your ORYNO wallet — not to your bank account.";
   }
