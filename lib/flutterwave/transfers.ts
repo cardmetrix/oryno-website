@@ -11,6 +11,7 @@ import {
   isFlutterwaveDemoMode,
   isPaymentSuccessful,
 } from "@/lib/flutterwave/client";
+import { humanizeWalletRefundReason } from "@/lib/flutterwave/errors";
 import type { BankAccountRow } from "@/lib/wallet";
 import {
   refundFailedDebit,
@@ -215,11 +216,12 @@ export async function settlePayoutTransfer(input: {
   }
 
   const nextStatus = input.status === "reversed" ? "reversed" : "failed";
-  const reason =
+  const reason = humanizeWalletRefundReason(
     input.failureReason ||
-    (input.status === "reversed"
-      ? "This withdrawal was reversed"
-      : "Transfer failed");
+      (input.status === "reversed"
+        ? "This withdrawal was reversed"
+        : "Transfer failed"),
+  );
 
   try {
     if (withdrawal.transactionId) {

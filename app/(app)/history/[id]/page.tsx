@@ -216,6 +216,18 @@ export default function TransactionReceiptPage({
                 <div className="relative z-10 space-y-0 divide-y divide-border">
                   <DetailRow label="Category" value={tx.categoryLabel} />
                   <DetailRow label="Details" value={tx.subtitle} />
+                  {tx.category === "refund" && credit ? (
+                    <div className="border-t border-border px-0 py-4">
+                      <p className="rounded-[14px] bg-muted/50 px-3.5 py-3 text-xs leading-relaxed text-muted-foreground">
+                        This credit was added back to your{" "}
+                        <span className="font-semibold text-foreground">
+                          ORYNO wallet balance
+                        </span>
+                        . It is not a refund to your bank account. Check Wallet
+                        for your current balance.
+                      </p>
+                    </div>
+                  ) : null}
                   <DetailRow label="Type" value={credit ? "Credit" : "Debit"} />
                   <DetailRow label="Date" value={tx.createdAtFormatted} />
                   <DetailRow label="Reference" value={tx.reference} mono />

@@ -1,3 +1,5 @@
+import { isFlutterwaveIpWhitelistError } from "@/lib/flutterwave/errors";
+
 const FLUTTERWAVE_BASE = "https://api.flutterwave.com/v3";
 
 export function flutterwaveSecretKey() {
@@ -86,7 +88,9 @@ export async function flutterwaveFetch<T>(
           ).trim()
         : "";
     throw new Error(
-      nested || json.message || `Flutterwave error (${res.status})`,
+      isFlutterwaveIpWhitelistError(nested || json.message)
+        ? "Please enable IP whitelisting on your Flutterwave dashboard for this server."
+        : nested || json.message || `Flutterwave error (${res.status})`,
     );
   }
   return json;
@@ -95,6 +99,11 @@ export async function flutterwaveFetch<T>(
 export function verifyFlutterwaveSignature(signature: string | null) {
   const hash = flutterwaveWebhookHash();
   if (!hash) {
+    if (!isFlutterwaveDemoMode()) {
+      console.error(
+        "[flutterwave-webhook] FLUTTERWAVE_WEBHOOK_HASH is missing — live webhooks are rejected and deposits will not credit automatically",
+      );
+    }
     return isFlutterwaveDemoMode();
   }
   if (!signature) return false;
@@ -120,5 +129,10 @@ export function normalizeFlutterwaveMeta(
 
 export function isPaymentSuccessful(status?: string | null) {
   const value = (status || "").toLowerCase();
-  return value === "successful" || value === "success" || value === "completed";
+  return (
+    value === "successful" ||
+    value === "success" ||
+    value === "completed" ||
+    value === "succeeded"
+  );
 }

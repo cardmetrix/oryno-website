@@ -23,6 +23,7 @@ import {
 } from "@/lib/fx/rates";
 import { getDisplayFx } from "@/lib/display-currency";
 import { refundFailedDebit } from "@/lib/wallet/ledger";
+import { humanizeWalletRefundReason } from "@/lib/flutterwave/errors";
 import type {
   BankAccountSummary,
   FundingMethod,
@@ -558,8 +559,9 @@ export async function withdrawWallet(input: {
         walletId: prepared.wallet.id,
         transactionId: prepared.transaction.id,
         amount: ledgerTotal,
-        reason:
+        reason: humanizeWalletRefundReason(
           error instanceof Error ? error.message : "Transfer failed",
+        ),
         userId: input.userId,
       });
     } catch (refundError) {

@@ -1,45 +1,23 @@
 import { NextResponse } from "next/server";
 import {
   isPaymentSuccessful,
-  normalizeFlutterwaveMeta,
   verifyFlutterwaveSignature,
 } from "@/lib/flutterwave/client";
+import { isProviderConfigError } from "@/lib/flutterwave/errors";
 import {
   creditWalletFromDeposit,
   findUserIdForDepositCharge,
   reverseDeposit,
 } from "@/lib/flutterwave/deposit-accounts";
 import { settlePayoutTransfer } from "@/lib/flutterwave/transfers";
+import {
+  chargePayloadForLookup,
+  parseFlutterwaveWebhook,
+} from "@/lib/flutterwave/webhook-payload";
 import { creditUsdWalletFromFunding } from "@/lib/wallet-usd";
 import { ensureWalletSchema } from "@/lib/db/ensure-schema";
 
 export const runtime = "nodejs";
-
-type FlutterwaveWebhookBody = {
-  event?: string;
-  "event.type"?: string;
-  data?: {
-    id?: number;
-    tx_ref?: string;
-    flw_ref?: string;
-    reference?: string;
-    amount?: number;
-    charged_amount?: number;
-    currency?: string;
-    status?: string;
-    payment_type?: string;
-    created_at?: string;
-    complete_message?: string | null;
-    account_number?: string;
-    customer?: { email?: string; id?: number; name?: string };
-    meta?: Record<string, unknown> | null;
-    metadata?: Record<string, unknown> | null;
-  };
-};
-
-function asMeta(raw: unknown): Record<string, unknown> | null {
-  return normalizeFlutterwaveMeta(raw);
-}
 
 export async function POST(req: Request) {
   try {
@@ -53,41 +31,33 @@ export async function POST(req: Request) {
 
     await ensureWalletSchema();
 
-    const body = JSON.parse(rawBody) as FlutterwaveWebhookBody;
-    const event = body.event || body["event.type"];
-    const data = body.data;
+    const body = JSON.parse(rawBody) as Record<string, unknown>;
+    const parsed = parseFlutterwaveWebhook(body);
+    const { eventName, data, meta, reference, amountMajor, status, isChargeSuccess } =
+      parsed;
 
-    if (!event || !data) {
+    if (!eventName && !reference) {
       return NextResponse.json({ ok: true, ignored: true });
     }
 
-    const eventName = event.toLowerCase();
-
-    if (
-      eventName === "charge.completed" ||
-      eventName === "charge.success"
-    ) {
-      if (!isPaymentSuccessful(data.status)) {
+    if (isChargeSuccess) {
+      if (!isPaymentSuccessful(status)) {
         return NextResponse.json({ ok: true, ignored: true });
       }
 
-      const reference =
-        data.tx_ref ||
-        data.flw_ref ||
-        (data.id != null ? `FLW_${data.id}` : null);
-      const amountMajor = Number(data.charged_amount ?? data.amount);
       if (!reference || !Number.isFinite(amountMajor) || amountMajor <= 0) {
         return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
       }
 
-      const meta = asMeta(data.meta) ?? asMeta(data.metadata);
       const purpose = meta?.purpose ?? meta?.Purpose;
+
+      const lookupPayload = chargePayloadForLookup(data, meta);
 
       if (purpose === "usd_fund") {
         const userId =
           (typeof meta?.oryno_user_id === "string"
             ? meta.oryno_user_id
-            : null) || (await findUserIdForDepositCharge({ ...data, meta }));
+            : null) || (await findUserIdForDepositCharge(lookupPayload));
         if (!userId) {
           return NextResponse.json({ error: "User not found" }, { status: 404 });
         }
@@ -100,12 +70,15 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: true, purpose: "usd_fund", ...result });
       }
 
-      const userId = await findUserIdForDepositCharge({ ...data, meta });
+      const userId = await findUserIdForDepositCharge(lookupPayload);
       if (!userId) {
         console.error("[flutterwave-webhook] unmatched customer", {
-          email: data.customer?.email,
-          account: data.account_number,
-          tx_ref: data.tx_ref,
+          email: lookupPayload.customer?.email,
+          account: lookupPayload.account_number,
+          tx_ref: lookupPayload.tx_ref,
+          flw_ref: lookupPayload.flw_ref,
+          order_ref: lookupPayload.order_ref,
+          event: eventName,
         });
         return NextResponse.json({ error: "User not found" }, { status: 404 });
       }
@@ -113,11 +86,14 @@ export async function POST(req: Request) {
       const result = await creditWalletFromDeposit({
         userId,
         amountKobo: Math.round(amountMajor * 100),
-        currency: data.currency,
+        currency:
+          typeof data.currency === "string" ? data.currency : undefined,
         reference,
-        channel: data.payment_type,
-        paidAt: data.created_at,
-        raw: data as unknown as Record<string, unknown>,
+        channel:
+          typeof data.payment_type === "string" ? data.payment_type : undefined,
+        paidAt:
+          typeof data.created_at === "string" ? data.created_at : undefined,
+        raw: data,
       });
 
       return NextResponse.json({ ok: true, ...result });
@@ -128,14 +104,6 @@ export async function POST(req: Request) {
       eventName === "charge.refunded" ||
       eventName === "charge.reversed"
     ) {
-      const nested = data as { transaction?: { tx_ref?: string; reference?: string } };
-      const reference =
-        data.tx_ref ||
-        data.flw_ref ||
-        nested.transaction?.tx_ref ||
-        nested.transaction?.reference ||
-        data.reference ||
-        null;
       if (!reference) {
         return NextResponse.json({
           ok: true,
@@ -144,10 +112,25 @@ export async function POST(req: Request) {
         });
       }
 
+      const reverseReason =
+        (typeof data.complete_message === "string" && data.complete_message) ||
+        "This deposit was reversed";
+      if (isProviderConfigError(reverseReason)) {
+        console.error(
+          "[flutterwave-webhook] ignored deposit reverse — provider config error",
+          reverseReason,
+        );
+        return NextResponse.json({
+          ok: true,
+          ignored: true,
+          reason: "provider_config_error",
+        });
+      }
+
       try {
         const result = await reverseDeposit({
           reference,
-          reason: data.complete_message || "This deposit was reversed",
+          reason: reverseReason,
         });
         return NextResponse.json(result);
       } catch (error) {
@@ -170,8 +153,11 @@ export async function POST(req: Request) {
       eventName === "transfer.failed" ||
       eventName === "transfer.reversed"
     ) {
-      const reference = data.reference || data.tx_ref;
-      if (!reference) {
+      const transferReference =
+        (typeof data.reference === "string" && data.reference) ||
+        (typeof data.tx_ref === "string" && data.tx_ref) ||
+        null;
+      if (!transferReference) {
         return NextResponse.json(
           { error: "Missing reference" },
           { status: 400 },
@@ -179,20 +165,23 @@ export async function POST(req: Request) {
       }
 
       const result = await settlePayoutTransfer({
-        reference,
+        reference: transferReference,
         status: eventName.includes("reversed")
           ? "reversed"
           : eventName.includes("fail")
             ? "failed"
             : "success",
         transferCode: data.id != null ? String(data.id) : null,
-        failureReason: data.complete_message ?? data.status ?? null,
+        failureReason:
+          (typeof data.complete_message === "string" && data.complete_message) ||
+          (typeof data.status === "string" && data.status) ||
+          null,
       });
 
       return NextResponse.json(result);
     }
 
-    return NextResponse.json({ ok: true, ignored: true });
+    return NextResponse.json({ ok: true, ignored: true, event: eventName });
   } catch (error) {
     console.error("[flutterwave-webhook]", error);
     return NextResponse.json(

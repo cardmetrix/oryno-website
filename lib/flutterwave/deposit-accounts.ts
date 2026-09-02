@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   transactions,
@@ -27,6 +27,7 @@ import {
   countryFromCurrency,
   flutterwaveSupportsVirtualAccount,
   fundPresetsForCountry,
+  paystackDepositAccountFallback,
 } from "@/lib/payments/country";
 import {
   flutterwaveFetch,
@@ -317,7 +318,7 @@ export async function getOrCreateDepositAccount(userId: string) {
     }
   }
 
-  if (hasPaystackKeys()) {
+  if (paystackDepositAccountFallback(country) && hasPaystackKeys()) {
     try {
       const { createPaystackDepositAccount } = await import("@/lib/paystack/dva");
       const created = await createPaystackDepositAccount(user);
@@ -454,13 +455,15 @@ export async function creditWalletFromDeposit(input: {
   const fx = await getDisplayFx(paidCountry);
 
   try {
-    await notifyWalletFunded({
+    void notifyWalletFunded({
       userId: input.userId,
       amountFormatted,
       reference: input.reference,
       transactionId: result.transaction.id,
       fundingId: result.funding.id,
       href: "/wallet",
+    }).catch((notifyError) => {
+      console.error("[flutterwave-deposit-notify]", notifyError);
     });
   } catch (notifyError) {
     console.error("[flutterwave-deposit-notify]", notifyError);
@@ -645,7 +648,10 @@ export async function findUserIdForDepositCharge(data: {
   customer?: { customer_code?: string; email?: string };
   authorization?: { receiver_bank_account_number?: string };
   account_number?: string;
+  account_id?: string;
   tx_ref?: string;
+  flw_ref?: string;
+  order_ref?: string;
   meta?: Record<string, unknown> | null;
   metadata?: Record<string, unknown> | null;
 }) {
@@ -656,6 +662,9 @@ export async function findUserIdForDepositCharge(data: {
 
   const fromVa = userIdFromVaReference(data.tx_ref);
   if (fromVa) return fromVa;
+
+  const fromOrderRef = userIdFromVaReference(data.order_ref);
+  if (fromOrderRef) return fromOrderRef;
 
   const customerCode = data.customer?.customer_code;
   if (customerCode) {
@@ -671,23 +680,45 @@ export async function findUserIdForDepositCharge(data: {
     data.authorization?.receiver_bank_account_number ||
     orderRef;
   if (accountNumber) {
+    const normalized = accountNumber.replace(/\D/g, "");
     const byAccount = await db.query.userDepositAccounts.findFirst({
       where: eq(userDepositAccounts.accountNumber, accountNumber),
     });
     if (byAccount) return byAccount.userId;
+    if (normalized && normalized !== accountNumber) {
+      const byDigits = await db.query.userDepositAccounts.findFirst({
+        where: eq(userDepositAccounts.accountNumber, normalized),
+      });
+      if (byDigits) return byDigits.userId;
+    }
   }
 
-  if (data.tx_ref) {
+  if (data.account_id) {
+    const byAccountId = await db.query.userDepositAccounts.findFirst({
+      where: eq(userDepositAccounts.paystackAccountId, data.account_id),
+    });
+    if (byAccountId) return byAccountId.userId;
+  }
+
+  if (data.flw_ref) {
+    const byFlw = await db.query.userDepositAccounts.findFirst({
+      where: eq(userDepositAccounts.paystackAccountId, data.flw_ref),
+    });
+    if (byFlw) return byFlw.userId;
+  }
+
+  for (const ref of [data.tx_ref, data.order_ref, data.flw_ref]) {
+    if (!ref) continue;
     const byRef = await db.query.userDepositAccounts.findFirst({
-      where: eq(userDepositAccounts.paystackCustomerCode, data.tx_ref),
+      where: eq(userDepositAccounts.paystackCustomerCode, ref),
     });
     if (byRef) return byRef.userId;
   }
 
-  const email = data.customer?.email?.toLowerCase();
+  const email = data.customer?.email?.trim().toLowerCase();
   if (email) {
     const user = await db.query.users.findFirst({
-      where: eq(users.email, email),
+      where: sql`lower(${users.email}) = ${email}`,
     });
     if (user) return user.id;
   }

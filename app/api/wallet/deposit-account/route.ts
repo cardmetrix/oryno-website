@@ -5,6 +5,7 @@ import {
   getWalletFundOptions,
   saveDepositIdentity,
 } from "@/lib/flutterwave/deposit-accounts";
+import { IdentityConflictError } from "@/lib/flutterwave/deposit-identity";
 
 export const runtime = "nodejs";
 
@@ -83,6 +84,9 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     console.error("[deposit-account-post]", error);
+    if (error instanceof IdentityConflictError) {
+      return NextResponse.json({ error: error.message }, { status: 409 });
+    }
     return NextResponse.json(
       {
         error:

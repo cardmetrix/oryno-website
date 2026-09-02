@@ -144,6 +144,12 @@ export function flutterwaveSupportsVirtualAccount(
   return code === "NG" || code === "GH";
 }
 
+/** Paystack DVA is only used where Flutterwave has no virtual account (KE/ZA). */
+export function paystackDepositAccountFallback(countryCode?: string | null) {
+  const code = resolveCountryCode(countryCode);
+  return code === "KE" || code === "ZA";
+}
+
 export function flutterwavePaymentOptions(countryCode?: string | null) {
   switch (resolveCountryCode(countryCode)) {
     case "GH":

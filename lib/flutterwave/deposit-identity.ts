@@ -4,6 +4,12 @@ import { resolveCountryCode } from "@/lib/country";
 import { db } from "@/lib/db";
 import { kycSubmissions, users } from "@/lib/db/schema";
 import { isFlutterwaveDemoMode } from "@/lib/flutterwave/client";
+import {
+  assertUniqueIdentity,
+  IdentityConflictError,
+} from "@/lib/kyc/identity-uniqueness";
+
+export { IdentityConflictError };
 
 export type DepositIdentity = {
   bvn?: string;
@@ -126,6 +132,8 @@ export async function saveDepositIdentity(
         : "NIN must be exactly 11 digits.",
     );
   }
+
+  await assertUniqueIdentity(userId, input.idType, digits);
 
   const targetLevel = 1;
   const latest = await db.query.kycSubmissions.findFirst({

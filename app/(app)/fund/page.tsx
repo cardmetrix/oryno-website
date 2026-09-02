@@ -184,10 +184,37 @@ function FundPageContent() {
 
   async function onIHaveFunded() {
     setChecking(true);
-    toast.message("Checking your wallet", {
+    setError(null);
+    toast.message("Checking for your transfer", {
       description:
-        "Complete the transfer. Your balance updates when payment is confirmed.",
+        "We’re matching your bank payment with Flutterwave. This can take a few minutes.",
     });
+    try {
+      const res = await fetch("/api/wallet/deposit-account/reconcile", {
+        method: "POST",
+      });
+      const json = (await res.json().catch(() => ({}))) as {
+        credited?: number;
+        message?: string;
+        error?: string;
+        wallet?: { balanceFormatted?: string };
+      };
+
+      if (res.ok) {
+        if ((json.credited ?? 0) > 0) {
+          toast.success(json.message || "Deposit received");
+        } else {
+          toast.message(json.message || "No new deposit yet", {
+            description: "If you just transferred, wait a few minutes and try again.",
+          });
+        }
+      } else if (json.error) {
+        setError(json.error);
+        toast.error(json.error);
+      }
+    } catch {
+      toast.error("Could not check for your deposit");
+    }
     await refreshWallet();
     setChecking(false);
   }

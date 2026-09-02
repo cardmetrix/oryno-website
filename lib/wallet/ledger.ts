@@ -1,6 +1,8 @@
-import { eq } from "drizzle-orm";
-import { db } from "@/lib/db";
-import { transactions, wallets } from "@/lib/db/schema";
+import {
+  humanizeDepositReverseReason,
+  humanizeWalletRefundReason,
+  isProviderConfigError,
+} from "@/lib/flutterwave/errors";
 
 export class ReverseFailedError extends Error {
   status = 422;
@@ -71,6 +73,7 @@ async function creditBack(input: {
       .set({ balance: restored, updatedAt: new Date() })
       .where(eq(wallets.id, wallet.id));
 
+    const friendlyReason = humanizeWalletRefundReason(input.reason);
     const nextStatus = input.kind === "reversed" ? "reversed" : "failed";
     await tx
       .update(transactions)
@@ -82,6 +85,8 @@ async function creditBack(input: {
           failureReason: input.reason,
           refundedAt: new Date().toISOString(),
           refundKind: input.kind,
+          refundDestination: "wallet",
+          providerConfigError: isProviderConfigError(input.reason),
         },
       })
       .where(eq(transactions.id, input.transactionId));
@@ -91,8 +96,11 @@ async function creditBack(input: {
       walletId: wallet.id,
       type: "credit",
       category: "refund",
-      title: input.kind === "reversed" ? "Transaction reversed" : "Payment refunded",
-      subtitle: input.reason.slice(0, 255),
+      title:
+        input.kind === "reversed"
+          ? "Transaction reversed"
+          : "Returned to wallet",
+      subtitle: friendlyReason.slice(0, 255),
       amount: input.amount.toFixed(2),
       currency: existing.currency,
       status: "completed",
@@ -103,6 +111,8 @@ async function creditBack(input: {
       metadata: {
         originalTransactionId: existing.id,
         kind: input.kind,
+        refundDestination: "wallet",
+        providerConfigError: isProviderConfigError(input.reason),
       },
     });
 
@@ -216,7 +226,7 @@ export async function reverseCompletedCredit(input: {
       type: "debit",
       category: "refund",
       title: "Deposit reversed",
-      subtitle: input.reason.slice(0, 255),
+      subtitle: humanizeDepositReverseReason(input.reason).slice(0, 255),
       amount: input.amount.toFixed(2),
       currency: existing.currency,
       status: "completed",

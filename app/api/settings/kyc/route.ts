@@ -15,6 +15,10 @@ import { ensureAppUser } from "@/lib/auth/current-user";
 import { db } from "@/lib/db";
 import { kycSubmissions, users } from "@/lib/db/schema";
 import {
+  assertUniqueIdentity,
+  IdentityConflictError,
+} from "@/lib/kyc/identity-uniqueness";
+import {
   uploadKycImage,
   type KycImagePayload,
 } from "@/lib/kyc-upload";
@@ -226,6 +230,17 @@ export async function POST(req: Request) {
           { error: "Selfie is required for this document type." },
           { status: 400 },
         );
+      }
+    }
+
+    if (payload.idNumber && (isBvnIdType(payload.idType) || isNinIdType(payload.idType))) {
+      try {
+        await assertUniqueIdentity(dbUser.id, payload.idType || "", payload.idNumber);
+      } catch (error) {
+        if (error instanceof IdentityConflictError) {
+          return NextResponse.json({ error: error.message }, { status: 409 });
+        }
+        throw error;
       }
     }
 

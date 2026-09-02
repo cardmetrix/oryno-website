@@ -7,6 +7,13 @@ import {
   paystackFetch,
 } from "@/lib/paystack/client";
 
+function paystackPreferredBank() {
+  if (isPaystackDemoMode()) {
+    return "test-bank";
+  }
+  return process.env.PAYSTACK_DVA_BANK?.trim() || "wema-bank";
+}
+
 type PaystackCustomer = {
   id: number;
   customer_code: string;
@@ -54,9 +61,7 @@ export async function createPaystackDepositAccount(
   }
 
   const customerCode = await ensurePaystackCustomer(user);
-  const preferredBank = isPaystackDemoMode()
-    ? process.env.PAYSTACK_DVA_BANK?.trim() || "test-bank"
-    : process.env.PAYSTACK_DVA_BANK?.trim() || "wema-bank";
+  const preferredBank = paystackPreferredBank();
 
   try {
     const created = await paystackFetch<PaystackDedicatedAccount>(
