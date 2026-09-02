@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { settleStuckDebits } from "@/lib/wallet/settle-pending";
+import { settleStuckWithdrawals } from "@/lib/wallet/settle-withdrawals";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -17,8 +18,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
-    const result = await settleStuckDebits();
-    return NextResponse.json({ ok: true, ...result });
+    const [debits, withdrawals] = await Promise.all([
+      settleStuckDebits(),
+      settleStuckWithdrawals(),
+    ]);
+    return NextResponse.json({ ok: true, debits, withdrawals });
   } catch (error) {
     console.error("[cron-settle-pending]", error);
     return NextResponse.json(

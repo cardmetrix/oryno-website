@@ -48,7 +48,31 @@ function mapTransferStatus(status?: string | null) {
   if (value === "failed" || value === "failure") {
     return "failed" as const;
   }
+  if (value === "reversed") {
+    return "reversed" as const;
+  }
   return "pending" as const;
+}
+
+export async function lookupFlutterwaveTransfer(reference: string) {
+  if (!reference.trim() || !hasFlutterwaveKeys()) return null;
+
+  try {
+    const res = await flutterwaveFetch<TransferData | TransferData[]>(
+      `/transfers?reference=${encodeURIComponent(reference.trim())}`,
+    );
+    const row = Array.isArray(res.data) ? res.data[0] : res.data;
+    if (!row) return null;
+
+    return {
+      status: mapTransferStatus(row.status),
+      transferCode: row.id != null ? String(row.id) : null,
+      failureReason: row.complete_message ?? null,
+    };
+  } catch (error) {
+    console.error("[flutterwave-transfer-lookup]", reference, error);
+    return null;
+  }
 }
 
 export async function initiateFlutterwaveTransfer(input: {

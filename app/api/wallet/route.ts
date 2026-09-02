@@ -33,6 +33,12 @@ export async function GET(req: Request) {
       );
     }
 
+    void import("@/lib/wallet/settle-withdrawals")
+      .then((m) => m.settleStuckWithdrawals({ userId: user.id, limit: 5 }))
+      .catch((error) => {
+        console.error("[wallet-settle-withdrawals]", error);
+      });
+
     const displayFx = await getDisplayFx(user.countryCode);
     const currency = displayFx.to;
 

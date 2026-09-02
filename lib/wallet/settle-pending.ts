@@ -26,6 +26,11 @@ export async function settleStuckDebits(limit = 40) {
     const provider = String(meta.provider || "");
     const requestId = String(row.externalRef || meta.requestId || "");
 
+    if (row.category === "withdraw") {
+      results.push({ id: row.id, action: "withdraw_skipped" });
+      continue;
+    }
+
     try {
       if (provider === "vtpass" && requestId) {
         const { requeryPurchase, isVtpassSuccessCode, isVtpassPendingCode } =

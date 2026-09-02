@@ -99,6 +99,11 @@ export async function POST(req: Request) {
       throw error;
     }
 
+    const { settleStuckWithdrawals } = await import(
+      "@/lib/wallet/settle-withdrawals"
+    );
+    await settleStuckWithdrawals({ userId: user.id, limit: 5 });
+
     const result = await withUserActionLock(user.id, () =>
       withdrawWallet({
         userId: user.id,
