@@ -18,19 +18,25 @@ export type BettingProvider = {
 const MIN = 100;
 const MAX = 500_000;
 
+/** Local bookmaker logos under /public/betting */
+const LOCAL_BOOKMAKER_IMAGES: Record<string, string> = {
+  sportybet: "/betting/sportybet.png",
+};
+
 function bookie(
   serviceID: string,
   name: string,
   domain: string,
   popular = false,
 ): BettingProvider {
+  const local = LOCAL_BOOKMAKER_IMAGES[serviceID];
   const urls = openLogoUrls(domain);
   return {
     serviceID,
     name,
     domain,
-    image: urls[0] || openLogoPrimary(name),
-    imageFallbacks: urls.slice(1),
+    image: local || urls[0] || openLogoPrimary(name),
+    imageFallbacks: local ? urls : urls.slice(1),
     minAmount: MIN,
     maxAmount: MAX,
     popular,
