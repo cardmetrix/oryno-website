@@ -1,5 +1,9 @@
 import { isFlutterwaveIpWhitelistError } from "@/lib/flutterwave/errors";
-import { flutterwaveHttp, hasFlutterwaveProxy } from "@/lib/flutterwave/http";
+import {
+  assertFlutterwaveProxyConfigured,
+  flutterwaveHttp,
+  hasFlutterwaveProxy,
+} from "@/lib/flutterwave/http";
 
 const FLUTTERWAVE_BASE = "https://api.flutterwave.com/v3";
 
@@ -57,6 +61,8 @@ export async function flutterwaveFetch<T>(
     throw new Error("FLUTTERWAVE_SECRET_KEY is not configured");
   }
 
+  assertFlutterwaveProxyConfigured(isFlutterwaveDemoMode());
+
   const res = await flutterwaveHttp(`${FLUTTERWAVE_BASE}${path}`, {
     ...init,
     headers: {
@@ -98,8 +104,8 @@ export async function flutterwaveFetch<T>(
         const ip = await getServerEgressIp();
         if (ip) {
           egressHint = hasFlutterwaveProxy()
-            ? ` Whitelist this proxy IP in Flutterwave: ${ip}.`
-            : ` This request came from ${ip}. On Vercel Hobby that IP changes — set FLUTTERWAVE_HTTPS_PROXY to a static-IP proxy and whitelist that proxy IP instead.`;
+            ? ` Add this Fixie/proxy IP in Flutterwave → Whitelisted IP addresses: ${ip}`
+            : ` This request came from ${ip}. On Vercel Hobby that IP changes — set FLUTTERWAVE_HTTPS_PROXY in Vercel and whitelist the Fixie IP instead.`;
         }
       } catch {
         // ignore lookup failures

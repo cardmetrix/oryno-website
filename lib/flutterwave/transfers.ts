@@ -11,6 +11,7 @@ import {
   isFlutterwaveDemoMode,
   isPaymentSuccessful,
 } from "@/lib/flutterwave/client";
+import { assertFlutterwaveProxyConfigured } from "@/lib/flutterwave/http";
 import { humanizeWalletRefundReason } from "@/lib/flutterwave/errors";
 import type { BankAccountRow } from "@/lib/wallet";
 import {
@@ -155,6 +156,9 @@ export async function initiateFlutterwaveTransfer(input: {
       demoMode: true as const,
     };
   }
+
+  // Fail before creating a transfer if live mode has no Fixie/proxy.
+  assertFlutterwaveProxyConfigured(isFlutterwaveDemoMode());
 
   const res = await flutterwaveFetch<TransferData>("/transfers", {
     method: "POST",
