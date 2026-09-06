@@ -513,9 +513,14 @@ export async function withdrawWallet(input: {
     });
 
     const transferStatus = payout.transfer.status;
-    // success/demo → completed; pending → await webhook.
+    if (transferStatus === "failed" || transferStatus === "reversed") {
+      throw new Error("Flutterwave could not send this withdrawal to the bank.");
+    }
+
+    // Only complete after Flutterwave confirms a successful bank transfer.
+    // Demo mode still waits for that confirmation so we never mark complete without a payout.
     const nextWithdrawalStatus =
-      transferStatus === "success" || payout.simulated
+      transferStatus === "success"
         ? ("completed" as const)
         : ("sent_to_provider" as const);
     const nextTxStatus =
@@ -545,6 +550,7 @@ export async function withdrawWallet(input: {
           reference,
           flutterwaveTransferId: payout.transfer.transferCode,
           simulated: Boolean(payout.simulated),
+          transferStatus: payout.transfer.status,
           localAmount: localAmountStr,
           payoutCurrency,
           countryCode,

@@ -45,7 +45,13 @@ function mapTransferStatus(status?: string | null) {
   if (isPaymentSuccessful(value) || value === "successful") {
     return "success" as const;
   }
-  if (value === "failed" || value === "failure") {
+  if (
+    value === "failed" ||
+    value === "failure" ||
+    value.includes("fail") ||
+    value === "cancelled" ||
+    value === "canceled"
+  ) {
     return "failed" as const;
   }
   if (value === "reversed") {
@@ -54,25 +60,79 @@ function mapTransferStatus(status?: string | null) {
   return "pending" as const;
 }
 
-export async function lookupFlutterwaveTransfer(reference: string) {
-  if (!reference.trim() || !hasFlutterwaveKeys()) return null;
+type TransferLookup = {
+  status: "success" | "failed" | "reversed" | "pending";
+  transferCode: string | null;
+  failureReason: string | null;
+  rawStatus: string | null;
+};
+
+function toTransferLookup(row: TransferData | null | undefined): TransferLookup | null {
+  if (!row) return null;
+  return {
+    status: mapTransferStatus(row.status),
+    transferCode: row.id != null ? String(row.id) : null,
+    failureReason: row.complete_message ?? null,
+    rawStatus: row.status ?? null,
+  };
+}
+
+export async function lookupFlutterwaveTransfer(
+  reference: string,
+  transferId?: string | number | null,
+) {
+  if (!hasFlutterwaveKeys()) return null;
+
+  if (transferId != null && String(transferId).trim()) {
+    try {
+      const res = await flutterwaveFetch<TransferData>(
+        `/transfers/${encodeURIComponent(String(transferId).trim())}`,
+      );
+      const found = toTransferLookup(res.data);
+      if (found) return found;
+    } catch (error) {
+      console.error("[flutterwave-transfer-lookup-id]", transferId, error);
+    }
+  }
+
+  if (!reference.trim()) return null;
 
   try {
     const res = await flutterwaveFetch<TransferData | TransferData[]>(
       `/transfers?reference=${encodeURIComponent(reference.trim())}`,
     );
     const row = Array.isArray(res.data) ? res.data[0] : res.data;
-    if (!row) return null;
-
-    return {
-      status: mapTransferStatus(row.status),
-      transferCode: row.id != null ? String(row.id) : null,
-      failureReason: row.complete_message ?? null,
-    };
+    return toTransferLookup(row);
   } catch (error) {
     console.error("[flutterwave-transfer-lookup]", reference, error);
     return null;
   }
+}
+
+async function wait(ms: number) {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Poll Flutterwave until the bank transfer succeeds, fails, or times out. */
+export async function confirmFlutterwaveTransfer(input: {
+  reference: string;
+  transferId?: string | number | null;
+  attempts?: number;
+  delayMs?: number;
+}) {
+  const attempts = input.attempts ?? 8;
+  const delayMs = input.delayMs ?? 1500;
+  let last: TransferLookup | null = null;
+
+  for (let i = 0; i < attempts; i += 1) {
+    last = await lookupFlutterwaveTransfer(input.reference, input.transferId);
+    if (last?.status === "success" || last?.status === "failed" || last?.status === "reversed") {
+      return last;
+    }
+    if (i < attempts - 1) await wait(delayMs);
+  }
+
+  return last;
 }
 
 export async function initiateFlutterwaveTransfer(input: {
@@ -110,12 +170,41 @@ export async function initiateFlutterwaveTransfer(input: {
     }),
   });
 
-  return {
+  const created = {
     reference: res.data.reference || input.reference,
     transferCode:
       res.data.id != null ? String(res.data.id) : res.data.reference || null,
     status: mapTransferStatus(res.data.status),
     demoMode: isFlutterwaveDemoMode(),
+    failureReason: res.data.complete_message ?? null,
+  };
+
+  if (created.status === "failed" || created.status === "reversed") {
+    throw new Error(
+      created.failureReason || "Flutterwave could not send this withdrawal to the bank.",
+    );
+  }
+
+  if (created.status === "success") {
+    return created;
+  }
+
+  const confirmed = await confirmFlutterwaveTransfer({
+    reference: created.reference,
+    transferId: created.transferCode,
+  });
+
+  if (confirmed?.status === "failed" || confirmed?.status === "reversed") {
+    throw new Error(
+      confirmed.failureReason || "Flutterwave could not send this withdrawal to the bank.",
+    );
+  }
+
+  return {
+    ...created,
+    status: confirmed?.status ?? "pending",
+    transferCode: confirmed?.transferCode ?? created.transferCode,
+    failureReason: confirmed?.failureReason ?? created.failureReason,
   };
 }
 

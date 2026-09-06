@@ -171,13 +171,31 @@ export async function POST(req: Request) {
         );
       }
 
+      const payloadStatus = String(data.status || "").toLowerCase();
+      const settledStatus = eventName.includes("reversed")
+        ? "reversed"
+        : eventName.includes("fail") ||
+            payloadStatus.includes("fail") ||
+            payloadStatus === "reversed"
+          ? payloadStatus === "reversed"
+            ? "reversed"
+            : "failed"
+          : isPaymentSuccessful(payloadStatus)
+            ? "success"
+            : null;
+
+      if (!settledStatus) {
+        return NextResponse.json({
+          ok: true,
+          ignored: true,
+          reason: "transfer_not_final",
+          status: payloadStatus || eventName,
+        });
+      }
+
       const result = await settlePayoutTransfer({
         reference: transferReference,
-        status: eventName.includes("reversed")
-          ? "reversed"
-          : eventName.includes("fail")
-            ? "failed"
-            : "success",
+        status: settledStatus,
         transferCode: data.id != null ? String(data.id) : null,
         failureReason:
           (typeof data.complete_message === "string" && data.complete_message) ||
