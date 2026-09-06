@@ -51,13 +51,13 @@ export default function HistoryPage() {
   const [downloading, setDownloading] = useState(false);
   const [currency, setCurrency] = useState("NGN");
   const { data: wallet } = useWallet();
-  const { settle: settlePending } = useSettlePendingTransactions();
+  const { settle: settlePending } = useSettlePendingTransactions(true);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(false);
     try {
-      await settlePending();
+      const settled = await settlePending();
       const txRes = await fetch("/api/transactions", { cache: "no-store" });
       if (!txRes.ok) throw new Error("Failed");
       const json = (await txRes.json()) as { items: AppTransaction[] };
@@ -65,6 +65,16 @@ export default function HistoryPage() {
       setCurrency(
         (prev) => json.items?.[0]?.currency ?? prev,
       );
+      if (
+        settled &&
+        (settled.completed ?? 0) + (settled.reversed ?? 0) + (settled.failed ?? 0) > 0
+      ) {
+        const again = await fetch("/api/transactions", { cache: "no-store" });
+        if (again.ok) {
+          const next = (await again.json()) as { items: AppTransaction[] };
+          setItems(next.items ?? []);
+        }
+      }
     } catch {
       setError(true);
       setItems([]);

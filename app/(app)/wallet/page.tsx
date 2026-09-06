@@ -29,6 +29,7 @@ import { UsdWalletActionsPanel, UsdWalletCard, type UsdPanel } from "@/component
 import { WalletSkeleton } from "@/components/app/wallet-skeleton";
 import { WalletBalanceAmount } from "@/components/app/wallet-balance-amount";
 import { fetchWallet, useWallet } from "@/hooks/use-wallet";
+import { useSettlePendingTransactions } from "@/hooks/use-settle-pending-transactions";
 import { WALLET_QUERY_KEY } from "@/lib/query-keys";
 import type { BankAccountSummary, BankOption, WalletPayload } from "@/lib/wallet-types";
 import { cn } from "@/lib/utils";
@@ -76,6 +77,7 @@ function WalletPageContent() {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { data: walletData } = useWallet();
+  useSettlePendingTransactions(true);
   const [data, setData] = useState<WalletPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

@@ -12,16 +12,19 @@ type SettleResult = {
   failed?: number;
 };
 
+const POLL_MS = 60_000;
+
 /**
- * On History (and similar pages), settle any pending transaction older than
- * 5 minutes: complete it if the provider succeeded, otherwise fail/reverse
- * it back to the user's ORYNO wallet.
+ * Checks pending/processing transactions older than 5 minutes from createdAt,
+ * then completes, fails, or reverses them based on the provider state.
  */
 export function useSettlePendingTransactions(enabled = true) {
   const queryClient = useQueryClient();
-  const ranRef = useRef(false);
+  const inFlightRef = useRef(false);
 
   const settle = useCallback(async () => {
+    if (inFlightRef.current) return null;
+    inFlightRef.current = true;
     try {
       const res = await fetch("/api/transactions/settle", {
         method: "POST",
@@ -36,13 +39,25 @@ export function useSettlePendingTransactions(enabled = true) {
     } catch (error) {
       console.error("[settle-pending-hook]", error);
       return null;
+    } finally {
+      inFlightRef.current = false;
     }
   }, [queryClient]);
 
   useEffect(() => {
-    if (!enabled || ranRef.current) return;
-    ranRef.current = true;
+    if (!enabled) return;
     void settle();
+    const id = window.setInterval(() => {
+      void settle();
+    }, POLL_MS);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void settle();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [enabled, settle]);
 
   return { settle };
