@@ -1,8 +1,10 @@
 import { ProxyAgent, fetch as undiciFetch } from "undici";
 
-/** Optional static-IP proxy so Flutterwave can whitelist a fixed egress on Vercel Hobby. */
-export function flutterwaveProxyUrl() {
-  const raw = (
+/** Known Fixie egress IP that Flutterwave should whitelist. */
+export const DEFAULT_FIXIE_OUTBOUND_IP = "52.5.155.132";
+
+function rawProxyUrl() {
+  return (
     process.env.FLUTTERWAVE_HTTPS_PROXY ||
     process.env.FLUTTERWAVE_PROXY_URL ||
     process.env.FIXIE_URL ||
@@ -11,20 +13,38 @@ export function flutterwaveProxyUrl() {
     process.env.HTTP_PROXY ||
     ""
   ).trim();
+}
 
-  if (!raw) return "";
-
-  // Optional: pin to one Fixie IP so Flutterwave only needs one whitelist entry.
-  // Example: FLUTTERWAVE_PROXY_IP=52.5.155.132
-  const pinnedIp = (
+/** Pin Fixie traffic to one IP so Flutterwave whitelist cannot flake across the pair. */
+export function flutterwavePinnedProxyIp() {
+  const explicit = (
     process.env.FLUTTERWAVE_PROXY_IP ||
     process.env.FIXIE_OUTBOUND_IP ||
+    process.env.FLUTTERWAVE_EXPECTED_EGRESS_IP ||
     ""
   ).trim();
+  if (explicit) return explicit;
+
+  const raw = rawProxyUrl().toLowerCase();
+  // Fixie load-balances across 2 IPs unless we address one IP directly.
+  if (raw.includes("usefixie.com") || raw.includes("fixie:")) {
+    return DEFAULT_FIXIE_OUTBOUND_IP;
+  }
+  return "";
+}
+
+/** Optional static-IP proxy so Flutterwave can whitelist a fixed egress on Vercel Hobby. */
+export function flutterwaveProxyUrl() {
+  const raw = rawProxyUrl();
+  if (!raw) return "";
+
+  const pinnedIp = flutterwavePinnedProxyIp();
   if (!pinnedIp) return raw;
 
   try {
     const parsed = new URL(raw);
+    // Already pinned to an IP host.
+    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(parsed.hostname)) return raw;
     parsed.hostname = pinnedIp;
     if (!parsed.port) parsed.port = "80";
     return parsed.toString().replace(/\/$/, "");

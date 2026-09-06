@@ -30,23 +30,24 @@ export function humanizeFlutterwaveSetupError(
   return flutterwaveIpWhitelistSetupHint(egressIp);
 }
 
+export const WITHDRAWAL_UNAVAILABLE_MESSAGE =
+  "Withdrawal unavailable right now. Please try again shortly. Your money was returned to your ORYNO wallet.";
+
 export function humanizeFlutterwaveTransferError(message?: string | null) {
   const detail = (message || "").trim();
-  if (/FLUTTERWAVE_HTTPS_PROXY is missing/i.test(detail)) {
-    return detail;
-  }
-  if (isFlutterwaveIpWhitelistError(message)) {
-    if (detail && !/^please enable ip whitelisting/i.test(detail)) {
-      return `${detail} The amount was returned to your ORYNO wallet.`;
-    }
-    return "Flutterwave blocked this withdrawal because our server IP is not allowed. The amount was returned to your ORYNO wallet. On Vercel Hobby you must set FLUTTERWAVE_HTTPS_PROXY (Fixie) in Vercel Environment Variables and whitelist Fixie IP 52.5.155.132 in Flutterwave, then redeploy.";
+  if (
+    isFlutterwaveIpWhitelistError(message) ||
+    /FLUTTERWAVE_HTTPS_PROXY is missing/i.test(detail) ||
+    /proxy request failed/i.test(detail)
+  ) {
+    return WITHDRAWAL_UNAVAILABLE_MESSAGE;
   }
   return detail || "Withdrawal could not be sent to your bank.";
 }
 
 export function humanizeWalletRefundReason(message?: string | null) {
   if (isFlutterwaveIpWhitelistError(message)) {
-    return "Payment provider blocked the transfer from our server. Your money was returned to your ORYNO wallet — not to your bank account.";
+    return "Withdrawal unavailable. Your money was returned to your ORYNO wallet — not to your bank account.";
   }
 
   const trimmed = (message || "").trim();

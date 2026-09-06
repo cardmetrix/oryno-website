@@ -570,14 +570,21 @@ export async function withdrawWallet(input: {
       countryCode,
     };
   } catch (error) {
+    const raw =
+      error instanceof Error ? error.message : "Withdrawal transfer failed";
+    console.error("[withdraw-flutterwave]", {
+      reference,
+      userId: input.userId,
+      proxyHost: process.env.FLUTTERWAVE_HTTPS_PROXY ? "configured" : "missing",
+      error: raw,
+    });
+
     try {
       await refundFailedDebit({
         walletId: prepared.wallet.id,
         transactionId: prepared.transaction.id,
         amount: ledgerTotal,
-        reason: humanizeWalletRefundReason(
-          error instanceof Error ? error.message : "Transfer failed",
-        ),
+        reason: humanizeWalletRefundReason(raw),
         userId: input.userId,
       });
     } catch (refundError) {
@@ -588,17 +595,12 @@ export async function withdrawWallet(input: {
       .update(withdrawals)
       .set({
         status: "failed",
-        failureReason:
-          error instanceof Error ? error.message : "Transfer failed",
+        failureReason: raw,
         processedAt: new Date(),
         updatedAt: new Date(),
       })
       .where(eq(withdrawals.id, prepared.withdrawal.id));
 
-    throw new Error(
-      humanizeFlutterwaveTransferError(
-        error instanceof Error ? error.message : "Withdrawal transfer failed",
-      ),
-    );
+    throw new Error(humanizeFlutterwaveTransferError(raw));
   }
 }

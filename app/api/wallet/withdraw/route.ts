@@ -157,7 +157,11 @@ export async function POST(req: Request) {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to withdraw";
-    console.error("[wallet-withdraw]", error);
+    console.error("[wallet-withdraw]", {
+      message,
+      stack: error instanceof Error ? error.stack : undefined,
+      error,
+    });
     return NextResponse.json(
       { error: message },
       { status: actionLockHttpStatus(error) || 400 },

@@ -4,6 +4,8 @@ import { isFlutterwaveDemoMode } from "@/lib/flutterwave/client";
 import { getServerEgressIp } from "@/lib/flutterwave/egress-ip";
 import {
   allowFlutterwaveDirect,
+  DEFAULT_FIXIE_OUTBOUND_IP,
+  flutterwavePinnedProxyIp,
   flutterwaveProxyHost,
   hasFlutterwaveProxy,
 } from "@/lib/flutterwave/http";
@@ -21,11 +23,7 @@ export async function GET() {
   const proxyHost = flutterwaveProxyHost();
   const demoMode = isFlutterwaveDemoMode();
   const allowDirect = allowFlutterwaveDirect();
-  const pinnedIp = (
-    process.env.FLUTTERWAVE_PROXY_IP ||
-    process.env.FIXIE_OUTBOUND_IP ||
-    ""
-  ).trim() || null;
+  const pinnedIp = flutterwavePinnedProxyIp() || DEFAULT_FIXIE_OUTBOUND_IP;
   let egressIp: string | null = null;
   let egressError: string | null = null;
 
@@ -35,9 +33,6 @@ export async function GET() {
     egressError = error instanceof Error ? error.message : "Could not resolve egress IP";
   }
 
-  const expected =
-    (process.env.FLUTTERWAVE_EXPECTED_EGRESS_IP || pinnedIp || "").trim() ||
-    null;
   const ready =
     demoMode ||
     allowDirect ||
@@ -52,12 +47,12 @@ export async function GET() {
     demoMode,
     allowDirect,
     egressIp,
-    expectedEgressIp: expected,
+    expectedEgressIp: pinnedIp,
     egressError,
     vercelHint:
       "If proxyConfigured is false here, the env var is missing on this deployed environment even if it exists in local .env.",
     flutterwaveHint:
-      "Fixie has TWO outbound IPs. Whitelist both in Flutterwave, or set FLUTTERWAVE_PROXY_IP to one IP and whitelist only that IP.",
+      `Traffic is pinned to ${pinnedIp}. Whitelist that exact IP in Flutterwave.`,
     message: ready
       ? `Flutterwave outbound path looks ready${egressIp ? ` (egress ${egressIp})` : ""}.`
       : !proxyConfigured

@@ -149,12 +149,17 @@ export default function WithdrawPage() {
         bank?: { bankName: string };
       };
       if (!res.ok) {
+        console.error("[withdraw]", {
+          status: res.status,
+          error: json.error,
+          code: json.code,
+        });
         if (json.code?.startsWith("pin_") || json.hasPin === false) {
           if (typeof json.hasPin === "boolean") setHasPin(json.hasPin);
           setPinError(json.error || "PIN verification failed");
           return;
         }
-        throw new Error(json.error || "Withdrawal failed");
+        throw new Error(json.error || "Withdrawal unavailable");
       }
 
       if (payload.isCreate) setHasPin(true);
@@ -173,8 +178,9 @@ export default function WithdrawPage() {
         pending: Boolean(json.pending),
       });
     } catch (err) {
+      console.error("[withdraw]", err);
       setPinModalOpen(false);
-      setError(err instanceof Error ? err.message : "Withdrawal failed");
+      setError(err instanceof Error ? err.message : "Withdrawal unavailable");
     } finally {
       setSubmitting(false);
     }
