@@ -11,6 +11,7 @@ import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
 import { AuthField, authInputClassName } from "@/components/auth/auth-field";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useWallet } from "@/hooks/use-wallet";
 import type { WalletSummary } from "@/lib/wallet-types";
 import { cn } from "@/lib/utils";
 
@@ -70,21 +71,20 @@ function FundPageContent() {
   const [idNumber, setIdNumber] = useState("");
   const lastBalanceRef = useRef<string | null>(null);
   const redirectedRef = useRef(false);
+  const { data: walletPayload, refetch: refetchWallet } = useWallet({
+    refetchInterval: 8000,
+  });
 
   const goToLatestFundReceipt = useCallback(async () => {
     if (redirectedRef.current) return;
     try {
-      const res = await fetch("/api/wallet", { cache: "no-store" });
-      if (!res.ok) return;
-      const json = (await res.json()) as {
-        recent?: Array<{ id: string; type: string; category?: string }>;
-      };
+      const { data: json } = await refetchWallet();
       const latest =
-        json.recent?.find(
+        json?.recent?.find(
           (tx) =>
             tx.type === "credit" &&
             (!tx.category || tx.category === "fund"),
-        ) ?? json.recent?.find((tx) => tx.type === "credit");
+        ) ?? json?.recent?.find((tx) => tx.type === "credit");
       if (latest?.id) {
         redirectedRef.current = true;
         router.replace(`/history/${latest.id}`);
@@ -92,49 +92,36 @@ function FundPageContent() {
     } catch {
       // keep user on fund page if receipt lookup fails
     }
-  }, [router]);
+  }, [refetchWallet, router]);
 
-  const refreshWallet = useCallback(async () => {
-    try {
-      const res = await fetch("/api/wallet", { cache: "no-store" });
-      if (!res.ok) return;
-      const json = (await res.json()) as { primary: WalletSummary };
-      const next = json.primary;
-      const prev = lastBalanceRef.current;
+  useEffect(() => {
+    if (!walletPayload?.primary) return;
+    const next = walletPayload.primary;
+    const prev = lastBalanceRef.current;
 
-      if (
-        prev != null &&
-        next.balance !== prev &&
-        Number(next.balance) > Number(prev)
-      ) {
-        toast.success("Payment received", {
-          description: `Your wallet is now ${next.balanceFormatted}`,
-        });
-        void goToLatestFundReceipt();
-      }
-
-      lastBalanceRef.current = next.balance;
-      setWallet(next);
-    } catch {
-      // keep existing balance on soft poll failures
+    if (
+      prev != null &&
+      next.balance !== prev &&
+      Number(next.balance) > Number(prev)
+    ) {
+      toast.success("Payment received", {
+        description: `Your wallet is now ${next.balanceFormatted}`,
+      });
+      void goToLatestFundReceipt();
     }
-  }, [goToLatestFundReceipt]);
+
+    lastBalanceRef.current = next.balance;
+    setWallet(next);
+  }, [walletPayload, goToLatestFundReceipt]);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     setSetupHint(null);
     try {
-      const [walletRes, depositRes] = await Promise.all([
-        fetch("/api/wallet", { cache: "no-store" }),
-        fetch("/api/wallet/deposit-account", { cache: "no-store" }),
-      ]);
-
-      if (walletRes.ok) {
-        const json = (await walletRes.json()) as { primary: WalletSummary };
-        lastBalanceRef.current = json.primary.balance;
-        setWallet(json.primary);
-      }
+      const depositRes = await fetch("/api/wallet/deposit-account", {
+        cache: "no-store",
+      });
 
       const json = (await depositRes.json().catch(() => ({}))) as {
         account?: DepositAccount | null;
@@ -166,13 +153,6 @@ function FundPageContent() {
   useEffect(() => {
     void load();
   }, [load]);
-
-  useEffect(() => {
-    const id = window.setInterval(() => {
-      void refreshWallet();
-    }, 8000);
-    return () => window.clearInterval(id);
-  }, [refreshWallet]);
 
   async function copyText(value: string, kind: "number" | "name") {
     try {
@@ -220,7 +200,7 @@ function FundPageContent() {
     } catch {
       toast.error("Could not check for your deposit");
     }
-    await refreshWallet();
+    await refetchWallet();
     setChecking(false);
   }
 
@@ -401,7 +381,7 @@ function FundPageContent() {
                   type="button"
                   onClick={() => {
                     void load();
-                    void refreshWallet();
+                    void refetchWallet();
                   }}
                   className="inline-flex items-center gap-1 text-xs font-semibold text-primary"
                 >

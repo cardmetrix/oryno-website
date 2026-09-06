@@ -18,6 +18,7 @@ import {
   type TransactionPinModalMode,
 } from "@/components/app/transaction-pin-modal";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useWallet } from "@/hooks/use-wallet";
 import type { BankAccountSummary, WalletSummary } from "@/lib/wallet-types";
 import { cn } from "@/lib/utils";
 
@@ -56,59 +57,45 @@ export default function WithdrawPage() {
     pending?: boolean;
   } | null>(null);
 
+  const { data: walletPayload, isLoading: walletLoading } = useWallet();
+
+  useEffect(() => {
+    if (!walletPayload) {
+      if (!walletLoading) setLoading(false);
+      return;
+    }
+    setWallet(walletPayload.primary);
+    setBanks(walletPayload.banks);
+    const primary =
+      walletPayload.banks.find((b) => b.isPrimary) ?? walletPayload.banks[0];
+    if (primary) setBankAccountId(primary.id);
+    const nextMin = walletPayload.withdrawMinimum
+      ? {
+          minLocal: walletPayload.withdrawMinimum.minLocal,
+          formatted: walletPayload.withdrawMinimum.formatted,
+          message: walletPayload.withdrawMinimum.message,
+        }
+      : null;
+    setMinWithdraw(nextMin);
+    setAmount((prev) => {
+      if (prev) return prev;
+      return nextMin ? String(nextMin.minLocal) : prev;
+    });
+    if (!walletLoading) setLoading(false);
+  }, [walletPayload, walletLoading]);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const [walletRes, settingsRes] = await Promise.all([
-          fetch("/api/wallet", { cache: "no-store" }),
-          fetch("/api/settings", { cache: "no-store" }),
-        ]);
-        if (!walletRes.ok) throw new Error("Failed");
-        const json = (await walletRes.json()) as {
-          primary: WalletSummary;
-          banks: BankAccountSummary[];
-          withdrawMinimum?: WithdrawMinimum;
+        const settingsRes = await fetch("/api/settings", { cache: "no-store" });
+        if (!settingsRes.ok || cancelled) return;
+        const settings = (await settingsRes.json()) as {
+          security?: { hasPin?: boolean };
         };
-        if (cancelled) return;
-        setWallet(json.primary);
-        setBanks(json.banks);
-        const primary =
-          json.banks.find((b) => b.isPrimary) ?? json.banks[0];
-        if (primary) setBankAccountId(primary.id);
-
-        const nextMin = json.withdrawMinimum
-          ? {
-              minLocal: json.withdrawMinimum.minLocal,
-              formatted: json.withdrawMinimum.formatted,
-              message: json.withdrawMinimum.message,
-            }
-          : null;
-        setMinWithdraw(nextMin);
-
-        setAmount((prev) => {
-          if (prev) return prev;
-          if (nextMin) return String(nextMin.minLocal);
-          const currency = json.primary.currency;
-          if (currency === "GHS") return "50";
-          if (currency === "KES") return "500";
-          if (currency === "ZAR") return "100";
-          return "100";
-        });
-
-        if (settingsRes.ok) {
-          const settings = (await settingsRes.json()) as {
-            security?: { hasPin?: boolean };
-          };
-          setHasPin(Boolean(settings.security?.hasPin));
-        }
+        if (!cancelled) setHasPin(Boolean(settings.security?.hasPin));
       } catch {
-        if (!cancelled) {
-          setWallet(null);
-          setBanks([]);
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
+        // PIN status stays false until settings load
       }
     })();
     return () => {

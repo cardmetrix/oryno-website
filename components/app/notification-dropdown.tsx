@@ -58,13 +58,9 @@ export function NotificationDropdown() {
   );
 
   useEffect(() => {
-    void load();
+    const timeoutId = window.setTimeout(() => void load(), 400);
+    return () => window.clearTimeout(timeoutId);
   }, [load]);
-
-  useEffect(() => {
-    if (!open) return;
-    void load({ soft: true });
-  }, [open, load]);
 
   const visible = useMemo(
     () => (filter === "unread" ? items.filter((n) => n.unread) : items),

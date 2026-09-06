@@ -15,9 +15,9 @@ export function DashboardHeader() {
 
   return (
     <motion.header
-      initial={{ opacity: 0, y: -8 }}
+      initial={{ opacity: 0, y: -4 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35 }}
+      transition={{ duration: 0.18 }}
       className="sticky top-0 z-30 -mx-4 mb-6 border-b border-border/70 bg-[image:var(--header-surface)] px-4 py-3.5 backdrop-blur-xl sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
     >
       <div className="flex flex-nowrap items-center justify-between gap-2 sm:gap-3">

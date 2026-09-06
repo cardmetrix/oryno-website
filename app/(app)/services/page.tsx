@@ -1,28 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import {
-  Activity,
-  Mail,
-  Phone,
-  Search,
-  SearchX,
-  Smartphone,
-  Sparkles,
-  Trophy,
-  TrendingUp,
-  Wifi,
-  Zap,
-  type LucideIcon,
-} from "lucide-react";
-import { GiftCardIcon } from "@/components/icons/gift-card-icon";
+import { Search, SearchX } from "lucide-react";
 import { AdCarousel } from "@/components/app/ad-carousel";
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
-import { ServicesSkeleton } from "@/components/app/services-skeleton";
 import { ServiceActionCard } from "@/components/app/service-action-card";
 import { useCountry } from "@/components/providers/country-provider";
 import {
@@ -33,57 +18,17 @@ import {
 } from "@/lib/services-directory";
 import { cn } from "@/lib/utils";
 
-const ICON_MAP: Record<string, LucideIcon | typeof GiftCardIcon> = {
-  airtime: Smartphone,
-  data: Wifi,
-  bills: Zap,
-  betting: Trophy,
-  social: TrendingUp,
-  "virtual-numbers": Phone,
-  emails: Mail,
-  "gift-cards-live": Activity,
-  "gift-cards": GiftCardIcon,
-};
-
-type ApiService = Omit<ServiceDirectoryItem, "icon"> & {
-  icon: string;
-  stats: string | null;
-};
-
 export default function ServicesPage() {
   const searchParams = useSearchParams();
   const { country } = useCountry();
-  const [services, setServices] = useState<ServiceDirectoryItem[] | null>(null);
-  const [loading, setLoading] = useState(true);
+  const services = useMemo(
+    () => getServicesDirectory(country.code),
+    [country.code],
+  );
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<(typeof serviceCategories)[number]>(
     "All",
   );
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/services", { cache: "no-store" });
-      if (!res.ok) throw new Error("Failed");
-      const json = (await res.json()) as { services: ApiService[] };
-      setServices(
-        json.services.map((s) => ({
-          ...s,
-          stats: s.stats ?? undefined,
-          icon: ICON_MAP[s.icon] ?? Sparkles,
-        })),
-      );
-    } catch {
-      // Local fallback — still fast
-      setServices(getServicesDirectory(country.code));
-    } finally {
-      setLoading(false);
-    }
-  }, [country.code]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
 
   useEffect(() => {
     const q = searchParams.get("q");
@@ -105,11 +50,7 @@ export default function ServicesPage() {
         backHref="/dashboard"
       />
 
-      {loading || !services ? (
-        <ServicesSkeleton />
-      ) : (
-        <>
-          <MotionSection className="overflow-hidden rounded-[20px] border border-border bg-background shadow-[var(--shadow-soft)]">
+      <MotionSection className="overflow-hidden rounded-[20px] border border-border bg-background shadow-[var(--shadow-soft)]">
             <div className="relative overflow-hidden bg-gradient-to-br from-[#ff8124] via-oryno-orange to-[#e85d00] px-3.5 py-2.5 text-white sm:px-4 sm:py-3">
               <div
                 aria-hidden="true"
@@ -212,8 +153,6 @@ export default function ServicesPage() {
             reserveSpaceWhileLoading={false}
             className="mt-5 sm:mt-6 lg:min-h-0 lg:h-[148px]"
           />
-        </>
-      )}
     </AppShell>
   );
 }

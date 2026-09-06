@@ -83,7 +83,8 @@ export function useProfileDisplay() {
   useEffect(() => {
     if (!isLoaded || !user || !bootstrap) return;
     setProfile((prev) => prev ?? bootstrap);
-    void loadProfile();
+    const timeoutId = window.setTimeout(() => void loadProfile(), 1200);
+    return () => window.clearTimeout(timeoutId);
   }, [isLoaded, user?.id, bootstrap, loadProfile]);
 
   const display = profile || bootstrap;

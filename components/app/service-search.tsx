@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -9,20 +8,7 @@ import {
   type KeyboardEvent,
 } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Activity,
-  Mail,
-  Phone,
-  Search,
-  Smartphone,
-  Sparkles,
-  Trophy,
-  TrendingUp,
-  Wifi,
-  Zap,
-  type LucideIcon,
-} from "lucide-react";
-import { GiftCardIcon } from "@/components/icons/gift-card-icon";
+import { Search } from "lucide-react";
 import { useCountry } from "@/components/providers/country-provider";
 import {
   filterServices,
@@ -30,23 +16,6 @@ import {
   type ServiceDirectoryItem,
 } from "@/lib/services-directory";
 import { cn } from "@/lib/utils";
-
-const ICON_MAP: Record<string, LucideIcon | typeof GiftCardIcon> = {
-  airtime: Smartphone,
-  data: Wifi,
-  bills: Zap,
-  betting: Trophy,
-  social: TrendingUp,
-  "virtual-numbers": Phone,
-  emails: Mail,
-  "gift-cards": GiftCardIcon,
-  "gift-cards-live": Activity,
-};
-
-type ApiService = Omit<ServiceDirectoryItem, "icon"> & {
-  icon: string;
-  stats: string | null;
-};
 
 type ServiceSearchProps = {
   className?: string;
@@ -64,31 +33,16 @@ export function ServiceSearch({
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const [services, setServices] = useState<ServiceDirectoryItem[]>([]);
+  const [services, setServices] = useState<ServiceDirectoryItem[]>(() =>
+    getServicesDirectory(country.code),
+  );
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
 
-  const loadServices = useCallback(async () => {
-    try {
-      const res = await fetch("/api/services", { cache: "no-store" });
-      if (!res.ok) throw new Error("Failed");
-      const json = (await res.json()) as { services: ApiService[] };
-      setServices(
-        json.services.map((s) => ({
-          ...s,
-          stats: s.stats ?? undefined,
-          icon: ICON_MAP[s.icon] ?? Sparkles,
-        })),
-      );
-    } catch {
-      setServices(getServicesDirectory(country.code));
-    }
-  }, [country.code]);
-
   useEffect(() => {
-    void loadServices();
-  }, [loadServices]);
+    setServices(getServicesDirectory(country.code));
+  }, [country.code]);
 
   const results = useMemo(() => {
     const available = services.filter((item) => !item.soon);

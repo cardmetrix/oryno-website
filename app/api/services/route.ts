@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server";
-import { ensureAppUser } from "@/lib/auth/current-user";
 import { getServicesDirectory } from "@/lib/services-directory";
 
 export const runtime = "nodejs";
 
 /** Lightweight catalog for the All Services page (fast JSON, no DB). */
-export async function GET() {
-  const user = await ensureAppUser();
-  const services = getServicesDirectory(user?.countryCode).map((s) => ({
+export async function GET(req: Request) {
+  const country = new URL(req.url).searchParams.get("country");
+  const services = getServicesDirectory(country).map((s) => ({
     id: s.id,
     href: s.href,
     label: s.label,
@@ -27,7 +26,7 @@ export async function GET() {
     { services, count: services.length },
     {
       headers: {
-        "Cache-Control": "no-store",
+        "Cache-Control": "public, max-age=120, stale-while-revalidate=600",
       },
     },
   );

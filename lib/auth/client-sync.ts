@@ -2,6 +2,7 @@ import { detectUserCountry } from "@/lib/geo/client-detect";
 import { getCountryInfo } from "@/lib/country";
 
 const LOGIN_ANNOUNCED_KEY = "oryno_login_announced";
+const SESSION_SYNCED_KEY = "oryno_session_synced";
 
 export function markLoginAnnounced() {
   if (typeof window === "undefined") return;
@@ -16,6 +17,16 @@ export function clearLoginAnnounced() {
 export function wasLoginAnnounced() {
   if (typeof window === "undefined") return false;
   return sessionStorage.getItem(LOGIN_ANNOUNCED_KEY) === "1";
+}
+
+export function markSessionSynced() {
+  if (typeof window === "undefined") return;
+  sessionStorage.setItem(SESSION_SYNCED_KEY, "1");
+}
+
+export function wasSessionSynced() {
+  if (typeof window === "undefined") return false;
+  return sessionStorage.getItem(SESSION_SYNCED_KEY) === "1";
 }
 
 export async function syncSessionToDatabase(options?: {

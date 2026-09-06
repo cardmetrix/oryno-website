@@ -34,6 +34,7 @@ import {
   type AppTransaction,
 } from "@/lib/transactions";
 import { cn } from "@/lib/utils";
+import { useWallet } from "@/hooks/use-wallet";
 
 type StatementFormat = "pdf" | "xlsx";
 type SheetKind = "category" | "status" | "month" | "statement" | null;
@@ -48,30 +49,19 @@ export default function HistoryPage() {
   const [sheet, setSheet] = useState<SheetKind>(null);
   const [downloading, setDownloading] = useState(false);
   const [currency, setCurrency] = useState("NGN");
+  const { data: wallet } = useWallet();
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(false);
     try {
-      const [txRes, walletRes] = await Promise.all([
-        fetch("/api/transactions", { cache: "no-store" }),
-        fetch("/api/wallet", { cache: "no-store" }),
-      ]);
+      const txRes = await fetch("/api/transactions", { cache: "no-store" });
       if (!txRes.ok) throw new Error("Failed");
       const json = (await txRes.json()) as { items: AppTransaction[] };
       setItems(json.items ?? []);
-      if (walletRes.ok) {
-        const wallet = (await walletRes.json()) as {
-          totals?: { currency?: string };
-          primary?: { currency?: string };
-        };
-        setCurrency(
-          wallet.totals?.currency ??
-            wallet.primary?.currency ??
-            json.items?.[0]?.currency ??
-            "NGN",
-        );
-      }
+      setCurrency(
+        (prev) => json.items?.[0]?.currency ?? prev,
+      );
     } catch {
       setError(true);
       setItems([]);
@@ -83,6 +73,11 @@ export default function HistoryPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    const next = wallet?.totals?.currency ?? wallet?.primary?.currency;
+    if (next) setCurrency(next);
+  }, [wallet]);
 
   const months = useMemo(() => buildHistoryMonths(items), [items]);
 

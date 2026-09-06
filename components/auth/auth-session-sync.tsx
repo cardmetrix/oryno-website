@@ -5,8 +5,10 @@ import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
+  markSessionSynced,
   syncSessionToDatabase,
   wasLoginAnnounced,
+  wasSessionSynced,
 } from "@/lib/auth/client-sync";
 import { getCountryInfo } from "@/lib/country";
 
@@ -18,12 +20,19 @@ export function AuthSessionSync() {
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn || ran.current) return;
+
+    const needAnnounce = !wasLoginAnnounced();
+    if (wasSessionSynced() && !needAnnounce) {
+      ran.current = true;
+      return;
+    }
+
     ran.current = true;
 
     void (async () => {
       // Announce login once per browser session (covers OAuth when login page didn't).
       const result = await syncSessionToDatabase({
-        announceLogin: !wasLoginAnnounced(),
+        announceLogin: needAnnounce,
       });
       if (!result.ok && result.code === "account_disabled") {
         router.replace("/login?error=account_disabled");
@@ -33,6 +42,8 @@ export function AuthSessionSync() {
         toast.error(result.error ?? "Could not sync your account");
         return;
       }
+
+      markSessionSynced();
 
       if (result.countryCode) {
         const info = getCountryInfo(result.countryCode);

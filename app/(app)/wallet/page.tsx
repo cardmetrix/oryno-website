@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
@@ -27,6 +28,8 @@ import { PageHeader } from "@/components/app/page-header";
 import { UsdWalletActionsPanel, UsdWalletCard, type UsdPanel } from "@/components/app/usd-wallet-card";
 import { WalletSkeleton } from "@/components/app/wallet-skeleton";
 import { WalletBalanceAmount } from "@/components/app/wallet-balance-amount";
+import { fetchWallet, useWallet } from "@/hooks/use-wallet";
+import { WALLET_QUERY_KEY } from "@/lib/query-keys";
 import type { BankAccountSummary, BankOption, WalletPayload } from "@/lib/wallet-types";
 import { cn } from "@/lib/utils";
 import {
@@ -71,6 +74,8 @@ function WalletPageFallback() {
 function WalletPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
+  const { data: walletData } = useWallet();
   const [data, setData] = useState<WalletPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -92,16 +97,30 @@ function WalletPageContent() {
   const [usdPanel, setUsdPanel] = useState<UsdPanel>("fund");
   const walletPagerRef = useRef<HTMLDivElement>(null);
 
-  const load = useCallback(async (opts?: { soft?: boolean }) => {
+  const load = useCallback(async (opts?: { soft?: boolean; wallet?: boolean }) => {
     if (!opts?.soft) setLoading(true);
     setError(null);
     try {
-      const [walletRes, banksRes] = await Promise.all([
-        fetch("/api/wallet", { cache: "no-store" }),
+      const refreshWallet = opts?.wallet !== false;
+      const [json, banksRes] = await Promise.all([
+        refreshWallet
+          ? queryClient.fetchQuery({
+              queryKey: WALLET_QUERY_KEY,
+              queryFn: fetchWallet,
+              staleTime: 0,
+            })
+          : Promise.resolve(
+              walletData ??
+                queryClient.getQueryData<WalletPayload>(WALLET_QUERY_KEY) ??
+                queryClient.fetchQuery({
+                  queryKey: WALLET_QUERY_KEY,
+                  queryFn: fetchWallet,
+                  staleTime: 20_000,
+                }),
+            ),
         fetch("/api/wallet/banks", { cache: "no-store" }),
       ]);
-      if (!walletRes.ok) throw new Error("Failed to load wallet");
-      const json = (await walletRes.json()) as WalletPayload;
+      if (!json) throw new Error("Failed to load wallet");
       setData(json);
 
       if (banksRes.ok) {
@@ -116,15 +135,28 @@ function WalletPageContent() {
       }
     } catch {
       setError("Couldn’t load your wallet. Pull to retry.");
-      setData(null);
+      if (!walletData) setData(null);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [queryClient, walletData]);
 
   useEffect(() => {
+    if (walletData) {
+      setData(walletData);
+      setLoading(false);
+    }
+  }, [walletData]);
+
+  useEffect(() => {
+    if (walletData) {
+      void load({ soft: true, wallet: false });
+      return;
+    }
     void load();
-  }, [load]);
+    // initial page load only
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Flutterwave local wallet funding callback: /wallet?local_fund=1&tx_ref=...
   useEffect(() => {

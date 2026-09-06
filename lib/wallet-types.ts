@@ -62,6 +62,13 @@ export type WalletPayload = {
     currency?: string;
     createdAt: string;
   }>;
+  withdrawMinimum?: {
+    minNgn: number;
+    minLocal: number;
+    currency: string;
+    formatted: string;
+    message: string;
+  };
   fx?: {
     base: string;
     quote: string;
@@ -72,6 +79,15 @@ export type WalletPayload = {
     provider: string;
     asOf: string;
   } | null;
+  displayFx?: {
+    from: "NGN";
+    to: string;
+    ngnToLocal: number;
+    localToNgn: number;
+    provider?: string;
+    asOf?: string;
+  };
+  ledgerNgn?: string;
   totals: {
     balance: string;
     balanceFormatted: string;

@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { AuthSessionSync } from "@/components/auth/auth-session-sync";
 import { CrispChatBoot } from "@/components/app/crisp-chat";
 import { CountryProvider } from "@/components/providers/country-provider";
+import { QueryProvider } from "@/components/providers/query-provider";
 import { ensureAppUser } from "@/lib/auth/current-user";
 import { twoFactorStatus } from "@/lib/security/totp-auth";
 
@@ -38,10 +39,12 @@ export default async function AppLayout({
   }
 
   return (
-    <CountryProvider>
-      <AuthSessionSync />
-      <CrispChatBoot />
-      {children}
-    </CountryProvider>
+    <QueryProvider>
+      <CountryProvider>
+        <AuthSessionSync />
+        <CrispChatBoot />
+        {children}
+      </CountryProvider>
+    </QueryProvider>
   );
 }

@@ -2,14 +2,14 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowUpRight, Eye, EyeOff, Plus } from "lucide-react";
 import { WalletCardSkeleton } from "@/components/app/wallet-skeleton";
 import { WalletBalanceAmount } from "@/components/app/wallet-balance-amount";
 import { BRAND_LOGO_SRC } from "@/components/brand-logo";
 import { useCountry } from "@/components/providers/country-provider";
-import type { WalletPayload } from "@/lib/wallet-types";
+import { useWallet } from "@/hooks/use-wallet";
 import { cn } from "@/lib/utils";
 
 type WalletCardProps = {
@@ -28,32 +28,10 @@ export function WalletCard({
 }: WalletCardProps) {
   const { country } = useCountry();
   const currencyCode = country.currency;
-
-  const [payload, setPayload] = useState<WalletPayload | null>(null);
-  const [loading, setLoading] = useState(!staticMode);
+  const { data: payload, isLoading } = useWallet({ enabled: !staticMode });
   const [hidden, setHidden] = useState(false);
 
-  useEffect(() => {
-    if (staticMode) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/wallet", { cache: "no-store" });
-        if (!res.ok) throw new Error("Failed");
-        const json = (await res.json()) as WalletPayload;
-        if (!cancelled) setPayload(json);
-      } catch {
-        if (!cancelled) setPayload(null);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [staticMode]);
-
-  if (loading) {
+  if (!staticMode && isLoading && !payload) {
     return <WalletCardSkeleton className={className} />;
   }
 

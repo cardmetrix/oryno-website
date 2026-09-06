@@ -3,7 +3,7 @@ import {
   formatCountryMoney,
   resolveCountryCode,
 } from "@/lib/country";
-import { convertNgnToLocal } from "@/lib/fx/rates";
+import { convertNgnToLocal, type NgnLocalQuote } from "@/lib/fx/rates";
 import { getDisplayFx } from "@/lib/display-currency";
 
 /** Flutterwave / ORYNO minimum payout floor in NGN ledger units. */
@@ -20,10 +20,11 @@ export type WithdrawMinimum = {
 
 export async function getWithdrawMinimum(
   countryCode?: string | null,
+  fxOverride?: NgnLocalQuote | null,
 ): Promise<WithdrawMinimum> {
   const code = resolveCountryCode(countryCode);
   const currency = currencyForCountry(code);
-  const fx = await getDisplayFx(code);
+  const fx = fxOverride ?? (await getDisplayFx(code));
   const minLocal =
     currency === "NGN"
       ? MIN_WITHDRAW_NGN

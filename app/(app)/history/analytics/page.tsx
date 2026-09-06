@@ -24,6 +24,7 @@ import {
 } from "@/lib/history";
 import type { AppTransaction } from "@/lib/transactions";
 import { cn } from "@/lib/utils";
+import { useWallet } from "@/hooks/use-wallet";
 
 export default function HistoryAnalyticsPage() {
   return (
@@ -51,29 +52,16 @@ function HistoryAnalyticsContent() {
   const [monthKey, setMonthKey] = useState(searchParams.get("month") ?? "");
   const [monthOpen, setMonthOpen] = useState(false);
   const [currency, setCurrency] = useState("NGN");
+  const { data: wallet } = useWallet();
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [txRes, walletRes] = await Promise.all([
-        fetch("/api/transactions", { cache: "no-store" }),
-        fetch("/api/wallet", { cache: "no-store" }),
-      ]);
+      const txRes = await fetch("/api/transactions", { cache: "no-store" });
       if (!txRes.ok) throw new Error("Failed");
       const json = (await txRes.json()) as { items: AppTransaction[] };
       setItems(json.items ?? []);
-      if (walletRes.ok) {
-        const wallet = (await walletRes.json()) as {
-          totals?: { currency?: string };
-          primary?: { currency?: string };
-        };
-        setCurrency(
-          wallet.totals?.currency ??
-            wallet.primary?.currency ??
-            json.items?.[0]?.currency ??
-            "NGN",
-        );
-      }
+      setCurrency((prev) => json.items?.[0]?.currency ?? prev);
     } catch {
       setItems([]);
     } finally {
@@ -84,6 +72,11 @@ function HistoryAnalyticsContent() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    const next = wallet?.totals?.currency ?? wallet?.primary?.currency;
+    if (next) setCurrency(next);
+  }, [wallet]);
 
   const months = useMemo(() => buildHistoryMonths(items), [items]);
   const paramMonth = searchParams.get("month") ?? "";

@@ -44,7 +44,7 @@ export function AdCarousel({
     (async () => {
       try {
         const res = await fetch(`/api/ads?placement=${placement}`, {
-          cache: "no-store",
+          next: { revalidate: 60 },
         });
         if (!res.ok) throw new Error("Failed");
         const json = (await res.json()) as {

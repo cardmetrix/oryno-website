@@ -37,17 +37,32 @@ type CountryContextValue = {
 
 const CountryContext = createContext<CountryContextValue | null>(null);
 
-function readCachedCountry(): CountryInfo | null {
+const COUNTRY_FRESH_MS = 5 * 60 * 1000;
+
+function readCachedCountryMeta(): {
+  country: CountryInfo;
+  updatedAt: number;
+} | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = window.localStorage.getItem("oryno_country");
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as { countryCode?: string };
+    const parsed = JSON.parse(raw) as {
+      countryCode?: string;
+      updatedAt?: number;
+    };
     if (!parsed.countryCode) return null;
-    return getCountryInfo(parsed.countryCode);
+    return {
+      country: getCountryInfo(parsed.countryCode),
+      updatedAt: Number(parsed.updatedAt) || 0,
+    };
   } catch {
     return null;
   }
+}
+
+function readCachedCountry(): CountryInfo | null {
+  return readCachedCountryMeta()?.country ?? null;
 }
 
 function readCachedFx(): DisplayFx | null {
@@ -104,6 +119,11 @@ export function CountryProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    const cached = readCachedCountryMeta();
+    if (cached && Date.now() - cached.updatedAt < COUNTRY_FRESH_MS) {
+      setLoading(false);
+      return;
+    }
     void refresh();
   }, [refresh]);
 

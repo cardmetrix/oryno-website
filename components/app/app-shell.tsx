@@ -20,9 +20,9 @@ export function AppShell({ children, className }: AppShellProps) {
 
         <div className="md:pl-[260px]">
           <motion.main
-            initial={{ opacity: 0, y: 12 }}
+            initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
             className={cn(
               "mx-auto min-h-[100svh] w-full max-w-6xl px-4 pt-0 pb-8 sm:px-6 md:pb-10 lg:px-8",
               className,

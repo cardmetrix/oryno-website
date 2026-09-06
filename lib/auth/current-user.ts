@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { eq } from "drizzle-orm";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
@@ -14,6 +15,38 @@ import {
 import { resolveLanguageForCountry } from "@/lib/country";
 import { countryOverrideForUser } from "@/lib/country-overrides";
 import { ensurePrimaryWallet } from "@/lib/wallet";
+
+const USER_LOOKUP_TTL_MS = 8_000;
+const userLookupCache = new Map<string, { user: SyncedUser; expires: number }>();
+const userLookupInflight = new Map<string, Promise<SyncedUser | null>>();
+
+function rememberUser(clerkId: string, user: SyncedUser) {
+  userLookupCache.set(clerkId, {
+    user,
+    expires: Date.now() + USER_LOOKUP_TTL_MS,
+  });
+}
+
+async function lookupExistingUser(clerkId: string): Promise<SyncedUser | null> {
+  const hit = userLookupCache.get(clerkId);
+  if (hit && hit.expires > Date.now()) return hit.user;
+
+  const pending = userLookupInflight.get(clerkId);
+  if (pending) return pending;
+
+  const promise = (async () => {
+    const existing = await db.query.users.findFirst({
+      where: eq(users.clerkId, clerkId),
+    });
+    if (existing) rememberUser(clerkId, existing);
+    return existing ?? null;
+  })().finally(() => {
+    userLookupInflight.delete(clerkId);
+  });
+
+  userLookupInflight.set(clerkId, promise);
+  return promise;
+}
 
 export async function requireClerkAuth() {
   const { userId } = await auth();
@@ -50,9 +83,7 @@ async function resolveAndSync(options?: {
 
   if (!needsFullSync) {
     try {
-      const existing = await db.query.users.findFirst({
-        where: eq(users.clerkId, clerkUser.id),
-      });
+      const existing = await lookupExistingUser(clerkUser.id);
       if (existing) {
         const locked = countryOverrideForUser({
           username: existing.username,
@@ -69,6 +100,7 @@ async function resolveAndSync(options?: {
             .where(eq(users.id, existing.id))
             .returning();
           if (updated) {
+            rememberUser(clerkUser.id, updated);
             await ensurePrimaryWallet(updated.id, "NGN").catch(() => undefined);
             return { user: updated, debug };
           }
@@ -86,7 +118,29 @@ async function resolveAndSync(options?: {
     forceCountry: options?.forceCountry,
     referralCode: options?.referralCode,
   });
+  if (synced) rememberUser(clerkUser.id, synced);
   return { user: synced, debug };
+}
+
+const ensureAppUserOnce = cache(async () => {
+  const { user } = await resolveAndSync();
+  return user;
+});
+
+function needsSpecialSync(options?: {
+  touchLogin?: boolean;
+  countryCode?: string | null;
+  forceCountry?: boolean;
+  referralCode?: string | null;
+  request?: Request;
+}) {
+  return Boolean(
+    options?.touchLogin ||
+      options?.countryCode ||
+      options?.forceCountry ||
+      options?.referralCode ||
+      options?.request,
+  );
 }
 
 /** Ensures the signed-in Clerk user exists in Postgres and returns the DB row. */
@@ -97,6 +151,9 @@ export async function ensureAppUser(options?: {
   referralCode?: string | null;
   request?: Request;
 }): Promise<SyncedUser | null> {
+  if (!needsSpecialSync(options)) {
+    return ensureAppUserOnce();
+  }
   const { user } = await resolveAndSync(options);
   return user;
 }
