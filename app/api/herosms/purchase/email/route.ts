@@ -39,7 +39,12 @@ export async function POST(req: Request) {
       priceLocal: body.priceLocal,
     });
 
-    const result = await withUserActionLock(user.id, () =>
+    const { withSpendLock } = await import("@/lib/wallet/action-lock");
+    const result = await withSpendLock(
+      user.id,
+      Number(body.priceLocal) || 0,
+      user.countryCode,
+      () =>
       purchaseEmailActivation({
         userId: user.id,
         countryCode: user.countryCode,

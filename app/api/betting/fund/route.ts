@@ -49,7 +49,12 @@ export async function POST(req: Request) {
         ? localAmount
         : convertLocalToNgn(localAmount, fx.localToNgn);
 
-    const result = await withUserActionLock(user.id, () =>
+    const { withSpendLock } = await import("@/lib/wallet/action-lock");
+    const result = await withSpendLock(
+      user.id,
+      localAmount,
+      user.countryCode,
+      () =>
       fundBettingWallet({
       userId: user.id,
       countryCode: user.countryCode,

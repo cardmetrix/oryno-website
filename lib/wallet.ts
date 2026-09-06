@@ -411,6 +411,14 @@ export async function withdrawWallet(input: {
     payoutCurrency === "NGN"
       ? localAmount
       : convertLocalToNgn(localAmount, fx.localToNgn);
+  const { assertDailyTransactionLimit } = await import(
+    "@/lib/wallet/daily-limit"
+  );
+  await assertDailyTransactionLimit({
+    userId: input.userId,
+    amountNgn: ledgerNgn,
+    countryCode,
+  });
   const fee = Math.max(0, Number(input.fee ?? 0));
   const ledgerTotal = Math.round((ledgerNgn + fee) * 100) / 100;
   const amountStr = ledgerNgn.toFixed(2);

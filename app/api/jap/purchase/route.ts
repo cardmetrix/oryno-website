@@ -59,7 +59,12 @@ export async function POST(req: Request) {
       hasComments,
     });
 
-    const result = await withUserActionLock(user.id, () =>
+    const { withSpendLock } = await import("@/lib/wallet/action-lock");
+    const result = await withSpendLock(
+      user.id,
+      Number(body.priceLocal) || 0,
+      user.countryCode,
+      () =>
       purchaseJapBoost({
       userId: user.id,
       countryCode: user.countryCode,

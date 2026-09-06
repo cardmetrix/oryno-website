@@ -2,6 +2,7 @@ import { and, eq, gte, inArray } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { transactions } from "@/lib/db/schema";
+import { assertDailyTransactionLimit } from "@/lib/wallet/daily-limit";
 
 const LOCK_CLASS = 87421;
 const IN_FLIGHT_MS = 90_000;
@@ -23,7 +24,11 @@ export function isActionLockError(error: unknown): error is ActionInProgressErro
 }
 
 export function actionLockHttpStatus(error: unknown) {
-  return isActionLockError(error) ? 409 : null;
+  if (isActionLockError(error)) return 409;
+  if ((error as { code?: string } | null)?.code === "daily_limit_exceeded") {
+    return 400;
+  }
+  return null;
 }
 
 function advisoryKey(userId: string) {
@@ -68,10 +73,32 @@ async function assertNoRecentInFlight(userId: string) {
   }
 }
 
+export async function withSpendLock<T>(
+  userId: string,
+  amountLocal: number,
+  countryCode: string | null | undefined,
+  fn: () => Promise<T>,
+) {
+  const { getDisplayFx } = await import("@/lib/display-currency");
+  const { convertLocalToNgn } = await import("@/lib/fx/rates");
+  const fx = await getDisplayFx(countryCode);
+  const amountNgn =
+    !Number.isFinite(amountLocal) || amountLocal <= 0
+      ? 0
+      : fx.to === "NGN"
+        ? amountLocal
+        : convertLocalToNgn(amountLocal, fx.localToNgn);
+  return withUserActionLock(userId, fn, {
+    amountNgn: amountNgn > 0 ? amountNgn : undefined,
+    countryCode,
+  });
+}
+
 /** One wallet debit/payout at a time per user. Second request gets 409. */
 export async function withUserActionLock<T>(
   userId: string,
   fn: () => Promise<T>,
+  options?: { amountNgn?: number; countryCode?: string | null },
 ): Promise<T> {
   const key = advisoryKey(userId);
   const locked = await tryLock(key);
@@ -79,6 +106,13 @@ export async function withUserActionLock<T>(
     throw new ActionInProgressError();
   }
   try {
+    if (options?.amountNgn != null) {
+      await assertDailyTransactionLimit({
+        userId,
+        amountNgn: options.amountNgn,
+        countryCode: options.countryCode,
+      });
+    }
     await assertNoRecentInFlight(userId);
     return await fn();
   } finally {

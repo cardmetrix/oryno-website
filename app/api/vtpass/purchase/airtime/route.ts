@@ -7,7 +7,7 @@ import { sogoHttpStatus } from "@/lib/sogo/errors";
 import { publicServiceError } from "@/lib/service-errors";
 import {
   actionLockHttpStatus,
-  withUserActionLock,
+  withSpendLock,
 } from "@/lib/wallet/action-lock";
 
 export const runtime = "nodejs";
@@ -63,7 +63,11 @@ export async function POST(req: Request) {
       );
     }
 
-    const result = await withUserActionLock(user.id, () =>
+    const result = await withSpendLock(
+      user.id,
+      amount,
+      user.countryCode,
+      () =>
       purchaseAirtime({
       userId: user.id,
       countryCode: user.countryCode,

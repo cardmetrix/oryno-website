@@ -35,6 +35,7 @@ import {
 } from "@/lib/transactions";
 import { cn } from "@/lib/utils";
 import { useWallet } from "@/hooks/use-wallet";
+import { useSettlePendingTransactions } from "@/hooks/use-settle-pending-transactions";
 
 type StatementFormat = "pdf" | "xlsx";
 type SheetKind = "category" | "status" | "month" | "statement" | null;
@@ -50,11 +51,13 @@ export default function HistoryPage() {
   const [downloading, setDownloading] = useState(false);
   const [currency, setCurrency] = useState("NGN");
   const { data: wallet } = useWallet();
+  const { settle: settlePending } = useSettlePendingTransactions();
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(false);
     try {
+      await settlePending();
       const txRes = await fetch("/api/transactions", { cache: "no-store" });
       if (!txRes.ok) throw new Error("Failed");
       const json = (await txRes.json()) as { items: AppTransaction[] };
@@ -68,7 +71,7 @@ export default function HistoryPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [settlePending]);
 
   useEffect(() => {
     void load();
