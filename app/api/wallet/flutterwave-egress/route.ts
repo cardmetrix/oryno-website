@@ -4,6 +4,7 @@ import { isFlutterwaveDemoMode } from "@/lib/flutterwave/client";
 import { getServerEgressIp } from "@/lib/flutterwave/egress-ip";
 import {
   allowFlutterwaveDirect,
+  flutterwaveProxyHost,
   hasFlutterwaveProxy,
 } from "@/lib/flutterwave/http";
 
@@ -17,8 +18,14 @@ export async function GET() {
   }
 
   const proxyConfigured = hasFlutterwaveProxy();
+  const proxyHost = flutterwaveProxyHost();
   const demoMode = isFlutterwaveDemoMode();
   const allowDirect = allowFlutterwaveDirect();
+  const pinnedIp = (
+    process.env.FLUTTERWAVE_PROXY_IP ||
+    process.env.FIXIE_OUTBOUND_IP ||
+    ""
+  ).trim() || null;
   let egressIp: string | null = null;
   let egressError: string | null = null;
 
@@ -29,27 +36,33 @@ export async function GET() {
   }
 
   const expected =
-    (process.env.FLUTTERWAVE_EXPECTED_EGRESS_IP || "52.5.155.132").trim();
+    (process.env.FLUTTERWAVE_EXPECTED_EGRESS_IP || pinnedIp || "").trim() ||
+    null;
   const ready =
     demoMode ||
     allowDirect ||
-    (proxyConfigured && Boolean(egressIp) && (!expected || egressIp === expected));
+    (proxyConfigured && Boolean(egressIp));
 
   return NextResponse.json({
     ok: true,
     ready,
     proxyConfigured,
+    proxyHost,
+    pinnedIp,
     demoMode,
     allowDirect,
     egressIp,
     expectedEgressIp: expected,
     egressError,
+    vercelHint:
+      "If proxyConfigured is false here, the env var is missing on this deployed environment even if it exists in local .env.",
+    flutterwaveHint:
+      "Fixie has TWO outbound IPs. Whitelist both in Flutterwave, or set FLUTTERWAVE_PROXY_IP to one IP and whitelist only that IP.",
     message: ready
-      ? "Flutterwave outbound path looks ready."
+      ? `Flutterwave outbound path looks ready${egressIp ? ` (egress ${egressIp})` : ""}.`
       : !proxyConfigured
-        ? "FLUTTERWAVE_HTTPS_PROXY is not set on this server. Add Fixie in Vercel Environment Variables and redeploy."
-        : egressIp && egressIp !== expected
-          ? `Proxy is active but egress IP is ${egressIp}. Whitelist that IP in Flutterwave (expected ${expected}).`
-          : "Could not confirm proxy egress IP yet.",
+        ? "FLUTTERWAVE_HTTPS_PROXY / FIXIE_URL is not set on this deployed server. Add it in Vercel Production env and redeploy."
+        : egressError ||
+          "Could not confirm proxy egress IP yet. Check Fixie credentials and Flutterwave whitelist.",
   });
 }
