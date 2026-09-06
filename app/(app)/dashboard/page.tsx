@@ -8,6 +8,7 @@ import { ensureAppUser } from "@/lib/auth/current-user";
 import { WALLET_QUERY_KEY } from "@/lib/query-keys";
 import { loadWalletPayload } from "@/lib/wallet/load-payload";
 
+
 export default async function DashboardPage() {
   const queryClient = new QueryClient({
     defaultOptions: {
