@@ -1,6 +1,6 @@
-import { and, eq, inArray, lte } from "drizzle-orm";
+import { and, eq, inArray, lte, or } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { withdrawals } from "@/lib/db/schema";
+import { transactions, withdrawals } from "@/lib/db/schema";
 import {
   lookupFlutterwaveTransfer,
   settlePayoutTransfer,
@@ -11,10 +11,10 @@ import { convertNgnToLocal } from "@/lib/fx/rates";
 import { getDisplayFx } from "@/lib/display-currency";
 import { refundFailedDebit } from "@/lib/wallet/ledger";
 
-export const WITHDRAWAL_TIMEOUT_MS = 30 * 60 * 1000;
+export const WITHDRAWAL_TIMEOUT_MS = 5 * 60 * 1000;
 
 const TIMEOUT_REASON =
-  "Withdrawal timed out after 30 minutes and was returned to your ORYNO wallet.";
+  "Withdrawal timed out after 5 minutes and was returned to your ORYNO wallet.";
 
 const STUCK_WITHDRAWAL_STATUSES = [
   "pending_verification",
@@ -94,13 +94,28 @@ async function reverseTimedOutWithdrawal(withdrawal: StuckWithdrawal) {
   };
 }
 
+async function transferIdFromWithdrawal(withdrawal: StuckWithdrawal) {
+  if (!withdrawal.transactionId) return null;
+  const txRow = await db.query.transactions.findFirst({
+    where: eq(transactions.id, withdrawal.transactionId),
+    columns: { metadata: true },
+  });
+  const meta = (txRow?.metadata || {}) as Record<string, unknown>;
+  const id = meta.flutterwaveTransferId ?? meta.transferCode ?? meta.transferId;
+  return id != null && String(id).trim() ? String(id).trim() : null;
+}
+
 async function settleOneStuckWithdrawal(withdrawal: StuckWithdrawal) {
   const reference = withdrawal.providerRef?.trim();
-  if (reference) {
-    const transfer = await lookupFlutterwaveTransfer(reference);
+  const transferId = await transferIdFromWithdrawal(withdrawal);
+  if (reference || transferId) {
+    const transfer = await lookupFlutterwaveTransfer(
+      reference || "",
+      transferId,
+    );
     if (transfer?.status === "success") {
       await settlePayoutTransfer({
-        reference,
+        reference: reference || withdrawal.providerRef || "",
         status: "success",
         transferCode: transfer.transferCode,
       });
@@ -108,7 +123,7 @@ async function settleOneStuckWithdrawal(withdrawal: StuckWithdrawal) {
     }
     if (transfer?.status === "failed" || transfer?.status === "reversed") {
       await settlePayoutTransfer({
-        reference,
+        reference: reference || withdrawal.providerRef || "",
         status: transfer.status,
         transferCode: transfer.transferCode,
         failureReason: transfer.failureReason || TIMEOUT_REASON,
@@ -129,7 +144,10 @@ export async function settleStuckWithdrawals(input?: {
   const stuck = await db.query.withdrawals.findMany({
     where: and(
       inArray(withdrawals.status, [...STUCK_WITHDRAWAL_STATUSES]),
-      lte(withdrawals.createdAt, cutoff),
+      or(
+        lte(withdrawals.createdAt, cutoff),
+        lte(withdrawals.updatedAt, cutoff),
+      ),
       input?.userId ? eq(withdrawals.userId, input.userId) : undefined,
     ),
     limit: input?.limit ?? 25,

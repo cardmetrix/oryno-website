@@ -17,10 +17,12 @@ export async function GET(req: Request) {
       );
     }
 
-    void import("@/lib/wallet/settle-withdrawals")
-      .then((m) => m.settleStuckWithdrawals({ userId: user.id, limit: 5 }))
+    void import("@/lib/wallet/settle-user-pending")
+      .then((m) =>
+        m.settleUserPendingTransactions({ userId: user.id, limit: 15 }),
+      )
       .catch((error) => {
-        console.error("[wallet-settle-withdrawals]", error);
+        console.error("[wallet-settle-pending]", error);
       });
 
     const payload = await loadWalletPayload(user);

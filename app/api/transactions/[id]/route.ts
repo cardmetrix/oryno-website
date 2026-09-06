@@ -22,6 +22,14 @@ export async function GET(_req: Request, { params }: Params) {
       return NextResponse.json({ error: "Missing id" }, { status: 400 });
     }
 
+    await import("@/lib/wallet/settle-user-pending")
+      .then((m) =>
+        m.settleUserPendingTransactions({ userId: user.id, limit: 15 }),
+      )
+      .catch((error) => {
+        console.error("[transactions-id-settle]", error);
+      });
+
     const row = await db.query.transactions.findFirst({
       where: and(eq(transactions.id, id), eq(transactions.userId, user.id)),
     });

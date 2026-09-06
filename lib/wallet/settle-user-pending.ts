@@ -1,4 +1,4 @@
-import { and, eq, inArray, lte } from "drizzle-orm";
+import { and, eq, inArray, lte, or } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { transactions, withdrawals } from "@/lib/db/schema";
 import {
@@ -15,31 +15,59 @@ const OPEN_STATUSES = ["pending", "processing"] as const;
 type PendingRow = typeof transactions.$inferSelect;
 
 async function settlePendingWithdrawal(row: PendingRow) {
-  const withdrawal = await db.query.withdrawals.findFirst({
-    where: row.externalRef
-      ? eq(withdrawals.providerRef, row.externalRef)
-      : eq(withdrawals.transactionId, row.id),
-  });
-  const reference = withdrawal?.providerRef || row.externalRef;
-  if (reference) {
-    const transfer = await lookupFlutterwaveTransfer(reference);
+  const meta = (row.metadata || {}) as Record<string, unknown>;
+  const metaRef =
+    typeof meta.reference === "string" ? meta.reference.trim() : "";
+  const transferId =
+    meta.flutterwaveTransferId ?? meta.transferCode ?? meta.transferId;
+
+  const withdrawal =
+    (await db.query.withdrawals.findFirst({
+      where: eq(withdrawals.transactionId, row.id),
+    })) ||
+    (row.externalRef
+      ? await db.query.withdrawals.findFirst({
+          where: eq(withdrawals.providerRef, row.externalRef),
+        })
+      : null) ||
+    (metaRef
+      ? await db.query.withdrawals.findFirst({
+          where: eq(withdrawals.providerRef, metaRef),
+        })
+      : null);
+  const reference =
+    withdrawal?.providerRef || row.externalRef || metaRef || "";
+  if (reference || transferId) {
+    const transfer = await lookupFlutterwaveTransfer(
+      reference,
+      transferId != null ? String(transferId) : null,
+    );
     if (transfer?.status === "success") {
-      await settlePayoutTransfer({
-        reference,
-        status: "success",
-        transferCode: transfer.transferCode,
-      });
+      if (reference) {
+        await settlePayoutTransfer({
+          reference,
+          status: "success",
+          transferCode: transfer.transferCode,
+        });
+      } else {
+        await db
+          .update(transactions)
+          .set({ status: "completed", updatedAt: new Date() })
+          .where(eq(transactions.id, row.id));
+      }
       return "completed" as const;
     }
     if (transfer?.status === "failed" || transfer?.status === "reversed") {
-      await settlePayoutTransfer({
-        reference,
-        status: transfer.status,
-        transferCode: transfer.transferCode,
-        failureReason:
-          transfer.failureReason ||
-          "Withdrawal was not completed and was returned to your wallet.",
-      });
+      if (reference) {
+        await settlePayoutTransfer({
+          reference,
+          status: transfer.status,
+          transferCode: transfer.transferCode,
+          failureReason:
+            transfer.failureReason ||
+            "Withdrawal was not completed and was returned to your wallet.",
+        });
+      }
       return "reversed" as const;
     }
   }
@@ -139,7 +167,10 @@ export async function settleUserPendingTransactions(input: {
     where: and(
       eq(transactions.userId, input.userId),
       inArray(transactions.status, [...OPEN_STATUSES]),
-      lte(transactions.createdAt, cutoff),
+      or(
+        lte(transactions.createdAt, cutoff),
+        lte(transactions.updatedAt, cutoff),
+      ),
     ),
     limit: input.limit ?? 15,
     orderBy: (t, { asc }) => [asc(t.createdAt)],
