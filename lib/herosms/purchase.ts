@@ -6,7 +6,8 @@ import {
   virtualNumberOffers,
   wallets,
 } from "@/lib/db/schema";
-import { convertLocalToNgn, quoteLocalUsd, roundMoney } from "@/lib/fx/rates";
+import { convertLocalToNgn, roundMoney } from "@/lib/fx/rates";
+import { quoteLocalUsd } from "@/lib/fx/customer-quote";
 import { usdFromLocalRetail } from "@/lib/pricing/service-pricing";
 import { debitUsdWallet } from "@/lib/wallet-usd";
 import {

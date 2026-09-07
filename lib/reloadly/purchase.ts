@@ -8,7 +8,8 @@ import {
   wallets,
 } from "@/lib/db/schema";
 import { nigeriaServiceLedgerCurrency, getDisplayFx } from "@/lib/display-currency";
-import { convertNgnToLocal, quoteLocalUsd, roundMoney } from "@/lib/fx/rates";
+import { convertNgnToLocal, roundMoney } from "@/lib/fx/rates";
+import { quoteLocalUsd } from "@/lib/fx/customer-quote";
 import { ensurePrimaryWallet, toWalletSummary } from "@/lib/wallet";
 import { refundFailedDebit } from "@/lib/wallet/ledger";
 import { categoryForSlug } from "@/lib/sogo/catalog";

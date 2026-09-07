@@ -11,7 +11,7 @@ import {
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AdminTable } from "@/components/admin/admin-table";
 import { StatCard } from "@/components/admin/stat-card";
-import type { CompanyChargesConfig } from "@/lib/company/charges";
+import type { CompanyChargesConfig } from "@/lib/company/charge-types";
 
 type SourceRow = {
   id: keyof CompanyChargesConfig["services"];

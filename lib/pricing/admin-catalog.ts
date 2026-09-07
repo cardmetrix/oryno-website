@@ -1,4 +1,4 @@
-import { quoteLocalUsd } from "@/lib/fx/rates";
+import { quoteLocalUsd } from "@/lib/fx/customer-quote";
 import {
   enrichJapService,
   filterJapServices,

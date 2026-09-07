@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
-import { quoteLocalUsd } from "@/lib/fx/rates";
+import { quoteLocalUsd } from "@/lib/fx/customer-quote";
 import { currencyForCountry } from "@/lib/wallet";
 import {
   enrichJapService,

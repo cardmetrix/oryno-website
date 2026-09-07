@@ -103,44 +103,52 @@ export async function getUsdMidRate(currency: string): Promise<{
   return { midRate: mid, provider };
 }
 
+export type CustomerFxConfig = {
+  defaultSpreadPercent: number;
+  currencies: Record<
+    string,
+    {
+      buyRate: number | null;
+      sellRate: number | null;
+      spreadPercent: number | null;
+    }
+  >;
+};
+
 /**
  * Quote for converting between a local currency and USD.
- * Uses admin-set customer rates when present, otherwise mid-market ± company spread.
+ * Pass `fxConfig` from company charges on the server. Client callers omit it
+ * and get the default 1% spread — this file must stay free of DB imports.
  */
-export async function quoteLocalUsd(localCurrency: string): Promise<FxQuote> {
+export async function quoteLocalUsd(
+  localCurrency: string,
+  fxConfig?: CustomerFxConfig | null,
+): Promise<FxQuote> {
   const local = localCurrency.toUpperCase();
   const { midRate, provider } = await getUsdMidRate(local);
 
   let spread = FX_COMMISSION;
+  if (fxConfig) {
+    const override = fxConfig.currencies[local];
+    const spreadPercent =
+      override?.spreadPercent != null
+        ? override.spreadPercent
+        : fxConfig.defaultSpreadPercent;
+    spread = Math.max(0, spreadPercent) / 100;
+  }
+
   let buyRate = midRate * (1 + spread);
   let sellRate = midRate * (1 - spread);
   let customRate = false;
 
-  try {
-    const { getCompanyCharges } = await import("@/lib/company/charges");
-    const charges = await getCompanyCharges();
-    const override = charges.fx.currencies[local];
-    const spreadPercent =
-      override?.spreadPercent != null
-        ? override.spreadPercent
-        : charges.fx.defaultSpreadPercent;
-    spread = Math.max(0, spreadPercent) / 100;
-
-    if (override?.buyRate && override.buyRate > 0) {
-      buyRate = override.buyRate;
-      customRate = true;
-    } else {
-      buyRate = midRate * (1 + spread);
-    }
-
-    if (override?.sellRate && override.sellRate > 0) {
-      sellRate = override.sellRate;
-      customRate = true;
-    } else {
-      sellRate = midRate * (1 - spread);
-    }
-  } catch (error) {
-    console.error("[fx-company-rates]", error);
+  const override = fxConfig?.currencies[local];
+  if (override?.buyRate && override.buyRate > 0) {
+    buyRate = override.buyRate;
+    customRate = true;
+  }
+  if (override?.sellRate && override.sellRate > 0) {
+    sellRate = override.sellRate;
+    customRate = true;
   }
 
   if (sellRate <= 0 || sellRate > buyRate) {

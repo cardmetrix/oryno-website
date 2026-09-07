@@ -4,9 +4,9 @@ import { currencyForCountry } from "@/lib/wallet";
 import {
   localFromSellUsd,
   localToBuyUsd,
-  quoteLocalUsd,
   usdFromLocal,
 } from "@/lib/fx/rates";
+import { quoteLocalUsd } from "@/lib/fx/customer-quote";
 
 export const runtime = "nodejs";
 

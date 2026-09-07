@@ -27,7 +27,8 @@ export async function POST(req: Request) {
     const localCurrency = currencyForCountry(user.countryCode);
 
     if (method === "convert") {
-      const { localToBuyUsd, quoteLocalUsd } = await import("@/lib/fx/rates");
+      const { localToBuyUsd } = await import("@/lib/fx/rates");
+      const { quoteLocalUsd } = await import("@/lib/fx/customer-quote");
       const quote = await quoteLocalUsd(localCurrency);
       const usd = Number(body.amountUsd);
       if (!Number.isFinite(usd) || usd <= 0) {

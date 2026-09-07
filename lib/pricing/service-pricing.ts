@@ -247,7 +247,7 @@ export async function createUsdPricer(
   const charges = await getCompanyCharges();
   const ngnBuyRate = charges.fx.currencies.NGN?.buyRate;
   const { quoteLocalUsd } = await import("@/lib/fx/rates");
-  const ngnQuote = await quoteLocalUsd("NGN");
+  const ngnQuote = await quoteLocalUsd("NGN", charges.fx);
   const chargeKey = chargeSourceForProvider(provider, source);
   const charge =
     chargeKey && chargeKey !== "fx_conversion" && chargeKey !== "withdraw"
@@ -397,7 +397,10 @@ export async function priceLocalAmount(input: {
     chargeKey && chargeKey !== "fx_conversion" && chargeKey !== "withdraw"
       ? charges.services[chargeKey]
       : null;
-  const ngnQuote = await (await import("@/lib/fx/rates")).quoteLocalUsd("NGN");
+  const ngnQuote = await (await import("@/lib/fx/rates")).quoteLocalUsd(
+    "NGN",
+    charges.fx,
+  );
   const priced = charge
     ? applySilentCharge({
         base: local,

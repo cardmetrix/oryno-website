@@ -8,10 +8,10 @@ import {
 import {
   localFromSellUsd,
   localToBuyUsd,
-  quoteLocalUsd,
   roundMoney,
   usdFromLocal,
 } from "@/lib/fx/rates";
+import { quoteLocalUsd } from "@/lib/fx/customer-quote";
 import { resolveCountryCode } from "@/lib/country";
 import { countryFromCurrency, flutterwavePaymentOptions } from "@/lib/payments/country";
 import { formatMoney } from "@/lib/transactions";
@@ -556,7 +556,7 @@ export async function creditUsdWalletFromFunding(input: {
     const localCurrency = String(meta.localCurrency || "NGN");
     if (localAmount > 0 && usdAmount > 0) {
       const { recognizeFxProfit } = await import("@/lib/company/recognize");
-      const { quoteLocalUsd } = await import("@/lib/fx/rates");
+      const { quoteLocalUsd } = await import("@/lib/fx/customer-quote");
       const quote = await quoteLocalUsd(localCurrency);
       await recognizeFxProfit({
         transactionId: result.transactionId,

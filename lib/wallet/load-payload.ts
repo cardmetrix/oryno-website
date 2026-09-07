@@ -1,7 +1,7 @@
 import { getCountryInfo } from "@/lib/country";
 import { ensureWalletSchema } from "@/lib/db/ensure-schema";
 import { getDisplayFx } from "@/lib/display-currency";
-import { quoteLocalUsd } from "@/lib/fx/rates";
+import { quoteLocalUsd } from "@/lib/fx/customer-quote";
 import { formatMoney } from "@/lib/transactions";
 import type { SyncedUser } from "@/lib/auth/sync-user";
 import type { WalletPayload } from "@/lib/wallet-types";

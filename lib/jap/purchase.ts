@@ -6,7 +6,7 @@ import {
   transactions,
   wallets,
 } from "@/lib/db/schema";
-import { quoteLocalUsd } from "@/lib/fx/rates";
+import { quoteLocalUsd } from "@/lib/fx/customer-quote";
 import { resolveCountryCode } from "@/lib/country";
 import { usdFromLocalRetail } from "@/lib/pricing/service-pricing";
 import { debitUsdWallet } from "@/lib/wallet-usd";
