@@ -58,6 +58,14 @@ export default function HistoryPage() {
     setError(false);
     try {
       const settled = await settlePending();
+      if (
+        settled &&
+        (settled.completed ?? 0) + (settled.reversed ?? 0) + (settled.failed ?? 0) > 0
+      ) {
+        toast.message("Pending transactions updated", {
+          description: "Older pending withdrawals were completed or returned to your wallet.",
+        });
+      }
       const txRes = await fetch("/api/transactions", { cache: "no-store" });
       if (!txRes.ok) throw new Error("Failed");
       const json = (await txRes.json()) as { items: AppTransaction[] };
@@ -65,16 +73,6 @@ export default function HistoryPage() {
       setCurrency(
         (prev) => json.items?.[0]?.currency ?? prev,
       );
-      if (
-        settled &&
-        (settled.completed ?? 0) + (settled.reversed ?? 0) + (settled.failed ?? 0) > 0
-      ) {
-        const again = await fetch("/api/transactions", { cache: "no-store" });
-        if (again.ok) {
-          const next = (await again.json()) as { items: AppTransaction[] };
-          setItems(next.items ?? []);
-        }
-      }
     } catch {
       setError(true);
       setItems([]);

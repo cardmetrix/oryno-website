@@ -1,4 +1,4 @@
-import { and, eq, inArray, lte, or } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { transactions, withdrawals } from "@/lib/db/schema";
 import {
@@ -11,8 +11,57 @@ import { settleStuckWithdrawals } from "@/lib/wallet/settle-withdrawals";
 export const PENDING_SETTLE_AFTER_MS = 5 * 60 * 1000;
 
 const OPEN_STATUSES = ["pending", "processing"] as const;
+const TIMEOUT_REASON =
+  "This withdrawal stayed pending for more than 5 minutes and was returned to your ORYNO wallet.";
 
 type PendingRow = typeof transactions.$inferSelect;
+
+async function forceReverseWithdrawal(row: PendingRow, reason: string) {
+  const meta = (row.metadata || {}) as Record<string, unknown>;
+  const metaRef =
+    typeof meta.reference === "string" ? meta.reference.trim() : "";
+
+  const withdrawal =
+    (await db.query.withdrawals.findFirst({
+      where: eq(withdrawals.transactionId, row.id),
+    })) ||
+    (row.externalRef
+      ? await db.query.withdrawals.findFirst({
+          where: eq(withdrawals.providerRef, row.externalRef),
+        })
+      : null) ||
+    (metaRef
+      ? await db.query.withdrawals.findFirst({
+          where: eq(withdrawals.providerRef, metaRef),
+        })
+      : null);
+
+  const refundAmount = withdrawal
+    ? Number(withdrawal.amount) + Number(withdrawal.fee || 0)
+    : Number(row.amount);
+
+  await refundFailedDebit({
+    walletId: row.walletId,
+    transactionId: row.id,
+    amount: refundAmount > 0 ? refundAmount : Number(row.amount),
+    reason,
+    userId: row.userId,
+  });
+
+  if (withdrawal) {
+    await db
+      .update(withdrawals)
+      .set({
+        status: "failed",
+        failureReason: reason,
+        processedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(withdrawals.id, withdrawal.id));
+  }
+
+  return "reversed" as const;
+}
 
 async function settlePendingWithdrawal(row: PendingRow) {
   const meta = (row.metadata || {}) as Record<string, unknown>;
@@ -35,64 +84,62 @@ async function settlePendingWithdrawal(row: PendingRow) {
           where: eq(withdrawals.providerRef, metaRef),
         })
       : null);
+
   const reference =
     withdrawal?.providerRef || row.externalRef || metaRef || "";
-  if (reference || transferId) {
-    const transfer = await lookupFlutterwaveTransfer(
-      reference,
-      transferId != null ? String(transferId) : null,
-    );
-    if (transfer?.status === "success") {
-      if (reference) {
-        await settlePayoutTransfer({
-          reference,
-          status: "success",
-          transferCode: transfer.transferCode,
-        });
-      } else {
-        await db
-          .update(transactions)
-          .set({ status: "completed", updatedAt: new Date() })
-          .where(eq(transactions.id, row.id));
+
+  try {
+    if (reference || transferId) {
+      const transfer = await lookupFlutterwaveTransfer(
+        reference,
+        transferId != null ? String(transferId) : null,
+      );
+      if (transfer?.status === "success") {
+        if (reference) {
+          await settlePayoutTransfer({
+            reference,
+            status: "success",
+            transferCode: transfer.transferCode,
+          });
+        } else {
+          await db
+            .update(transactions)
+            .set({ status: "completed", updatedAt: new Date() })
+            .where(eq(transactions.id, row.id));
+          if (withdrawal) {
+            await db
+              .update(withdrawals)
+              .set({
+                status: "completed",
+                processedAt: new Date(),
+                updatedAt: new Date(),
+              })
+              .where(eq(withdrawals.id, withdrawal.id));
+          }
+        }
+        return "completed" as const;
       }
-      return "completed" as const;
-    }
-    if (transfer?.status === "failed" || transfer?.status === "reversed") {
-      if (reference) {
-        await settlePayoutTransfer({
-          reference,
-          status: transfer.status,
-          transferCode: transfer.transferCode,
-          failureReason:
-            transfer.failureReason ||
-            "Withdrawal was not completed and was returned to your wallet.",
-        });
+      if (transfer?.status === "failed" || transfer?.status === "reversed") {
+        if (reference) {
+          await settlePayoutTransfer({
+            reference,
+            status: transfer.status,
+            transferCode: transfer.transferCode,
+            failureReason: transfer.failureReason || TIMEOUT_REASON,
+          });
+          return "reversed" as const;
+        }
+        return forceReverseWithdrawal(
+          row,
+          transfer.failureReason || TIMEOUT_REASON,
+        );
       }
-      return "reversed" as const;
     }
+  } catch (error) {
+    console.error("[settle-pending-withdrawal-lookup]", row.id, error);
   }
 
-  await refundFailedDebit({
-    walletId: row.walletId,
-    transactionId: row.id,
-    amount: Number(row.amount),
-    reason:
-      "This withdrawal stayed pending for more than 5 minutes and was returned to your ORYNO wallet.",
-    userId: row.userId,
-  });
-  if (withdrawal) {
-    await db
-      .update(withdrawals)
-      .set({
-        status: "failed",
-        failureReason:
-          "Withdrawal timed out after 5 minutes and was returned to your ORYNO wallet.",
-        processedAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .where(eq(withdrawals.id, withdrawal.id));
-  }
-  return "reversed" as const;
+  return forceReverseWithdrawal(row, TIMEOUT_REASON);
 }
 
 async function settlePendingService(row: PendingRow) {
@@ -101,19 +148,23 @@ async function settlePendingService(row: PendingRow) {
   const requestId = String(row.externalRef || meta.requestId || "");
 
   if (provider === "vtpass" && requestId) {
-    const { requeryPurchase, isVtpassSuccessCode, isVtpassPendingCode } =
-      await import("@/lib/vtpass");
-    const response = await requeryPurchase(requestId);
-    const code = String(response.code || "");
-    if (isVtpassSuccessCode(code)) {
-      await db
-        .update(transactions)
-        .set({ status: "completed", updatedAt: new Date() })
-        .where(eq(transactions.id, row.id));
-      return "completed" as const;
-    }
-    if (isVtpassPendingCode(code)) {
-      return "still_pending" as const;
+    try {
+      const { requeryPurchase, isVtpassSuccessCode, isVtpassPendingCode } =
+        await import("@/lib/vtpass");
+      const response = await requeryPurchase(requestId);
+      const code = String(response.code || "");
+      if (isVtpassSuccessCode(code)) {
+        await db
+          .update(transactions)
+          .set({ status: "completed", updatedAt: new Date() })
+          .where(eq(transactions.id, row.id));
+        return "completed" as const;
+      }
+      if (isVtpassPendingCode(code)) {
+        // Older than 5 minutes already — reverse instead of waiting forever.
+      }
+    } catch (error) {
+      console.error("[settle-pending-service]", row.id, error);
     }
   }
 
@@ -129,7 +180,7 @@ async function settlePendingService(row: PendingRow) {
 }
 
 async function settleOnePending(row: PendingRow) {
-  if (row.category === "withdraw" || row.category === "payout") {
+  if (row.category === "withdraw") {
     return settlePendingWithdrawal(row);
   }
   if (row.type === "credit") {
@@ -155,11 +206,12 @@ export async function settleUserPendingTransactions(input: {
   userId: string;
   limit?: number;
 }) {
-  await settleStuckWithdrawals({
+  const withdrawalSettle = await settleStuckWithdrawals({
     userId: input.userId,
-    limit: input.limit ?? 10,
+    limit: input.limit ?? 25,
   }).catch((error) => {
     console.error("[settle-user-withdrawals]", error);
+    return { scanned: 0, results: [] as Array<{ id: string; action: string }> };
   });
 
   const cutoff = new Date(Date.now() - PENDING_SETTLE_AFTER_MS);
@@ -167,22 +219,42 @@ export async function settleUserPendingTransactions(input: {
     where: and(
       eq(transactions.userId, input.userId),
       inArray(transactions.status, [...OPEN_STATUSES]),
-      or(
-        lte(transactions.createdAt, cutoff),
-        lte(transactions.updatedAt, cutoff),
-      ),
+      sql`coalesce(${transactions.createdAt}, ${transactions.updatedAt}) <= ${cutoff}`,
     ),
-    limit: input.limit ?? 15,
+    limit: input.limit ?? 25,
     orderBy: (t, { asc }) => [asc(t.createdAt)],
   });
 
-  const results: Array<{ id: string; action: string }> = [];
-  let completed = 0;
-  let reversed = 0;
+  const results: Array<{ id: string; action: string }> = [
+    ...withdrawalSettle.results.map((r) => ({
+      id: r.id,
+      action: `withdrawal:${r.action}`,
+    })),
+  ];
+  let completed = withdrawalSettle.results.filter((r) => r.action === "completed")
+    .length;
+  let reversed = withdrawalSettle.results.filter((r) =>
+    ["refunded", "already_refunded", "settled_from_provider", "marked_failed_no_tx"].includes(
+      r.action,
+    ),
+  ).length;
   let failed = 0;
 
   for (const row of stuck) {
     try {
+      // Skip if withdrawal settle already finalized this tx.
+      const fresh = await db.query.transactions.findFirst({
+        where: eq(transactions.id, row.id),
+        columns: { status: true },
+      });
+      if (
+        fresh &&
+        !OPEN_STATUSES.includes(fresh.status as (typeof OPEN_STATUSES)[number])
+      ) {
+        results.push({ id: row.id, action: "already_settled" });
+        continue;
+      }
+
       const action = await settleOnePending(row);
       results.push({ id: row.id, action });
       if (action === "completed") completed += 1;
@@ -190,12 +262,24 @@ export async function settleUserPendingTransactions(input: {
       else if (action === "failed") failed += 1;
     } catch (error) {
       console.error("[settle-user-pending]", row.id, error);
-      results.push({ id: row.id, action: "error" });
+      results.push({
+        id: row.id,
+        action: `error:${error instanceof Error ? error.message : "unknown"}`,
+      });
     }
   }
 
-  return {
+  console.info("[settle-user-pending-summary]", {
+    userId: input.userId,
     scanned: stuck.length,
+    withdrawalsScanned: withdrawalSettle.scanned,
+    completed,
+    reversed,
+    failed,
+  });
+
+  return {
+    scanned: stuck.length + withdrawalSettle.scanned,
     completed,
     reversed,
     failed,

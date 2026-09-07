@@ -1,4 +1,4 @@
-import { and, eq, inArray, lte, or } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { transactions, withdrawals } from "@/lib/db/schema";
 import {
@@ -135,7 +135,7 @@ async function settleOneStuckWithdrawal(withdrawal: StuckWithdrawal) {
   return reverseTimedOutWithdrawal(withdrawal);
 }
 
-/** Return stuck withdrawals to the ORYNO wallet after 30 minutes. */
+/** Return stuck withdrawals to the ORYNO wallet after 5 minutes. */
 export async function settleStuckWithdrawals(input?: {
   userId?: string;
   limit?: number;
@@ -144,10 +144,7 @@ export async function settleStuckWithdrawals(input?: {
   const stuck = await db.query.withdrawals.findMany({
     where: and(
       inArray(withdrawals.status, [...STUCK_WITHDRAWAL_STATUSES]),
-      or(
-        lte(withdrawals.createdAt, cutoff),
-        lte(withdrawals.updatedAt, cutoff),
-      ),
+      sql`coalesce(${withdrawals.createdAt}, ${withdrawals.updatedAt}) <= ${cutoff}`,
       input?.userId ? eq(withdrawals.userId, input.userId) : undefined,
     ),
     limit: input?.limit ?? 25,

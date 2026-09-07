@@ -466,6 +466,7 @@ export async function withdrawWallet(input: {
         currency: "NGN",
         status: "processing",
         balanceAfter: nextBalance,
+        externalRef: reference,
         metadata: {
           fee: feeStr,
           bankAccountId: bank.id,

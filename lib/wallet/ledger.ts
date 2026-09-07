@@ -1,3 +1,6 @@
+import { eq } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { transactions, wallets } from "@/lib/db/schema";
 import {
   humanizeDepositReverseReason,
   humanizeWalletRefundReason,
