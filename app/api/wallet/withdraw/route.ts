@@ -122,17 +122,24 @@ export async function POST(req: Request) {
 
     const pending = Boolean(result.pending);
     try {
+      const reference =
+        result.withdrawal.providerRef?.trim() ||
+        result.transaction.externalRef?.trim() ||
+        result.transaction.id;
       await createNotification({
         userId: user.id,
-        title: pending ? "Withdrawal processing" : "Withdrawal completed",
+        title: pending ? "Withdrawal processing" : "Withdrawal Successful 🎉",
         body: pending
-          ? `${amountFormatted} is on the way to ${result.bank.bankName}. Ref ${result.withdrawal.providerRef ?? "—"}`
-          : `${amountFormatted} sent to ${result.bank.bankName}. Ref ${result.withdrawal.providerRef ?? "—"}`,
+          ? `${amountFormatted} is on the way to ${result.bank.bankName}. Ref ${reference}`
+          : `${amountFormatted} sent to ${result.bank.bankName}. Ref ${reference}`,
         type: "withdraw",
         metadata: {
           href: "/wallet",
           withdrawalId: result.withdrawal.id,
           transactionId: result.transaction.id,
+          amountFormatted,
+          reference,
+          status: pending ? "processing" : "completed",
         },
       });
     } catch (notifyError) {

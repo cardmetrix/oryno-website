@@ -314,15 +314,25 @@ export async function settlePayoutTransfer(input: {
     });
 
     try {
+      const amountFormatted = await formatWithdrawalAmount(
+        withdrawal.amount,
+        withdrawal.countryCode,
+      );
+      const reference =
+        input.reference.trim() ||
+        withdrawal.providerRef?.trim() ||
+        withdrawal.id;
       await createNotification({
         userId: withdrawal.userId,
-        title: "Withdrawal completed",
-        body: `${await formatWithdrawalAmount(withdrawal.amount, withdrawal.countryCode)} has been sent to your bank.`,
+        title: "Withdrawal Successful 🎉",
+        body: `${amountFormatted} has been sent to your bank.`,
         type: "withdraw",
         metadata: {
           href: "/wallet",
           withdrawalId: withdrawal.id,
-          reference: input.reference,
+          amountFormatted,
+          reference,
+          status: "completed",
         },
       });
     } catch {

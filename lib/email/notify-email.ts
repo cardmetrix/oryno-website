@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { sendBrandedEmail } from "@/lib/email/send";
 import { walletFundedEmailContent } from "@/lib/email/wallet-funded-email";
+import { withdrawalSuccessfulEmailContent } from "@/lib/email/withdrawal-successful-email";
 import type { NotificationType } from "@/lib/notification-types";
 
 const CTA_BY_TYPE: Partial<
@@ -81,35 +82,59 @@ export async function deliverNotificationEmail(input: {
   const ctaLabel =
     CTA_BY_TYPE[input.type || "system"]?.label || "View in ORYNO";
 
-  if (input.type === "fund") {
-    const meta = input.metadata ?? {};
-    const amountFormatted =
-      typeof meta.amountFormatted === "string" ? meta.amountFormatted : null;
-    const reference =
-      typeof meta.reference === "string"
-        ? meta.reference
-        : typeof meta.transactionId === "string"
-          ? meta.transactionId
-          : null;
+  const meta = input.metadata ?? {};
+  const amountFormatted =
+    typeof meta.amountFormatted === "string" ? meta.amountFormatted : null;
+  const reference =
+    typeof meta.reference === "string"
+      ? meta.reference
+      : typeof meta.transactionId === "string"
+        ? meta.transactionId
+        : null;
 
-    if (amountFormatted && reference) {
-      const content = walletFundedEmailContent({
-        amountFormatted,
-        reference,
-      });
+  if (input.type === "fund" && amountFormatted && reference) {
+    const content = walletFundedEmailContent({
+      amountFormatted,
+      reference,
+    });
 
-      return sendBrandedEmail({
-        to: user.email,
-        subject: content.subject,
-        title: content.title,
-        preheader: content.preheader,
-        body: content.bodyPlain,
-        bodyHtml: content.bodyHtml,
-        cta: { label: ctaLabel, href },
-        footerNote:
-          "You’re receiving this because a wallet funding transaction completed on your ORYNO account. Manage preferences in Settings.",
-      });
-    }
+    return sendBrandedEmail({
+      to: user.email,
+      subject: content.subject,
+      title: content.title,
+      preheader: content.preheader,
+      body: content.bodyPlain,
+      bodyHtml: content.bodyHtml,
+      cta: { label: ctaLabel, href },
+      footerNote:
+        "You’re receiving this because a wallet funding transaction completed on your ORYNO account. Manage preferences in Settings.",
+    });
+  }
+
+  const withdrawStatus =
+    typeof meta.status === "string" ? meta.status.toLowerCase() : "";
+  const isWithdrawalSuccess =
+    input.type === "withdraw" &&
+    (withdrawStatus === "completed" ||
+      /completed|successful/i.test(input.title));
+
+  if (isWithdrawalSuccess && amountFormatted && reference) {
+    const content = withdrawalSuccessfulEmailContent({
+      amountFormatted,
+      reference,
+    });
+
+    return sendBrandedEmail({
+      to: user.email,
+      subject: content.subject,
+      title: content.title,
+      preheader: content.preheader,
+      body: content.bodyPlain,
+      bodyHtml: content.bodyHtml,
+      cta: { label: ctaLabel, href },
+      footerNote:
+        "You’re receiving this because a withdrawal completed on your ORYNO account. Manage preferences in Settings.",
+    });
   }
 
   const firstName = user.fullName?.trim().split(/\s+/)[0] || "there";
