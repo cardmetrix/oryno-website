@@ -6,8 +6,7 @@ import {
   virtualNumberOffers,
   wallets,
 } from "@/lib/db/schema";
-import { quoteLocalUsd } from "@/lib/fx/rates";
-import { convertLocalToNgn } from "@/lib/fx/rates";
+import { convertLocalToNgn, quoteLocalUsd, roundMoney } from "@/lib/fx/rates";
 import { usdFromLocalRetail } from "@/lib/pricing/service-pricing";
 import { debitUsdWallet } from "@/lib/wallet-usd";
 import {
@@ -120,6 +119,7 @@ export async function usdToLocalPrice(
   usd: number,
   countryCode?: string | null,
   serviceKey?: string | null,
+  source?: "virtual_number" | "email",
 ) {
   const currency = currencyForCountry(countryCode);
   const quote = await quoteLocalUsd(currency);
@@ -129,8 +129,15 @@ export async function usdToLocalPrice(
     serviceKey,
     usd,
     buyRate: quote.buyRate,
+    source: source ?? "virtual_number",
   });
-  return { local: priced.local, currency, quote, markup: priced.markup };
+  return {
+    local: priced.local,
+    currency,
+    quote,
+    markup: priced.markup,
+    companyCharge: priced.companyCharge,
+  };
 }
 
 /** Retail USD for numbers — local retail (markup + app buyRate) converted back at that rate. */
@@ -147,6 +154,7 @@ export async function usdRetailNumberPrice(
     localCurrency: priced.currency,
     quote: priced.quote,
     markup: priced.markup,
+    companyCharge: priced.companyCharge,
   };
 }
 
@@ -208,7 +216,7 @@ export async function purchaseVirtualNumber(input: {
       ? (input.costUsd as number)
       : input.priceUsd;
   const serviceKey = `${input.heroCountryId}:${input.service}`;
-  const { usd, local, quote } = await usdRetailNumberPrice(
+  const { usd, local, quote, companyCharge } = await usdRetailNumberPrice(
     wholesaleUsd,
     input.countryCode,
     serviceKey,
@@ -321,6 +329,28 @@ export async function purchaseVirtualNumber(input: {
       })
       .where(eq(transactions.id, prepared.transaction.id));
 
+    try {
+      const { recognizeUsdServiceProfit } = await import("@/lib/company/recognize");
+      const chargeUsd = roundMoney(
+        companyCharge > 0 ? companyCharge / quote.buyRate : 0,
+      );
+      await recognizeUsdServiceProfit({
+        source: "virtual_number",
+        transactionId: prepared.transaction.id,
+        userId: input.userId,
+        customerUsd: chargeAmount,
+        providerUsd: wholesaleUsd,
+        chargeUsd: Math.max(0, chargeUsd),
+        description: `${input.serviceName} virtual number`,
+        metadata: {
+          service: input.service,
+          heroCountryId: input.heroCountryId,
+        },
+      });
+    } catch (revenueError) {
+      console.error("[herosms-revenue]", revenueError);
+    }
+
     const { scheduleReferralCheck } = await import("@/lib/referrals/service");
     scheduleReferralCheck(input.userId);
 
@@ -359,10 +389,11 @@ export async function purchaseEmailActivation(input: {
   priceLocal?: number;
 }) {
   const serviceKey = `email:${input.site}:${input.domain}`;
-  const { local, currency } = await usdToLocalPrice(
+  const { local, currency, companyCharge } = await usdToLocalPrice(
     input.priceUsd,
     input.countryCode,
     serviceKey,
+    "email",
   );
   const chargeAmount = local;
 
@@ -438,6 +469,29 @@ export async function purchaseEmailActivation(input: {
 
     const { scheduleReferralCheck } = await import("@/lib/referrals/service");
     scheduleReferralCheck(input.userId);
+
+    try {
+      const { ngnValueOfUsd, recognizeNgnServiceProfit } = await import(
+        "@/lib/company/recognize"
+      );
+      const providerNgn = await ngnValueOfUsd(input.priceUsd);
+      await recognizeNgnServiceProfit({
+        source: "email",
+        transactionId: prepared.transaction.id,
+        userId: input.userId,
+        grossIn: prepared.amount,
+        grossOut: providerNgn,
+        chargeAmount: companyCharge,
+        markupAmount: Math.max(
+          0,
+          prepared.amount - providerNgn - companyCharge,
+        ),
+        description: `Email rental ${domain}`,
+        metadata: { site, domain, priceUsd: input.priceUsd },
+      });
+    } catch (revenueError) {
+      console.error("[herosms-email-revenue]", revenueError);
+    }
 
     return {
       emailId,

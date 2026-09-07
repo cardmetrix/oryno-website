@@ -8,7 +8,7 @@ import {
   wallets,
 } from "@/lib/db/schema";
 import { nigeriaServiceLedgerCurrency, getDisplayFx } from "@/lib/display-currency";
-import { convertNgnToLocal, quoteLocalUsd } from "@/lib/fx/rates";
+import { convertNgnToLocal, quoteLocalUsd, roundMoney } from "@/lib/fx/rates";
 import { ensurePrimaryWallet, toWalletSummary } from "@/lib/wallet";
 import { refundFailedDebit } from "@/lib/wallet/ledger";
 import { categoryForSlug } from "@/lib/sogo/catalog";
@@ -155,6 +155,7 @@ export async function quoteGiftCardBuy(input: {
     serviceKey: String(input.product.productId),
     usd: usdFace,
     buyRate: quote.buyRate,
+    source: "gift_card_buy",
   });
   const displayFx = await getDisplayFx(input.countryCode);
 
@@ -164,7 +165,9 @@ export async function quoteGiftCardBuy(input: {
     currency: displayFx.to,
     ledgerNgn: priced.local,
     rate: quote.buyRate,
+    midRate: quote.midRate,
     markup: priced.markup,
+    companyCharge: priced.companyCharge,
     demo: isReloadlyDemoMode(),
   };
 }
@@ -329,6 +332,36 @@ export async function buyGiftCard(input: {
 
     const { scheduleReferralCheck } = await import("@/lib/referrals/service");
     scheduleReferralCheck(input.userId);
+
+    try {
+      const { ngnValueOfUsd, recognizeNgnServiceProfit } = await import(
+        "@/lib/company/recognize"
+      );
+      const providerNgn = await ngnValueOfUsd(price.usdFace);
+      await recognizeNgnServiceProfit({
+        source: "gift_card_buy",
+        transactionId: debit.transaction.id,
+        userId: input.userId,
+        grossIn: debit.amount,
+        grossOut: providerNgn,
+        chargeAmount: price.companyCharge,
+        markupAmount: Math.max(0, debit.amount - providerNgn - price.companyCharge),
+        fxSpreadAmount: Math.max(
+          0,
+          roundMoney(price.usdFace * price.rate) -
+            roundMoney(price.usdFace * price.midRate),
+        ),
+        description: `Bought ${product.brandName} gift card`,
+        metadata: {
+          productId: product.productId,
+          usdFace: price.usdFace,
+          buyRate: price.rate,
+          midRate: price.midRate,
+        },
+      });
+    } catch (revenueError) {
+      console.error("[reloadly-revenue]", revenueError);
+    }
 
     return {
       order,

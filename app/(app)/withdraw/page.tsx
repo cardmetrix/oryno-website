@@ -36,11 +36,20 @@ type WithdrawMinimum = {
   message: string;
 };
 
+type WithdrawFee = {
+  ngn: number;
+  local: number;
+  currency: string;
+  formatted: string;
+  formattedNgn: string;
+};
+
 export default function WithdrawPage() {
   const router = useRouter();
   const [wallet, setWallet] = useState<WalletSummary | null>(null);
   const [banks, setBanks] = useState<BankAccountSummary[]>([]);
   const [minWithdraw, setMinWithdraw] = useState<WithdrawMinimum | null>(null);
+  const [withdrawFee, setWithdrawFee] = useState<WithdrawFee | null>(null);
   const [loading, setLoading] = useState(true);
   const [amount, setAmount] = useState("");
   const [bankAccountId, setBankAccountId] = useState<string>("");
@@ -77,6 +86,9 @@ export default function WithdrawPage() {
         }
       : null;
     setMinWithdraw(nextMin);
+    if (walletPayload.withdrawFee) {
+      setWithdrawFee(walletPayload.withdrawFee);
+    }
     setAmount((prev) => {
       if (prev) return prev;
       return nextMin ? String(nextMin.minLocal) : prev;
@@ -113,6 +125,18 @@ export default function WithdrawPage() {
     }
     if (minWithdraw && value + 1e-9 < minWithdraw.minLocal) {
       setError(minWithdraw.message);
+      return;
+    }
+    const feeLocal = withdrawFee?.local ?? 0;
+    if (
+      wallet &&
+      value + feeLocal > Number(wallet.balance) + 0.0001
+    ) {
+      setError(
+        withdrawFee
+          ? `Amount plus ${withdrawFee.formatted} fee exceeds your available balance.`
+          : "Insufficient wallet balance.",
+      );
       return;
     }
     setPinMode(hasPin ? "confirm" : "create");
@@ -291,6 +315,46 @@ export default function WithdrawPage() {
                   </p>
                 ) : null}
 
+                {withdrawFee && withdrawFee.ngn > 0 ? (
+                  <div className="mt-4 space-y-1.5 rounded-[16px] border border-border bg-muted/30 px-4 py-3 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">You receive</span>
+                      <span className="font-semibold text-foreground">
+                        {symbol}
+                        {Number(amount || 0).toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">
+                        Withdrawal fee
+                      </span>
+                      <span className="font-semibold text-foreground">
+                        {withdrawFee.formatted}
+                        {withdrawFee.currency !== "NGN"
+                          ? ` (${withdrawFee.formattedNgn})`
+                          : ""}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between border-t border-border pt-1.5">
+                      <span className="font-medium text-foreground">
+                        Total deducted
+                      </span>
+                      <span className="font-bold text-foreground">
+                        {symbol}
+                        {(
+                          Number(amount || 0) + withdrawFee.local
+                        ).toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </span>
+                    </div>
+                  </div>
+                ) : null}
+
                 <div className="mt-4">
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-sm font-medium text-foreground">
@@ -379,7 +443,9 @@ export default function WithdrawPage() {
                     !bankAccountId ||
                     Number(amount) <= 0 ||
                     banks.length === 0 ||
-                    (wallet != null && Number(amount) > Number(wallet.balance) + 0.0001)
+                    (wallet != null &&
+                      Number(amount) + (withdrawFee?.local ?? 0) >
+                        Number(wallet.balance) + 0.0001)
                   }
                   onClick={openPinModal}
                   className="btn-primary mt-6 inline-flex h-12 w-full items-center justify-center gap-2 text-base disabled:opacity-50 md:max-w-sm"
@@ -390,7 +456,8 @@ export default function WithdrawPage() {
                       Sending…
                     </>
                   ) : wallet != null &&
-                    Number(amount) > Number(wallet.balance) + 0.0001 ? (
+                    Number(amount) + (withdrawFee?.local ?? 0) >
+                      Number(wallet.balance) + 0.0001 ? (
                     "Insufficient balance"
                   ) : (
                     "Withdraw Funds"

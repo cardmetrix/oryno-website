@@ -1301,6 +1301,115 @@ export const platformSettings = pgTable("platform_settings", {
 });
 
 /**
+ * ORYNO company cash ledgers — separate from customer wallets.
+ * Profit is recognized here so customer balances are never mixed with earnings.
+ */
+export const companyBalances = pgTable("company_balances", {
+  currency: varchar("currency", { length: 3 }).primaryKey(),
+  available: numeric("available", { precision: 18, scale: 2 })
+    .notNull()
+    .default("0"),
+  reserved: numeric("reserved", { precision: 18, scale: 2 })
+    .notNull()
+    .default("0"),
+  lifetimeRecognized: numeric("lifetime_recognized", {
+    precision: 18,
+    scale: 2,
+  })
+    .notNull()
+    .default("0"),
+  lifetimeWithdrawn: numeric("lifetime_withdrawn", {
+    precision: 18,
+    scale: 2,
+  })
+    .notNull()
+    .default("0"),
+  ...timestamps,
+});
+
+/**
+ * One recognized (or reversed) profit row per completed customer transaction.
+ * profitAmount = grossIn − grossOut in `currency`.
+ */
+export const companyRevenueEntries = pgTable(
+  "company_revenue_entries",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    source: varchar("source", { length: 40 }).notNull(),
+    status: varchar("status", { length: 20 }).notNull().default("recognized"),
+    transactionId: uuid("transaction_id").references(() => transactions.id, {
+      onDelete: "set null",
+    }),
+    userId: uuid("user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    currency: varchar("currency", { length: 3 }).notNull(),
+    grossIn: numeric("gross_in", { precision: 18, scale: 2 })
+      .notNull()
+      .default("0"),
+    grossOut: numeric("gross_out", { precision: 18, scale: 2 })
+      .notNull()
+      .default("0"),
+    markupAmount: numeric("markup_amount", { precision: 18, scale: 2 })
+      .notNull()
+      .default("0"),
+    chargeAmount: numeric("charge_amount", { precision: 18, scale: 2 })
+      .notNull()
+      .default("0"),
+    fxSpreadAmount: numeric("fx_spread_amount", { precision: 18, scale: 2 })
+      .notNull()
+      .default("0"),
+    profitAmount: numeric("profit_amount", { precision: 18, scale: 2 })
+      .notNull()
+      .default("0"),
+    profitNgn: numeric("profit_ngn", { precision: 18, scale: 2 })
+      .notNull()
+      .default("0"),
+    description: varchar("description", { length: 255 }),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+    recognizedAt: timestamp("recognized_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    reversedAt: timestamp("reversed_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex("company_revenue_entries_tx_uidx").on(t.transactionId),
+    index("company_revenue_entries_source_idx").on(t.source),
+    index("company_revenue_entries_status_idx").on(t.status),
+    index("company_revenue_entries_created_idx").on(t.createdAt),
+  ],
+);
+
+/** Owner withdrawals of recognized company profit. */
+export const companyPayouts = pgTable(
+  "company_payouts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    currency: varchar("currency", { length: 3 }).notNull(),
+    amount: numeric("amount", { precision: 18, scale: 2 }).notNull(),
+    status: varchar("status", { length: 20 }).notNull().default("pending"),
+    destinationLabel: varchar("destination_label", { length: 160 }),
+    bankName: varchar("bank_name", { length: 120 }),
+    accountName: varchar("account_name", { length: 160 }),
+    accountNumber: varchar("account_number", { length: 32 }),
+    bankCode: varchar("bank_code", { length: 20 }),
+    providerRef: varchar("provider_ref", { length: 120 }),
+    adminId: uuid("admin_id").references(() => admins.id, {
+      onDelete: "set null",
+    }),
+    notes: text("notes"),
+    processedAt: timestamp("processed_at", { withTimezone: true }),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+    ...timestamps,
+  },
+  (t) => [
+    index("company_payouts_status_idx").on(t.status),
+    index("company_payouts_created_idx").on(t.createdAt),
+  ],
+);
+
+/**
  * Per-SKU / per-service retail price overrides.
  * Group (provider-wide) markups live in platform_settings key `service_pricing`.
  */

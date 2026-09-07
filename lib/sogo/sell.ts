@@ -135,12 +135,14 @@ export async function quoteGiftCardSell(input: {
     provider: "sogo",
     serviceKey: input.slug,
     amount: providerPayout,
+    source: "gift_card_sell",
   });
 
   return {
     ratePerUnit, // exact NGN-per-unit from provider (or demo mirror)
     providerPayout,
     userPayout: priced.local,
+    companyCharge: priced.companyCharge,
     currency: "NGN" as const,
     share,
     demo: isSogoDemoMode(),
@@ -286,6 +288,7 @@ export async function sellGiftCard(input: {
       provider: "sogo",
       serviceKey: input.slug,
       amount: providerPayout,
+      source: "gift_card_sell",
     });
     const userPayout = priced.local;
     const lockedRatePerUnit =
@@ -510,6 +513,34 @@ export async function settleGiftCardSellSuccess(input: {
   if (!result.alreadySettled) {
     const { scheduleReferralCheck } = await import("@/lib/referrals/service");
     scheduleReferralCheck(input.userId);
+
+    try {
+      const txRow = await db.query.transactions.findFirst({
+        where: eq(transactions.id, input.transactionId),
+      });
+      const meta = (txRow?.metadata || {}) as Record<string, unknown>;
+      const providerPayout = Number(meta.providerPayout ?? 0);
+      const userPayout = Number(input.amount);
+      const { recognizeNgnServiceProfit } = await import(
+        "@/lib/company/recognize"
+      );
+      await recognizeNgnServiceProfit({
+        source: "gift_card_sell",
+        transactionId: input.transactionId,
+        userId: input.userId,
+        grossIn: providerPayout > 0 ? providerPayout : userPayout,
+        grossOut: userPayout,
+        chargeAmount: Math.max(0, (providerPayout || userPayout) - userPayout),
+        description: "Gift card sell margin",
+        metadata: {
+          providerPayout,
+          userPayout,
+          orderId: input.orderId,
+        },
+      });
+    } catch (revenueError) {
+      console.error("[sogo-sell-revenue]", revenueError);
+    }
   }
 
   return result;

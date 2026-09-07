@@ -3,6 +3,11 @@ import { db } from "@/lib/db";
 import { platformSettings, servicePriceOverrides } from "@/lib/db/schema";
 import { roundMoney } from "@/lib/fx/rates";
 import {
+  applySilentCharge,
+  getCompanyCharges,
+  type CompanyChargeSource,
+} from "@/lib/company/charges";
+import {
   DEFAULT_SERVICE_PRICING,
   PRICING_PROVIDERS,
   type OverrideMode,
@@ -212,16 +217,55 @@ type UsdPriceResult = {
   markup: number;
   overrideApplied: boolean;
   listLocal: number;
+  /** Silent company charge baked into `local`. Never shown to the customer. */
+  companyCharge: number;
 };
+
+export function chargeSourceForProvider(
+  provider: PricingProvider,
+  source?: CompanyChargeSource | null,
+): CompanyChargeSource | null {
+  if (source) return source;
+  if (provider === "jap") return "social";
+  if (provider === "reloadly") return "gift_card_buy";
+  if (provider === "herosms") return "virtual_number";
+  if (provider === "sogo") return "gift_card_sell";
+  return null;
+}
 
 /**
  * Preload markup + overrides once, then price many USD rows synchronously.
  * Avoids N async DB hits when building large catalogs (e.g. JAP).
  */
-export async function createUsdPricer(provider: PricingProvider) {
+export async function createUsdPricer(
+  provider: PricingProvider,
+  source?: CompanyChargeSource | null,
+) {
   const markup = await getProviderMarkup(provider);
   const maps = await loadOverrideMaps();
   const providerMap = maps.get(provider);
+  const charges = await getCompanyCharges();
+  const ngnBuyRate = charges.fx.currencies.NGN?.buyRate;
+  const { quoteLocalUsd } = await import("@/lib/fx/rates");
+  const ngnQuote = await quoteLocalUsd("NGN");
+  const chargeKey = chargeSourceForProvider(provider, source);
+  const charge =
+    chargeKey && chargeKey !== "fx_conversion" && chargeKey !== "withdraw"
+      ? charges.services[chargeKey]
+      : null;
+
+  const bake = (base: number, buyRate: number) => {
+    if (!charge) {
+      return { total: base, chargeAmount: 0 };
+    }
+    return applySilentCharge({
+      base,
+      charge,
+      localBuyRate: buyRate,
+      ngnBuyRate: ngnBuyRate && ngnBuyRate > 0 ? ngnBuyRate : ngnQuote.buyRate,
+      direction: provider === "sogo" ? "subtract" : "add",
+    });
+  };
 
   return (input: {
     serviceKey?: string | null;
@@ -231,12 +275,26 @@ export async function createUsdPricer(provider: PricingProvider) {
     const listLocal = roundMoney(input.usd * input.buyRate * markup);
 
     if (!input.serviceKey) {
-      return { local: listLocal, markup, overrideApplied: false, listLocal };
+      const priced = bake(listLocal, input.buyRate);
+      return {
+        local: priced.total,
+        markup,
+        overrideApplied: false,
+        listLocal,
+        companyCharge: priced.chargeAmount,
+      };
     }
 
     const row = providerMap?.get(input.serviceKey);
     if (!row) {
-      return { local: listLocal, markup, overrideApplied: false, listLocal };
+      const priced = bake(listLocal, input.buyRate);
+      return {
+        local: priced.total,
+        markup,
+        overrideApplied: false,
+        listLocal,
+        companyCharge: priced.chargeAmount,
+      };
     }
 
     const value = Number(row.value);
@@ -244,11 +302,25 @@ export async function createUsdPricer(provider: PricingProvider) {
       const local = roundMoney(
         input.usd * input.buyRate * Math.max(1, value),
       );
-      return { local, markup: value, overrideApplied: true, listLocal };
+      const priced = bake(local, input.buyRate);
+      return {
+        local: priced.total,
+        markup: value,
+        overrideApplied: true,
+        listLocal,
+        companyCharge: priced.chargeAmount,
+      };
     }
 
     const local = applyOverrideMode(listLocal, row.mode, value);
-    return { local, markup, overrideApplied: true, listLocal };
+    const priced = bake(local, input.buyRate);
+    return {
+      local: priced.total,
+      markup,
+      overrideApplied: true,
+      listLocal,
+      companyCharge: priced.chargeAmount,
+    };
   };
 }
 
@@ -260,8 +332,9 @@ export async function priceUsdToLocal(input: {
   serviceKey?: string | null;
   usd: number;
   buyRate: number;
+  source?: CompanyChargeSource | null;
 }): Promise<UsdPriceResult> {
-  const price = await createUsdPricer(input.provider);
+  const price = await createUsdPricer(input.provider, input.source);
   return price({
     serviceKey: input.serviceKey,
     usd: input.usd,
@@ -285,11 +358,13 @@ export async function priceLocalAmount(input: {
   provider: PricingProvider;
   serviceKey?: string | null;
   amount: number;
+  source?: CompanyChargeSource | null;
 }): Promise<{
   local: number;
   markup: number;
   overrideApplied: boolean;
   listLocal: number;
+  companyCharge: number;
 }> {
   const markup = await getProviderMarkup(input.provider);
   const listLocal =
@@ -297,23 +372,49 @@ export async function priceLocalAmount(input: {
       ? roundMoney(input.amount * (await getSogoPayoutShare()))
       : roundMoney(input.amount * markup);
 
-  if (!input.serviceKey) {
-    return { local: listLocal, markup, overrideApplied: false, listLocal };
-  }
-
   const maps = await loadOverrideMaps();
-  const row = maps.get(input.provider)?.get(input.serviceKey);
-  if (!row) {
-    return { local: listLocal, markup, overrideApplied: false, listLocal };
+  const row = input.serviceKey
+    ? maps.get(input.provider)?.get(input.serviceKey)
+    : undefined;
+
+  let local = listLocal;
+  let overrideApplied = false;
+  let usedMarkup = markup;
+  if (row) {
+    const value = Number(row.value);
+    overrideApplied = true;
+    if (row.mode === "markup") {
+      local = roundMoney(input.amount * Math.max(0.01, value));
+      usedMarkup = value;
+    } else {
+      local = applyOverrideMode(listLocal, row.mode, value);
+    }
   }
 
-  const value = Number(row.value);
-  if (row.mode === "markup") {
-    const local = roundMoney(input.amount * Math.max(0.01, value));
-    return { local, markup: value, overrideApplied: true, listLocal };
-  }
-  const local = applyOverrideMode(listLocal, row.mode, value);
-  return { local, markup, overrideApplied: true, listLocal };
+  const charges = await getCompanyCharges();
+  const chargeKey = chargeSourceForProvider(input.provider, input.source);
+  const charge =
+    chargeKey && chargeKey !== "fx_conversion" && chargeKey !== "withdraw"
+      ? charges.services[chargeKey]
+      : null;
+  const ngnQuote = await (await import("@/lib/fx/rates")).quoteLocalUsd("NGN");
+  const priced = charge
+    ? applySilentCharge({
+        base: local,
+        charge,
+        localBuyRate: ngnQuote.buyRate,
+        ngnBuyRate: ngnQuote.buyRate,
+        direction: input.provider === "sogo" ? "subtract" : "add",
+      })
+    : { total: local, chargeAmount: 0 };
+
+  return {
+    local: priced.total,
+    markup: usedMarkup,
+    overrideApplied,
+    listLocal,
+    companyCharge: priced.chargeAmount,
+  };
 }
 
 export function toOverrideDto(row: OverrideRow): ServicePriceOverrideDto {

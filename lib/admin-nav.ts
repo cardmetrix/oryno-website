@@ -1,4 +1,5 @@
 import {
+  Banknote,
   BadgeCheck,
   BarChart3,
   Bell,
@@ -42,6 +43,7 @@ export const adminNav: AdminNavItem[] = [
   { href: "/admin/virtual-numbers", label: "Virtual Numbers", icon: Phone },
   { href: "/admin/providers", label: "Providers", icon: Wifi },
   { href: "/admin/pricing", label: "Pricing", icon: Tags },
+  { href: "/admin/revenue", label: "Revenue", icon: Banknote },
   { href: "/admin/bills", label: "Bill Providers", icon: Zap },
   { href: "/admin/betting", label: "Betting Funding", icon: Trophy },
   { href: "/admin/referrals", label: "Referrals", icon: BarChart3 },

@@ -187,7 +187,7 @@ export async function convertWalletCurrency(input: {
     const usdNext = (Number(usdWallet.balance) + usdCredit).toFixed(2);
     const ref = `FX_${Date.now().toString(36).toUpperCase()}`;
 
-    return db.transaction(async (tx) => {
+    const converted = await db.transaction(async (tx) => {
       const [debitTx] = await tx
         .insert(transactions)
         .values({
@@ -248,7 +248,7 @@ export async function convertWalletCurrency(input: {
         .set({ balance: usdNext, updatedAt: new Date() })
         .where(eq(wallets.id, usdWallet.id));
 
-      return {
+      const result = {
         direction: "to_usd" as const,
         quote,
         fromAmount: amount,
@@ -260,7 +260,26 @@ export async function convertWalletCurrency(input: {
         localWallet: toWalletSummary({ ...localWallet, balance: localNext }),
         usdWallet: toWalletSummary({ ...usdWallet, balance: usdNext }),
       };
+
+      return result;
     });
+
+    try {
+      const { recognizeFxProfit } = await import("@/lib/company/recognize");
+      await recognizeFxProfit({
+        transactionId: converted.debitTransactionId,
+        userId: input.userId,
+        localCurrency,
+        direction: "to_usd",
+        localAmount: amount,
+        usdAmount: usdCredit,
+        quote,
+      });
+    } catch (revenueError) {
+      console.error("[fx-convert-revenue]", revenueError);
+    }
+
+    return converted;
   }
 
   // to_local
@@ -276,7 +295,7 @@ export async function convertWalletCurrency(input: {
   const localNext = (Number(localWallet.balance) + localCredit).toFixed(2);
   const ref = `FX_${Date.now().toString(36).toUpperCase()}`;
 
-  return db.transaction(async (tx) => {
+  const convertedLocal = await db.transaction(async (tx) => {
     const [debitTx] = await tx
       .insert(transactions)
       .values({
@@ -350,6 +369,23 @@ export async function convertWalletCurrency(input: {
       usdWallet: toWalletSummary({ ...usdWallet, balance: usdNext }),
     };
   });
+
+  try {
+    const { recognizeFxProfit } = await import("@/lib/company/recognize");
+    await recognizeFxProfit({
+      transactionId: convertedLocal.debitTransactionId,
+      userId: input.userId,
+      localCurrency,
+      direction: "to_local",
+      localAmount: localCredit,
+      usdAmount: amount,
+      quote,
+    });
+  } catch (revenueError) {
+    console.error("[fx-convert-revenue]", revenueError);
+  }
+
+  return convertedLocal;
 }
 
 type InitCheckoutData = {
@@ -513,6 +549,28 @@ export async function creditUsdWalletFromFunding(input: {
 
     return { transactionId: txRow.id };
   });
+
+  try {
+    const meta = (funding.metadata || {}) as Record<string, unknown>;
+    const localAmount = Number(meta.localAmount ?? 0);
+    const localCurrency = String(meta.localCurrency || "NGN");
+    if (localAmount > 0 && usdAmount > 0) {
+      const { recognizeFxProfit } = await import("@/lib/company/recognize");
+      const { quoteLocalUsd } = await import("@/lib/fx/rates");
+      const quote = await quoteLocalUsd(localCurrency);
+      await recognizeFxProfit({
+        transactionId: result.transactionId,
+        userId: input.userId,
+        localCurrency,
+        direction: "usd_fund",
+        localAmount,
+        usdAmount,
+        quote,
+      });
+    }
+  } catch (revenueError) {
+    console.error("[usd-fund-revenue]", revenueError);
+  }
 
   return {
     duplicated: false as const,

@@ -123,6 +123,15 @@ async function creditBack(input: {
   });
 }
 
+async function reverseCompanyRevenue(transactionId: string) {
+  try {
+    const { reverseRevenue } = await import("@/lib/company/revenue");
+    await reverseRevenue(transactionId);
+  } catch (error) {
+    console.error("[ledger-reverse-revenue]", error);
+  }
+}
+
 /** Provider never fulfilled — restore the debit and mark the original failed. */
 export async function refundFailedDebit(input: {
   walletId: string;
@@ -132,7 +141,9 @@ export async function refundFailedDebit(input: {
   userId?: string;
 }) {
   try {
-    return await creditBack({ ...input, kind: "failed" });
+    const result = await creditBack({ ...input, kind: "failed" });
+    if (!result.already) await reverseCompanyRevenue(input.transactionId);
+    return result;
   } catch (error) {
     console.error("[ledger-refund-failed]", error);
     throw error instanceof ReverseFailedError
@@ -152,7 +163,9 @@ export async function reverseCompletedDebit(input: {
   userId?: string;
 }) {
   try {
-    return await creditBack({ ...input, kind: "reversed" });
+    const result = await creditBack({ ...input, kind: "reversed" });
+    if (!result.already) await reverseCompanyRevenue(input.transactionId);
+    return result;
   } catch (error) {
     console.error("[ledger-reverse]", error);
     throw error instanceof ReverseFailedError

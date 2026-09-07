@@ -55,8 +55,15 @@ export async function usdToLocalJapPrice(
     serviceKey,
     usd,
     buyRate: quote.buyRate,
+    source: "social",
   });
-  return { local: priced.local, currency, quote, markup: priced.markup };
+  return {
+    local: priced.local,
+    currency,
+    quote,
+    markup: priced.markup,
+    companyCharge: priced.companyCharge,
+  };
 }
 
 /** Retail USD for boosting — local retail (markup + app buyRate) converted back at that rate. */
@@ -73,6 +80,7 @@ export async function usdRetailJapPrice(
     localCurrency: priced.currency,
     quote: priced.quote,
     markup: priced.markup,
+    companyCharge: priced.companyCharge,
   };
 }
 
@@ -193,7 +201,7 @@ export async function purchaseJapBoost(input: {
   const commentsPayload = needsComments ? comments.join("\n") : undefined;
 
   const wholesaleUsd = japUsdCost(input.rateUsd, quantity);
-  const { usd, local, quote } = await usdRetailJapPrice(
+  const { usd, local, quote, companyCharge } = await usdRetailJapPrice(
     wholesaleUsd,
     input.countryCode,
     String(input.serviceId),
@@ -308,6 +316,28 @@ export async function purchaseJapBoost(input: {
 
     const { scheduleReferralCheck } = await import("@/lib/referrals/service");
     scheduleReferralCheck(input.userId);
+
+    try {
+      const { recognizeUsdServiceProfit } = await import("@/lib/company/recognize");
+      await recognizeUsdServiceProfit({
+        source: "social",
+        transactionId: debit.transaction.id,
+        userId: input.userId,
+        customerUsd: chargeAmount,
+        providerUsd: wholesaleUsd,
+        chargeUsd: Math.max(
+          0,
+          quote.buyRate > 0 ? companyCharge / quote.buyRate : 0,
+        ),
+        description: `Social boost ${input.platform}`,
+        metadata: {
+          japServiceId: input.serviceId,
+          quantity,
+        },
+      });
+    } catch (revenueError) {
+      console.error("[jap-revenue]", revenueError);
+    }
 
     return {
       simulated,

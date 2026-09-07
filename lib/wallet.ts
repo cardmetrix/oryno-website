@@ -461,7 +461,10 @@ export async function withdrawWallet(input: {
         type: "debit",
         category: "withdraw",
         title: "Withdrawal",
-        subtitle: `${bank.bankName} · ${maskAccountNumber(bank.accountNumber)}`,
+        subtitle:
+          fee > 0
+            ? `${bank.bankName} · ${maskAccountNumber(bank.accountNumber)} · Fee ₦${feeStr}`
+            : `${bank.bankName} · ${maskAccountNumber(bank.accountNumber)}`,
         amount: amountStr,
         currency: "NGN",
         status: "processing",
@@ -567,6 +570,26 @@ export async function withdrawWallet(input: {
       })
       .where(eq(transactions.id, prepared.transaction.id))
       .returning();
+
+    if (nextWithdrawalStatus === "completed" && fee > 0) {
+      try {
+        const { recognizeNgnServiceProfit } = await import(
+          "@/lib/company/recognize"
+        );
+        await recognizeNgnServiceProfit({
+          source: "withdraw",
+          transactionId: prepared.transaction.id,
+          userId: input.userId,
+          grossIn: fee,
+          grossOut: 0,
+          chargeAmount: fee,
+          description: "Withdrawal fee",
+          metadata: { reference, localAmount, countryCode },
+        });
+      } catch (revenueError) {
+        console.error("[withdraw-fee-revenue]", revenueError);
+      }
+    }
 
     return {
       withdrawal: withdrawal ?? prepared.withdrawal,

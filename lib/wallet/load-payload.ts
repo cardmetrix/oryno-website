@@ -16,6 +16,7 @@ import {
 } from "@/lib/wallet";
 import { ensureUsdWallet } from "@/lib/wallet-usd";
 import { getWithdrawMinimum } from "@/lib/wallet/withdraw-limits";
+import { getWithdrawFeeDisplay } from "@/lib/company/charges";
 
 export async function loadWalletPayload(user: SyncedUser): Promise<WalletPayload> {
   await ensureWalletSchema();
@@ -23,8 +24,15 @@ export async function loadWalletPayload(user: SyncedUser): Promise<WalletPayload
   const displayFx = await getDisplayFx(user.countryCode);
   const currency = displayFx.to;
 
-  const [withdrawMinimum, primaryResult, usdRow, bankRows] = await Promise.all([
+  const [withdrawMinimum, withdrawFee, primaryResult, usdRow, bankRows] = await Promise.all([
     getWithdrawMinimum(user.countryCode, displayFx),
+    getWithdrawFeeDisplay(user.countryCode).catch(() => ({
+      ngn: 50,
+      local: 50,
+      currency: "NGN",
+      formatted: "₦50.00",
+      formattedNgn: "₦50.00",
+    })),
     ensurePrimaryWallet(user.id, "NGN").catch(async (walletError) => {
       console.error("[wallet-get-primary]", walletError);
       const fallbackWallets = await listUserWallets(user.id).catch(() => []);
@@ -85,6 +93,7 @@ export async function loadWalletPayload(user: SyncedUser): Promise<WalletPayload
       formatted: withdrawMinimum.formatted,
       message: withdrawMinimum.message,
     },
+    withdrawFee,
     fx,
     displayFx,
     ledgerNgn: Number(primary.balance).toFixed(2),

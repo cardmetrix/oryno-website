@@ -19,9 +19,6 @@ import {
 
 export const runtime = "nodejs";
 
-/** Flat demo fee — replace with gateway pricing later */
-const WITHDRAW_FEE = 0;
-
 export async function POST(req: Request) {
   try {
     await ensureWalletSchema();
@@ -104,13 +101,16 @@ export async function POST(req: Request) {
     );
     await settleStuckWithdrawals({ userId: user.id, limit: 5 });
 
+    const { getWithdrawFeeNgn } = await import("@/lib/company/charges");
+    const withdrawFee = await getWithdrawFeeNgn();
+
     const result = await withUserActionLock(user.id, () =>
       withdrawWallet({
         userId: user.id,
         amount: body.amount ?? 0,
-        bankAccountId: body.bankAccountId,
+        bankAccountId: body.bankAccountId!,
         countryCode: user.countryCode ?? "NG",
-        fee: WITHDRAW_FEE,
+        fee: withdrawFee,
       }),
     );
 
@@ -156,6 +156,7 @@ export async function POST(req: Request) {
       transactionId: result.transaction.id,
       amountFormatted,
       reference: result.withdrawal.providerRef,
+      fee: withdrawFee,
       bank: {
         bankName: result.bank.bankName,
         accountNumber: result.bank.accountNumber,

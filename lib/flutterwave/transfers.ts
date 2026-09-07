@@ -314,6 +314,27 @@ export async function settlePayoutTransfer(input: {
     });
 
     try {
+      const fee = Number(withdrawal.fee || 0);
+      if (fee > 0 && withdrawal.transactionId) {
+        const { recognizeNgnServiceProfit } = await import(
+          "@/lib/company/recognize"
+        );
+        await recognizeNgnServiceProfit({
+          source: "withdraw",
+          transactionId: withdrawal.transactionId,
+          userId: withdrawal.userId,
+          grossIn: fee,
+          grossOut: 0,
+          chargeAmount: fee,
+          description: "Withdrawal fee",
+          metadata: { reference: input.reference },
+        });
+      }
+    } catch (revenueError) {
+      console.error("[withdraw-settle-revenue]", revenueError);
+    }
+
+    try {
       const amountFormatted = await formatWithdrawalAmount(
         withdrawal.amount,
         withdrawal.countryCode,

@@ -237,6 +237,7 @@ export async function loadAdminPricingCatalog(input: {
           serviceKey,
           usd: costUsd,
           buyRate: quote.buyRate,
+          source: "email",
         });
         const ov = await withOverride("herosms", serviceKey, priced);
         items.push({

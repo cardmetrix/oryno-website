@@ -51,6 +51,7 @@ export async function GET(req: Request) {
         costUsd,
         user.countryCode,
         `email:${site}:${domainName}`,
+        "email",
       );
       list.push({
         name: d.name,

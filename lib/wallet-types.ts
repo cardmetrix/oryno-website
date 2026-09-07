@@ -69,6 +69,13 @@ export type WalletPayload = {
     formatted: string;
     message: string;
   };
+  withdrawFee?: {
+    ngn: number;
+    local: number;
+    currency: string;
+    formatted: string;
+    formattedNgn: string;
+  };
   fx?: {
     base: string;
     quote: string;
