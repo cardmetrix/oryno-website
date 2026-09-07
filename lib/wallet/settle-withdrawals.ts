@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, lte } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { transactions, withdrawals } from "@/lib/db/schema";
 import {
@@ -144,7 +144,8 @@ export async function settleStuckWithdrawals(input?: {
   const stuck = await db.query.withdrawals.findMany({
     where: and(
       inArray(withdrawals.status, [...STUCK_WITHDRAWAL_STATUSES]),
-      sql`coalesce(${withdrawals.createdAt}, ${withdrawals.updatedAt}) <= ${cutoff}`,
+      // createdAt is NOT NULL; lte binds Date correctly (sql`...${Date}` does not with postgres.js).
+      lte(withdrawals.createdAt, cutoff),
       input?.userId ? eq(withdrawals.userId, input.userId) : undefined,
     ),
     limit: input?.limit ?? 25,

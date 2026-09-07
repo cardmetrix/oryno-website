@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, lte } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { transactions, withdrawals } from "@/lib/db/schema";
 import {
@@ -219,7 +219,8 @@ export async function settleUserPendingTransactions(input: {
     where: and(
       eq(transactions.userId, input.userId),
       inArray(transactions.status, [...OPEN_STATUSES]),
-      sql`coalesce(${transactions.createdAt}, ${transactions.updatedAt}) <= ${cutoff}`,
+      // createdAt is NOT NULL; lte binds Date correctly (sql`...${Date}` does not with postgres.js).
+      lte(transactions.createdAt, cutoff),
     ),
     limit: input.limit ?? 25,
     orderBy: (t, { asc }) => [asc(t.createdAt)],
