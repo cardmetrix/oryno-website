@@ -36,7 +36,7 @@ const quickActions = [
 export function DashboardClient() {
   const { data, isLoading } = useWallet();
   useSettlePendingTransactions(true);
-  const recent = (data?.recent.slice(0, 5) ?? []) as AppTransaction[];
+  const recent = (data?.recent.slice(0, 4) ?? []) as AppTransaction[];
   const loadingTx = isLoading && !data;
 
   return (
@@ -100,8 +100,11 @@ export function DashboardClient() {
 
         {loadingTx ? (
           <div className="space-y-3">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-3 py-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div
+                key={i}
+                className={`items-center gap-3 py-2 ${i >= 2 ? "hidden md:flex" : "flex"}`}
+              >
                 <Skeleton className="h-11 w-11 rounded-2xl" />
                 <div className="min-w-0 flex-1 space-y-2">
                   <Skeleton className="h-3.5 w-2/3 rounded-full" />
@@ -116,7 +119,9 @@ export function DashboardClient() {
         ) : (
           <div className="divide-y divide-border">
             {recent.map((tx, i) => (
-              <TransactionRow key={tx.id} transaction={tx} index={i} />
+              <div key={tx.id} className={i >= 2 ? "hidden md:block" : ""}>
+                <TransactionRow transaction={tx} index={i} />
+              </div>
             ))}
           </div>
         )}
