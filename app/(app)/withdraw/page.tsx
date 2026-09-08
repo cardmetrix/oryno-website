@@ -310,8 +310,7 @@ export default function WithdrawPage() {
                 </label>
                 {minWithdraw ? (
                   <p className="mt-2 text-xs text-muted-foreground">
-                    Minimum withdrawal · {minWithdraw.formatted} (₦100
-                    equivalent)
+                    Minimum withdrawal · {minWithdraw.formatted}
                   </p>
                 ) : null}
 
