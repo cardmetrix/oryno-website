@@ -197,11 +197,7 @@ export default function HistoryPage() {
         <HistoryError onRetry={() => void load()} />
       ) : (
         <>
-          <MotionSection className="relative overflow-hidden rounded-[28px] border border-border/60 bg-background p-4 shadow-[var(--shadow-soft)] sm:p-5">
-            <div
-              aria-hidden
-              className="pointer-events-none absolute -top-16 -right-10 h-40 w-40 rounded-full bg-primary/10 blur-3xl"
-            />
+          <MotionSection className="relative overflow-hidden rounded-[28px] border border-border/60 bg-background p-4 sm:p-5">
             <div className="relative flex flex-wrap items-center justify-between gap-3">
               <button
                 type="button"
