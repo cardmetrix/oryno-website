@@ -199,13 +199,9 @@ function HistoryAnalyticsContent() {
 
           <MotionSection
             delay={0.06}
-            className="relative mt-5 overflow-hidden rounded-[28px] border border-border/50 bg-background p-5 shadow-[var(--shadow-soft)]"
+            className="mt-5 overflow-hidden rounded-[28px] border border-border/50 bg-background p-5 shadow-[var(--shadow-soft)]"
           >
-            <div
-              aria-hidden
-              className="pointer-events-none absolute -top-20 right-0 h-44 w-44 rounded-full bg-primary/10 blur-3xl"
-            />
-            <div className="relative mb-5 flex items-end justify-between gap-3">
+            <div className="mb-5 flex items-end justify-between gap-3">
               <div>
                 <h2 className="text-base font-bold text-foreground">
                   Daily cashflow
@@ -214,7 +210,7 @@ function HistoryAnalyticsContent() {
                   In vs out for {activeMonth?.label}
                 </p>
               </div>
-              <div className="rounded-full bg-oryno-orange-muted px-3 py-1.5 text-xs font-bold text-primary">
+              <div className="shrink-0 rounded-full bg-oryno-orange-muted px-3 py-1.5 text-xs font-bold text-primary">
                 {Math.round(spendShare * 100)}% spent
               </div>
             </div>
