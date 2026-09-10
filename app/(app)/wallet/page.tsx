@@ -452,11 +452,7 @@ function WalletPageContent() {
                 )}
               >
                 <div className="flex min-h-full flex-1 flex-col overflow-hidden rounded-[28px] bg-background shadow-[var(--shadow-soft)]">
-                  <div className="relative flex min-h-full flex-1 flex-col overflow-hidden bg-gradient-to-br from-[#ff8124] via-oryno-orange to-[#e85d00] px-5 py-5 text-white sm:px-6 sm:py-6">
-                    <div
-                      aria-hidden="true"
-                      className="pointer-events-none absolute -top-12 -right-10 h-40 w-40 rounded-full bg-white/15 blur-2xl"
-                    />
+                  <div className="relative isolate flex min-h-full flex-1 flex-col overflow-hidden [clip-path:inset(0_round_28px)] bg-gradient-to-br from-[#ff8124] via-oryno-orange to-[#e85d00] px-5 py-5 text-white sm:px-6 sm:py-6">
                     <motion.div
                       aria-hidden="true"
                       animate={{ x: ["-30%", "130%"] }}
