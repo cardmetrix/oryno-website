@@ -451,8 +451,7 @@ function WalletPageContent() {
                   "md:flex md:h-auto md:min-h-full md:min-w-0 md:max-w-none md:basis-auto md:snap-none md:flex-col md:px-0",
                 )}
               >
-                <div className="flex min-h-full flex-1 flex-col overflow-hidden rounded-[28px] bg-background shadow-[var(--shadow-soft)]">
-                  <div className="relative flex min-h-full flex-1 flex-col overflow-hidden bg-gradient-to-br from-[#ff8124] via-oryno-orange to-[#e85d00] px-5 py-5 text-white sm:px-6 sm:py-6">
+                <div className="relative flex min-h-full flex-1 flex-col overflow-hidden rounded-[28px] bg-gradient-to-br from-[#ff8124] via-oryno-orange to-[#e85d00] px-5 py-5 text-white shadow-[0_18px_40px_rgba(255,106,0,0.28)] sm:px-6 sm:py-6">
                     <div
                       aria-hidden="true"
                       className="pointer-events-none absolute -top-12 -right-10 h-40 w-40 rounded-full bg-white/15 blur-2xl"
@@ -537,7 +536,6 @@ function WalletPageContent() {
                         </Link>
                       </motion.div>
                     </div>
-                  </div>
                 </div>
               </MotionSection>
 
