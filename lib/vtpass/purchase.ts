@@ -26,6 +26,8 @@ import {
   getVtpassVariations,
   isVtpassDemoMode,
   isVtpassPendingCode,
+  isVtpassSandbox,
+  isVtpassSandboxTestPhone,
   isVtpassSuccessCode,
   normalizePhone,
   payVtpass,
@@ -400,6 +402,27 @@ function mapVtpassOutcome(response: VtpassPayResponse) {
   return "failed" as const;
 }
 
+function vtpassFailureMessage(
+  response: VtpassPayResponse,
+  fallback: string,
+  phone?: string,
+) {
+  const base =
+    response.response_description ||
+    (response.code ? `Provider error (${response.code})` : null) ||
+    fallback;
+
+  if (
+    isVtpassSandbox() &&
+    phone &&
+    !isVtpassSandboxTestPhone(phone)
+  ) {
+    return "Airtime is running in test mode, so real phone numbers cannot be topped up yet. Please try again later.";
+  }
+
+  return base;
+}
+
 async function callProviderOrSimulate(payload: Parameters<typeof payVtpass>[0]) {
   if (isVtpassDemoMode()) {
     throw new Error(
@@ -503,17 +526,24 @@ export async function purchaseAirtime(input: {
   flexibleLocalAmount?: boolean;
 }) {
   if (input.mode !== "international") {
-    const phone = normalizePhone(input.phone);
+    const phone = normalizePhone(input.phone, input.countryCode || "NG");
     if (phone.length < 10) throw new Error("Enter a valid phone number");
     if (!Number.isFinite(input.amount) || input.amount <= 0) {
       throw new Error("Enter a valid amount");
     }
-    if (input.amount < 50) throw new Error("Minimum airtime amount is ₦50");
+    const faceAmount = Math.round(input.amount);
+    if (faceAmount < 50) throw new Error("Minimum airtime amount is ₦50");
+
+    if (isVtpassSandbox() && !isVtpassSandboxTestPhone(phone)) {
+      throw new Error(
+        "Airtime is running in test mode, so real phone numbers cannot be topped up yet. Please try again later.",
+      );
+    }
 
     const priced = await resolveVtpassRetail({
       serviceID: input.serviceID,
       variationCode: input.variationCode,
-      faceAmount: input.amount,
+      faceAmount,
     });
     const cashback = estimateAirtimeCashback(priced.retail);
     const market = resolveCountryCode(input.countryCode);
@@ -560,7 +590,7 @@ export async function purchaseAirtime(input: {
       const outcome = mapVtpassOutcome(response);
       if (outcome === "failed") {
         throw new Error(
-          response.response_description || "Airtime purchase failed",
+          vtpassFailureMessage(response, "Airtime purchase failed", phone),
         );
       }
 
@@ -617,7 +647,7 @@ export async function purchaseAirtime(input: {
     }
   }
 
-  const phone = normalizePhone(input.phone);
+  const phone = normalizePhone(input.phone, input.countryCode || input.countryIso);
   if (phone.length < 10) throw new Error("Enter a valid phone number");
   if (!Number.isFinite(input.amount) || input.amount <= 0) {
     throw new Error("Enter a valid amount");
@@ -801,10 +831,16 @@ export async function purchaseData(input: {
 }) {
   if (input.mode !== "international") {
     if (!input.variationCode) throw new Error("Select a data plan");
-    const phone = normalizePhone(input.phone);
+    const phone = normalizePhone(input.phone, input.countryCode || "NG");
     if (phone.length < 10) throw new Error("Enter a valid phone number");
     if (!Number.isFinite(input.amount) || input.amount <= 0) {
       throw new Error("Enter a valid amount");
+    }
+
+    if (isVtpassSandbox() && !isVtpassSandboxTestPhone(phone)) {
+      throw new Error(
+        "Data is running in test mode, so real phone numbers cannot be topped up yet. Please try again later.",
+      );
     }
 
     const variationCode = input.variationCode;
@@ -869,7 +905,9 @@ export async function purchaseData(input: {
       });
       const outcome = mapVtpassOutcome(response);
       if (outcome === "failed") {
-        throw new Error(response.response_description || "Data purchase failed");
+        throw new Error(
+          vtpassFailureMessage(response, "Data purchase failed", phone),
+        );
       }
 
       await db
@@ -923,7 +961,7 @@ export async function purchaseData(input: {
     }
   }
 
-  const phone = normalizePhone(input.phone);
+  const phone = normalizePhone(input.phone, input.countryCode || input.countryIso);
   if (phone.length < 10) throw new Error("Enter a valid phone number");
   if (!Number.isFinite(input.amount) || input.amount <= 0) {
     throw new Error("Enter a valid amount");

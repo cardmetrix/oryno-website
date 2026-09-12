@@ -110,6 +110,16 @@ async function vtpassFetch<T>(
     );
   }
 
+  // Some VTpass failures still return HTTP 200 with an error code.
+  // Leave success/pending codes to the purchase layer; reject hard auth errors here.
+  const code = String(json.code || "");
+  if (code === "091" || code === "092" || code === "093") {
+    throw new Error(
+      json.response_description ||
+        "Airtime provider authentication failed. Check VTpass API keys.",
+    );
+  }
+
   return json;
 }
 
@@ -216,6 +226,39 @@ export function isVtpassPendingCode(code?: string | null) {
   return code === "099" || code === "01";
 }
 
-export function normalizePhone(phone: string) {
-  return phone.replace(/\D/g, "");
+/**
+ * Normalize recipient phone for VTpass.
+ * Nigerian numbers must be local `0XXXXXXXXXX` (not `234…` / bare 10 digits).
+ */
+export function normalizePhone(phone: string, countryCode?: string | null) {
+  let digits = phone.replace(/\D/g, "");
+  const country = (countryCode || "").toUpperCase();
+  const looksNg =
+    country === "NG" ||
+    digits.startsWith("234") ||
+    (digits.startsWith("0") && digits.length === 11) ||
+    (digits.length === 10 && /^[789]/.test(digits));
+
+  if (looksNg) {
+    if (digits.startsWith("234") && digits.length >= 12) {
+      digits = `0${digits.slice(3)}`;
+    }
+    if (digits.length === 10 && /^[789]/.test(digits)) {
+      digits = `0${digits}`;
+    }
+  }
+
+  return digits;
+}
+
+/** Sandbox only delivers for these simulated phones (VTpass docs). */
+export function isVtpassSandboxTestPhone(phone: string) {
+  const digits = normalizePhone(phone, "NG");
+  return (
+    digits === "08011111111" ||
+    digits === "201000000000" ||
+    digits === "500000000000" ||
+    digits === "400000000000" ||
+    digits === "300000000000"
+  );
 }
