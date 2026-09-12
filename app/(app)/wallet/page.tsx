@@ -44,6 +44,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+
 const DEFAULT_ACCOUNT_RULES = {
   min: 10,
   max: 10,
