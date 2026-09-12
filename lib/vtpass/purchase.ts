@@ -2,6 +2,8 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   airtimeOrders,
+  billPayments,
+  billProviders,
   dataOrders,
   dataPlans,
   telecomNetworks,
@@ -18,11 +20,6 @@ import {
   toWalletSummary,
 } from "@/lib/wallet";
 import { refundFailedDebit } from "@/lib/wallet/ledger";
-import {
-  purchaseSogoAirtime,
-  purchaseSogoBill,
-  purchaseSogoData,
-} from "@/lib/sogo/purchase";
 import {
   generateVtpassRequestId,
   getIntlAirtimeOperators,
@@ -227,6 +224,47 @@ async function ensureDataPlan(input: {
     .returning();
 
   return created;
+}
+
+async function ensureBillProvider(input: {
+  countryCode: string;
+  serviceID: string;
+  name: string;
+  category: "electricity" | "tv";
+}) {
+  const slug = input.serviceID.slice(0, 80);
+  const existing = await db.query.billProviders.findFirst({
+    where: and(
+      eq(billProviders.countryCode, input.countryCode),
+      eq(billProviders.slug, slug),
+    ),
+  });
+  if (existing) return existing;
+
+  const [created] = await db
+    .insert(billProviders)
+    .values({
+      countryCode: input.countryCode,
+      name: input.name.slice(0, 120),
+      slug,
+      category: input.category,
+      description: input.name,
+      accent: "#FF6A00",
+      status: "active",
+    })
+    .onConflictDoNothing()
+    .returning();
+
+  if (created) return created;
+
+  const again = await db.query.billProviders.findFirst({
+    where: and(
+      eq(billProviders.countryCode, input.countryCode),
+      eq(billProviders.slug, slug),
+    ),
+  });
+  if (!again) throw new Error("Unable to resolve bill provider");
+  return again;
 }
 
 type DebitPrepared = {
@@ -465,14 +503,118 @@ export async function purchaseAirtime(input: {
   flexibleLocalAmount?: boolean;
 }) {
   if (input.mode !== "international") {
-    return purchaseSogoAirtime({
+    const phone = normalizePhone(input.phone);
+    if (phone.length < 10) throw new Error("Enter a valid phone number");
+    if (!Number.isFinite(input.amount) || input.amount <= 0) {
+      throw new Error("Enter a valid amount");
+    }
+    if (input.amount < 50) throw new Error("Minimum airtime amount is ₦50");
+
+    const priced = await resolveVtpassRetail({
+      serviceID: input.serviceID,
+      variationCode: input.variationCode,
+      faceAmount: input.amount,
+    });
+    const cashback = estimateAirtimeCashback(priced.retail);
+    const market = resolveCountryCode(input.countryCode);
+    const network = await ensureTelecomNetwork(market, input.serviceID);
+
+    const prepared = await debitForPurchase({
       userId: input.userId,
       countryCode: input.countryCode,
-      serviceID: input.serviceID,
-      phone: input.phone,
-      amount: input.amount,
-      saveBeneficiary: input.saveBeneficiary,
+      amount: priced.retail,
+      category: "airtime",
+      title: `${network.name} Airtime`,
+      subtitle: phone,
+      metadata: {
+        serviceID: input.serviceID,
+        mode: "local",
+        cashback,
+        faceAmount: priced.face,
+        serviceKey: priced.serviceKey,
+      },
     });
+
+    const [order] = await db
+      .insert(airtimeOrders)
+      .values({
+        userId: input.userId,
+        networkId: network.id,
+        phone,
+        amount: priced.retail.toFixed(2),
+        cashbackAmount: cashback.toFixed(2),
+        status: "processing",
+        saveBeneficiary: Boolean(input.saveBeneficiary),
+        transactionId: prepared.transaction.id,
+        providerRef: prepared.requestId,
+      })
+      .returning();
+
+    try {
+      const { response, simulated } = await callProviderOrSimulate({
+        request_id: prepared.requestId,
+        serviceID: input.serviceID,
+        amount: priced.face,
+        phone,
+      });
+      const outcome = mapVtpassOutcome(response);
+      if (outcome === "failed") {
+        throw new Error(
+          response.response_description || "Airtime purchase failed",
+        );
+      }
+
+      await db
+        .update(airtimeOrders)
+        .set({
+          status: outcome === "completed" ? "completed" : "processing",
+          providerRef:
+            response.content?.transactions?.transactionId || prepared.requestId,
+          updatedAt: new Date(),
+        })
+        .where(eq(airtimeOrders.id, order.id));
+
+      await finalizeTx(
+        prepared.transaction.id,
+        outcome === "completed" ? "completed" : "processing",
+        {
+          provider: "vtpass",
+          requestId: prepared.requestId,
+          vtpass: response,
+          simulated,
+          cashback,
+          orderId: order.id,
+        },
+      );
+
+      return {
+        order,
+        transactionId: prepared.transaction.id,
+        wallet: toWalletSummary(prepared.wallet),
+        requestId: prepared.requestId,
+        status: outcome,
+        cashback,
+        simulated,
+        response,
+      };
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : "Purchase failed";
+      await refundDebit({
+        walletId: prepared.wallet.id,
+        transactionId: prepared.transaction.id,
+        amount: prepared.amount,
+        reason,
+      });
+      await db
+        .update(airtimeOrders)
+        .set({
+          status: "failed",
+          failureReason: reason,
+          updatedAt: new Date(),
+        })
+        .where(eq(airtimeOrders.id, order.id));
+      throw error instanceof Error ? error : new Error(reason);
+    }
   }
 
   const phone = normalizePhone(input.phone);
@@ -659,15 +801,126 @@ export async function purchaseData(input: {
 }) {
   if (input.mode !== "international") {
     if (!input.variationCode) throw new Error("Select a data plan");
-    return purchaseSogoData({
+    const phone = normalizePhone(input.phone);
+    if (phone.length < 10) throw new Error("Enter a valid phone number");
+    if (!Number.isFinite(input.amount) || input.amount <= 0) {
+      throw new Error("Enter a valid amount");
+    }
+
+    const variationCode = input.variationCode;
+    const variationName = input.variationName || variationCode;
+    const faceAmount = await lookupVariationFace({
+      serviceID: input.serviceID,
+      variationCode,
+      fallbackAmount: input.amount,
+    });
+    const priced = await resolveVtpassRetail({
+      serviceID: input.serviceID,
+      variationCode,
+      faceAmount,
+    });
+
+    const country = (input.countryCode || "NG").toUpperCase().slice(0, 2);
+    const network = await ensureTelecomNetwork(country, input.serviceID);
+    const plan = await ensureDataPlan({
+      networkId: network.id,
+      variationCode,
+      name: variationName,
+      amount: priced.retail,
+    });
+
+    const prepared = await debitForPurchase({
       userId: input.userId,
       countryCode: input.countryCode,
-      serviceID: input.serviceID,
-      phone: input.phone,
-      variationCode: input.variationCode,
-      variationName: input.variationName || input.variationCode,
-      amount: input.amount,
+      amount: priced.retail,
+      category: "data",
+      title: `${network.name} Data`,
+      subtitle: `${variationName} · ${phone}`,
+      metadata: {
+        serviceID: input.serviceID,
+        variationCode,
+        faceAmount: priced.face,
+        serviceKey: priced.serviceKey,
+      },
     });
+
+    const [order] = await db
+      .insert(dataOrders)
+      .values({
+        userId: input.userId,
+        networkId: network.id,
+        planId: plan.id,
+        phone,
+        amount: priced.retail.toFixed(2),
+        status: "processing",
+        transactionId: prepared.transaction.id,
+        providerRef: prepared.requestId,
+      })
+      .returning();
+
+    try {
+      const { response, simulated } = await callProviderOrSimulate({
+        request_id: prepared.requestId,
+        serviceID: input.serviceID,
+        billersCode: phone,
+        variation_code: variationCode,
+        amount: priced.face,
+        phone,
+      });
+      const outcome = mapVtpassOutcome(response);
+      if (outcome === "failed") {
+        throw new Error(response.response_description || "Data purchase failed");
+      }
+
+      await db
+        .update(dataOrders)
+        .set({
+          status: outcome === "completed" ? "completed" : "processing",
+          providerRef:
+            response.content?.transactions?.transactionId || prepared.requestId,
+          updatedAt: new Date(),
+        })
+        .where(eq(dataOrders.id, order.id));
+
+      await finalizeTx(
+        prepared.transaction.id,
+        outcome === "completed" ? "completed" : "processing",
+        {
+          provider: "vtpass",
+          requestId: prepared.requestId,
+          vtpass: response,
+          simulated,
+          orderId: order.id,
+        },
+      );
+
+      return {
+        order,
+        transactionId: prepared.transaction.id,
+        wallet: toWalletSummary(prepared.wallet),
+        requestId: prepared.requestId,
+        status: outcome,
+        simulated,
+        response,
+      };
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : "Purchase failed";
+      await refundDebit({
+        walletId: prepared.wallet.id,
+        transactionId: prepared.transaction.id,
+        amount: prepared.amount,
+        reason,
+      });
+      await db
+        .update(dataOrders)
+        .set({
+          status: "failed",
+          failureReason: reason,
+          updatedAt: new Date(),
+        })
+        .where(eq(dataOrders.id, order.id));
+      throw error instanceof Error ? error : new Error(reason);
+    }
   }
 
   const phone = normalizePhone(input.phone);
@@ -954,18 +1207,145 @@ export async function purchaseBill(input: {
       { status: 400 },
     );
   }
-  return purchaseSogoBill({
+
+  const phone = normalizePhone(input.phone);
+  const customerRef = input.customerRef.trim();
+  if (customerRef.length < 6) {
+    throw new Error(
+      input.category === "tv"
+        ? "Enter a valid smartcard number"
+        : "Enter a valid meter number",
+    );
+  }
+  if (!input.variationCode) throw new Error("Select a plan or meter type");
+  if (input.amount < 100) throw new Error("Minimum bill amount is ₦100");
+
+  const faceAmount = await lookupVariationFace({
+    serviceID: input.serviceID,
+    variationCode: input.variationCode,
+    fallbackAmount: input.amount,
+    fixedOnly: true,
+  });
+  const priced = await resolveVtpassRetail({
+    serviceID: input.serviceID,
+    variationCode: input.variationCode,
+    faceAmount,
+  });
+
+  const country = (input.countryCode || "NG").toUpperCase().slice(0, 2);
+  const billCategory = input.category === "tv" ? "tv" : "electricity";
+  const provider = await ensureBillProvider({
+    countryCode: country,
+    serviceID: input.serviceID,
+    name: input.serviceName,
+    category: billCategory,
+  });
+
+  const prepared = await debitForPurchase({
     userId: input.userId,
     countryCode: input.countryCode,
-    serviceID: input.serviceID,
-    serviceName: input.serviceName,
-    category: input.category,
-    customerRef: input.customerRef,
-    phone: input.phone,
-    amount: input.amount,
-    variationCode: input.variationCode,
-    subscriptionType: input.subscriptionType,
+    amount: priced.retail,
+    category: "bill",
+    title: input.serviceName,
+    subtitle: customerRef,
+    metadata: {
+      serviceID: input.serviceID,
+      variationCode: input.variationCode,
+      billCategory: input.category,
+      faceAmount: priced.face,
+      serviceKey: priced.serviceKey,
+    },
   });
+
+  const [payment] = await db
+    .insert(billPayments)
+    .values({
+      userId: input.userId,
+      providerId: provider.id,
+      customerRef,
+      amount: priced.retail.toFixed(2),
+      status: "processing",
+      transactionId: prepared.transaction.id,
+      providerRef: prepared.requestId,
+    })
+    .returning();
+
+  try {
+    const payload = {
+      request_id: prepared.requestId,
+      serviceID: input.serviceID,
+      billersCode: customerRef,
+      variation_code: input.variationCode,
+      amount: priced.face,
+      phone: phone || "08011111111",
+      ...(input.category === "electricity"
+        ? { type: input.variationCode }
+        : {}),
+      ...(input.subscriptionType
+        ? { subscription_type: input.subscriptionType }
+        : {}),
+      ...(input.quantity ? { quantity: input.quantity } : {}),
+    };
+
+    const { response, simulated } = await callProviderOrSimulate(payload);
+    const outcome = mapVtpassOutcome(response);
+    if (outcome === "failed") {
+      throw new Error(response.response_description || "Bill payment failed");
+    }
+
+    const token = response.purchased_code || null;
+
+    await db
+      .update(billPayments)
+      .set({
+        status: outcome === "completed" ? "completed" : "processing",
+        providerRef:
+          response.content?.transactions?.transactionId || prepared.requestId,
+        tokenOrReceipt: token,
+        updatedAt: new Date(),
+      })
+      .where(eq(billPayments.id, payment.id));
+
+    await finalizeTx(
+      prepared.transaction.id,
+      outcome === "completed" ? "completed" : "processing",
+      {
+        provider: "vtpass",
+        requestId: prepared.requestId,
+        vtpass: response,
+        simulated,
+        orderId: payment.id,
+      },
+    );
+
+    return {
+      payment,
+      transactionId: prepared.transaction.id,
+      wallet: toWalletSummary(prepared.wallet),
+      requestId: prepared.requestId,
+      status: outcome,
+      simulated,
+      response,
+      token,
+    };
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : "Payment failed";
+    await refundDebit({
+      walletId: prepared.wallet.id,
+      transactionId: prepared.transaction.id,
+      amount: prepared.amount,
+      reason,
+    });
+    await db
+      .update(billPayments)
+      .set({
+        status: "failed",
+        failureReason: reason,
+        updatedAt: new Date(),
+      })
+      .where(eq(billPayments.id, payment.id));
+    throw error instanceof Error ? error : new Error(reason);
+  }
 }
 
 export async function requeryPurchase(requestId: string) {

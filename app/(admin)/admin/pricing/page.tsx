@@ -101,7 +101,7 @@ const PROVIDER_LABELS: Record<ProviderKey, string> = {
   herosms: "Numbers & Emails",
   reloadly: "Gift cards (buy)",
   sogo: "Gift cards (sell)",
-  vtpass: "Airtime / Data / Bills (Sogo)",
+  vtpass: "Airtime / Data / Bills (VTpass)",
 };
 
 function markupToPercent(markup: number) {

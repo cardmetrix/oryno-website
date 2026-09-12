@@ -167,7 +167,7 @@ export default function AirtimePage() {
     setError(null);
     try {
       const res = await fetch(
-        isNigeria ? "/api/sogo/bills/airtime" : "/api/vtpass/purchase/airtime",
+        "/api/vtpass/purchase/airtime",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

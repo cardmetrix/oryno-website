@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
 import { priceLocalAmount } from "@/lib/pricing/service-pricing";
-import { isSogoDemoMode, listSogoVariations } from "@/lib/sogo";
 import { getDisplayFx } from "@/lib/display-currency";
 import { convertLocalToNgn } from "@/lib/fx/rates";
 import {
@@ -73,13 +72,6 @@ export async function GET(req: Request) {
 
     const operatorId = searchParams.get("operator_id") ?? undefined;
     const productTypeId = searchParams.get("product_type_id") ?? undefined;
-    const identifier = searchParams.get("identifier") as
-      | "airtime"
-      | "data"
-      | "tv-subscription"
-      | "electricity-bill"
-      | "water-bill"
-      | null;
 
     if ((user.countryCode || "NG") === "ZA") {
       const {
@@ -307,46 +299,62 @@ export async function GET(req: Request) {
       });
     }
 
-    const live = await listSogoVariations({
-      identifier: identifier ?? undefined,
-      serviceID,
-    });
+    let variations;
+    let serviceName = serviceID;
+
+    if (isVtpassDemoMode() && serviceID !== "foreign-airtime") {
+      variations = fallbackVariationsFor(serviceID);
+    } else {
+      try {
+        const live = await getVtpassVariations(serviceID, {
+          operator_id: operatorId,
+          product_type_id: productTypeId,
+        });
+        variations = live.variations;
+        serviceName = live.serviceName;
+      } catch (error) {
+        console.error("[vtpass-variations-live]", error);
+        variations = fallbackVariationsFor(serviceID);
+      }
+    }
+
+    if (!variations.length) {
+      variations = fallbackVariationsFor(serviceID);
+    }
 
     const priced = await Promise.all(
-      live.variations.map(async (v) => {
-        const base = v.amount || 0;
-        const key =
-          base > 0
-            ? `${serviceID}:${v.variationCode}`
-            : `${serviceID}:open`;
+      variations.map(async (v) => {
+        const base = Number(v.charged_amount ?? v.variation_amount) || 0;
+        const key = `${serviceID}:${v.variation_code || v.name}`;
         const result = await priceLocalAmount({
           provider: "vtpass",
           serviceKey: key,
           amount: base > 0 ? base : 1000,
         });
         return {
-          variationCode: v.variationCode,
+          variationCode: v.variation_code,
           name: v.name,
           amount: base > 0 ? result.local : 0,
           listAmount: base > 0 ? result.listLocal : 0,
           priceOverride: result.overrideApplied,
-          fixedPrice: v.fixedPrice,
-          variationAmount: String(v.amount),
-          chargedAmount: v.amount,
+          fixedPrice: String(v.fixedPrice || "").toLowerCase() === "yes",
+          variationAmount: v.variation_amount,
+          chargedAmount: v.charged_amount,
+          variationRate: v.variation_rate,
         };
       }),
     );
 
     return NextResponse.json({
       ok: true,
-      demo: isSogoDemoMode(),
-      provider: "sogo",
+      demo: isVtpassDemoMode(),
+      provider: "vtpass",
       serviceID,
-      serviceName: live.serviceName,
+      serviceName,
       variations: priced,
     });
   } catch (error) {
-    console.error("[sogo-variations]", error);
+    console.error("[vtpass-variations]", error);
     return NextResponse.json(
       {
         error:

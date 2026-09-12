@@ -237,7 +237,7 @@ export default function DataPage() {
         : selected!.name;
 
       const res = await fetch(
-        isNigeria ? "/api/sogo/bills/data" : "/api/vtpass/purchase/data",
+        "/api/vtpass/purchase/data",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

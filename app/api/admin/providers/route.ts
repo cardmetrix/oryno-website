@@ -33,7 +33,7 @@ export async function GET() {
       {
         id: "sogo",
         name: "Sogo",
-        type: "Gift card sell + Airtime / Data / Bills",
+        type: "Gift card sell",
         country: "Nigeria",
         status: modeLabel({
           configured: !isSogoDemoMode(),
@@ -46,14 +46,14 @@ export async function GET() {
               ? "Demo mode"
               : null
             : sogoBalance <= 0
-              ? "Sogo NGN wallet is ₦0. Fund it at app.sogo.africa before airtime/data/bills will go through."
+              ? "Sogo NGN wallet is ₦0. Fund it at app.sogo.africa before gift-card sells will go through."
               : `Sogo NGN wallet ₦${sogoBalance.toLocaleString("en-NG", { minimumFractionDigits: 2 })}`,
       },
       {
         id: "vtpass",
         name: "VTpass",
-        type: "International airtime / data",
-        country: "Global",
+        type: "Airtime / Data / Bills",
+        country: "Nigeria + international",
         status: modeLabel({
           configured: !isVtpassDemoMode() || Boolean(process.env.VTPASS_API_KEY),
           demo: isVtpassDemoMode(),

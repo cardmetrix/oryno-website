@@ -28,10 +28,15 @@ import {
   fetchSogoSellCatalog,
   fetchSogoSellRates,
   isSogoDemoMode,
-  listSogoBillServices,
-  listSogoVariations,
 } from "@/lib/sogo";
-import type { VtpassServiceCategory } from "@/lib/vtpass";
+import {
+  fallbackServicesFor,
+  fallbackVariationsFor,
+  getVtpassServices,
+  getVtpassVariations,
+  isVtpassDemoMode,
+  type VtpassServiceCategory,
+} from "@/lib/vtpass";
 import {
   createUsdPricer,
   getOverrideFor,
@@ -560,19 +565,24 @@ export async function loadAdminPricingCatalog(input: {
     };
   }
 
-  // Airtime / data / bills — live Sogo catalogue, priced with the vtpass markup bucket
+  // Airtime / data / bills — live VTpass catalogue
   const identifier = (input.params.identifier ||
     "data") as VtpassServiceCategory;
   applied.identifier = identifier;
 
-  const services = await listSogoBillServices(identifier);
-  const serviceOptions = services.map((s) => ({
-    id: s.slug,
+  const services = isVtpassDemoMode()
+    ? fallbackServicesFor(identifier)
+    : await getVtpassServices(identifier).catch(() =>
+        fallbackServicesFor(identifier),
+      );
+  const filtered = services.filter((s) => s.serviceID !== "foreign-airtime");
+  const serviceOptions = filtered.map((s) => ({
+    id: s.serviceID,
     label: s.name,
   }));
 
   const serviceID =
-    input.params.serviceID || serviceOptions[0]?.id || services[0]?.slug;
+    input.params.serviceID || serviceOptions[0]?.id || filtered[0]?.serviceID;
   if (serviceID) applied.serviceID = serviceID;
 
   if (!serviceID) {
@@ -595,19 +605,27 @@ export async function loadAdminPricingCatalog(input: {
         applied,
       },
       items: [],
-      demo: isSogoDemoMode(),
+      demo: isVtpassDemoMode(),
       hint: "Select a category to load networks/providers.",
     };
   }
 
-  const live = await listSogoVariations({ identifier, serviceID });
+  const live = isVtpassDemoMode()
+    ? {
+        serviceName: serviceID,
+        variations: fallbackVariationsFor(serviceID),
+      }
+    : await getVtpassVariations(serviceID).catch(() => ({
+        serviceName: serviceID,
+        variations: fallbackVariationsFor(serviceID),
+      }));
   const variations = live.variations;
   const serviceName = live.serviceName || serviceID;
 
   const items: AdminCatalogItem[] = [];
   for (const v of variations) {
-    const code = v.variationCode || v.name;
-    const face = v.amount || 0;
+    const code = v.variation_code || v.name;
+    const face = Number(v.charged_amount ?? v.variation_amount) || 0;
     const serviceKey = `${serviceID}:${code}`;
     const priced = await priceLocalAmount({
       provider: "vtpass",
@@ -630,7 +648,7 @@ export async function loadAdminPricingCatalog(input: {
       subtitle: `${serviceName} · ${identifier}`,
       details:
         face > 0
-          ? `Code ${code} · provider ₦${face} · ${v.fixedPrice ? "fixed" : "variable"}`
+          ? `Code ${code} · provider ₦${face} · ${String(v.fixedPrice || "").toLowerCase() === "yes" ? "fixed" : "variable"}`
           : `Code ${code} · open amount (sample ₦1,000 shown) · override key ${keyForOverride}`,
       currency,
       costUsd: null,
@@ -670,7 +688,7 @@ export async function loadAdminPricingCatalog(input: {
       applied,
     },
     items,
-    demo: isSogoDemoMode(),
-    hint: "Nigeria airtime, data, and bills are fulfilled by Sogo live.",
+    demo: isVtpassDemoMode(),
+    hint: "Nigeria airtime, data, and bills are fulfilled by VTpass.",
   };
 }

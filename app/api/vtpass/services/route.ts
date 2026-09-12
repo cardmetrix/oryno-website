@@ -5,8 +5,14 @@ import {
   isHubtelDemoMode,
   listHubtelBillServices,
 } from "@/lib/hubtel";
-import { isSogoDemoMode, listSogoBillServices } from "@/lib/sogo";
-import type { VtpassServiceCategory } from "@/lib/vtpass";
+import {
+  cleanNetworkName,
+  fallbackServicesFor,
+  getVtpassServices,
+  isVtpassDemoMode,
+  resolveServiceImage,
+  type VtpassServiceCategory,
+} from "@/lib/vtpass";
 
 export const runtime = "nodejs";
 
@@ -130,29 +136,42 @@ export async function GET(req: Request) {
       return NextResponse.json({
         ok: true,
         demo: false,
-        provider: "sogo",
+        provider: "vtpass",
         identifier,
         services: [],
       });
     }
 
-    const services = await listSogoBillServices(
-      identifier as VtpassServiceCategory,
-    );
+    let services = isVtpassDemoMode()
+      ? fallbackServicesFor(identifier as VtpassServiceCategory)
+      : await getVtpassServices(identifier).catch((error) => {
+          console.error("[vtpass-services-live]", error);
+          return fallbackServicesFor(identifier as VtpassServiceCategory);
+        });
+
+    if (!services.length) {
+      services = fallbackServicesFor(identifier as VtpassServiceCategory);
+    }
+
+    const filtered = services.filter((s) => s.serviceID !== "foreign-airtime");
 
     return NextResponse.json({
       ok: true,
-      demo: isSogoDemoMode(),
-      provider: "sogo",
+      demo: isVtpassDemoMode(),
+      provider: "vtpass",
       identifier,
-      services: services.map((s) => ({
-        serviceID: s.slug,
-        name: s.name,
-        image: s.image ?? null,
+      services: filtered.map((s) => ({
+        serviceID: s.serviceID,
+        name: cleanNetworkName(s.name),
+        rawName: s.name,
+        minAmount: Number(s.minimium_amount) || undefined,
+        maxAmount: Number(s.maximum_amount) || undefined,
+        convenienceFee: s.convinience_fee,
+        image: resolveServiceImage(s.image, s.serviceID),
       })),
     });
   } catch (error) {
-    console.error("[sogo-bills-services]", error);
+    console.error("[vtpass-services]", error);
     return NextResponse.json(
       {
         error:

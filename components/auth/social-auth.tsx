@@ -27,14 +27,15 @@ export function SocialAuth({ className, mode = "signIn" }: SocialAuthProps) {
 
     try {
       const redirectUrl = "/sso-callback";
-      const redirectUrlComplete = "/dashboard";
+      const forceRedirectUrl = "/dashboard";
 
       if (mode === "signUp") {
         if (!signUpLoaded || !signUp) return;
         await signUp.authenticateWithRedirect({
           strategy,
           redirectUrl,
-          redirectUrlComplete,
+          forceRedirectUrl,
+          fallbackRedirectUrl: forceRedirectUrl,
           continueSignUp: true,
         });
         return;
@@ -44,7 +45,8 @@ export function SocialAuth({ className, mode = "signIn" }: SocialAuthProps) {
       await signIn.authenticateWithRedirect({
         strategy,
         redirectUrl,
-        redirectUrlComplete,
+        forceRedirectUrl,
+        fallbackRedirectUrl: forceRedirectUrl,
       });
     } catch (err) {
       setPending(null);
