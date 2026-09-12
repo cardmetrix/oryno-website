@@ -461,7 +461,7 @@ function LoginForm() {
         ) : null}
 
         <div className="space-y-5">
-          <AuthField label="Email or Phone Number">
+          <AuthField label="Email or Username">
             <input
               type="text"
               name="identifier"

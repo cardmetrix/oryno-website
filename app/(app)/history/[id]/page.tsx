@@ -380,8 +380,10 @@ function DetailRow({
 }
 
 async function renderReceiptCanvas(tx: TransactionReceipt) {
-  const width = 720;
-  const rowH = 44;
+  // ~80mm thermal receipt strip at crisp digital density
+  const width = 400;
+  const padX = 24;
+  const rowH = 40;
   const rows = [
     ["Category", tx.categoryLabel],
     ["Details", tx.subtitle],
@@ -390,8 +392,8 @@ async function renderReceiptCanvas(tx: TransactionReceipt) {
     ["Reference", tx.reference],
     ["Currency", tx.currency ?? "NGN"],
   ];
-  const detailsTop = 268;
-  const height = detailsTop + rows.length * rowH + 70;
+  const detailsTop = 240;
+  const height = detailsTop + rows.length * rowH + 64;
   const isDark =
     typeof document !== "undefined" &&
     document.documentElement.classList.contains("dark");
@@ -407,7 +409,7 @@ async function renderReceiptCanvas(tx: TransactionReceipt) {
   ctx.fillRect(0, 0, width, height);
 
   // Orange header
-  const headerH = 248;
+  const headerH = 220;
   const grad = ctx.createLinearGradient(0, 0, width, headerH);
   grad.addColorStop(0, "#ff8124");
   grad.addColorStop(0.5, "#FF6A00");
@@ -417,9 +419,9 @@ async function renderReceiptCanvas(tx: TransactionReceipt) {
 
   const logo = await loadReceiptLogo();
   if (logo) {
-    const size = 44;
-    const x = 40;
-    const y = 28;
+    const size = 36;
+    const x = padX;
+    const y = 22;
     ctx.save();
     ctx.beginPath();
     ctx.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2);
@@ -431,28 +433,28 @@ async function renderReceiptCanvas(tx: TransactionReceipt) {
 
   ctx.textAlign = "left";
   ctx.fillStyle = "rgba(255,255,255,0.9)";
-  ctx.font = "bold 14px system-ui, sans-serif";
-  ctx.fillText("ORYNO", logo ? 96 : 40, 48);
-  ctx.font = "600 18px system-ui, sans-serif";
+  ctx.font = "bold 12px system-ui, sans-serif";
+  ctx.fillText("ORYNO", logo ? padX + 48 : padX, 38);
+  ctx.font = "600 15px system-ui, sans-serif";
   ctx.fillStyle = "#FFFFFF";
-  ctx.fillText("Transaction receipt", logo ? 96 : 40, 74);
+  ctx.fillText("Transaction receipt", logo ? padX + 48 : padX, 60);
 
   // Status icon fills circle (no tinted ring)
   const status = normalizeStatus(tx.status);
   const iconCx = width / 2;
-  const iconCy = 118;
-  drawStatusGlyph(ctx, status, iconCx, iconCy, 28);
+  const iconCy = 104;
+  drawStatusGlyph(ctx, status, iconCx, iconCy, 24);
 
   ctx.textAlign = "center";
-  ctx.font = "500 16px system-ui, sans-serif";
+  ctx.font = "500 14px system-ui, sans-serif";
   ctx.fillStyle = "rgba(255,255,255,0.85)";
-  ctx.fillText(tx.title, width / 2, 168);
-  ctx.font = "bold 42px system-ui, sans-serif";
+  ctx.fillText(tx.title, width / 2, 148);
+  ctx.font = "bold 32px system-ui, sans-serif";
   ctx.fillStyle = "#FFFFFF";
-  ctx.fillText(tx.amount, width / 2, 212);
-  ctx.font = "600 14px system-ui, sans-serif";
+  ctx.fillText(tx.amount, width / 2, 186);
+  ctx.font = "600 13px system-ui, sans-serif";
   ctx.fillStyle = "rgba(255,255,255,0.9)";
-  ctx.fillText(status, width / 2, 236);
+  ctx.fillText(status, width / 2, 208);
 
   // Repeating slanted ORYNO watermark (OPay-style)
   const detailsH = rows.length * rowH + 24;
@@ -462,8 +464,8 @@ async function renderReceiptCanvas(tx: TransactionReceipt) {
   ctx.clip();
   ctx.translate(width / 2, detailsTop + detailsH / 2);
   ctx.rotate((-32 * Math.PI) / 180);
-  const markW = 150;
-  const markH = 52;
+  const markW = 130;
+  const markH = 46;
   for (let row = -4; row <= 4; row += 1) {
     for (let col = -4; col <= 4; col += 1) {
       const x = col * markW + (row % 2 === 0 ? 0 : markW / 2);
@@ -472,51 +474,68 @@ async function renderReceiptCanvas(tx: TransactionReceipt) {
         ctx.save();
         ctx.globalAlpha = isDark ? 0.022 : 0.016;
         ctx.beginPath();
-        ctx.arc(x - 42, y, 9, 0, Math.PI * 2);
+        ctx.arc(x - 36, y, 8, 0, Math.PI * 2);
         ctx.closePath();
         ctx.clip();
-        ctx.drawImage(logo, x - 51, y - 9, 18, 18);
+        ctx.drawImage(logo, x - 44, y - 8, 16, 16);
         ctx.restore();
       }
       ctx.globalAlpha = isDark ? 0.08 : 0.055;
       ctx.fillStyle = isDark ? "#FFFFFF" : "#1C1C1E";
-      ctx.font = "bold 15px system-ui, sans-serif";
+      ctx.font = "bold 13px system-ui, sans-serif";
       ctx.textAlign = "left";
-      ctx.fillText("ORYNO", x - 28, y + 5);
+      ctx.fillText("ORYNO", x - 24, y + 4);
     }
   }
   ctx.restore();
 
   ctx.textAlign = "left";
-  let y = detailsTop + 18;
+  let y = detailsTop + 16;
+  const maxValueWidth = width - padX * 2 - 88;
   for (const [label, value] of rows) {
     ctx.fillStyle = isDark ? "#A1A1A6" : "#8A8A8E";
-    ctx.font = "600 12px system-ui, sans-serif";
-    ctx.fillText(label.toUpperCase(), 40, y);
+    ctx.font = "600 10px system-ui, sans-serif";
+    ctx.fillText(label.toUpperCase(), padX, y);
     ctx.fillStyle = isDark ? "#F5F5F7" : "#1C1C1E";
-    ctx.font = "600 16px system-ui, sans-serif";
+    ctx.font = "600 13px system-ui, sans-serif";
     ctx.textAlign = "right";
-    const display = value.length > 36 ? `${value.slice(0, 36)}…` : value;
-    ctx.fillText(display, width - 40, y);
+    const display = truncateToWidth(ctx, value, maxValueWidth);
+    ctx.fillText(display, width - padX, y);
     ctx.textAlign = "left";
     y += rowH;
     ctx.strokeStyle = isDark ? "rgba(255,255,255,0.08)" : "#EFEFEF";
     ctx.beginPath();
-    ctx.moveTo(40, y - 24);
-    ctx.lineTo(width - 40, y - 24);
+    ctx.moveTo(padX, y - 22);
+    ctx.lineTo(width - padX, y - 22);
     ctx.stroke();
   }
 
   ctx.textAlign = "center";
   ctx.fillStyle = isDark ? "#A1A1A6" : "#8A8A8E";
-  ctx.font = "12px system-ui, sans-serif";
+  ctx.font = "10px system-ui, sans-serif";
   ctx.fillText(
     "Powered by ORYNO · Keep this receipt for your records",
     width / 2,
-    height - 28,
+    height - 24,
   );
 
   return canvas;
+}
+
+function truncateToWidth(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+) {
+  if (ctx.measureText(text).width <= maxWidth) return text;
+  let truncated = text;
+  while (truncated.length > 1) {
+    truncated = truncated.slice(0, -1);
+    if (ctx.measureText(`${truncated}…`).width <= maxWidth) {
+      return `${truncated}…`;
+    }
+  }
+  return "…";
 }
 
 function drawStatusGlyph(

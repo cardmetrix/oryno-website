@@ -62,7 +62,40 @@ async function fetchFlutterwaveBanks(country: string, type?: string) {
   const res = await flutterwaveFetch<FlutterwaveBankRow[]>(
     `/banks/${encodeURIComponent(country)}${suffix}`,
   );
-  return res.data ?? [];
+  return Array.isArray(res.data) ? res.data : [];
+}
+
+/** Paystack uses the same CBN NUBAN codes Flutterwave expects for NG transfers. */
+async function fetchPaystackNigerianBanks(): Promise<FlutterwaveBankOption[]> {
+  const { hasPaystackKeys, paystackFetch } = await import(
+    "@/lib/paystack/client"
+  );
+  if (!hasPaystackKeys()) return [];
+
+  const res = await paystackFetch<
+    Array<{ name?: string; code?: string; active?: boolean; is_deleted?: boolean }>
+  >("/bank?country=nigeria&perPage=100");
+
+  return (res.data ?? [])
+    .filter((b) => b.code && b.name && b.active !== false && !b.is_deleted)
+    .map((b) => ({
+      name: String(b.name),
+      code: String(b.code),
+      active: true,
+    }));
+}
+
+function dedupeBanks(items: FlutterwaveBankOption[]) {
+  const seen = new Set<string>();
+  return items
+    .filter((b) => {
+      const key = `${b.code}:${b.type ?? ""}`;
+      if (seen.has(key) || seen.has(b.code)) return false;
+      seen.add(key);
+      seen.add(b.code);
+      return true;
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export async function listFlutterwaveBanks(
@@ -70,24 +103,46 @@ export async function listFlutterwaveBanks(
 ): Promise<FlutterwaveBankOption[]> {
   const country = resolveCountryCode(countryCode);
   const cached = banksCache.get(country);
-  if (cached && Date.now() - cached.at < BANKS_TTL_MS) {
+  if (cached && cached.items.length > 0 && Date.now() - cached.at < BANKS_TTL_MS) {
     return cached.items;
   }
 
   if (!hasFlutterwaveKeys()) {
+    // Still try Paystack for live NG bank lists when Flutterwave keys are absent.
+    if (country === "NG") {
+      try {
+        const paystackBanks = await fetchPaystackNigerianBanks();
+        if (paystackBanks.length) {
+          const unique = dedupeBanks(paystackBanks);
+          banksCache.set(country, { at: Date.now(), items: unique });
+          return unique;
+        }
+      } catch (error) {
+        console.error("[paystack-banks-list-fallback]", error);
+      }
+    }
     return demoBanksForCountry(country);
   }
 
   try {
-    const pages = [fetchFlutterwaveBanks(country)];
-    if (country === "GH" || country === "KE") {
-      pages.push(fetchFlutterwaveBanks(country, "mobile_money"));
+    let banks: FlutterwaveBankRow[] = [];
+    let momo: FlutterwaveBankRow[] = [];
+    let primaryFailed = false;
+
+    try {
+      banks = await fetchFlutterwaveBanks(country);
+    } catch (error) {
+      primaryFailed = true;
+      console.error("[flutterwave-banks-list]", country, error);
     }
-    const results = await Promise.allSettled(pages);
-    const banks =
-      results[0]?.status === "fulfilled" ? results[0].value : [];
-    const momo =
-      results[1]?.status === "fulfilled" ? results[1].value : [];
+
+    if (country === "GH" || country === "KE") {
+      try {
+        momo = await fetchFlutterwaveBanks(country, "mobile_money");
+      } catch (error) {
+        console.error("[flutterwave-banks-momo]", country, error);
+      }
+    }
 
     const items = [
       ...mapBankRows(banks),
@@ -103,21 +158,42 @@ export async function listFlutterwaveBanks(
       }
     }
 
-    const seen = new Set<string>();
-    const unique = items
-      .filter((b) => {
-        const key = `${b.code}:${b.type ?? ""}`;
-        if (seen.has(key) || seen.has(b.code)) return false;
-        seen.add(key);
-        seen.add(b.code);
-        return true;
-      })
-      .sort((a, b) => a.name.localeCompare(b.name));
+    let unique = dedupeBanks(items);
 
-    banksCache.set(country, { at: Date.now(), items: unique });
+    // Flutterwave IP/proxy failures used to cache [] via allSettled — recover with
+    // Paystack (NG) or demo banks so Add bank is never an empty select.
+    if (unique.length === 0) {
+      if (country === "NG") {
+        try {
+          unique = dedupeBanks(await fetchPaystackNigerianBanks());
+        } catch (error) {
+          console.error("[paystack-banks-list-fallback]", error);
+        }
+      }
+      if (unique.length === 0) {
+        unique = dedupeBanks(demoBanksForCountry(country));
+      }
+      if (primaryFailed) {
+        console.warn(
+          `[flutterwave-banks-list] using fallback banks for ${country} (${unique.length})`,
+        );
+      }
+    }
+
+    if (unique.length > 0) {
+      banksCache.set(country, { at: Date.now(), items: unique });
+    }
     return unique;
   } catch (error) {
     console.error("[flutterwave-banks-list]", country, error);
+    if (country === "NG") {
+      try {
+        const paystackBanks = dedupeBanks(await fetchPaystackNigerianBanks());
+        if (paystackBanks.length) return paystackBanks;
+      } catch {
+        // fall through to demo
+      }
+    }
     return demoBanksForCountry(country);
   }
 }
