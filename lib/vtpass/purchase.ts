@@ -1232,10 +1232,9 @@ export async function purchaseBill(input: {
     faceAmount,
   });
 
-  const country = (input.countryCode || "NG").toUpperCase().slice(0, 2);
   const billCategory = input.category === "tv" ? "tv" : "electricity";
   const provider = await ensureBillProvider({
-    countryCode: country,
+    countryCode: country.slice(0, 2),
     serviceID: input.serviceID,
     name: input.serviceName,
     category: billCategory,
