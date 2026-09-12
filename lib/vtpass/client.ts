@@ -111,6 +111,14 @@ async function vtpassFetch<T>(
       json.message ||
       (json.code ? `Provider error (${json.code})` : null) ||
       `VTpass error (${res.status})`;
+    const lower = detail.toLowerCase();
+    if (lower.includes("invalid credential") || json.code === "087") {
+      throw new Error(
+        isVtpassSandbox()
+          ? "VTpass sandbox rejected these API keys. Paste the api-key, public-key, and secret-key from sandbox.vtpass.com → Profile → API Keys, then restart the app."
+          : "VTpass live rejected these API keys. Sandbox keys only work with VTPASS_SANDBOX=true. For production, use live keys after VTpass approves API access (or set VTPASS_SANDBOX=true while testing).",
+      );
+    }
     throw new Error(detail);
   }
 
