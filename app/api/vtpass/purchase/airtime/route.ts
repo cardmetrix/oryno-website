@@ -126,14 +126,19 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     console.error("[vtpass-airtime]", error);
-    const message = publicServiceError(
-      error instanceof Error ? error.message : "Airtime purchase failed",
-    );
+    const raw =
+      error instanceof Error ? error.message : "Airtime purchase failed";
+    const message = publicServiceError(raw)
+      .replace(/VTpass/gi, "ORYNO")
+      .replace(/vtpass/gi, "ORYNO");
     return NextResponse.json(
       {
-        error: message
-          .replace(/VTpass/gi, "ORYNO")
-          .replace(/vtpass/gi, "ORYNO"),
+        error: message,
+        // Helps browser Network tab / support without exposing secrets
+        code:
+          /invalid credentials/i.test(raw)
+            ? "provider_auth"
+            : (error as { code?: string } | null)?.code || undefined,
       },
       { status: actionLockHttpStatus(error) || sogoHttpStatus(error) },
     );

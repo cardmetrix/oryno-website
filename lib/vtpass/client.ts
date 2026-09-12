@@ -101,13 +101,17 @@ async function vtpassFetch<T>(
 
   const json = (await res.json()) as T & {
     code?: string;
+    message?: string;
     response_description?: string;
   };
 
   if (!res.ok) {
-    throw new Error(
-      json.response_description || `VTpass error (${res.status})`,
-    );
+    const detail =
+      json.response_description ||
+      json.message ||
+      (json.code ? `Provider error (${json.code})` : null) ||
+      `VTpass error (${res.status})`;
+    throw new Error(detail);
   }
 
   // Some VTpass failures still return HTTP 200 with an error code.
