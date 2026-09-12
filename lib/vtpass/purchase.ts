@@ -417,7 +417,7 @@ function vtpassFailureMessage(
     phone &&
     !isVtpassSandboxTestPhone(phone)
   ) {
-    return "Airtime is running in test mode, so real phone numbers cannot be topped up yet. Please try again later.";
+    return "VTpass sandbox only accepts test numbers (e.g. 08011111111 for successful airtime). Real numbers fail until live API access is approved.";
   }
 
   return base;
@@ -536,7 +536,7 @@ export async function purchaseAirtime(input: {
 
     if (isVtpassSandbox() && !isVtpassSandboxTestPhone(phone)) {
       throw new Error(
-        "Airtime is running in test mode, so real phone numbers cannot be topped up yet. Please try again later.",
+        "VTpass sandbox only accepts test numbers. For airtime use 08011111111 (success). Real numbers only work after live API access is approved.",
       );
     }
 
@@ -839,7 +839,7 @@ export async function purchaseData(input: {
 
     if (isVtpassSandbox() && !isVtpassSandboxTestPhone(phone)) {
       throw new Error(
-        "Data is running in test mode, so real phone numbers cannot be topped up yet. Please try again later.",
+        "VTpass sandbox only accepts test numbers. For data use 08011111111. Real numbers only work after live API access is approved.",
       );
     }
 
