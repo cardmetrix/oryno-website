@@ -17,7 +17,7 @@ export function accountNumberRules(countryCode?: string | null) {
       min: 10,
       max: 10,
       label: "10-digit account number",
-      hint: "Nigerian NUBAN",
+      hint: "Enter your account number",
     };
   }
   if (code === "GH") {
