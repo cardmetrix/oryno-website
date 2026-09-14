@@ -76,7 +76,12 @@ export async function recognizeUsdServiceProfit(input: {
 }
 
 export async function recognizeNgnServiceProfit(input: {
-  source: "gift_card_buy" | "gift_card_sell" | "email" | "withdraw";
+  source:
+    | "gift_card_buy"
+    | "gift_card_sell"
+    | "email"
+    | "withdraw"
+    | "betting";
   transactionId: string;
   userId?: string | null;
   grossIn: number;

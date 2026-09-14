@@ -204,10 +204,24 @@ export async function fundBettingWallet(input: {
     32,
   );
 
+  // Face amount funds the bookmaker; company charge (admin Revenue → Betting) is added on top.
+  const faceAmount = amount;
+  const { applySilentCharge, getServiceCharge } = await import(
+    "@/lib/company/charges"
+  );
+  const chargeCfg = await getServiceCharge("betting");
+  const priced = applySilentCharge({
+    base: faceAmount,
+    charge: chargeCfg,
+    direction: "add",
+  });
+  const retailAmount = priced.total;
+  const chargeAmount = priced.chargeAmount;
+
   const prepared = await debitForBetting({
     userId: input.userId,
     countryCode: country,
-    amount,
+    amount: retailAmount,
     title: `${provider.name} funding`,
     subtitle: `${customerRef}${customerName ? ` · ${customerName}` : ""}`,
     metadata: {
@@ -215,6 +229,9 @@ export async function fundBettingWallet(input: {
       customerRef,
       customerName,
       idempotencyKey: requestId,
+      faceAmount,
+      chargeAmount,
+      provider: "vtu-africa",
     },
   });
 
@@ -226,10 +243,16 @@ export async function fundBettingWallet(input: {
       providerName: provider.name,
       customerRef,
       customerName,
-      amount: amount.toFixed(2),
+      amount: retailAmount.toFixed(2),
       status: "processing",
       transactionId: prepared.transaction.id,
-      metadata: { requestId, demo: verified.demo },
+      metadata: {
+        requestId,
+        demo: verified.demo,
+        faceAmount,
+        chargeAmount,
+        retailAmount,
+      },
     })
     .returning();
 
@@ -246,7 +269,7 @@ export async function fundBettingWallet(input: {
     const funded = await fundBettingAccount({
       serviceID: provider.serviceID,
       customerId: customerRef,
-      amount,
+      amount: faceAmount,
       reference: requestId,
       phone: input.phone,
       countryCode: country,
@@ -271,7 +294,35 @@ export async function fundBettingWallet(input: {
       providerRef: funded.reference,
       simulated: funded.demo,
       token: funded.reference,
+      faceAmount,
+      chargeAmount,
     });
+
+    if (chargeAmount > 0 || retailAmount > faceAmount) {
+      try {
+        const { recognizeNgnServiceProfit } = await import(
+          "@/lib/company/recognize"
+        );
+        await recognizeNgnServiceProfit({
+          source: "betting",
+          transactionId: prepared.transaction.id,
+          userId: input.userId,
+          grossIn: retailAmount,
+          grossOut: faceAmount,
+          chargeAmount,
+          markupAmount: 0,
+          description: `${provider.name} funding · ${customerRef}`,
+          metadata: {
+            serviceID: provider.serviceID,
+            customerRef,
+            providerRef: funded.reference,
+            faceAmount,
+          },
+        });
+      } catch (revenueError) {
+        console.error("[betting-revenue]", revenueError);
+      }
+    }
 
     const wallet = await ensurePrimaryWallet(input.userId, prepared.currency);
     const fx = await getDisplayFx(country);
@@ -291,7 +342,7 @@ export async function fundBettingWallet(input: {
       orderId: order.id,
       transactionId: prepared.transaction.id,
       requestId,
-      amount,
+      amount: retailAmount,
       customerName,
       token: funded.reference,
     };

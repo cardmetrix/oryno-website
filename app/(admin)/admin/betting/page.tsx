@@ -8,11 +8,23 @@ import {
 } from "@/components/admin/admin-loading";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AdminTable } from "@/components/admin/admin-table";
+import { StatCard } from "@/components/admin/stat-card";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { useAdminQuery } from "@/lib/admin/use-admin-query";
 
 type Response = {
   demo?: boolean;
+  revenue?: {
+    volume30d: number;
+    completed30d: number;
+    profit30d: number;
+    revenueEntries30d: number;
+    charge: {
+      mode: "flat" | "percent";
+      value: number;
+      enabled: boolean;
+    };
+  };
   providers: Array<{
     id: string;
     name: string;
@@ -32,9 +44,25 @@ type Response = {
   }>;
 };
 
+function money(n: number) {
+  return `₦${n.toLocaleString("en-NG", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
 export default function AdminBettingPage() {
   const { data, loading, error, reload } =
     useAdminQuery<Response>("/api/admin/betting");
+
+  const revenue = data?.revenue;
+  const chargeLabel = revenue?.charge
+    ? !revenue.charge.enabled
+      ? "Off"
+      : revenue.charge.mode === "percent"
+        ? `${revenue.charge.value}%`
+        : money(revenue.charge.value)
+    : "—";
 
   return (
     <>
@@ -43,13 +71,40 @@ export default function AdminBettingPage() {
         subtitle={
           data?.demo
             ? "Demo mode — catalog + recent wallet funding tests"
-            : "Bookmakers and recent betting wallet funding"
+            : "Bookmakers, funding volume, and company profit"
         }
       />
 
+      {loading ? <AdminLoadingBlock variant="table" /> : null}
+      {error ? <AdminErrorBlock message={error} onRetry={reload} /> : null}
+
+      {data && revenue ? (
+        <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard
+            label="Volume (30d)"
+            value={money(revenue.volume30d)}
+            change={`${revenue.completed30d} completed funds`}
+          />
+          <StatCard
+            label="Company profit (30d)"
+            value={money(revenue.profit30d)}
+            change={`${revenue.revenueEntries30d} revenue entries`}
+            up={revenue.profit30d > 0}
+          />
+          <StatCard
+            label="Betting charge"
+            value={chargeLabel}
+            change="Edit under Admin → Revenue"
+          />
+          <StatCard
+            label="Live mode"
+            value={data.demo ? "Demo" : "Live"}
+            change="Open /admin/revenue to tune fee"
+          />
+        </div>
+      ) : null}
+
       <AdminCard title="Bookmakers">
-        {loading ? <AdminLoadingBlock variant="table" /> : null}
-        {error ? <AdminErrorBlock message={error} onRetry={reload} /> : null}
         {data ? (
           data.providers.length === 0 ? (
             <AdminEmptyBlock message="No betting providers configured." />

@@ -6,6 +6,7 @@ export const COMPANY_CHARGE_SOURCES = [
   "social",
   "email",
   "withdraw",
+  "betting",
 ] as const;
 
 export type CompanyChargeSource = (typeof COMPANY_CHARGE_SOURCES)[number];
@@ -49,6 +50,7 @@ export const DEFAULT_COMPANY_CHARGES: CompanyChargesConfig = {
     social: { mode: "flat", value: 0, enabled: true },
     email: { mode: "flat", value: 0, enabled: true },
     withdraw: { mode: "flat", value: 50, enabled: true },
+    betting: { mode: "percent", value: 1, enabled: true },
   },
   fx: {
     defaultSpreadPercent: 1,

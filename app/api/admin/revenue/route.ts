@@ -27,6 +27,7 @@ const SOURCE_LABELS: Record<string, string> = {
   social: "Social boosting",
   email: "Temporary emails",
   withdraw: "Withdrawals",
+  betting: "Betting funding",
 };
 
 async function liveRatesForCharges(config: CompanyChargesConfig) {
