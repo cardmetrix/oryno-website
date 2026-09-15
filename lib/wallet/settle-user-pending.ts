@@ -183,6 +183,10 @@ async function settleOnePending(row: PendingRow) {
   if (row.category === "withdraw") {
     return settlePendingWithdrawal(row);
   }
+  // Numbers wait up to 1 hour for SMS — handled by expireStaleVirtualNumberPurchases.
+  if (row.category === "virtual_number") {
+    return "still_pending" as const;
+  }
   if (row.type === "credit") {
     await db
       .update(transactions)

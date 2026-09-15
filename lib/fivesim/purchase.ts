@@ -2,7 +2,7 @@
  * 5sim virtual-number purchase + status polling.
  */
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray, lte } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   transactions,
@@ -15,7 +15,7 @@ import { createUsdPricer, usdFromLocalRetail } from "@/lib/pricing/service-prici
 import { notifyServiceEvent } from "@/lib/notify/service-events";
 import { currencyForCountry, toWalletSummary } from "@/lib/wallet";
 import { debitUsdWallet } from "@/lib/wallet-usd";
-import { refundFailedDebit } from "@/lib/wallet/ledger";
+import { refundFailedDebit, reverseCompletedDebit } from "@/lib/wallet/ledger";
 import { countryFlagEmoji } from "./flags";
 import {
   assertFivesimReady,
@@ -38,6 +38,8 @@ import {
 } from "./catalog";
 
 const LOG_PREFIX = "[5sim-purchase]";
+/** Wait this long for an SMS before reversing the purchase. */
+export const VIRTUAL_NUMBER_SMS_TIMEOUT_MS = 60 * 60 * 1000;
 
 async function usdRetailNumberPrice(
   usd: number,
@@ -202,7 +204,7 @@ export async function purchaseFivesimNumber(input: {
       : input.priceUsd;
 
   const serviceKey = `${countrySlug}:${product}`;
-  const { usd, local, quote, companyCharge } = await usdRetailNumberPrice(
+  const { usd, local, quote } = await usdRetailNumberPrice(
     wholesaleUsd,
     input.countryCode,
     serviceKey,
@@ -259,9 +261,7 @@ export async function purchaseFivesimNumber(input: {
       phone: bought.phoneNumber,
     });
 
-    const expiresAt = bought.expires
-      ? new Date(bought.expires)
-      : new Date(Date.now() + 20 * 60 * 1000);
+    const expiresAt = new Date(Date.now() + VIRTUAL_NUMBER_SMS_TIMEOUT_MS);
 
     const [row] = await db
       .insert(userVirtualNumbers)
@@ -276,45 +276,30 @@ export async function purchaseFivesimNumber(input: {
       })
       .returning();
 
+    // Stay pending/processing until the SMS code arrives (or we time out).
     await db
       .update(transactions)
       .set({
-        status: "completed",
+        status: "processing",
         externalRef: bought.activationId,
         relatedOrderId: row.id,
         relatedOrderType: "virtual_number",
         updatedAt: new Date(),
         metadata: {
           provider: "fivesim",
+          kind: "virtual_number",
+          awaitingSms: true,
           activationId: bought.activationId,
           phoneNumber: bought.phoneNumber,
           service: product,
           countrySlug,
           operator: bought.operator,
+          expiresAt: expiresAt.toISOString(),
+          costUsd: wholesaleUsd,
+          priceUsd: chargeAmount,
         },
       })
       .where(eq(transactions.id, prepared.transaction.id));
-
-    try {
-      const { recognizeUsdServiceProfit } = await import(
-        "@/lib/company/recognize"
-      );
-      const chargeUsd = roundMoney(
-        companyCharge > 0 ? companyCharge / quote.buyRate : 0,
-      );
-      await recognizeUsdServiceProfit({
-        source: "virtual_number",
-        transactionId: prepared.transaction.id,
-        userId: input.userId,
-        customerUsd: chargeAmount,
-        providerUsd: wholesaleUsd,
-        chargeUsd: Math.max(0, chargeUsd),
-        description: `${input.serviceName || product} virtual number`,
-        metadata: { provider: "fivesim", service: product, countrySlug },
-      });
-    } catch (revenueError) {
-      console.error("[5sim-revenue]", revenueError);
-    }
 
     const { scheduleReferralCheck } = await import("@/lib/referrals/service");
     scheduleReferralCheck(input.userId);
@@ -328,6 +313,8 @@ export async function purchaseFivesimNumber(input: {
       amount: chargeAmount,
       currency: "USD" as const,
       simulated: false,
+      expiresAt: expiresAt.toISOString(),
+      status: "pending" as const,
     };
   } catch (error) {
     const reason = fivesimErrorToEnglish(
@@ -354,6 +341,58 @@ export async function pollFivesimNumberStatus(
     );
   }
 
+  const tx = await findServiceTx(activationId, userId);
+  if (userId && !tx) {
+    throw new Error("Number order not found");
+  }
+
+  const meta = (tx?.metadata || {}) as Record<string, unknown>;
+  if (typeof meta.smsCode === "string" && meta.smsCode) {
+    return {
+      status: "STATUS_OK" as const,
+      code: meta.smsCode,
+      demo: false as const,
+      provider: "fivesim" as const,
+      rawStatus: "FINISHED",
+      transactionStatus: "completed" as const,
+    };
+  }
+
+  if (
+    tx &&
+    (tx.status === "reversed" ||
+      tx.status === "failed" ||
+      tx.status === "cancelled")
+  ) {
+    return {
+      status: "STATUS_CANCEL" as const,
+      code: null as string | null,
+      demo: false as const,
+      provider: "fivesim" as const,
+      rawStatus: String(tx.status).toUpperCase(),
+      transactionStatus: tx.status,
+      refunded: true as const,
+    };
+  }
+
+  // Auto-reverse if past the 1-hour SMS window.
+  if (tx && isPastSmsDeadline(tx)) {
+    await reverseVirtualNumberForTimeout({
+      tx,
+      activationId,
+      reason: "No SMS code arrived within 1 hour. Purchase reversed.",
+    });
+    return {
+      status: "STATUS_CANCEL" as const,
+      code: null as string | null,
+      demo: false as const,
+      provider: "fivesim" as const,
+      rawStatus: "TIMEOUT",
+      transactionStatus: "reversed" as const,
+      refunded: true as const,
+    };
+  }
+
   const result = await checkFivesimOrder(activationId);
   const status = result.status;
   const code = result.code;
@@ -366,16 +405,29 @@ export async function pollFivesimNumberStatus(
       demo: false as const,
       provider: "fivesim" as const,
       rawStatus: status,
+      transactionStatus: "completed" as const,
     };
   }
 
   if (status === "CANCELED" || status === "TIMEOUT" || status === "BANNED") {
+    if (tx) {
+      await reverseVirtualNumberForTimeout({
+        tx,
+        activationId,
+        reason:
+          status === "TIMEOUT"
+            ? "Number timed out before an SMS arrived. Purchase reversed."
+            : "Number was cancelled. Purchase reversed.",
+      });
+    }
     return {
       status: "STATUS_CANCEL" as const,
       code: null as string | null,
       demo: false as const,
       provider: "fivesim" as const,
       rawStatus: status,
+      transactionStatus: "reversed" as const,
+      refunded: true as const,
     };
   }
 
@@ -385,7 +437,29 @@ export async function pollFivesimNumberStatus(
     demo: false as const,
     provider: "fivesim" as const,
     rawStatus: status,
+    transactionStatus: "processing" as const,
+    expiresAt:
+      typeof meta.expiresAt === "string"
+        ? meta.expiresAt
+        : tx?.createdAt
+          ? new Date(
+              new Date(tx.createdAt).getTime() + VIRTUAL_NUMBER_SMS_TIMEOUT_MS,
+            ).toISOString()
+          : null,
   };
+}
+
+function isPastSmsDeadline(tx: {
+  createdAt: Date | string;
+  metadata: Record<string, unknown> | null;
+}) {
+  const meta = (tx.metadata || {}) as Record<string, unknown>;
+  if (typeof meta.expiresAt === "string") {
+    const at = Date.parse(meta.expiresAt);
+    if (Number.isFinite(at)) return Date.now() >= at;
+  }
+  const created = new Date(tx.createdAt).getTime();
+  return Date.now() - created >= VIRTUAL_NUMBER_SMS_TIMEOUT_MS;
 }
 
 async function findServiceTx(externalRef: string, userId?: string) {
@@ -397,6 +471,82 @@ async function findServiceTx(externalRef: string, userId?: string) {
   });
 }
 
+async function reverseVirtualNumberForTimeout(input: {
+  tx: {
+    id: string;
+    userId: string;
+    walletId: string;
+    amount: string | number;
+    status: string;
+    relatedOrderId: string | null;
+    metadata: Record<string, unknown> | null;
+  };
+  activationId: string;
+  reason: string;
+}) {
+  const meta = (input.tx.metadata || {}) as Record<string, unknown>;
+  if (
+    meta.smsCode ||
+    meta.refundedAt ||
+    input.tx.status === "reversed" ||
+    input.tx.status === "failed"
+  ) {
+    return { already: true as const };
+  }
+
+  try {
+    if (isFivesimLive()) {
+      await cancelFivesimOrder(input.activationId);
+    }
+  } catch (error) {
+    console.error(LOG_PREFIX, "cancel on timeout failed", error);
+  }
+
+  await reverseCompletedDebit({
+    walletId: input.tx.walletId,
+    transactionId: input.tx.id,
+    amount: Number(input.tx.amount),
+    reason: input.reason,
+    userId: input.tx.userId,
+  });
+
+  // reverseCompletedDebit marks reversed; keep awaitingSms cleared
+  await db
+    .update(transactions)
+    .set({
+      updatedAt: new Date(),
+      metadata: {
+        ...meta,
+        awaitingSms: false,
+        reversedForSmsTimeout: true,
+        reverseReason: input.reason,
+      },
+    })
+    .where(eq(transactions.id, input.tx.id));
+
+  if (input.tx.relatedOrderId) {
+    await db
+      .update(userVirtualNumbers)
+      .set({ status: "cancelled", updatedAt: new Date() })
+      .where(eq(userVirtualNumbers.id, input.tx.relatedOrderId));
+  }
+
+  await notifyServiceEvent({
+    userId: input.tx.userId,
+    title: "Number purchase reversed",
+    body: input.reason,
+    type: "virtual_number",
+    href: `/history/${input.tx.id}`,
+    metadata: {
+      activationId: input.activationId,
+      transactionId: input.tx.id,
+      refunded: true,
+    },
+  });
+
+  return { already: false as const };
+}
+
 async function maybeNotifyNumberCode(
   activationId: string,
   code: string,
@@ -405,13 +555,24 @@ async function maybeNotifyNumberCode(
   const tx = await findServiceTx(activationId, userId);
   if (!tx) return;
   const meta = (tx.metadata || {}) as Record<string, unknown>;
-  if (meta.completionNotifiedAt) return;
+  if (meta.completionNotifiedAt && meta.smsCode) {
+    // Already completed earlier
+    if (tx.status !== "completed") {
+      await db
+        .update(transactions)
+        .set({ status: "completed", updatedAt: new Date() })
+        .where(eq(transactions.id, tx.id));
+    }
+    return;
+  }
 
   await db
     .update(transactions)
     .set({
+      status: "completed",
       metadata: {
         ...meta,
+        awaitingSms: false,
         completionNotifiedAt: new Date().toISOString(),
         smsCode: code,
       },
@@ -426,6 +587,32 @@ async function maybeNotifyNumberCode(
       .where(eq(userVirtualNumbers.id, tx.relatedOrderId));
   }
 
+  // Recognize profit only once the SMS is delivered.
+  try {
+    const wholesaleUsd = Number(meta.costUsd) || 0;
+    const customerUsd = Number(meta.priceUsd) || Number(tx.amount) || 0;
+    if (customerUsd > 0) {
+      const { recognizeUsdServiceProfit } = await import(
+        "@/lib/company/recognize"
+      );
+      await recognizeUsdServiceProfit({
+        source: "virtual_number",
+        transactionId: tx.id,
+        userId: tx.userId,
+        customerUsd,
+        providerUsd: wholesaleUsd > 0 ? wholesaleUsd : customerUsd,
+        description: "Virtual number SMS received",
+        metadata: {
+          provider: "fivesim",
+          activationId,
+          service: meta.service,
+        },
+      });
+    }
+  } catch (revenueError) {
+    console.error("[5sim-revenue]", revenueError);
+  }
+
   const phone =
     typeof meta.phoneNumber === "string" ? meta.phoneNumber : "your number";
   await notifyServiceEvent({
@@ -433,7 +620,7 @@ async function maybeNotifyNumberCode(
     title: "SMS code received",
     body: `Code for ${phone}: ${code}`,
     type: "virtual_number",
-    href: "/services/virtual-numbers",
+    href: `/history/${tx.id}`,
     metadata: { activationId, transactionId: tx.id, provider: "fivesim" },
   });
 
@@ -449,4 +636,64 @@ export async function cancelFivesimNumber(activationId: string) {
     throw new Error("5sim is not configured for live cancellations");
   }
   return cancelFivesimOrder(activationId);
+}
+
+/**
+ * Reverse number purchases that stayed pending past the SMS timeout.
+ * Called from the settle-pending cron.
+ */
+export async function expireStaleVirtualNumberPurchases(limit = 40) {
+  const cutoff = new Date(Date.now() - VIRTUAL_NUMBER_SMS_TIMEOUT_MS);
+  const stale = await db.query.transactions.findMany({
+    where: and(
+      eq(transactions.category, "virtual_number"),
+      eq(transactions.type, "debit"),
+      inArray(transactions.status, ["pending", "processing"]),
+      lte(transactions.createdAt, cutoff),
+    ),
+    limit,
+    orderBy: (t, { asc }) => [asc(t.createdAt)],
+  });
+
+  const results: Array<{ id: string; action: string }> = [];
+  for (const row of stale) {
+    const meta = (row.metadata || {}) as Record<string, unknown>;
+    if (meta.smsCode) {
+      await db
+        .update(transactions)
+        .set({ status: "completed", updatedAt: new Date() })
+        .where(eq(transactions.id, row.id));
+      results.push({ id: row.id, action: "completed" });
+      continue;
+    }
+    const activationId = String(
+      meta.activationId || row.externalRef || "",
+    ).trim();
+    if (!activationId) {
+      results.push({ id: row.id, action: "missing_activation" });
+      continue;
+    }
+    try {
+      // Prefer live check first — code may have arrived without client poll.
+      if (isFivesimLive()) {
+        const check = await checkFivesimOrder(activationId);
+        if (check.code) {
+          await maybeNotifyNumberCode(activationId, check.code, row.userId);
+          results.push({ id: row.id, action: "completed_late" });
+          continue;
+        }
+      }
+      await reverseVirtualNumberForTimeout({
+        tx: row,
+        activationId,
+        reason: "No SMS code arrived within 1 hour. Purchase reversed.",
+      });
+      results.push({ id: row.id, action: "reversed" });
+    } catch (error) {
+      console.error(LOG_PREFIX, "expire stale failed", row.id, error);
+      results.push({ id: row.id, action: "error" });
+    }
+  }
+
+  return { scanned: stale.length, results };
 }

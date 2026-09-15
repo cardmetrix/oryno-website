@@ -455,6 +455,9 @@ function VirtualNumberCodePanel({ tx }: { tx: TransactionReceipt }) {
   const [fetching, setFetching] = useState(false);
   const [polling, setPolling] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refunded, setRefunded] = useState(
+    tx.status === "Reversed" || tx.statusRaw === "reversed" || tx.statusRaw === "failed",
+  );
 
   const fetchCode = useCallback(
     async (opts?: { silent?: boolean }) => {
@@ -472,9 +475,16 @@ function VirtualNumberCodePanel({ tx }: { tx: TransactionReceipt }) {
         const data = (await res.json()) as {
           error?: string;
           code?: string | null;
+          refunded?: boolean;
+          status?: string;
           data?: { code?: string | null };
         };
         if (!res.ok) throw new Error(data.error || "Could not get SMS code");
+        if (data.refunded || data.status === "STATUS_CANCEL") {
+          setRefunded(true);
+          setPolling(false);
+          return null;
+        }
         const next =
           (typeof data.code === "string" && data.code) ||
           (typeof data.data?.code === "string" && data.data.code) ||
@@ -501,7 +511,7 @@ function VirtualNumberCodePanel({ tx }: { tx: TransactionReceipt }) {
   }, [cachedCode, tx.id]);
 
   useEffect(() => {
-    if (!activationId || code) return;
+    if (!activationId || code || refunded) return;
     let cancelled = false;
     let tries = 0;
     setPolling(true);
@@ -511,18 +521,18 @@ function VirtualNumberCodePanel({ tx }: { tx: TransactionReceipt }) {
       tries += 1;
       const next = await fetchCode({ silent: true });
       if (cancelled) return;
-      if (next || tries >= 40) {
+      if (next || refunded || tries >= 450) {
         setPolling(false);
         return;
       }
-      window.setTimeout(tick, 5000);
+      window.setTimeout(tick, 8000);
     }
 
     void tick();
     return () => {
       cancelled = true;
     };
-  }, [activationId, code, fetchCode]);
+  }, [activationId, code, refunded, fetchCode]);
 
   async function onCopy(value: string, label: string) {
     try {
@@ -576,7 +586,11 @@ function VirtualNumberCodePanel({ tx }: { tx: TransactionReceipt }) {
               )}
             >
               {code ||
-                (polling || fetching ? "Waiting for SMS…" : "Not received yet")}
+                (refunded
+                  ? "Reversed — no SMS"
+                  : polling || fetching
+                    ? "Waiting for SMS…"
+                    : "Not received yet")}
             </p>
           </div>
           {code ? (

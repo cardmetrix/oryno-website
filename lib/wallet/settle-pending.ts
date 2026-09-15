@@ -31,6 +31,12 @@ export async function settleStuckDebits(limit = 40) {
       continue;
     }
 
+    // Virtual numbers stay pending until SMS (up to 1 hour) — dedicated expire job.
+    if (row.category === "virtual_number") {
+      results.push({ id: row.id, action: "virtual_number_skipped" });
+      continue;
+    }
+
     try {
       if (provider === "vtpass" && requestId) {
         const { requeryPurchase, isVtpassSuccessCode, isVtpassPendingCode } =

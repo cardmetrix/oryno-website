@@ -103,6 +103,9 @@ export default function VirtualNumbersPage() {
   const [smsCode, setSmsCode] = useState<string | null>(null);
   const [polling, setPolling] = useState(false);
   const [receipt, setReceipt] = useState("");
+  const [orderPending, setOrderPending] = useState(true);
+  const [reversed, setReversed] = useState(false);
+  const [expiresAt, setExpiresAt] = useState<string | null>(null);
 
   const filteredServices = useMemo(() => {
     const q = serviceQuery.trim().toLowerCase();
@@ -183,36 +186,55 @@ export default function VirtualNumbersPage() {
   }, [service]);
 
   useEffect(() => {
-    if (!success || !activationId || smsCode) return;
+    if (!success || !activationId || smsCode || reversed) return;
     let cancelled = false;
-    let tries = 0;
+    const started = Date.now();
+    const maxMs = 60 * 60 * 1000;
 
     async function tick() {
-      if (cancelled || tries > 40) return;
-      tries += 1;
+      if (cancelled) return;
+      if (Date.now() - started > maxMs) {
+        setPolling(false);
+        return;
+      }
       setPolling(true);
       try {
         const res = await fetch(
           `/api/services/numbers/status/${encodeURIComponent(activationId)}`,
         );
         const data = await res.json();
+        if (cancelled) return;
         if (data.code) {
           setSmsCode(data.code);
+          setOrderPending(false);
           setPolling(false);
           return;
+        }
+        if (data.refunded || data.status === "STATUS_CANCEL") {
+          setReversed(true);
+          setOrderPending(false);
+          setPolling(false);
+          toast.error(
+            data.error ||
+              "No SMS arrived in time. This purchase was reversed to your USD wallet.",
+          );
+          return;
+        }
+        if (typeof data.expiresAt === "string") {
+          setExpiresAt(data.expiresAt);
         }
       } catch {
         // keep polling
       }
       setPolling(false);
-      window.setTimeout(tick, 5000);
+      window.setTimeout(tick, 8000);
     }
 
     tick();
     return () => {
       cancelled = true;
     };
-  }, [success, activationId, smsCode]);
+  }, [success, activationId, smsCode, reversed]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -243,6 +265,9 @@ export default function VirtualNumbersPage() {
       setTransactionId(data.transactionId || "");
       setReceipt(data.amountFormatted);
       setSmsCode(null);
+      setOrderPending(true);
+      setReversed(false);
+      setExpiresAt(data.expiresAt || null);
       setSuccess(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Purchase failed");
@@ -269,15 +294,30 @@ export default function VirtualNumbersPage() {
         {success ? (
           <MotionSection key="success">
             <ServiceSuccess
-              title="Number ready!"
-              subtitle="Use this number for verification."
+              variant={
+                reversed ? "pending" : smsCode ? "success" : "pending"
+              }
+              title={
+                reversed
+                  ? "Purchase reversed"
+                  : smsCode
+                    ? "Code received!"
+                    : "Number ready — pending SMS"
+              }
+              subtitle={
+                reversed
+                  ? "No SMS arrived in time. Your USD wallet was refunded."
+                  : smsCode
+                    ? "Use this number and code for verification."
+                    : "Waiting for the OTP. If it doesn’t arrive within 1 hour, you’ll be refunded automatically."
+              }
               amountLabel="Amount charged"
               amount={receipt}
               onDismiss={() => setSuccess(false)}
               primaryAction={
                 transactionId
                   ? {
-                      label: "Get code in History",
+                      label: "View in History",
                       href: `/history/${transactionId}`,
                       icon: "receipt",
                     }
@@ -296,22 +336,53 @@ export default function VirtualNumbersPage() {
                   setActivationId("");
                   setTransactionId("");
                   setSmsCode(null);
+                  setOrderPending(true);
+                  setReversed(false);
+                  setExpiresAt(null);
                 },
                 icon: "plus",
               }}
             >
               <div className="space-y-3">
+                <div className="flex items-center justify-between gap-2 rounded-[14px] bg-muted/50 px-3.5 py-2.5 text-xs font-semibold">
+                  <span className="text-muted-foreground">Status</span>
+                  <span
+                    className={
+                      reversed
+                        ? "text-destructive"
+                        : smsCode
+                          ? "text-[var(--oryno-success)]"
+                          : "text-primary"
+                    }
+                  >
+                    {reversed
+                      ? "Reversed"
+                      : smsCode
+                        ? "Completed"
+                        : "Pending SMS"}
+                  </span>
+                </div>
                 <CopyRow label="Phone number" value={phoneNumber} />
                 <CopyRow
                   label="SMS code"
-                  value={smsCode || (polling ? "Waiting for SMS…" : "—")}
+                  value={
+                    smsCode ||
+                    (reversed
+                      ? "—"
+                      : polling || orderPending
+                        ? "Waiting for SMS…"
+                        : "—")
+                  }
                   mono={!smsCode}
                   copyable={Boolean(smsCode)}
                 />
-                {polling && !smsCode ? (
+                {!smsCode && !reversed ? (
                   <p className="inline-flex items-center gap-2 text-xs text-muted-foreground">
                     <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                    Waiting for the OTP…
+                    Waiting for the OTP
+                    {expiresAt
+                      ? ` · refunds after ${new Date(expiresAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+                      : " · auto-refund in 1 hour if no code"}
                   </p>
                 ) : null}
               </div>

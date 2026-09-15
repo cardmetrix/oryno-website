@@ -98,7 +98,7 @@ export async function POST(req: Request) {
         body: `${result.phoneNumber} · ${body.serviceName || body.service}. Waiting for SMS.`,
         type: "virtual_number",
         metadata: {
-          href: "/services/virtual-numbers",
+          href: `/history/${result.transactionId}`,
           activationId: result.activationId,
           transactionId: result.transactionId,
           provider: "fivesim",
@@ -118,7 +118,9 @@ export async function POST(req: Request) {
       transactionId: result.transactionId,
       wallet: result.wallet,
       amountFormatted,
-      message: "Number purchased — waiting for SMS code",
+      status: result.status,
+      expiresAt: result.expiresAt,
+      message: "Number reserved — pending SMS. Auto-refund in 1 hour if no code.",
     });
   } catch (error) {
     console.error("[numbers-purchase]", error);

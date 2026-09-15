@@ -8,6 +8,7 @@ import {
   PENDING_SETTLE_AFTER_MS,
   settleUserPendingTransactions,
 } from "@/lib/wallet/settle-user-pending";
+import { expireStaleVirtualNumberPurchases } from "@/lib/fivesim/purchase";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -25,9 +26,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
-    const [debits, withdrawals] = await Promise.all([
+    const [debits, withdrawals, numbers] = await Promise.all([
       settleStuckDebits(),
       settleStuckWithdrawals(),
+      expireStaleVirtualNumberPurchases(),
     ]);
     const cutoff = new Date(Date.now() - PENDING_SETTLE_AFTER_MS);
     const stale = await db.query.transactions.findMany({
@@ -35,10 +37,16 @@ export async function POST(req: Request) {
         inArray(transactions.status, ["pending", "processing"]),
         lte(transactions.createdAt, cutoff),
       ),
-      columns: { userId: true },
+      columns: { userId: true, category: true },
       limit: 80,
     });
-    const userIds = [...new Set(stale.map((row) => row.userId))];
+    const userIds = [
+      ...new Set(
+        stale
+          .filter((row) => row.category !== "virtual_number")
+          .map((row) => row.userId),
+      ),
+    ];
     const userSettles = [];
     for (const userId of userIds) {
       userSettles.push(
@@ -49,6 +57,7 @@ export async function POST(req: Request) {
       ok: true,
       debits,
       withdrawals,
+      numbers,
       users: userSettles.length,
     });
   } catch (error) {
