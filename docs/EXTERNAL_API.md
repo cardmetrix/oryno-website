@@ -87,7 +87,7 @@ curl -X POST \
   https://orynoafrica.com/api/external/v1/services/betting/fund
 ```
 
-Demo customer IDs (when `VTU_AFRICA_API_KEY` is unset or `BETTING_DEMO=true`):
+Demo customer IDs (when the country’s rail keys are unset or `BETTING_DEMO=true`):
 
 | ID | Result |
 |---|---|
@@ -96,3 +96,5 @@ Demo customer IDs (when `VTU_AFRICA_API_KEY` is unset or `BETTING_DEMO=true`):
 | `10000001` | Sporty Demo User — verify + fund succeed |
 | `00000000` | Verification fails |
 | `99999999` | Verifies, then funding fails and wallet is refunded |
+
+Rails: Nigeria uses ClubKonnect (`CLUBKONNECT_USER_ID` + `CLUBKONNECT_API_KEY`). Ghana, Kenya, and South Africa use VTU Africa (`VTU_AFRICA_API_KEY`).

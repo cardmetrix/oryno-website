@@ -43,7 +43,7 @@ function bookie(
   };
 }
 
-/** Bookmakers VTU Africa (and similar NG aggregators) commonly fund. */
+/** Bookmakers commonly funded on Nigeria rails (ClubKonnect / VTU Africa). */
 export const BETTING_PROVIDERS_NG: BettingProvider[] = [
   bookie("bet9ja", "Bet9ja", "bet9ja.com", true),
   bookie("sportybet", "SportyBet", "sportybet.com", true),

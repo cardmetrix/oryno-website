@@ -11,11 +11,13 @@ export {
 } from "./catalog";
 export {
   bettingApiKey,
+  bettingRailForCountry,
   fundBettingAccount,
   hasBettingKeys,
   isBettingDemoMode,
   isBettingLiveCountry,
   verifyBettingCustomer,
+  type BettingRail,
 } from "./client";
 export { bettingErrorToEnglish, bettingHttpStatus } from "./errors";
 export { formatBettingAmount, fundBettingWallet } from "./purchase";

@@ -14,7 +14,11 @@ import {
   findBettingProvider,
   normalizeBettingCustomerId,
 } from "./catalog";
-import { fundBettingAccount, verifyBettingCustomer } from "./client";
+import {
+  bettingRailForCountry,
+  fundBettingAccount,
+  verifyBettingCustomer,
+} from "./client";
 import type { BettingFundResult } from "./types";
 
 type DebitPrepared = {
@@ -93,7 +97,7 @@ async function debitForBetting(input: {
         relatedOrderType: "betting",
         externalRef: requestId,
         metadata: {
-          provider: "vtu-africa",
+          provider: bettingRailForCountry(input.countryCode),
           requestId,
           ...(input.metadata ?? {}),
         },
@@ -231,10 +235,11 @@ export async function fundBettingWallet(input: {
       idempotencyKey: requestId,
       faceAmount,
       chargeAmount,
-      provider: "vtu-africa",
+      provider: bettingRailForCountry(country),
     },
   });
 
+  const rail = bettingRailForCountry(country);
   const [order] = await db
     .insert(bettingOrders)
     .values({
@@ -252,6 +257,7 @@ export async function fundBettingWallet(input: {
         faceAmount,
         chargeAmount,
         retailAmount,
+        provider: rail,
       },
     })
     .returning();
@@ -296,6 +302,7 @@ export async function fundBettingWallet(input: {
       token: funded.reference,
       faceAmount,
       chargeAmount,
+      provider: funded.rail || rail,
     });
 
     if (chargeAmount > 0 || retailAmount > faceAmount) {

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
 import {
   DEMO_BETTING_CUSTOMERS,
+  bettingRailForCountry,
   isBettingDemoMode,
   presetsForBettingCountry,
   providersForBettingCountry,
@@ -28,7 +29,7 @@ export async function GET() {
     demo,
     countryCode,
     currency: fx.to,
-    provider: demo ? "demo" : "vtu-africa",
+    provider: demo ? "demo" : bettingRailForCountry(countryCode),
     services,
     presets: presetsForBettingCountry(countryCode),
     demoTests: demo

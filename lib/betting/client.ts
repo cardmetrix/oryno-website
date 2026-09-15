@@ -1,25 +1,45 @@
-import { resolveCountryCode } from "@/lib/country";
+import { resolveCountryCode, type SupportedCountryCode } from "@/lib/country";
 import {
   DEMO_BETTING_CUSTOMERS,
   findBettingProvider,
   normalizeBettingCustomerId,
 } from "./catalog";
+import {
+  clubKonnectFund,
+  clubKonnectVerify,
+  hasClubKonnectKeys,
+} from "./clubkonnect";
+import { hasVtuAfricaKeys, vtuAfricaFund, vtuAfricaVerify } from "./vtu-africa";
 
-export function bettingApiKey() {
-  return (process.env.VTU_AFRICA_API_KEY || process.env.BETTING_API_KEY || "").trim();
+export type BettingRail = "clubkonnect" | "vtu-africa";
+
+/** Nigeria → ClubKonnect; GH / KE / ZA → VTU Africa. */
+export function bettingRailForCountry(
+  countryCode?: string | null,
+): BettingRail {
+  return resolveCountryCode(countryCode) === "NG" ? "clubkonnect" : "vtu-africa";
 }
 
-export function bettingBaseUrl() {
+export function hasBettingKeys(countryCode?: string | null) {
+  const rail = bettingRailForCountry(countryCode);
+  return rail === "clubkonnect" ? hasClubKonnectKeys() : hasVtuAfricaKeys();
+}
+
+/** @deprecated Prefer hasBettingKeys(country). Kept for callers that only check NG. */
+export function bettingApiKey() {
   return (
-    process.env.VTU_AFRICA_BASE_URL ||
-    "https://vtuafrica.com.ng/portal/api"
-  ).replace(/\/$/, "");
+    process.env.CLUBKONNECT_API_KEY ||
+    process.env.VTU_AFRICA_API_KEY ||
+    process.env.BETTING_API_KEY ||
+    ""
+  ).trim();
 }
 
 export function isBettingDemoForced() {
   const flag = (
     process.env.BETTING_DEMO ||
     process.env.VTU_AFRICA_DEMO ||
+    process.env.CLUBKONNECT_DEMO ||
     ""
   )
     .trim()
@@ -27,19 +47,18 @@ export function isBettingDemoForced() {
   return flag === "true" || flag === "1" || flag === "yes";
 }
 
-export function hasBettingKeys() {
-  return Boolean(bettingApiKey());
-}
-
-/** Live VTU Africa only works for Nigeria. Other markets stay demo until a local rail is keyed. */
+/** Live when the country’s rail has keys and demo is not forced. */
 export function isBettingLiveCountry(countryCode?: string | null) {
-  return resolveCountryCode(countryCode) === "NG";
+  const code = resolveCountryCode(countryCode);
+  return (
+    (["NG", "GH", "KE", "ZA"] as SupportedCountryCode[]).includes(code) &&
+    hasBettingKeys(code)
+  );
 }
 
-/** Demo when keys are missing, BETTING_DEMO is set, or the country has no live betting rail. */
+/** Demo when keys are missing for that country’s rail, or BETTING_DEMO is set. */
 export function isBettingDemoMode(countryCode?: string | null) {
-  if (countryCode && !isBettingLiveCountry(countryCode)) return true;
-  return isBettingDemoForced() || !hasBettingKeys();
+  return isBettingDemoForced() || !hasBettingKeys(countryCode);
 }
 
 function demoCustomer(customerId: string) {
@@ -68,61 +87,6 @@ export function shouldDemoFundFail(customerId: string) {
   return demoCustomer(customerId)?.outcome === "fund_fail";
 }
 
-type LiveVerifyJson = {
-  code?: number | string;
-  description?: {
-    Status?: string;
-    Customer?: string;
-    Service?: string;
-    UserID?: string;
-    message?: string;
-  };
-  message?: string;
-};
-
-type LiveFundJson = {
-  code?: number | string;
-  description?: {
-    Status?: string;
-    Service?: string;
-    Network?: string;
-    UserID?: string;
-    Request_Amount?: string;
-    Charge?: string;
-    Amount_Charged?: string;
-    ReferenceID?: string;
-    message?: string;
-  };
-  message?: string;
-};
-
-async function getJson<T>(url: string): Promise<T> {
-  const res = await fetch(url, {
-    method: "GET",
-    headers: { Accept: "application/json" },
-    cache: "no-store",
-  });
-  const text = await res.text();
-  let json: T;
-  try {
-    json = JSON.parse(text) as T;
-  } catch {
-    const err = new Error("Betting provider returned an invalid response") as Error & {
-      status?: number;
-    };
-    err.status = 503;
-    throw err;
-  }
-  if (!res.ok) {
-    const err = new Error(
-      (json as { message?: string })?.message || "Betting provider request failed",
-    ) as Error & { status?: number };
-    err.status = res.status >= 400 ? res.status : 503;
-    throw err;
-  }
-  return json;
-}
-
 export async function verifyBettingCustomer(input: {
   serviceID: string;
   customerId: string;
@@ -132,58 +96,45 @@ export async function verifyBettingCustomer(input: {
   demo: boolean;
   customerName: string | null;
   message?: string;
+  rail?: BettingRail;
 }> {
   const provider = findBettingProvider(input.serviceID, input.countryCode);
+  const rail = bettingRailForCountry(input.countryCode);
   if (!provider) {
     return {
       ok: false,
       demo: isBettingDemoMode(input.countryCode),
       customerName: null,
       message: "Unknown betting provider",
+      rail,
     };
   }
   const customerId = normalizeBettingCustomerId(input.customerId);
 
   if (isBettingDemoMode(input.countryCode)) {
-    if (!isBettingLiveCountry(input.countryCode)) {
-      return {
-        ok: false,
-        demo: false,
-        customerName: null,
-        message: "Live betting is only available in Nigeria.",
-      };
-    }
+    const demo = demoVerifyName(customerId);
     return {
-      ok: false,
-      demo: false,
-      customerName: null,
-      message:
-        "Betting is not configured for live use. Set VTU_AFRICA_API_KEY and BETTING_DEMO=false.",
+      ok: demo.ok,
+      demo: true,
+      customerName: demo.name,
+      message: demo.message,
+      rail,
     };
   }
 
-  const url = `${bettingBaseUrl()}/merchant-verify/?apikey=${encodeURIComponent(
-    bettingApiKey(),
-  )}&serviceName=Betting&service=${encodeURIComponent(provider.serviceID)}&userid=${encodeURIComponent(customerId)}`;
-
-  const json = await getJson<LiveVerifyJson>(url);
-  const desc = json.description;
-  const name = desc?.Customer?.trim() || null;
-  const success =
-    Number(json.code) === 101 ||
-    String(desc?.Status || "").toLowerCase() === "completed" ||
-    /verified/i.test(desc?.message || json.message || "");
-
-  if (!success || !name) {
-    return {
-      ok: false,
-      demo: false,
-      customerName: null,
-      message: desc?.message || json.message || "Could not verify betting account",
-    };
+  if (rail === "clubkonnect") {
+    const result = await clubKonnectVerify({
+      serviceID: provider.serviceID,
+      customerId,
+    });
+    return { ...result, demo: false, rail };
   }
 
-  return { ok: true, demo: false, customerName: name };
+  const result = await vtuAfricaVerify({
+    serviceID: provider.serviceID,
+    customerId,
+  });
+  return { ...result, demo: false, rail };
 }
 
 export async function fundBettingAccount(input: {
@@ -198,56 +149,57 @@ export async function fundBettingAccount(input: {
   demo: boolean;
   reference: string;
   message?: string;
+  rail?: BettingRail;
 }> {
   const provider = findBettingProvider(input.serviceID, input.countryCode);
+  const rail = bettingRailForCountry(input.countryCode);
   if (!provider) {
     return {
       ok: false,
       demo: isBettingDemoMode(input.countryCode),
       reference: input.reference,
       message: "Unknown betting provider",
+      rail,
     };
   }
   const customerId = normalizeBettingCustomerId(input.customerId);
 
   if (isBettingDemoMode(input.countryCode)) {
-    if (!isBettingLiveCountry(input.countryCode)) {
-      throw new Error("Live betting funding is only available in Nigeria.");
+    if (shouldDemoFundFail(customerId)) {
+      return {
+        ok: false,
+        demo: true,
+        reference: input.reference,
+        message: "Demo funding failed",
+        rail,
+      };
     }
-    throw new Error(
-      "Betting is not configured for live purchases. Set VTU_AFRICA_API_KEY and BETTING_DEMO=false.",
-    );
-  }
-
-  const params = new URLSearchParams({
-    apikey: bettingApiKey(),
-    service: provider.serviceID,
-    userid: customerId,
-    amount: String(Math.round(input.amount)),
-    ref: input.reference,
-  });
-  if (input.phone) params.set("phone", input.phone.replace(/\D/g, "").slice(-11));
-
-  const url = `${bettingBaseUrl()}/betpay/?${params.toString()}`;
-  const json = await getJson<LiveFundJson>(url);
-  const desc = json.description;
-  const success =
-    Number(json.code) === 101 ||
-    String(desc?.Status || "").toLowerCase() === "completed";
-
-  if (!success) {
     return {
-      ok: false,
-      demo: false,
-      reference: input.reference,
-      message: desc?.message || json.message || "Betting funding failed",
+      ok: true,
+      demo: true,
+      reference: `DEMO-${input.reference}`,
+      message: "Demo betting wallet funded",
+      rail,
     };
   }
 
-  return {
-    ok: true,
-    demo: false,
-    reference: desc?.ReferenceID || input.reference,
-    message: desc?.message || "Betting wallet funded",
-  };
+  if (rail === "clubkonnect") {
+    const funded = await clubKonnectFund({
+      serviceID: provider.serviceID,
+      customerId,
+      amount: input.amount,
+      reference: input.reference,
+      phone: input.phone,
+    });
+    return { ...funded, demo: false, rail };
+  }
+
+  const funded = await vtuAfricaFund({
+    serviceID: provider.serviceID,
+    customerId,
+    amount: input.amount,
+    reference: input.reference,
+    phone: input.phone,
+  });
+  return { ...funded, demo: false, rail };
 }
