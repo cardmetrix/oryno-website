@@ -70,13 +70,13 @@ export const SERVICE_INSTRUCTIONS: Record<
     ],
   },
   emails: {
-    subtitle: "Follow these steps to get an SMS number for email signup",
+    subtitle: "Follow these steps to rent a temporary email",
     steps: [
-      "Fund your USD wallet before buying a number.",
-      "Choose the mailbox service (Gmail, Hotmail, Yahoo, Proton, Outlook).",
-      "Pick a country with stock and confirm the price.",
-      "Pay from your wallet — copy the phone number into the signup form.",
-      "Stay on this page — the SMS verification code appears automatically.",
+      "Fund your wallet before renting an inbox.",
+      "Choose the site you are signing up for (e.g. Telegram, Google).",
+      "Pick an available email domain and confirm the price.",
+      "Pay from your wallet — copy the address into the signup form.",
+      "Wait on this page for the verification code; it updates automatically.",
     ],
   },
   "gift-cards": {

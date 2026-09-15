@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { withAdminApi } from "@/lib/admin/api";
+import { isHerosmsDemoMode, isHerosmsLive } from "@/lib/herosms/client";
 import { isFivesimDemoMode, isFivesimLive } from "@/lib/fivesim/client";
 import { isJapDemoMode, isJapLive } from "@/lib/jap/client";
 import {
@@ -63,11 +64,21 @@ export async function GET() {
       {
         id: "fivesim",
         name: "5sim",
-        type: "Virtual numbers + email signup SMS",
+        type: "Virtual numbers",
         country: "Global",
         status: modeLabel({
           configured: isFivesimLive() || !isFivesimDemoMode(),
           demo: isFivesimDemoMode(),
+        }),
+      },
+      {
+        id: "herosms",
+        name: "HeroSMS",
+        type: "Temporary emails",
+        country: "Global",
+        status: modeLabel({
+          configured: isHerosmsLive() || !isHerosmsDemoMode(),
+          demo: isHerosmsDemoMode(),
         }),
       },
       {

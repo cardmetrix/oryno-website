@@ -7,11 +7,15 @@ import {
   JAP_PLATFORMS,
 } from "@/lib/jap";
 import {
-  FIVESIM_EMAIL_SERVICES,
   FIVESIM_POPULAR_SERVICES,
   isFivesimDemoMode,
   listFivesimOffers,
 } from "@/lib/fivesim";
+import {
+  FALLBACK_EMAIL_DOMAINS,
+  getHerosmsEmailDomains,
+  isHerosmsDemoMode,
+} from "@/lib/herosms";
 import {
   fetchReloadlyCountries,
   fetchReloadlyProducts,
@@ -92,11 +96,12 @@ const VTPASS_CATEGORIES: Array<{
 ];
 
 const EMAIL_SITES: CatalogFilterOption[] = [
-  { id: "google", label: "Google / Gmail" },
-  { id: "hotmail", label: "Hotmail" },
-  { id: "microsoft", label: "Microsoft / Outlook" },
-  { id: "yahoo", label: "Yahoo Mail" },
-  { id: "protonmail", label: "Proton Mail" },
+  { id: "telegram.com", label: "Telegram" },
+  { id: "google.com", label: "Google" },
+  { id: "instagram.com", label: "Instagram" },
+  { id: "facebook.com", label: "Facebook" },
+  { id: "discord.com", label: "Discord" },
+  { id: "openai.com", label: "OpenAI" },
 ];
 
 function diversifyJapCatalog<
@@ -210,17 +215,80 @@ export async function loadAdminPricingCatalog(input: {
     const channel = (input.params.channel || "numbers") as "numbers" | "emails";
     applied.channel = channel;
 
-    const services =
-      channel === "emails" ? FIVESIM_EMAIL_SERVICES : FIVESIM_POPULAR_SERVICES;
-    const service =
-      (channel === "emails"
-        ? input.params.site || input.params.service
-        : input.params.service) ||
-      services[0]?.code ||
-      "whatsapp";
-    applied.service = service;
-    if (channel === "emails") applied.site = service;
+    if (channel === "emails") {
+      const site = (input.params.site || "telegram.com").toLowerCase();
+      applied.site = site;
+      const demo = isHerosmsDemoMode();
+      let domains = FALLBACK_EMAIL_DOMAINS;
+      if (!demo) {
+        try {
+          const live = await getHerosmsEmailDomains(site);
+          if (live?.length) domains = live;
+        } catch {
+          // keep fallback
+        }
+      }
+      const quote = await quoteLocalUsd(currency);
+      const items: AdminCatalogItem[] = [];
+      for (const d of domains) {
+        const domainName = String(d.name || "").toLowerCase();
+        const costUsd = Number(d.cost) || 0.1;
+        const serviceKey = `email:${site}:${domainName}`;
+        const priced = await priceUsdToLocal({
+          provider: "herosms",
+          serviceKey,
+          usd: costUsd,
+          buyRate: quote.buyRate,
+          source: "email",
+        });
+        const ov = await withOverride("herosms", serviceKey, priced);
+        items.push({
+          serviceKey,
+          title: `@${domainName}`,
+          subtitle: `Email · ${site}`,
+          details: `Cost $${costUsd} · stock ${Number(d.count) || 0}`,
+          currency,
+          costUsd,
+          costLocal: null,
+          ...ov,
+          meta: { site, domain: domainName, count: Number(d.count) || 0 },
+        });
+      }
+      return {
+        ok: true,
+        provider: "herosms",
+        currency,
+        filters: {
+          fields: [
+            {
+              key: "channel",
+              label: "Channel",
+              options: [
+                { id: "numbers", label: "Virtual numbers" },
+                { id: "emails", label: "Emails" },
+              ],
+              required: true,
+            },
+            {
+              key: "site",
+              label: "Site",
+              options: EMAIL_SITES,
+              required: true,
+            },
+          ],
+          applied,
+        },
+        items,
+        demo,
+        hint: demo
+          ? "Set HEROSMS_API_KEY and HEROSMS_DEMO=false to load live email domains."
+          : "Live HeroSMS inbox domains.",
+      };
+    }
 
+    const services = FIVESIM_POPULAR_SERVICES;
+    const service = input.params.service || services[0]?.code || "whatsapp";
+    applied.service = service;
     const serviceName =
       services.find((s) => s.code === service)?.name || service;
     const demo = isFivesimDemoMode();
@@ -242,10 +310,7 @@ export async function loadAdminPricingCatalog(input: {
         items.push({
           serviceKey,
           title: `${offer.countryName} · ${serviceName}`,
-          subtitle:
-            channel === "emails"
-              ? `Email signup SMS · ${service}`
-              : `Virtual number · ${service}`,
+          subtitle: `Virtual number · ${service}`,
           details: `${offer.countrySlug} · cost $${offer.costUsd} · stock ${offer.count}`,
           currency,
           costUsd: offer.costUsd,
@@ -274,23 +339,16 @@ export async function loadAdminPricingCatalog(input: {
             label: "Channel",
             options: [
               { id: "numbers", label: "Virtual numbers" },
-              { id: "emails", label: "Email signup SMS" },
+              { id: "emails", label: "Emails" },
             ],
             required: true,
           },
-          channel === "emails"
-            ? {
-                key: "site",
-                label: "Mailbox",
-                options: EMAIL_SITES,
-                required: true,
-              }
-            : {
-                key: "service",
-                label: "App / service",
-                options: services.map((s) => ({ id: s.code, label: s.name })),
-                required: true,
-              },
+          {
+            key: "service",
+            label: "App / service",
+            options: services.map((s) => ({ id: s.code, label: s.name })),
+            required: true,
+          },
         ],
         applied,
       },
@@ -298,7 +356,7 @@ export async function loadAdminPricingCatalog(input: {
       demo,
       hint: demo
         ? "Set FIVESIM_API_KEY and FIVESIM_DEMO=false to load live 5sim prices."
-        : "Live 5sim activation prices. Fund the 5sim wallet before customer purchases will succeed.",
+        : "Live 5sim activation prices.",
     };
   }
 

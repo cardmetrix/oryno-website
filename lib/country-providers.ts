@@ -237,8 +237,8 @@ export const SERVICE_PROVIDERS: CountryServiceProvider[] = [
   {
     id: "fivesim",
     name: "5sim",
-    role: "Virtual numbers and email-signup SMS for all markets",
-    services: ["virtual-numbers", "emails"],
+    role: "Virtual numbers (SMS activations) for all markets",
+    services: ["virtual-numbers"],
     countries: ["NG", "GH", "KE", "ZA"],
     signupUrl: "https://5sim.net",
     dashboardUrl: "https://5sim.net",
@@ -250,7 +250,24 @@ export const SERVICE_PROVIDERS: CountryServiceProvider[] = [
       { env: "FIVESIM_MARKUP", label: "Optional retail markup (default 1.15)" },
     ],
     notes:
-      "Only live rail for /services/virtual-numbers and /services/emails. Get the API key from 5sim → profile → Get API key. Fund the 5sim balance before purchases will succeed.",
+      "Only live rail for /services/virtual-numbers. Get the API key from 5sim → profile → Get API key. Fund the 5sim balance before purchases will succeed.",
+  },
+  {
+    id: "herosms",
+    name: "HeroSMS",
+    role: "Temporary email inboxes",
+    services: ["emails"],
+    countries: ["NG", "GH", "KE", "ZA"],
+    signupUrl: "https://hero-sms.com",
+    dashboardUrl: "https://hero-sms.com",
+    apiKeysUrl: "https://hero-sms.com",
+    docsUrl: "https://hero-sms.com/api",
+    credentials: [
+      { env: "HEROSMS_API_KEY", label: "API key" },
+      { env: "HEROSMS_DEMO", label: "true to force demo; false for live" },
+    ],
+    notes:
+      "Used only for /services/emails temporary inboxes. Virtual numbers stay on 5sim.",
   },
 ];
 
@@ -267,7 +284,7 @@ export const BEST_PROVIDER_BY_SERVICE: Record<
     "gift-cards-sell": "sogo",
     social: "jap",
     "virtual-numbers": "fivesim",
-    emails: "fivesim",
+    emails: "herosms",
     wallet: "flutterwave",
   },
   GH: {
@@ -279,7 +296,7 @@ export const BEST_PROVIDER_BY_SERVICE: Record<
     "gift-cards-sell": "sogo",
     social: "jap",
     "virtual-numbers": "fivesim",
-    emails: "fivesim",
+    emails: "herosms",
     wallet: "flutterwave",
   },
   KE: {
@@ -291,7 +308,7 @@ export const BEST_PROVIDER_BY_SERVICE: Record<
     "gift-cards-sell": "sogo",
     social: "jap",
     "virtual-numbers": "fivesim",
-    emails: "fivesim",
+    emails: "herosms",
     wallet: "flutterwave",
   },
   ZA: {
@@ -303,7 +320,7 @@ export const BEST_PROVIDER_BY_SERVICE: Record<
     "gift-cards-sell": "sogo",
     social: "jap",
     "virtual-numbers": "fivesim",
-    emails: "fivesim",
+    emails: "herosms",
     wallet: "flutterwave",
   },
 };
