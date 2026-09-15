@@ -1,12 +1,16 @@
 "use client";
 
-import { use, useEffect, useRef, useState } from "react";
+import { use, useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import {
   CheckCircle2,
   Clock3,
+  Copy,
   Download,
   Loader2,
+  MessageSquareText,
+  Phone,
+  RefreshCw,
   RotateCcw,
   Share2,
   XCircle,
@@ -19,6 +23,20 @@ import { BRAND_LOGO_SRC, BrandLogo } from "@/components/brand-logo";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { TransactionReceipt } from "@/lib/transactions";
 import { cn } from "@/lib/utils";
+
+function metaString(meta: Record<string, unknown> | null, key: string) {
+  const v = meta?.[key];
+  return typeof v === "string" && v.trim() ? v.trim() : null;
+}
+
+function isVirtualNumberTx(tx: TransactionReceipt) {
+  return (
+    tx.category === "virtual_number" ||
+    tx.category === "numbers" ||
+    Boolean(metaString(tx.metadata, "activationId")) ||
+    Boolean(metaString(tx.metadata, "phoneNumber"))
+  );
+}
 
 export default function TransactionReceiptPage({
   params,
@@ -232,6 +250,9 @@ export default function TransactionReceiptPage({
                   <DetailRow label="Date" value={tx.createdAtFormatted} />
                   <DetailRow label="Reference" value={tx.reference} mono />
                   <DetailRow label="Currency" value={tx.currency ?? "NGN"} />
+                  {isVirtualNumberTx(tx) ? (
+                    <VirtualNumberDetails meta={tx.metadata} />
+                  ) : null}
                 </div>
               </div>
 
@@ -240,6 +261,12 @@ export default function TransactionReceiptPage({
               </p>
             </div>
           </MotionSection>
+
+          {isVirtualNumberTx(tx) ? (
+            <MotionSection delay={0.04} className="mt-5">
+              <VirtualNumberCodePanel tx={tx} />
+            </MotionSection>
+          ) : null}
 
           <MotionSection delay={0.06} className="mt-5 grid grid-cols-2 gap-3">
             <button
@@ -272,6 +299,194 @@ export default function TransactionReceiptPage({
         </>
       )}
     </AppShell>
+  );
+}
+
+function VirtualNumberDetails({
+  meta,
+}: {
+  meta: Record<string, unknown> | null;
+}) {
+  const phone = metaString(meta, "phoneNumber");
+  const service = metaString(meta, "service");
+  if (!phone && !service) return null;
+  return (
+    <>
+      {phone ? <DetailRow label="Phone" value={phone} mono /> : null}
+      {service ? <DetailRow label="Service" value={service} /> : null}
+    </>
+  );
+}
+
+function VirtualNumberCodePanel({ tx }: { tx: TransactionReceipt }) {
+  const activationId =
+    metaString(tx.metadata, "activationId") || tx.externalRef;
+  const phone = metaString(tx.metadata, "phoneNumber");
+  const cachedCode = metaString(tx.metadata, "smsCode");
+
+  const [code, setCode] = useState<string | null>(cachedCode);
+  const [fetching, setFetching] = useState(false);
+  const [polling, setPolling] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchCode = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      if (!activationId) {
+        setError("Activation id missing for this number");
+        return null;
+      }
+      if (!opts?.silent) setFetching(true);
+      setError(null);
+      try {
+        const res = await fetch(
+          `/api/services/numbers/status/${encodeURIComponent(activationId)}`,
+          { cache: "no-store" },
+        );
+        const data = (await res.json()) as {
+          error?: string;
+          code?: string | null;
+          data?: { code?: string | null };
+        };
+        if (!res.ok) throw new Error(data.error || "Could not get SMS code");
+        const next =
+          (typeof data.code === "string" && data.code) ||
+          (typeof data.data?.code === "string" && data.data.code) ||
+          null;
+        if (next) {
+          setCode(next);
+          setPolling(false);
+        }
+        return next;
+      } catch (err) {
+        const msg =
+          err instanceof Error ? err.message : "Could not get SMS code";
+        setError(msg);
+        return null;
+      } finally {
+        if (!opts?.silent) setFetching(false);
+      }
+    },
+    [activationId],
+  );
+
+  useEffect(() => {
+    setCode(cachedCode);
+  }, [cachedCode, tx.id]);
+
+  useEffect(() => {
+    if (!activationId || code) return;
+    let cancelled = false;
+    let tries = 0;
+    setPolling(true);
+
+    async function tick() {
+      if (cancelled) return;
+      tries += 1;
+      const next = await fetchCode({ silent: true });
+      if (cancelled) return;
+      if (next || tries >= 40) {
+        setPolling(false);
+        return;
+      }
+      window.setTimeout(tick, 5000);
+    }
+
+    void tick();
+    return () => {
+      cancelled = true;
+    };
+  }, [activationId, code, fetchCode]);
+
+  async function onCopy(value: string, label: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      toast.success(`${label} copied`);
+    } catch {
+      toast.error("Could not copy");
+    }
+  }
+
+  if (!activationId && !phone && !code) return null;
+
+  return (
+    <div className="overflow-hidden rounded-[28px] border border-border bg-background shadow-[var(--shadow-soft)]">
+      <div className="flex items-center gap-2 border-b border-border px-5 py-3.5">
+        <MessageSquareText className="h-4 w-4 text-primary" />
+        <p className="text-sm font-semibold text-foreground">SMS code</p>
+      </div>
+
+      <div className="space-y-3 px-5 py-4">
+        {phone ? (
+          <div className="flex items-center justify-between gap-3 rounded-[16px] bg-muted/50 px-3.5 py-3">
+            <div className="min-w-0">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                Phone number
+              </p>
+              <p className="mt-0.5 truncate font-mono text-sm font-semibold text-foreground">
+                {phone}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void onCopy(phone, "Phone number")}
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-background text-muted-foreground hover:text-foreground"
+              aria-label="Copy phone number"
+            >
+              <Copy className="h-4 w-4" />
+            </button>
+          </div>
+        ) : null}
+
+        <div className="flex items-center justify-between gap-3 rounded-[16px] bg-muted/50 px-3.5 py-3">
+          <div className="min-w-0">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              Verification code
+            </p>
+            <p
+              className={cn(
+                "mt-0.5 truncate text-sm font-semibold text-foreground",
+                code ? "font-mono tracking-wider" : "text-muted-foreground",
+              )}
+            >
+              {code ||
+                (polling || fetching ? "Waiting for SMS…" : "Not received yet")}
+            </p>
+          </div>
+          {code ? (
+            <button
+              type="button"
+              onClick={() => void onCopy(code, "SMS code")}
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-background text-muted-foreground hover:text-foreground"
+              aria-label="Copy SMS code"
+            >
+              <Copy className="h-4 w-4" />
+            </button>
+          ) : polling || fetching ? (
+            <RefreshCw className="h-4 w-4 shrink-0 animate-spin text-primary" />
+          ) : (
+            <Phone className="h-4 w-4 shrink-0 text-muted-foreground" />
+          )}
+        </div>
+
+        {error ? (
+          <p className="text-xs text-destructive">{error}</p>
+        ) : null}
+
+        <button
+          type="button"
+          disabled={!activationId || fetching}
+          onClick={() => void fetchCode()}
+          className="btn-primary inline-flex h-11 w-full items-center justify-center gap-2 text-sm disabled:opacity-50"
+        >
+          {fetching ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <RefreshCw className="h-4 w-4" />
+          )}
+          {code ? "Refresh code" : "Get code"}
+        </button>
+      </div>
+    </div>
   );
 }
 

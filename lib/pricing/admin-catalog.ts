@@ -13,9 +13,9 @@ import {
 } from "@/lib/fivesim";
 import {
   FALLBACK_EMAIL_DOMAINS,
-  getHerosmsEmailDomains,
-  isHerosmsDemoMode,
-} from "@/lib/herosms";
+  getAnymessageEmailDomains,
+  isAnymessageDemoMode,
+} from "@/lib/anymessage";
 import {
   fetchReloadlyCountries,
   fetchReloadlyProducts,
@@ -218,11 +218,11 @@ export async function loadAdminPricingCatalog(input: {
     if (channel === "emails") {
       const site = (input.params.site || "telegram.com").toLowerCase();
       applied.site = site;
-      const demo = isHerosmsDemoMode();
+      const demo = isAnymessageDemoMode();
       let domains = FALLBACK_EMAIL_DOMAINS;
       if (!demo) {
         try {
-          const live = await getHerosmsEmailDomains(site);
+          const live = await getAnymessageEmailDomains(site);
           if (live?.length) domains = live;
         } catch {
           // keep fallback
@@ -281,8 +281,8 @@ export async function loadAdminPricingCatalog(input: {
         items,
         demo,
         hint: demo
-          ? "Set HEROSMS_API_KEY and HEROSMS_DEMO=false to load live email domains."
-          : "Live HeroSMS inbox domains.",
+          ? "Set ANYMESSAGE_API_TOKEN and ANYMESSAGE_DEMO=false to load live email domains."
+          : "Live AnyMessage inbox domains.",
       };
     }
 

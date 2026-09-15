@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { withAdminApi } from "@/lib/admin/api";
-import { isHerosmsDemoMode, isHerosmsLive } from "@/lib/herosms/client";
+import {
+  isAnymessageDemoMode,
+  isAnymessageLive,
+} from "@/lib/anymessage/client";
 import { isFivesimDemoMode, isFivesimLive } from "@/lib/fivesim/client";
 import { isJapDemoMode, isJapLive } from "@/lib/jap/client";
 import {
@@ -72,13 +75,13 @@ export async function GET() {
         }),
       },
       {
-        id: "herosms",
-        name: "HeroSMS",
+        id: "anymessage",
+        name: "AnyMessage",
         type: "Temporary emails",
         country: "Global",
         status: modeLabel({
-          configured: isHerosmsLive() || !isHerosmsDemoMode(),
-          demo: isHerosmsDemoMode(),
+          configured: isAnymessageLive() || !isAnymessageDemoMode(),
+          demo: isAnymessageDemoMode(),
         }),
       },
       {

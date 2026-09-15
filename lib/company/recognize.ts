@@ -47,7 +47,7 @@ export async function recognizeFxProfit(input: {
 }
 
 export async function recognizeUsdServiceProfit(input: {
-  source: "virtual_number" | "social";
+  source: "virtual_number" | "social" | "email";
   transactionId: string;
   userId: string;
   customerUsd: number;

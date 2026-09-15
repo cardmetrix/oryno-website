@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
 import {
+  anymessageErrorToEnglish,
   cancelEmail,
-  herosmsErrorToEnglish,
-  isHerosmsDemoMode,
+  isAnymessageDemoMode,
   pollEmailStatus,
-} from "@/lib/herosms";
+} from "@/lib/anymessage";
 import { publicServiceError } from "@/lib/service-errors";
 
 export const runtime = "nodejs";
@@ -26,13 +26,18 @@ export async function GET(
     }
 
     const status = await pollEmailStatus(id, user.id);
-    return NextResponse.json({ ok: true, demo: false, data: status });
+    return NextResponse.json({
+      ok: true,
+      demo: false,
+      provider: "anymessage",
+      data: status,
+    });
   } catch (error) {
     console.error("[rent-email-status]", error);
     return NextResponse.json(
       {
         error: publicServiceError(
-          herosmsErrorToEnglish(
+          anymessageErrorToEnglish(
             error instanceof Error ? error.message : "Failed to get status",
           ),
         ),
@@ -52,11 +57,11 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (isHerosmsDemoMode()) {
+    if (isAnymessageDemoMode()) {
       return NextResponse.json(
         {
           error:
-            "Email rental is not configured for live. Set HEROSMS_API_KEY and HEROSMS_DEMO=false.",
+            "Email rental is not configured for live. Set ANYMESSAGE_API_TOKEN and ANYMESSAGE_DEMO=false.",
         },
         { status: 503 },
       );
@@ -68,13 +73,18 @@ export async function DELETE(
     }
 
     await cancelEmail(id.trim());
-    return NextResponse.json({ ok: true, cancelled: true, emailId: id });
+    return NextResponse.json({
+      ok: true,
+      cancelled: true,
+      emailId: id,
+      provider: "anymessage",
+    });
   } catch (error) {
     console.error("[rent-email-cancel]", error);
     return NextResponse.json(
       {
         error: publicServiceError(
-          herosmsErrorToEnglish(
+          anymessageErrorToEnglish(
             error instanceof Error ? error.message : "Could not cancel email",
           ),
         ),

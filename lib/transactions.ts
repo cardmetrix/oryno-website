@@ -2,6 +2,24 @@ import { convertNgnToLocal, type NgnLocalQuote } from "@/lib/fx/rates";
 
 export type TransactionStatus = "Completed" | "Pending" | "Failed" | "Reversed";
 
+const RECEIPT_CATEGORY_LABELS: Record<string, string> = {
+  virtual_number: "Virtual numbers",
+  numbers: "Virtual numbers",
+  email: "Temp emails",
+  email_rental: "Temp emails",
+  social: "Social boost",
+  fund: "Wallet funding",
+  withdraw: "Withdrawals",
+  refund: "Refunds",
+};
+
+function receiptCategoryLabel(category: string) {
+  return (
+    RECEIPT_CATEGORY_LABELS[category] ??
+    category.replace(/[_-]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+  );
+}
+
 export type AppTransaction = {
   id: string;
   title: string;
@@ -111,7 +129,7 @@ export function toTransactionReceipt(
         : presentAmount(row.balanceAfter, row.currency, fx).formatted,
     externalRef: row.externalRef,
     reference,
-    categoryLabel: row.category.replace(/_/g, " "),
+    categoryLabel: receiptCategoryLabel(row.category),
     statusRaw: row.status,
     createdAtFormatted: created.toLocaleString("en-NG", {
       dateStyle: "medium",

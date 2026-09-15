@@ -98,6 +98,7 @@ export default function VirtualNumbersPage() {
   const [success, setSuccess] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState("");
   const [activationId, setActivationId] = useState("");
+  const [transactionId, setTransactionId] = useState("");
   const [smsCode, setSmsCode] = useState<string | null>(null);
   const [polling, setPolling] = useState(false);
   const [receipt, setReceipt] = useState("");
@@ -238,6 +239,7 @@ export default function VirtualNumbersPage() {
       if (!res.ok) throw new Error(data.error || "Purchase failed");
       setPhoneNumber(data.phoneNumber);
       setActivationId(data.activationId);
+      setTransactionId(data.transactionId || "");
       setReceipt(data.amountFormatted);
       setSmsCode(null);
       setSuccess(true);
@@ -271,6 +273,15 @@ export default function VirtualNumbersPage() {
               amountLabel="Amount charged"
               amount={receipt}
               onDismiss={() => setSuccess(false)}
+              primaryAction={
+                transactionId
+                  ? {
+                      label: "Get code in History",
+                      href: `/history/${transactionId}`,
+                      icon: "receipt",
+                    }
+                  : undefined
+              }
               secondaryAction={{
                 label: "Back to Home",
                 href: "/dashboard",
@@ -282,6 +293,7 @@ export default function VirtualNumbersPage() {
                   setSuccess(false);
                   setPhoneNumber("");
                   setActivationId("");
+                  setTransactionId("");
                   setSmsCode(null);
                 },
                 icon: "plus",

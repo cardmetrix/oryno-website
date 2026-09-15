@@ -38,11 +38,20 @@ import { cn } from "@/lib/utils";
 
 type Domain = {
   name: string;
+  /** Wholesale from provider */
   costUsd: number;
+  /** Retail charged to USD card (falls back to costUsd) */
+  priceUsd?: number;
   costLocal: number;
   currency: string;
   count: number;
 };
+
+function retailUsd(d: Pick<Domain, "costUsd" | "priceUsd">) {
+  return Number.isFinite(d.priceUsd) && (d.priceUsd as number) > 0
+    ? (d.priceUsd as number)
+    : d.costUsd;
+}
 
 const SITES = [
   { id: "telegram.com", label: "Telegram" },
@@ -93,7 +102,7 @@ export default function EmailRentPage() {
           selected &&
           !submitting &&
           !frozen &&
-          canAffordUsd(selected.costUsd),
+          canAffordUsd(retailUsd(selected)),
       ),
     [domain, siteValue, selected, submitting, frozen, canAffordUsd],
   );
@@ -190,7 +199,8 @@ export default function EmailRentPage() {
         body: JSON.stringify({
           site: siteValue,
           domain: selected.name,
-          priceUsd: selected.costUsd,
+          costUsd: selected.costUsd,
+          priceUsd: retailUsd(selected),
           priceLocal: selected.costLocal,
         }),
       });
@@ -387,7 +397,7 @@ export default function EmailRentPage() {
                   </span>
                   {selected ? (
                     <span className="shrink-0 text-sm font-bold text-primary">
-                      {money(selected.costUsd)}
+                      {money(retailUsd(selected))}
                     </span>
                   ) : null}
                   <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -427,7 +437,7 @@ export default function EmailRentPage() {
                 <Row label="Domain" value={domain ? `@${domain}` : "—"} />
                 <Row
                   label="Amount"
-                  value={selected ? money(selected.costUsd) : money(0)}
+                  value={selected ? money(retailUsd(selected)) : money(0)}
                   accent
                 />
                 <div className="flex items-center gap-2 border-t border-border pt-3 font-semibold">
@@ -448,10 +458,10 @@ export default function EmailRentPage() {
                   ? "Reserving…"
                   : frozen
                     ? "Wallet unavailable"
-                    : selected && !canAffordUsd(selected.costUsd)
+                    : selected && !canAffordUsd(retailUsd(selected))
                       ? "Insufficient USD balance"
                       : selected
-                        ? `Rent email · ${money(selected.costUsd)}`
+                        ? `Rent email · ${money(retailUsd(selected))}`
                         : "Continue"}
               </motion.button>
             </div>
@@ -471,10 +481,10 @@ export default function EmailRentPage() {
                   ? "Reserving…"
                   : frozen
                     ? "Wallet unavailable"
-                    : selected && !canAffordUsd(selected.costUsd)
+                    : selected && !canAffordUsd(retailUsd(selected))
                       ? "Insufficient USD balance"
                       : selected
-                        ? `Rent · ${money(selected.costUsd)}`
+                        ? `Rent · ${money(retailUsd(selected))}`
                         : "Continue"}
               </button>
             </div>
@@ -550,7 +560,7 @@ function DomainPickerSheet({
             ) : null}
           </div>
           <span className="shrink-0 text-sm font-bold tabular-nums text-primary">
-            {formatPrice(d.costUsd)}
+            {formatPrice(retailUsd(d))}
           </span>
           {active ? (
             <Check className="h-4 w-4 shrink-0 text-primary" strokeWidth={2.25} />

@@ -98,7 +98,7 @@ type CatalogResponse = {
 
 const PROVIDER_LABELS: Record<ProviderKey, string> = {
   jap: "Social (JAP)",
-  herosms: "5sim Numbers + Emails",
+  herosms: "5sim Numbers + AnyMessage Emails",
   reloadly: "Gift cards (buy)",
   sogo: "Gift cards (sell)",
   vtpass: "Airtime / Data / Bills (VTpass)",

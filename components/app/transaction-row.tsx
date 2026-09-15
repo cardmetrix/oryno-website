@@ -104,7 +104,11 @@ export function TransactionRow({
           </div>
           <div className="mt-1 flex items-center justify-between gap-2">
             <p className="truncate text-xs text-muted-foreground">
-              {transaction.subtitle}
+              {"category" in transaction &&
+              (transaction.category === "virtual_number" ||
+                transaction.category === "numbers")
+                ? "Tap to get SMS code"
+                : transaction.subtitle}
             </p>
             <span
               className={cn(

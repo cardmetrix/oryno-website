@@ -253,21 +253,25 @@ export const SERVICE_PROVIDERS: CountryServiceProvider[] = [
       "Only live rail for /services/virtual-numbers. Get the API key from 5sim → profile → Get API key. Fund the 5sim balance before purchases will succeed.",
   },
   {
-    id: "herosms",
-    name: "HeroSMS",
-    role: "Temporary email inboxes",
+    id: "anymessage",
+    name: "AnyMessage",
+    role: "Temporary email inboxes for signup OTP",
     services: ["emails"],
     countries: ["NG", "GH", "KE", "ZA"],
-    signupUrl: "https://hero-sms.com",
-    dashboardUrl: "https://hero-sms.com",
-    apiKeysUrl: "https://hero-sms.com",
-    docsUrl: "https://hero-sms.com/api",
+    signupUrl: "https://anymessage.shop",
+    dashboardUrl: "https://anymessage.shop",
+    apiKeysUrl: "https://anymessage.shop",
+    docsUrl: "https://anymessage.shop/en/docs",
     credentials: [
-      { env: "HEROSMS_API_KEY", label: "API key" },
-      { env: "HEROSMS_DEMO", label: "true to force demo; false for live" },
+      { env: "ANYMESSAGE_API_TOKEN", label: "API token from dashboard" },
+      { env: "ANYMESSAGE_DEMO", label: "true to force offline; false for live" },
+      {
+        env: "ANYMESSAGE_DEFAULT_EMAIL_USD",
+        label: "Fallback wholesale USD when quantity has no price (default 0.05)",
+      },
     ],
     notes:
-      "Used only for /services/emails temporary inboxes. Virtual numbers stay on 5sim.",
+      "Primary live rail for /services/emails. Register at anymessage.shop, copy API token, and fund the wallet.",
   },
 ];
 
@@ -284,7 +288,7 @@ export const BEST_PROVIDER_BY_SERVICE: Record<
     "gift-cards-sell": "sogo",
     social: "jap",
     "virtual-numbers": "fivesim",
-    emails: "herosms",
+    emails: "anymessage",
     wallet: "flutterwave",
   },
   GH: {
@@ -296,7 +300,7 @@ export const BEST_PROVIDER_BY_SERVICE: Record<
     "gift-cards-sell": "sogo",
     social: "jap",
     "virtual-numbers": "fivesim",
-    emails: "herosms",
+    emails: "anymessage",
     wallet: "flutterwave",
   },
   KE: {
@@ -308,7 +312,7 @@ export const BEST_PROVIDER_BY_SERVICE: Record<
     "gift-cards-sell": "sogo",
     social: "jap",
     "virtual-numbers": "fivesim",
-    emails: "herosms",
+    emails: "anymessage",
     wallet: "flutterwave",
   },
   ZA: {
@@ -320,7 +324,7 @@ export const BEST_PROVIDER_BY_SERVICE: Record<
     "gift-cards-sell": "sogo",
     social: "jap",
     "virtual-numbers": "fivesim",
-    emails: "herosms",
+    emails: "anymessage",
     wallet: "flutterwave",
   },
 };

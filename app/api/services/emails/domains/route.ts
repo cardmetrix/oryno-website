@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
 import {
-  getHerosmsEmailDomains,
-  isHerosmsDemoMode,
+  anymessageErrorToEnglish,
+  getAnymessageEmailDomains,
+  isAnymessageDemoMode,
   normalizeEmailSite,
-  usdToLocalPrice,
-} from "@/lib/herosms";
+} from "@/lib/anymessage";
+import { quoteLocalUsd } from "@/lib/fx/customer-quote";
+import { createUsdPricer, usdFromLocalRetail } from "@/lib/pricing/service-pricing";
 import { currencyForCountry } from "@/lib/wallet";
 
 export const runtime = "nodejs";
@@ -26,13 +28,11 @@ export async function GET(req: Request) {
       );
     }
 
-    const currency = currencyForCountry(user.countryCode);
-
-    if (isHerosmsDemoMode()) {
+    if (isAnymessageDemoMode()) {
       return NextResponse.json(
         {
           error:
-            "Email rental is not configured for live yet. Set HEROSMS_API_KEY and HEROSMS_DEMO=false on the server.",
+            "Email rental is not configured for live yet. Set ANYMESSAGE_API_TOKEN and ANYMESSAGE_DEMO=false on the server.",
           demo: true,
           domains: [],
         },
@@ -40,41 +40,47 @@ export async function GET(req: Request) {
       );
     }
 
-    const live = await getHerosmsEmailDomains(site);
+    const currency = currencyForCountry(user.countryCode);
+    const quote = await quoteLocalUsd(currency);
+    const price = await createUsdPricer("herosms", "email");
+
+    const live = await getAnymessageEmailDomains(site);
     if (!live.length) {
       return NextResponse.json({
         ok: true,
         demo: false,
-        provider: "herosms",
+        provider: "anymessage",
         site,
         domains: [],
-        message: "No domains in stock for that site right now. Try another site.",
+        message:
+          "No domains in stock for that site right now. Try another site.",
       });
     }
 
-    const list = [];
-    for (const d of live) {
-      const costUsd = Number(d.cost) || 0.1;
+    const list = live.map((d) => {
       const domainName = String(d.name || "").toLowerCase();
-      const { local } = await usdToLocalPrice(
-        costUsd,
-        user.countryCode,
-        `email:${site}:${domainName}`,
-        "email",
-      );
-      list.push({
-        name: d.name,
-        costUsd,
-        costLocal: local,
-        currency,
-        count: Number(d.count) || 0,
+      const costUsd = Number(d.cost) || 0.05;
+      const local = price({
+        serviceKey: `email:${site}:${domainName}`,
+        usd: costUsd,
+        buyRate: quote.buyRate,
       });
-    }
+      return {
+        name: domainName,
+        /** Wholesale from AnyMessage */
+        costUsd,
+        /** Retail charged to the customer (USD card) */
+        priceUsd: usdFromLocalRetail(local.local, quote.buyRate),
+        costLocal: local.local,
+        currency: "USD",
+        count: Number(d.count) || 0,
+      };
+    });
 
     return NextResponse.json({
       ok: true,
       demo: false,
-      provider: "herosms",
+      provider: "anymessage",
       site,
       domains: list,
     });
@@ -82,8 +88,9 @@ export async function GET(req: Request) {
     console.error("[email-domains]", error);
     return NextResponse.json(
       {
-        error:
+        error: anymessageErrorToEnglish(
           error instanceof Error ? error.message : "Failed to load domains",
+        ),
       },
       { status: 400 },
     );

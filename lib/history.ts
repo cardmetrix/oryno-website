@@ -37,12 +37,15 @@ const CATEGORY_LABELS: Record<string, string> = {
   giftcard: 'Gift cards',
   social: 'Social boost',
   numbers: 'Virtual numbers',
+  virtual_number: 'Virtual numbers',
   email: 'Temp emails',
+  email_rental: 'Temp emails',
   convert: 'FX convert',
   usd: 'USD wallet',
   transfer: 'Transfers',
   fee: 'Fees',
   referral: 'Referrals',
+  refund: 'Refunds',
   other: 'Other',
 };
 

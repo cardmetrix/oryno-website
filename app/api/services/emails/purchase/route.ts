@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
 import { createNotification } from "@/lib/notifications-service";
 import { formatMoney } from "@/lib/transactions";
-import { herosmsErrorToEnglish, purchaseEmailActivation } from "@/lib/herosms";
+import {
+  anymessageErrorToEnglish,
+  purchaseEmailActivation,
+} from "@/lib/anymessage";
 import { publicServiceError } from "@/lib/service-errors";
 import { actionLockHttpStatus } from "@/lib/wallet/action-lock";
 
@@ -18,6 +21,7 @@ export async function POST(req: Request) {
     const body = (await req.json()) as {
       site?: string;
       domain?: string;
+      costUsd?: number;
       priceUsd?: number;
       priceLocal?: number;
     };
@@ -40,7 +44,8 @@ export async function POST(req: Request) {
           countryCode: user.countryCode,
           site: body.site!.trim(),
           domain: body.domain!.trim(),
-          priceUsd: Number(body.priceUsd) || 0.1,
+          costUsd: Number(body.costUsd) || undefined,
+          priceUsd: Number(body.priceUsd) || 0.05,
           priceLocal: Number(body.priceLocal) || undefined,
         }),
     );
@@ -57,16 +62,17 @@ export async function POST(req: Request) {
           href: "/services/emails",
           emailId: result.emailId,
           transactionId: result.transactionId,
+          provider: "anymessage",
         },
       });
     } catch (e) {
-      console.error("[herosms-email-notify]", e);
+      console.error("[anymessage-email-notify]", e);
     }
 
     return NextResponse.json({
       ok: true,
       simulated: result.simulated,
-      provider: "herosms",
+      provider: "anymessage",
       email: result.email,
       emailId: result.emailId,
       site: result.site,
@@ -80,7 +86,7 @@ export async function POST(req: Request) {
     console.error("[rent-email-purchase]", error);
     const raw =
       error instanceof Error ? error.message : "Failed to rent email";
-    const errorMessage = publicServiceError(herosmsErrorToEnglish(raw));
+    const errorMessage = publicServiceError(anymessageErrorToEnglish(raw));
     return NextResponse.json(
       {
         error: errorMessage,
