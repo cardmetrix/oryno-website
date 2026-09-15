@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
 import { createNotification } from "@/lib/notifications-service";
-import { hasPairgateKeys, purchasePairgateAirtime } from "@/lib/pairgate";
+import { isNigeriaMarket, purchasePairgateAirtime, requirePairgateForNigeria } from "@/lib/pairgate";
 import { formatMoney } from "@/lib/transactions";
 import { purchaseAirtime } from "@/lib/vtpass";
 import { sogoHttpStatus } from "@/lib/sogo/errors";
@@ -65,9 +65,11 @@ export async function POST(req: Request) {
     }
 
     const usePairgate =
-      mode === "local" &&
-      (user.countryCode || "NG").toUpperCase() === "NG" &&
-      hasPairgateKeys();
+      mode === "local" && isNigeriaMarket(user.countryCode);
+
+    if (usePairgate) {
+      requirePairgateForNigeria(user.countryCode);
+    }
 
     const result = await withSpendLock(
       user.id,
@@ -155,7 +157,14 @@ export async function POST(req: Request) {
             ? "provider_auth"
             : (error as { code?: string } | null)?.code || undefined,
       },
-      { status: actionLockHttpStatus(error) || sogoHttpStatus(error) },
+      {
+        status:
+          actionLockHttpStatus(error) ||
+          sogoHttpStatus(error) ||
+          (typeof (error as { status?: unknown })?.status === "number"
+            ? Number((error as { status: number }).status)
+            : 400),
+      },
     );
   }
 }

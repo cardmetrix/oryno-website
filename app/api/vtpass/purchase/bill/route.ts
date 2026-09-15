@@ -5,7 +5,11 @@ import { formatCountryMoney } from "@/lib/country";
 import { getDisplayFx } from "@/lib/display-currency";
 import { convertNgnToLocal } from "@/lib/fx/rates";
 import { hubtelHttpStatus } from "@/lib/hubtel";
-import { hasPairgateKeys, purchasePairgateBill } from "@/lib/pairgate";
+import {
+  isNigeriaMarket,
+  purchasePairgateBill,
+  requirePairgateForNigeria,
+} from "@/lib/pairgate";
 import { kenyaBillHttpStatus } from "@/lib/reloadly/utilities";
 import { purchaseBill } from "@/lib/vtpass";
 import { sogoHttpStatus } from "@/lib/sogo/errors";
@@ -16,6 +20,18 @@ import {
 } from "@/lib/wallet/action-lock";
 
 export const runtime = "nodejs";
+
+function errorStatus(error: unknown) {
+  return (
+    actionLockHttpStatus(error) ||
+    kenyaBillHttpStatus(error) ||
+    hubtelHttpStatus(error) ||
+    sogoHttpStatus(error) ||
+    (typeof (error as { status?: unknown })?.status === "number"
+      ? Number((error as { status: number }).status)
+      : 400)
+  );
+}
 
 export async function POST(req: Request) {
   try {
@@ -49,42 +65,96 @@ export async function POST(req: Request) {
       );
     }
 
-    const usePairgate =
-      (user.countryCode || "NG").toUpperCase() === "NG" &&
-      hasPairgateKeys() &&
-      (body.category === "tv" || body.category === "electricity");
+    const country = (user.countryCode || "NG").toUpperCase();
+
+    // Nigeria bills are Pairgate-only (same rail as betting). Never VTpass.
+    if (isNigeriaMarket(country)) {
+      if (body.category === "water") {
+        return NextResponse.json(
+          { error: "Water bills are not available in Nigeria yet" },
+          { status: 400 },
+        );
+      }
+      requirePairgateForNigeria(country);
+
+      const result = await withSpendLock(
+        user.id,
+        Number(body.amount),
+        user.countryCode,
+        () =>
+          purchasePairgateBill({
+            userId: user.id,
+            countryCode: user.countryCode,
+            serviceID: body.serviceID!,
+            serviceName: body.serviceName || body.serviceID!,
+            category: body.category as "electricity" | "tv",
+            customerRef: body.customerRef!,
+            phone: body.phone || "",
+            amount: Number(body.amount),
+            variationCode: body.variationCode!,
+            recipientName: body.recipientName,
+          }),
+      );
+
+      const fx = await getDisplayFx(user.countryCode);
+      const amountFormatted = formatCountryMoney(
+        convertNgnToLocal(Number(result.payment.amount), fx.ngnToLocal),
+        user.countryCode,
+      );
+
+      try {
+        await createNotification({
+          userId: user.id,
+          title:
+            result.status === "completed" ? "Bill paid" : "Bill processing",
+          body: `${body.serviceName || "Bill"} · ${body.customerRef}. Ref ${result.requestId}`,
+          type: "bill",
+          metadata: {
+            href: `/history/${result.transactionId}`,
+            transactionId: result.transactionId,
+            paymentId: result.payment.id,
+          },
+        });
+      } catch (notifyError) {
+        console.error("[pairgate-bill-notify]", notifyError);
+      }
+
+      return NextResponse.json({
+        ok: true,
+        status: result.status,
+        simulated: result.simulated,
+        provider: "pairgate",
+        wallet: result.wallet,
+        paymentId: result.payment.id,
+        transactionId: result.transactionId,
+        requestId: result.requestId,
+        amountFormatted,
+        token: result.token,
+        message:
+          result.status === "completed"
+            ? "Bill paid successfully"
+            : "Bill payment is processing",
+      });
+    }
 
     const result = await withSpendLock(
       user.id,
       Number(body.amount),
       user.countryCode,
       () =>
-        usePairgate
-          ? purchasePairgateBill({
-              userId: user.id,
-              countryCode: user.countryCode,
-              serviceID: body.serviceID!,
-              serviceName: body.serviceName || body.serviceID!,
-              category: body.category as "electricity" | "tv",
-              customerRef: body.customerRef!,
-              phone: body.phone || "",
-              amount: Number(body.amount),
-              variationCode: body.variationCode!,
-              recipientName: body.recipientName,
-            })
-          : purchaseBill({
-              userId: user.id,
-              countryCode: user.countryCode,
-              serviceID: body.serviceID!,
-              serviceName: body.serviceName || body.serviceID!,
-              category: body.category!,
-              customerRef: body.customerRef!,
-              phone: body.phone || "",
-              amount: Number(body.amount),
-              variationCode: body.variationCode!,
-              subscriptionType: body.subscriptionType,
-              quantity: body.quantity,
-            }),
+        purchaseBill({
+          userId: user.id,
+          countryCode: user.countryCode,
+          serviceID: body.serviceID!,
+          serviceName: body.serviceName || body.serviceID!,
+          category: body.category!,
+          customerRef: body.customerRef!,
+          phone: body.phone || "",
+          amount: Number(body.amount),
+          variationCode: body.variationCode!,
+          subscriptionType: body.subscriptionType,
+          quantity: body.quantity,
+        }),
     );
 
     const fx = await getDisplayFx(user.countryCode);
@@ -126,20 +196,14 @@ export async function POST(req: Request) {
           : "Bill payment is processing",
     });
   } catch (error) {
-    console.error("[vtpass-bill]", error);
+    console.error("[bill-purchase]", error);
     return NextResponse.json(
       {
         error: publicServiceError(
           error instanceof Error ? error.message : "Bill payment failed",
         ),
       },
-      {
-        status:
-          actionLockHttpStatus(error) ||
-          kenyaBillHttpStatus(error) ||
-          hubtelHttpStatus(error) ||
-          sogoHttpStatus(error),
-      },
+      { status: errorStatus(error) },
     );
   }
 }

@@ -6,12 +6,13 @@ import {
   listHubtelBillServices,
 } from "@/lib/hubtel";
 import {
-  hasPairgateKeys,
-  isPairgateSandbox,
+  isNigeriaMarket,
   listAirtimeServices,
   listDataServices,
   listElectricityServices,
   listTvServices,
+  requirePairgateForNigeria,
+  isPairgateSandbox,
 } from "@/lib/pairgate";
 import {
   cleanNetworkName,
@@ -52,14 +53,27 @@ export async function GET(req: Request) {
 
     const country = (user.countryCode || "NG").toUpperCase();
 
+    // Nigeria: Pairgate only (same rail as betting). Never fall back to VTpass.
     if (
-      country === "NG" &&
-      hasPairgateKeys() &&
+      isNigeriaMarket(country) &&
       (identifier === "airtime" ||
         identifier === "data" ||
         identifier === "tv-subscription" ||
         identifier === "electricity-bill")
     ) {
+      try {
+        requirePairgateForNigeria(country);
+      } catch (error) {
+        return NextResponse.json(
+          {
+            error:
+              error instanceof Error
+                ? error.message
+                : "Nigeria services are temporarily unavailable",
+          },
+          { status: 503 },
+        );
+      }
       const services =
         identifier === "airtime"
           ? listAirtimeServices()
@@ -88,6 +102,22 @@ export async function GET(req: Request) {
                 ? "Meter number"
                 : undefined,
         })),
+      });
+    }
+
+    if (
+      isNigeriaMarket(country) &&
+      identifier === "water-bill"
+    ) {
+      return NextResponse.json({
+        ok: true,
+        demo: false,
+        provider: "pairgate",
+        countryCode: "NG",
+        currency: "NGN",
+        identifier,
+        services: [],
+        error: "Water bills are not available in Nigeria yet",
       });
     }
 

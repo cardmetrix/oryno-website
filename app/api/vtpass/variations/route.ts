@@ -4,7 +4,7 @@ import { priceLocalAmount } from "@/lib/pricing/service-pricing";
 import { getDisplayFx } from "@/lib/display-currency";
 import { convertLocalToNgn } from "@/lib/fx/rates";
 import {
-  hasPairgateKeys,
+  isNigeriaMarket,
   isPairgateSandbox,
   listCableVariations,
   listDataVariations,
@@ -14,6 +14,7 @@ import {
   normalizePairgateDisco,
   normalizePairgateNetwork,
   normalizePairgateTv,
+  requirePairgateForNigeria,
 } from "@/lib/pairgate";
 import {
   fallbackVariationsFor,
@@ -115,12 +116,24 @@ export async function GET(req: Request) {
     const country = (user.countryCode || "NG").toUpperCase();
 
     if (
-      country === "NG" &&
-      hasPairgateKeys() &&
+      isNigeriaMarket(country) &&
       !operatorId &&
       !productTypeId &&
       serviceID !== "foreign-airtime"
     ) {
+      try {
+        requirePairgateForNigeria(country);
+      } catch (error) {
+        return NextResponse.json(
+          {
+            error:
+              error instanceof Error
+                ? error.message
+                : "Nigeria services are temporarily unavailable",
+          },
+          { status: 503 },
+        );
+      }
       const networkSlug = normalizePairgateNetwork(serviceID);
       const isDataNetwork = ["mtn", "airtel", "glo", "9mobile"].includes(
         networkSlug,
@@ -218,6 +231,18 @@ export async function GET(req: Request) {
           variations: priced,
         });
       }
+
+      // Never fall through to VTpass for Nigeria
+      return NextResponse.json({
+        ok: true,
+        demo: isPairgateSandbox(),
+        provider: "pairgate",
+        countryCode: "NG",
+        currency: "NGN",
+        serviceID,
+        serviceName: serviceID,
+        variations: [],
+      });
     }
 
     if (country === "ZA") {

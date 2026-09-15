@@ -1,11 +1,13 @@
 export {
   generatePairgateReference,
   hasPairgateKeys,
+  isNigeriaMarket,
   isPairgateSandbox,
   pairgateApiKey,
   pairgateBaseUrl,
   pairgateFetch,
   pairgateWebhookSecret,
+  requirePairgateForNigeria,
   verifyPairgateWebhookSignature,
   type PairgateEnvelope,
   type PairgateWebhookPayload,

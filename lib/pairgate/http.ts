@@ -37,6 +37,25 @@ export function hasPairgateKeys() {
   return Boolean(pairgateApiKey());
 }
 
+/** Nigeria VTU/bills/betting always use Pairgate — never VTpass. */
+export function isNigeriaMarket(countryCode?: string | null) {
+  return (countryCode || "NG").toUpperCase().slice(0, 2) === "NG";
+}
+
+/**
+ * Throw when Nigeria Pairgate credentials are missing.
+ * Call this instead of falling back to VTpass.
+ */
+export function requirePairgateForNigeria(countryCode?: string | null) {
+  if (!isNigeriaMarket(countryCode)) return;
+  if (hasPairgateKeys()) return;
+  const err = new Error(
+    "Nigeria services are temporarily unavailable. Please try again later.",
+  ) as Error & { status?: number };
+  err.status = 503;
+  throw err;
+}
+
 /** Serialize Pairgate calls — their API rate-limits ~1 request / 2s. */
 let pairgateRequestChain: Promise<unknown> = Promise.resolve();
 let lastPairgateRequestAt = 0;

@@ -48,9 +48,9 @@ export const SERVICE_PROVIDERS: CountryServiceProvider[] = [
   {
     id: "vtpass",
     name: "VTpass",
-    role: "NG bills backup + international airtime/data for GH, KE, ZA",
-    services: ["airtime", "data", "bills"],
-    countries: ["NG", "GH", "KE", "ZA"],
+    role: "International airtime/data for GH, KE, ZA only (not Nigeria)",
+    services: ["airtime", "data"],
+    countries: ["GH", "KE", "ZA"],
     signupUrl: "https://vtpass.com/register",
     dashboardUrl: "https://vtpass.com/dashboard",
     apiKeysUrl: "https://vtpass.com/dashboard",
@@ -115,7 +115,7 @@ export const SERVICE_PROVIDERS: CountryServiceProvider[] = [
       { env: "BETTING_DEMO", label: "true to force local demo betting" },
     ],
     notes:
-      "Primary Nigeria rail for airtime, data, cable TV, electricity, and betting. Set PAIRGATE_API_KEY, point the webhook to /api/webhooks/pairgate, and fund the Pairgate wallet. Water bills are not supported — leave water on other rails or hide for NG. PAIRGATE_SANDBOX=true uses /test/... endpoints.",
+      "Primary and only Nigeria rail for airtime, data, cable TV, electricity, and betting — never falls back to VTpass. Set PAIRGATE_API_KEY on production, point the webhook to /api/webhooks/pairgate, and fund the Pairgate wallet. Water bills are not supported for NG.",
   },
   {
     id: "vtu-africa",

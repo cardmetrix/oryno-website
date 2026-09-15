@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
 import {
-  hasPairgateKeys,
+  isNigeriaMarket,
   isPairgateSandbox,
   listElectricityServices,
   listTvServices,
   normalizePairgateDisco,
   normalizePairgateTv,
+  requirePairgateForNigeria,
   verifyPairgateCable,
   verifyPairgateElectricity,
 } from "@/lib/pairgate";
@@ -16,12 +17,17 @@ export const runtime = "nodejs";
 
 function isPairgateTv(serviceID: string) {
   const slug = normalizePairgateTv(serviceID);
-  return listTvServices().some((s) => s.serviceID === slug);
+  return listTvServices().some((s) => s.serviceID === slug) || /dstv|gotv|startimes/i.test(serviceID);
 }
 
 function isPairgateElectricity(serviceID: string) {
   const slug = normalizePairgateDisco(serviceID);
-  return listElectricityServices().some((s) => s.serviceID === slug);
+  return (
+    listElectricityServices().some((s) => s.serviceID === slug) ||
+    /electric|ikedc|eko|aedc|kedco|ibedc|jedc|kaduna|enugu|benin|aba|yola|^ph$|ibadan|ikeja|abuja|kano|jos|portharcourt|port-harcourt/i.test(
+      serviceID,
+    )
+  );
 }
 
 export async function POST(req: Request) {
@@ -47,7 +53,10 @@ export async function POST(req: Request) {
 
     const country = (user.countryCode || "NG").toUpperCase();
 
-    if (country === "NG" && hasPairgateKeys()) {
+    // Nigeria: Pairgate only — never VTpass.
+    if (isNigeriaMarket(country)) {
+      requirePairgateForNigeria(country);
+
       const category =
         body.category ||
         (isPairgateTv(body.serviceID)
@@ -55,6 +64,13 @@ export async function POST(req: Request) {
           : isPairgateElectricity(body.serviceID)
             ? "electricity"
             : null);
+
+      if (category === "water") {
+        return NextResponse.json(
+          { error: "Water bills are not available in Nigeria yet" },
+          { status: 400 },
+        );
+      }
 
       if (category === "tv") {
         const result = await verifyPairgateCable({
@@ -96,6 +112,11 @@ export async function POST(req: Request) {
           meterNumber: body.billersCode,
         });
       }
+
+      return NextResponse.json(
+        { error: "Unsupported Nigeria bill provider" },
+        { status: 400 },
+      );
     }
 
     if (country === "ZA") {
