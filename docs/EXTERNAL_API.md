@@ -97,4 +97,4 @@ Demo customer IDs (when the country’s rail keys are unset or `BETTING_DEMO=tru
 | `00000000` | Verification fails |
 | `99999999` | Verifies, then funding fails and wallet is refunded |
 
-Rails: Nigeria uses ClubKonnect (`CLUBKONNECT_USER_ID` + `CLUBKONNECT_API_KEY`). Ghana, Kenya, and South Africa use VTU Africa (`VTU_AFRICA_API_KEY`).
+Rails: Nigeria uses Pairgate (`PAIRGATE_API_KEY`). Ghana, Kenya, and South Africa use VTU Africa (`VTU_AFRICA_API_KEY`). Pairgate webhooks: `POST /api/webhooks/pairgate`.

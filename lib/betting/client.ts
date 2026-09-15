@@ -4,31 +4,27 @@ import {
   findBettingProvider,
   normalizeBettingCustomerId,
 } from "./catalog";
-import {
-  clubKonnectFund,
-  clubKonnectVerify,
-  hasClubKonnectKeys,
-} from "./clubkonnect";
+import { hasPairgateKeys, pairgateFund, pairgateVerify } from "./pairgate";
 import { hasVtuAfricaKeys, vtuAfricaFund, vtuAfricaVerify } from "./vtu-africa";
 
-export type BettingRail = "clubkonnect" | "vtu-africa";
+export type BettingRail = "pairgate" | "vtu-africa";
 
-/** Nigeria → ClubKonnect only; GH / KE / ZA → VTU Africa. */
+/** Nigeria → Pairgate; GH / KE / ZA → VTU Africa. */
 export function bettingRailForCountry(
   countryCode?: string | null,
 ): BettingRail {
-  return resolveCountryCode(countryCode) === "NG" ? "clubkonnect" : "vtu-africa";
+  return resolveCountryCode(countryCode) === "NG" ? "pairgate" : "vtu-africa";
 }
 
 export function hasBettingKeys(countryCode?: string | null) {
   const rail = bettingRailForCountry(countryCode);
-  return rail === "clubkonnect" ? hasClubKonnectKeys() : hasVtuAfricaKeys();
+  return rail === "pairgate" ? hasPairgateKeys() : hasVtuAfricaKeys();
 }
 
 /** @deprecated Prefer hasBettingKeys(country). */
 export function bettingApiKey() {
   return (
-    process.env.CLUBKONNECT_API_KEY ||
+    process.env.PAIRGATE_API_KEY ||
     process.env.VTU_AFRICA_API_KEY ||
     process.env.BETTING_API_KEY ||
     ""
@@ -41,7 +37,7 @@ export function isBettingDemoForced() {
   const flag = (
     process.env.BETTING_DEMO ||
     process.env.VTU_AFRICA_DEMO ||
-    process.env.CLUBKONNECT_DEMO ||
+    process.env.PAIRGATE_DEMO ||
     ""
   )
     .trim()
@@ -122,12 +118,12 @@ export async function verifyBettingCustomer(input: {
     };
   }
 
-  if (rail === "clubkonnect") {
-    const result = await clubKonnectVerify({
+  if (rail === "pairgate") {
+    const result = await pairgateVerify({
       serviceID: provider.serviceID,
       customerId,
     });
-    return { ...result, demo: false, rail: "clubkonnect" };
+    return { ...result, demo: false, rail: "pairgate" };
   }
 
   const result = await vtuAfricaVerify({
@@ -143,6 +139,7 @@ export async function fundBettingAccount(input: {
   amount: number;
   reference: string;
   phone?: string | null;
+  recipientName?: string | null;
   countryCode?: string | null;
 }): Promise<{
   ok: boolean;
@@ -183,15 +180,15 @@ export async function fundBettingAccount(input: {
     };
   }
 
-  if (rail === "clubkonnect") {
-    const funded = await clubKonnectFund({
+  if (rail === "pairgate") {
+    const funded = await pairgateFund({
       serviceID: provider.serviceID,
       customerId,
       amount: input.amount,
       reference: input.reference,
-      phone: input.phone,
+      recipientName: input.recipientName,
     });
-    return { ...funded, demo: false, rail: "clubkonnect" };
+    return { ...funded, demo: false, rail: "pairgate" };
   }
 
   const funded = await vtuAfricaFund({

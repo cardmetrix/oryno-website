@@ -278,6 +278,7 @@ export async function fundBettingWallet(input: {
       amount: faceAmount,
       reference: requestId,
       phone: input.phone,
+      recipientName: customerName,
       countryCode: country,
     });
 

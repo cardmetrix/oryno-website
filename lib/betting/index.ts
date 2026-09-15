@@ -19,6 +19,8 @@ export {
   verifyBettingCustomer,
   type BettingRail,
 } from "./client";
+export { hasPairgateKeys, pairgateApiKey } from "./pairgate";
 export { bettingErrorToEnglish, bettingHttpStatus } from "./errors";
 export { formatBettingAmount, fundBettingWallet } from "./purchase";
 export type { BettingFundResult, BettingVerifyResult } from "./types";
+
