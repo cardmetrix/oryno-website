@@ -84,12 +84,30 @@ export function fivesimErrorToEnglish(message: string) {
   const raw = String(message || "").trim();
   const lower = raw.toLowerCase();
   if (!raw) return "Virtual number service error";
+
+  // Keep user-wallet errors readable (do not treat as provider downtime).
+  if (
+    lower.includes("insufficient usd") ||
+    lower.includes("usd card") ||
+    lower.includes("usd wallet") ||
+    lower.includes("fund your usd")
+  ) {
+    return raw;
+  }
+
   if (lower.includes("no free phones") || lower.includes("no_numbers")) {
     return "No numbers in stock for that country and service. Try another country.";
   }
-  if (lower.includes("not enough user balance") || lower.includes("balance")) {
-    return "This service is temporarily unavailable. Please try again later.";
+
+  // 5sim provider wallet empty / too low
+  if (
+    lower === "no_balance" ||
+    lower.includes("not enough user balance") ||
+    lower.includes("not enough balance")
+  ) {
+    return "No numbers available right now. Try another country or try again later.";
   }
+
   if (lower.includes("bad token") || lower.includes("unauthorized")) {
     return "Virtual number provider credentials are invalid.";
   }
@@ -178,6 +196,10 @@ export async function assertFivesimReady(minUsd = 0.01) {
   }
   const profile = await getFivesimProfile();
   if (profile.balance < minUsd) {
+    console.error(LOG_PREFIX, "provider wallet empty", {
+      balance: profile.balance,
+      minUsd,
+    });
     throw new Error("NO_BALANCE");
   }
   return profile.balance;

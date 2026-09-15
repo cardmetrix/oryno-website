@@ -41,11 +41,14 @@ export async function POST(req: Request) {
     }
 
     const costUsd = Number(body.costUsd);
-    const priceUsd =
-      Number.isFinite(costUsd) && costUsd > 0
-        ? costUsd
-        : Number(body.priceUsd);
-    if (!Number.isFinite(priceUsd) || priceUsd <= 0) {
+    const priceUsd = Number(body.priceUsd);
+    const chargeUsd =
+      Number.isFinite(priceUsd) && priceUsd > 0
+        ? priceUsd
+        : Number.isFinite(costUsd) && costUsd > 0
+          ? costUsd
+          : NaN;
+    if (!Number.isFinite(chargeUsd) || chargeUsd <= 0) {
       return NextResponse.json(
         { error: "Invalid price — refresh and try again" },
         { status: 400 },
@@ -87,8 +90,9 @@ export async function POST(req: Request) {
             service: body.service!.trim(),
             serviceName: body.serviceName || body.service!,
             operator: body.operator,
-            priceUsd,
-            costUsd: Number.isFinite(costUsd) && costUsd > 0 ? costUsd : undefined,
+            priceUsd: chargeUsd,
+            costUsd:
+              Number.isFinite(costUsd) && costUsd > 0 ? costUsd : undefined,
             priceLocal: Number(body.priceLocal) || 0,
           }),
       );
@@ -148,7 +152,7 @@ export async function POST(req: Request) {
           iso: body.iso,
           service: body.service!,
           serviceName: body.serviceName || body.service!,
-          priceUsd,
+          priceUsd: chargeUsd,
           costUsd: Number.isFinite(costUsd) && costUsd > 0 ? costUsd : undefined,
           priceLocal: Number(body.priceLocal) || 0,
         }),

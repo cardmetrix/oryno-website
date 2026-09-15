@@ -66,11 +66,14 @@ export async function POST(req: Request) {
     }
 
     const costUsd = Number(body.costUsd);
-    const priceUsd =
-      Number.isFinite(costUsd) && costUsd > 0
-        ? costUsd
-        : Number(body.priceUsd);
-    if (!Number.isFinite(priceUsd) || priceUsd <= 0) {
+    const retailUsd = Number(body.priceUsd);
+    const chargeUsd =
+      Number.isFinite(retailUsd) && retailUsd > 0
+        ? retailUsd
+        : Number.isFinite(costUsd) && costUsd > 0
+          ? costUsd
+          : NaN;
+    if (!Number.isFinite(chargeUsd) || chargeUsd <= 0) {
       return NextResponse.json(
         { error: "Invalid price — refresh and try again" },
         { status: 400 },
@@ -78,7 +81,7 @@ export async function POST(req: Request) {
     }
 
     const { withSpendLock } = await import("@/lib/wallet/action-lock");
-      const result = await withSpendLock(
+    const result = await withSpendLock(
       user.id,
       Number(body.priceLocal) || 0,
       user.countryCode,
@@ -92,7 +95,7 @@ export async function POST(req: Request) {
           service,
           serviceName: body.serviceName || service,
           operator: body.operator,
-          priceUsd,
+          priceUsd: chargeUsd,
           costUsd:
             Number.isFinite(costUsd) && costUsd > 0 ? costUsd : undefined,
           priceLocal: Number(body.priceLocal) || 0,
