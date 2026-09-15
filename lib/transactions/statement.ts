@@ -13,6 +13,7 @@ import {
   toAppTransaction,
   type AppTransaction,
 } from "@/lib/transactions";
+import { statusDisplayLabel } from "@/lib/history";
 
 
 /** Bundled TTF so PDFKit never needs missing Helvetica.afm in production. */
@@ -197,7 +198,7 @@ async function buildPdfBuffer(opts: {
       doc
         .fillColor("#8E8E93")
         .fontSize(9)
-        .text(`${date} · ${item.subtitle} · ${item.status} · ${item.category ?? "other"}`);
+        .text(`${date} · ${item.subtitle} · ${statusDisplayLabel(item.status)} · ${item.category ?? "other"}`);
       doc.moveDown(0.35);
       if (doc.y > 760) doc.addPage();
     }
@@ -275,7 +276,7 @@ async function buildXlsxBuffer(opts: {
       details: item.subtitle,
       category: item.category ?? "other",
       type: item.type,
-      status: item.status,
+      status: statusDisplayLabel(item.status),
       amount: item.type === "credit" ? Math.abs(amount) : -Math.abs(amount),
       currency: (item.currency ?? currency).toUpperCase(),
       id: item.id,

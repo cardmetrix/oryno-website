@@ -5,6 +5,7 @@ import { formatCountryMoney } from "@/lib/country";
 import { getDisplayFx } from "@/lib/display-currency";
 import { convertNgnToLocal } from "@/lib/fx/rates";
 import { hubtelHttpStatus } from "@/lib/hubtel";
+import { hasPairgateKeys, purchasePairgateBill } from "@/lib/pairgate";
 import { kenyaBillHttpStatus } from "@/lib/reloadly/utilities";
 import { purchaseBill } from "@/lib/vtpass";
 import { sogoHttpStatus } from "@/lib/sogo/errors";
@@ -47,24 +48,41 @@ export async function POST(req: Request) {
       );
     }
 
+    const usePairgate =
+      (user.countryCode || "NG").toUpperCase() === "NG" &&
+      hasPairgateKeys() &&
+      (body.category === "tv" || body.category === "electricity");
+
     const result = await withSpendLock(
       user.id,
       Number(body.amount),
       user.countryCode,
       () =>
-      purchaseBill({
-      userId: user.id,
-      countryCode: user.countryCode,
-      serviceID: body.serviceID,
-      serviceName: body.serviceName || body.serviceID,
-      category: body.category,
-      customerRef: body.customerRef,
-      phone: body.phone || "",
-      amount: Number(body.amount),
-      variationCode: body.variationCode,
-      subscriptionType: body.subscriptionType,
-      quantity: body.quantity,
-      }),
+        usePairgate
+          ? purchasePairgateBill({
+              userId: user.id,
+              countryCode: user.countryCode,
+              serviceID: body.serviceID!,
+              serviceName: body.serviceName || body.serviceID!,
+              category: body.category as "electricity" | "tv",
+              customerRef: body.customerRef!,
+              phone: body.phone || "",
+              amount: Number(body.amount),
+              variationCode: body.variationCode!,
+            })
+          : purchaseBill({
+              userId: user.id,
+              countryCode: user.countryCode,
+              serviceID: body.serviceID!,
+              serviceName: body.serviceName || body.serviceID!,
+              category: body.category!,
+              customerRef: body.customerRef!,
+              phone: body.phone || "",
+              amount: Number(body.amount),
+              variationCode: body.variationCode!,
+              subscriptionType: body.subscriptionType,
+              quantity: body.quantity,
+            }),
     );
 
     const fx = await getDisplayFx(user.countryCode);
@@ -113,7 +131,13 @@ export async function POST(req: Request) {
           error instanceof Error ? error.message : "Bill payment failed",
         ),
       },
-      { status: actionLockHttpStatus(error) || kenyaBillHttpStatus(error) || hubtelHttpStatus(error) || sogoHttpStatus(error) },
+      {
+        status:
+          actionLockHttpStatus(error) ||
+          kenyaBillHttpStatus(error) ||
+          hubtelHttpStatus(error) ||
+          sogoHttpStatus(error),
+      },
     );
   }
 }

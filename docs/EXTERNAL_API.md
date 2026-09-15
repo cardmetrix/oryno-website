@@ -97,4 +97,4 @@ Demo customer IDs (when the country’s rail keys are unset or `BETTING_DEMO=tru
 | `00000000` | Verification fails |
 | `99999999` | Verifies, then funding fails and wallet is refunded |
 
-Rails: Nigeria uses Pairgate (`PAIRGATE_API_KEY`). Ghana, Kenya, and South Africa use VTU Africa (`VTU_AFRICA_API_KEY`). Pairgate webhooks: `POST /api/webhooks/pairgate`.
+Rails: Nigeria uses Pairgate (`PAIRGATE_API_KEY`) for betting, airtime, data, cable TV, and electricity. Ghana, Kenya, and South Africa betting use VTU Africa (`VTU_AFRICA_API_KEY`). Pairgate webhooks: `POST /api/webhooks/pairgate` (settles betting + VTU/bill orders; electricity tokens arrive in `pin`).

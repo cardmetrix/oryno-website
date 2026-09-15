@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
 import { createNotification } from "@/lib/notifications-service";
+import { hasPairgateKeys, purchasePairgateData } from "@/lib/pairgate";
 import { formatMoney } from "@/lib/transactions";
 import { purchaseData } from "@/lib/vtpass";
 import { sogoHttpStatus } from "@/lib/sogo/errors";
@@ -68,26 +69,41 @@ export async function POST(req: Request) {
       );
     }
 
+    const usePairgate =
+      mode === "local" &&
+      (user.countryCode || "NG").toUpperCase() === "NG" &&
+      hasPairgateKeys();
+
     const result = await withSpendLock(
       user.id,
       Number(body.amount),
       user.countryCode,
       () =>
-      purchaseData({
-      userId: user.id,
-      countryCode: user.countryCode,
-      serviceID: body.serviceID || "foreign-airtime",
-      phone: body.phone,
-      variationCode: body.variationCode,
-      variationName: body.variationName || body.variationCode,
-      amount: Number(body.amount),
-      email: user.email,
-      mode,
-      operatorId: body.operatorId,
-      countryIso: body.countryIso,
-      productTypeId: body.productTypeId,
-      flexibleLocalAmount: flexibleIntl,
-      }),
+        usePairgate
+          ? purchasePairgateData({
+              userId: user.id,
+              countryCode: user.countryCode,
+              serviceID: body.serviceID!,
+              phone: body.phone!,
+              variationCode: body.variationCode!,
+              variationName: body.variationName || body.variationCode!,
+              amount: Number(body.amount),
+            })
+          : purchaseData({
+              userId: user.id,
+              countryCode: user.countryCode,
+              serviceID: body.serviceID || "foreign-airtime",
+              phone: body.phone!,
+              variationCode: body.variationCode,
+              variationName: body.variationName || body.variationCode,
+              amount: Number(body.amount),
+              email: user.email,
+              mode,
+              operatorId: body.operatorId,
+              countryIso: body.countryIso,
+              productTypeId: body.productTypeId,
+              flexibleLocalAmount: flexibleIntl,
+            }),
     );
 
     const amountFormatted = formatMoney(

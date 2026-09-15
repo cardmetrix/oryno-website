@@ -4,6 +4,18 @@ import { priceLocalAmount } from "@/lib/pricing/service-pricing";
 import { getDisplayFx } from "@/lib/display-currency";
 import { convertLocalToNgn } from "@/lib/fx/rates";
 import {
+  hasPairgateKeys,
+  isPairgateSandbox,
+  listCableVariations,
+  listDataVariations,
+  listElectricityServices,
+  listElectricityVariations,
+  listTvServices,
+  normalizePairgateDisco,
+  normalizePairgateNetwork,
+  normalizePairgateTv,
+} from "@/lib/pairgate";
+import {
   fallbackVariationsFor,
   getVtpassVariations,
   isIntlDataProductType,
@@ -54,6 +66,33 @@ async function keDataCatalogResponse(serviceID: string, operatorId: string) {
   });
 }
 
+function isPairgateBillService(serviceID: string) {
+  const key = serviceID.trim().toLowerCase();
+  if (listTvServices().some((s) => s.serviceID === normalizePairgateTv(key))) {
+    return "tv" as const;
+  }
+  if (
+    listElectricityServices().some(
+      (s) => s.serviceID === normalizePairgateDisco(key),
+    )
+  ) {
+    return "electricity" as const;
+  }
+  // Legacy VTpass IDs that map to Pairgate
+  if (normalizePairgateTv(key) !== key && /dstv|gotv|startimes/.test(key)) {
+    return "tv" as const;
+  }
+  if (
+    normalizePairgateDisco(key) !== key ||
+    /electric|ikedc|eko|aedc|kedco|ibedc|jedc|kaduna|enugu|benin|aba|yola|^ph$/.test(
+      key,
+    )
+  ) {
+    return "electricity" as const;
+  }
+  return null;
+}
+
 export async function GET(req: Request) {
   try {
     const user = await ensureAppUser();
@@ -72,8 +111,115 @@ export async function GET(req: Request) {
 
     const operatorId = searchParams.get("operator_id") ?? undefined;
     const productTypeId = searchParams.get("product_type_id") ?? undefined;
+    const country = (user.countryCode || "NG").toUpperCase();
 
-    if ((user.countryCode || "NG") === "ZA") {
+    if (
+      country === "NG" &&
+      hasPairgateKeys() &&
+      !operatorId &&
+      !productTypeId &&
+      serviceID !== "foreign-airtime"
+    ) {
+      const networkSlug = normalizePairgateNetwork(serviceID);
+      const isDataNetwork = ["mtn", "airtel", "glo", "9mobile"].includes(
+        networkSlug,
+      );
+      const billKind = isPairgateBillService(serviceID);
+
+      if (billKind === "tv") {
+        const live = await listCableVariations(serviceID);
+        const priced = await Promise.all(
+          live.variations.map(async (v) => {
+            const base = Number(v.charged_amount) || 0;
+            const result = await priceLocalAmount({
+              provider: "vtpass",
+              serviceKey: `${normalizePairgateTv(serviceID)}:${v.variation_code}`,
+              amount: base > 0 ? base : 1000,
+            });
+            return {
+              variationCode: v.variation_code,
+              name: v.name,
+              amount: base > 0 ? result.local : 0,
+              listAmount: base > 0 ? result.listLocal : 0,
+              priceOverride: result.overrideApplied,
+              fixedPrice: true,
+              variationAmount: v.variation_amount,
+              chargedAmount: v.charged_amount,
+            };
+          }),
+        );
+        return NextResponse.json({
+          ok: true,
+          demo: isPairgateSandbox(),
+          provider: "pairgate",
+          countryCode: "NG",
+          currency: "NGN",
+          serviceID,
+          serviceName: live.serviceName,
+          variations: priced,
+        });
+      }
+
+      if (billKind === "electricity") {
+        const live = listElectricityVariations();
+        return NextResponse.json({
+          ok: true,
+          demo: isPairgateSandbox(),
+          provider: "pairgate",
+          countryCode: "NG",
+          currency: "NGN",
+          serviceID,
+          serviceName: live.serviceName,
+          variations: live.variations.map((v) => ({
+            variationCode: v.variation_code,
+            name: v.name,
+            amount: 0,
+            listAmount: 0,
+            priceOverride: false,
+            fixedPrice: false,
+            variationAmount: v.variation_amount,
+            chargedAmount: 0,
+          })),
+        });
+      }
+
+      // Data plans (airtime has no variations)
+      if (isDataNetwork || /-data$/i.test(serviceID)) {
+        const live = await listDataVariations(serviceID);
+        const priced = await Promise.all(
+          live.variations.map(async (v) => {
+            const base = Number(v.charged_amount) || 0;
+            const result = await priceLocalAmount({
+              provider: "vtpass",
+              serviceKey: `${networkSlug}:${v.variation_code}`,
+              amount: base > 0 ? base : 1000,
+            });
+            return {
+              variationCode: v.variation_code,
+              name: v.name,
+              amount: base > 0 ? result.local : 0,
+              listAmount: base > 0 ? result.listLocal : 0,
+              priceOverride: result.overrideApplied,
+              fixedPrice: true,
+              variationAmount: v.variation_amount,
+              chargedAmount: v.charged_amount,
+            };
+          }),
+        );
+        return NextResponse.json({
+          ok: true,
+          demo: isPairgateSandbox(),
+          provider: "pairgate",
+          countryCode: "NG",
+          currency: "NGN",
+          serviceID,
+          serviceName: live.serviceName,
+          variations: priced,
+        });
+      }
+    }
+
+    if (country === "ZA") {
       const {
         findZaBillService,
         listZaVariations,
@@ -227,7 +373,7 @@ export async function GET(req: Request) {
         });
       }
 
-      let variations;
+      let variations: Awaited<ReturnType<typeof getVtpassVariations>>["variations"] | ReturnType<typeof fallbackVariationsFor> = [];
       let serviceName = serviceID;
 
       if (isVtpassDemoMode() && serviceID !== "foreign-airtime") {

@@ -6,6 +6,14 @@ import {
   listHubtelBillServices,
 } from "@/lib/hubtel";
 import {
+  hasPairgateKeys,
+  isPairgateSandbox,
+  listAirtimeServices,
+  listDataServices,
+  listElectricityServices,
+  listTvServices,
+} from "@/lib/pairgate";
+import {
   cleanNetworkName,
   fallbackServicesFor,
   getVtpassServices,
@@ -42,8 +50,43 @@ export async function GET(req: Request) {
       );
     }
 
+    const country = (user.countryCode || "NG").toUpperCase();
+
     if (
-      (user.countryCode || "NG") === "GH" &&
+      country === "NG" &&
+      hasPairgateKeys() &&
+      (identifier === "airtime" ||
+        identifier === "data" ||
+        identifier === "tv-subscription" ||
+        identifier === "electricity-bill")
+    ) {
+      const services =
+        identifier === "airtime"
+          ? listAirtimeServices()
+          : identifier === "data"
+            ? listDataServices()
+            : identifier === "tv-subscription"
+              ? listTvServices()
+              : listElectricityServices();
+      return NextResponse.json({
+        ok: true,
+        demo: isPairgateSandbox(),
+        provider: "pairgate",
+        countryCode: "NG",
+        currency: "NGN",
+        identifier,
+        services: services.map((s) => ({
+          serviceID: s.serviceID,
+          name: s.name,
+          image: s.image,
+          minAmount: s.minAmount,
+          maxAmount: s.maxAmount,
+        })),
+      });
+    }
+
+    if (
+      country === "GH" &&
       (identifier === "tv-subscription" ||
         identifier === "electricity-bill" ||
         identifier === "water-bill")
@@ -69,7 +112,7 @@ export async function GET(req: Request) {
     }
 
     if (
-      (user.countryCode || "NG") === "ZA" &&
+      country === "ZA" &&
       (identifier === "tv-subscription" ||
         identifier === "electricity-bill" ||
         identifier === "water-bill")
@@ -101,7 +144,7 @@ export async function GET(req: Request) {
     }
 
     if (
-      (user.countryCode || "NG") === "KE" &&
+      country === "KE" &&
       (identifier === "tv-subscription" ||
         identifier === "electricity-bill" ||
         identifier === "water-bill")

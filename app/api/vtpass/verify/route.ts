@@ -1,8 +1,28 @@
 import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
+import {
+  hasPairgateKeys,
+  isPairgateSandbox,
+  listElectricityServices,
+  listTvServices,
+  normalizePairgateDisco,
+  normalizePairgateTv,
+  verifyPairgateCable,
+  verifyPairgateElectricity,
+} from "@/lib/pairgate";
 import { isVtpassDemoMode, verifyVtpassCustomer } from "@/lib/vtpass";
 
 export const runtime = "nodejs";
+
+function isPairgateTv(serviceID: string) {
+  const slug = normalizePairgateTv(serviceID);
+  return listTvServices().some((s) => s.serviceID === slug);
+}
+
+function isPairgateElectricity(serviceID: string) {
+  const slug = normalizePairgateDisco(serviceID);
+  return listElectricityServices().some((s) => s.serviceID === slug);
+}
 
 export async function POST(req: Request) {
   try {
@@ -25,7 +45,60 @@ export async function POST(req: Request) {
       );
     }
 
-    if ((user.countryCode || "NG") === "ZA") {
+    const country = (user.countryCode || "NG").toUpperCase();
+
+    if (country === "NG" && hasPairgateKeys()) {
+      const category =
+        body.category ||
+        (isPairgateTv(body.serviceID)
+          ? "tv"
+          : isPairgateElectricity(body.serviceID)
+            ? "electricity"
+            : null);
+
+      if (category === "tv") {
+        const result = await verifyPairgateCable({
+          serviceID: body.serviceID,
+          smartcard: body.billersCode.trim(),
+        });
+        if (!result.ok) {
+          return NextResponse.json(
+            { error: result.message || "Could not verify smartcard" },
+            { status: 422 },
+          );
+        }
+        return NextResponse.json({
+          ok: true,
+          demo: isPairgateSandbox(),
+          provider: "pairgate",
+          customerName: result.customerName,
+          meterNumber: body.billersCode,
+        });
+      }
+
+      if (category === "electricity") {
+        const result = await verifyPairgateElectricity({
+          serviceID: body.serviceID,
+          meterNumber: body.billersCode.trim(),
+          meterType: body.type,
+        });
+        if (!result.ok) {
+          return NextResponse.json(
+            { error: result.message || "Could not verify meter" },
+            { status: 422 },
+          );
+        }
+        return NextResponse.json({
+          ok: true,
+          demo: isPairgateSandbox(),
+          provider: "pairgate",
+          customerName: result.customerName,
+          meterNumber: body.billersCode,
+        });
+      }
+    }
+
+    if (country === "ZA") {
       const {
         verifyZaBillCustomer,
         isZaBillsDemoMode,
@@ -57,7 +130,7 @@ export async function POST(req: Request) {
       });
     }
 
-    if ((user.countryCode || "NG") === "KE") {
+    if (country === "KE") {
       const {
         verifyKenyaBillCustomer,
         isKenyaBillsDemoMode,
@@ -89,7 +162,7 @@ export async function POST(req: Request) {
       });
     }
 
-    if ((user.countryCode || "NG") === "GH") {
+    if (country === "GH") {
       const { verifyHubtelCustomer, isHubtelDemoMode, hubtelErrorToEnglish } =
         await import("@/lib/hubtel");
       const result = await verifyHubtelCustomer({

@@ -288,7 +288,7 @@ export function buildStatementCsv(
       csvEscape(item.subtitle),
       csvEscape(categoryLabel(item.category)),
       item.type,
-      normalizeStatusLabel(item.status),
+      statusDisplayLabel(item.status),
       signed.toFixed(2),
       (item.currency ?? opts.currency ?? 'NGN').toUpperCase(),
       item.id,

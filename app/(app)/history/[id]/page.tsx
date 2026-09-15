@@ -275,13 +275,13 @@ export default function TransactionReceiptPage({
   );
 }
 
-function normalizeStatus(status: string): "Completed" | "Pending" | "Failed" | "Reversed" {
+function normalizeStatus(status: string): "Successful" | "Pending" | "Failed" | "Reversed" {
   const s = status.toLowerCase();
   if (s === "reversed") return "Reversed";
   if (s === "failed") return "Failed";
   if (s === "pending" || s === "processing") return "Pending";
-  if (s === "completed") return "Completed";
-  return "Completed";
+  if (s === "completed" || s === "successful" || s === "success") return "Successful";
+  return "Successful";
 }
 
 function StatusHeroIcon({ status }: { status: string }) {
@@ -540,7 +540,7 @@ function truncateToWidth(
 
 function drawStatusGlyph(
   ctx: CanvasRenderingContext2D,
-  status: "Completed" | "Pending" | "Failed" | "Reversed" | string,
+  status: "Successful" | "Pending" | "Failed" | "Reversed" | string,
   cx: number,
   cy: number,
   radius = 28,

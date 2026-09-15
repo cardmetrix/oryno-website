@@ -30,8 +30,8 @@ export const SERVICE_PROVIDERS: CountryServiceProvider[] = [
   {
     id: "sogo",
     name: "Sogo",
-    role: "Primary NG airtime, data, bills, gift-card sell",
-    services: ["airtime", "data", "bills", "gift-cards-sell"],
+    role: "NG gift-card sell (+ legacy airtime/data/bills backup)",
+    services: ["gift-cards-sell", "airtime", "data", "bills"],
     countries: ["NG"],
     signupUrl: "https://sogo.africa",
     dashboardUrl: "https://app.sogo.africa",
@@ -42,7 +42,8 @@ export const SERVICE_PROVIDERS: CountryServiceProvider[] = [
       { env: "SOGO_PUBLIC_KEY", label: "Public key (sogo_pk_live_…)" },
       { env: "SOGO_WEBHOOK_SECRET", label: "Webhook signing secret" },
     ],
-    notes: "Use the secret key, not the public key, for server calls.",
+    notes:
+      "Gift-card sell remains on Sogo. Nigeria airtime/data/bills now prefer Pairgate when PAIRGATE_API_KEY is set.",
   },
   {
     id: "vtpass",
@@ -100,21 +101,21 @@ export const SERVICE_PROVIDERS: CountryServiceProvider[] = [
   {
     id: "pairgate",
     name: "Pairgate",
-    role: "Nigeria betting wallet funding (Bet9ja, SportyBet, 1xBet, …)",
-    services: ["betting"],
+    role: "Primary NG airtime, data, TV, electricity, and betting",
+    services: ["airtime", "data", "bills", "betting"],
     countries: ["NG"],
     signupUrl: "https://pairgate.com",
     dashboardUrl: "https://pairgate.com",
     apiKeysUrl: "https://pairgate.com",
-    docsUrl: "https://pairgate.com/developers/betting-purchase",
+    docsUrl: "https://pairgate.com/developers/introduction",
     credentials: [
       { env: "PAIRGATE_API_KEY", label: "Bearer API token" },
       { env: "PAIRGATE_WEBHOOK_SECRET", label: "Optional webhook HMAC secret" },
       { env: "PAIRGATE_SANDBOX", label: "true to use /api/v1/test endpoints" },
-      { env: "BETTING_DEMO", label: "true to force local demo" },
+      { env: "BETTING_DEMO", label: "true to force local demo betting" },
     ],
     notes:
-      "Primary Nigeria betting rail. Create a Pairgate account, copy the API token, set webhook URL to /api/webhooks/pairgate, fund the Pairgate wallet, then set PAIRGATE_API_KEY with BETTING_DEMO=false.",
+      "Primary Nigeria rail for airtime, data, cable TV, electricity, and betting. Set PAIRGATE_API_KEY, point the webhook to /api/webhooks/pairgate, and fund the Pairgate wallet. Water bills are not supported — leave water on other rails or hide for NG. PAIRGATE_SANDBOX=true uses /test/... endpoints.",
   },
   {
     id: "vtu-africa",
@@ -252,9 +253,9 @@ export const BEST_PROVIDER_BY_SERVICE: Record<
   Record<string, string>
 > = {
   NG: {
-    airtime: "sogo",
-    data: "sogo",
-    bills: "sogo",
+    airtime: "pairgate",
+    data: "pairgate",
+    bills: "pairgate",
     betting: "pairgate",
     "gift-cards-buy": "reloadly",
     "gift-cards-sell": "sogo",

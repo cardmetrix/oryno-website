@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
 import { createNotification } from "@/lib/notifications-service";
+import { hasPairgateKeys, purchasePairgateAirtime } from "@/lib/pairgate";
 import { formatMoney } from "@/lib/transactions";
 import { purchaseAirtime } from "@/lib/vtpass";
 import { sogoHttpStatus } from "@/lib/sogo/errors";
@@ -63,26 +64,40 @@ export async function POST(req: Request) {
       );
     }
 
+    const usePairgate =
+      mode === "local" &&
+      (user.countryCode || "NG").toUpperCase() === "NG" &&
+      hasPairgateKeys();
+
     const result = await withSpendLock(
       user.id,
       amount,
       user.countryCode,
       () =>
-      purchaseAirtime({
-      userId: user.id,
-      countryCode: user.countryCode,
-      serviceID: body.serviceID || "foreign-airtime",
-      phone: body.phone,
-      amount,
-      saveBeneficiary: body.saveBeneficiary,
-      mode,
-      email: user.email,
-      operatorId: body.operatorId,
-      countryIso: body.countryIso,
-      productTypeId: body.productTypeId,
-      variationCode: body.variationCode,
-      flexibleLocalAmount: flexibleIntl,
-      }),
+        usePairgate
+          ? purchasePairgateAirtime({
+              userId: user.id,
+              countryCode: user.countryCode,
+              serviceID: body.serviceID!,
+              phone: body.phone!,
+              amount,
+              saveBeneficiary: body.saveBeneficiary,
+            })
+          : purchaseAirtime({
+              userId: user.id,
+              countryCode: user.countryCode,
+              serviceID: body.serviceID || "foreign-airtime",
+              phone: body.phone!,
+              amount,
+              saveBeneficiary: body.saveBeneficiary,
+              mode,
+              email: user.email,
+              operatorId: body.operatorId,
+              countryIso: body.countryIso,
+              productTypeId: body.productTypeId,
+              variationCode: body.variationCode,
+              flexibleLocalAmount: flexibleIntl,
+            }),
     );
 
     const amountFormatted = formatMoney(
@@ -130,11 +145,11 @@ export async function POST(req: Request) {
       error instanceof Error ? error.message : "Airtime purchase failed";
     const message = publicServiceError(raw)
       .replace(/VTpass/gi, "ORYNO")
-      .replace(/vtpass/gi, "ORYNO");
+      .replace(/vtpass/gi, "ORYNO")
+      .replace(/Pairgate/gi, "ORYNO");
     return NextResponse.json(
       {
         error: message,
-        // Helps browser Network tab / support without exposing secrets
         code:
           /invalid credentials/i.test(raw)
             ? "provider_auth"

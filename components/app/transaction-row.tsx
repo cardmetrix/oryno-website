@@ -11,6 +11,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import type { AppTransaction } from "@/lib/transactions";
+import { statusDisplayLabel } from "@/lib/history";
 import { cn } from "@/lib/utils";
 
 export type Transaction = {
@@ -36,6 +37,7 @@ export function TransactionRow({
   const credit = transaction.type === "credit";
   const status = transaction.status ?? "Completed";
   const to = href ?? `/history/${transaction.id}`;
+  const displayStatus = statusDisplayLabel(status);
 
   const statusMeta =
     status === "Failed"
@@ -57,7 +59,7 @@ export function TransactionRow({
             Icon: Clock3,
           }
         : {
-            label: "Completed",
+            label: displayStatus,
             className: "bg-oryno-success/12 text-oryno-success",
             Icon: CheckCircle2,
           };

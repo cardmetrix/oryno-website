@@ -4,7 +4,6 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Droplets,
-  Search,
   Tv,
   Wallet,
   Zap,
@@ -63,6 +62,7 @@ export default function BillsPage() {
   );
   const [verifying, setVerifying] = useState(false);
   const [customerName, setCustomerName] = useState<string | null>(null);
+  const [verifyHint, setVerifyHint] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -179,34 +179,54 @@ export default function BillsPage() {
     };
   }, [serviceID, category]);
 
-  async function verifyCustomer() {
-    if (!serviceID || customerRef.trim().length < 6) return;
-    setVerifying(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/vtpass/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          billersCode: customerRef.trim(),
-          serviceID,
-          category,
-          type: variationCode || undefined,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Verification failed");
-      setCustomerName(data.customerName || "Verified customer");
-      if (data.renewalAmount) {
-        setAmount(String(Math.round(Number(data.renewalAmount))));
-      }
-    } catch (e) {
+  // Auto-verify meter / smartcard / account when the customer ref is long enough.
+  useEffect(() => {
+    if (!billsLive || !serviceID || customerRef.trim().length < 6) {
       setCustomerName(null);
-      setError(e instanceof Error ? e.message : "Verification failed");
-    } finally {
       setVerifying(false);
+      setVerifyHint(null);
+      return;
     }
-  }
+
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      setVerifying(true);
+      setVerifyHint(null);
+      try {
+        const res = await fetch("/api/vtpass/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            billersCode: customerRef.trim(),
+            serviceID,
+            category,
+            type: variationCode || undefined,
+          }),
+        });
+        const data = await res.json();
+        if (cancelled) return;
+        if (!res.ok) throw new Error(data.error || "Verification failed");
+        setCustomerName(data.customerName || "Verified customer");
+        setVerifyHint(null);
+        if (data.renewalAmount) {
+          setAmount(String(Math.round(Number(data.renewalAmount))));
+        }
+      } catch (e) {
+        if (cancelled) return;
+        setCustomerName(null);
+        setVerifyHint(
+          e instanceof Error ? e.message : "Could not verify that account",
+        );
+      } finally {
+        if (!cancelled) setVerifying(false);
+      }
+    }, 550);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [billsLive, serviceID, customerRef, category, variationCode]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -454,35 +474,27 @@ export default function BillsPage() {
               <label className="mb-2 block text-sm font-medium">
                 {customerLabel}
               </label>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <input
-                  value={customerRef}
-                  onChange={(e) => {
-                    setCustomerRef(e.target.value);
-                    setCustomerName(null);
-                  }}
-                  placeholder={
-                    customerLabel
-                  }
-                  className="h-12 w-full rounded-[14px] border border-border bg-background px-4 text-sm outline-none focus:border-primary"
-                />
-                <button
-                  type="button"
-                  onClick={verifyCustomer}
-                  disabled={verifying || customerRef.trim().length < 6}
-                  className="btn-secondary inline-flex h-12 shrink-0 items-center justify-center gap-2 px-4 disabled:opacity-50"
-                >
-                  <Search className="h-4 w-4" />
-                  {verifying ? "Checking…" : "Verify"}
-                </button>
-              </div>
-              {customerName ? (
+              <input
+                value={customerRef}
+                onChange={(e) => {
+                  setCustomerRef(e.target.value);
+                  setCustomerName(null);
+                  setVerifyHint(null);
+                }}
+                placeholder={customerLabel}
+                className="h-12 w-full rounded-[14px] border border-border bg-background px-4 text-sm outline-none focus:border-primary"
+              />
+              {verifying ? (
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Checking account…
+                </p>
+              ) : customerName ? (
                 <p className="mt-2 text-sm font-medium text-[var(--oryno-success)]">
                   {customerName}
                 </p>
+              ) : verifyHint ? (
+                <p className="mt-2 text-sm text-destructive">{verifyHint}</p>
               ) : null}
-
-           
             </MotionSection>
 
             <MotionSection
