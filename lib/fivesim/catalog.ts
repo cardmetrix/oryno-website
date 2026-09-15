@@ -24,6 +24,15 @@ export const FIVESIM_POPULAR_SERVICES: FivesimService[] = [
   { code: "other", name: "Any other" },
 ];
 
+/** Email / mailbox signup products on 5sim (SMS OTP — not temp inboxes). */
+export const FIVESIM_EMAIL_SERVICES: FivesimService[] = [
+  { code: "google", name: "Google / Gmail" },
+  { code: "hotmail", name: "Hotmail" },
+  { code: "microsoft", name: "Microsoft / Outlook" },
+  { code: "yahoo", name: "Yahoo Mail" },
+  { code: "protonmail", name: "Proton Mail" },
+];
+
 /** Map legacy HeroSMS short codes → 5sim products. */
 export const HEROSMS_TO_FIVESIM: Record<string, string> = {
   wa: "whatsapp",

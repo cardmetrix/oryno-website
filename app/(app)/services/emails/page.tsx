@@ -4,10 +4,9 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Check,
-  CheckCircle2,
   ChevronDown,
   Copy,
-  Inbox,
+  Globe2,
   Mail,
   RefreshCw,
   Search,
@@ -18,7 +17,6 @@ import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
 import { ServiceSuccess } from "@/components/app/service-success";
 import { ErrorAlertModal } from "@/components/app/error-alert-modal";
-import { ServiceInstructions } from "@/components/app/service-instructions";
 import {
   Dialog,
   DialogContent,
@@ -36,115 +34,100 @@ import {
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useWalletBalance } from "@/hooks/use-wallet-balance";
 import { formatUsd } from "@/lib/country";
+import { FIVESIM_EMAIL_SERVICES } from "@/lib/fivesim/catalog";
 import { cn } from "@/lib/utils";
 
-type Domain = {
-  name: string;
-  costUsd: number;
-  costLocal: number;
+type EmailOffer = {
+  countryId: number;
+  countrySlug?: string;
+  countryName: string;
+  iso: string | null;
+  flagUrl: string | null;
+  flagEmoji: string;
+  service: string;
+  serviceName: string;
+  operator?: string;
+  costUsd?: number;
+  priceUsd: number;
+  priceLocal: number;
   currency: string;
   count: number;
 };
 
-const SITES = [
-  { id: "telegram.com", label: "Telegram" },
-  { id: "google.com", label: "Google" },
-  { id: "instagram.com", label: "Instagram" },
-  { id: "facebook.com", label: "Facebook" },
-  { id: "discord.com", label: "Discord" },
-  { id: "openai.com", label: "OpenAI" },
-  { id: "other", label: "Other site" },
-];
+const EMAIL_SERVICES = FIVESIM_EMAIL_SERVICES;
 
 export default function EmailRentPage() {
   const isMobile = useIsMobile();
   const { canAffordUsd, frozen } = useWalletBalance();
-  const [domains, setDomains] = useState<Domain[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [domain, setDomain] = useState("");
-  const [domainOpen, setDomainOpen] = useState(false);
-  const [domainQuery, setDomainQuery] = useState("");
-  const [site, setSite] = useState("telegram.com");
-  const [customSite, setCustomSite] = useState("");
+  const [service, setService] = useState(EMAIL_SERVICES[0]?.code || "google");
+  const [offers, setOffers] = useState<EmailOffer[]>([]);
+  const [loadingOffers, setLoadingOffers] = useState(false);
+  const [countryOpen, setCountryOpen] = useState(false);
+  const [countryQuery, setCountryQuery] = useState("");
+  const [selected, setSelected] = useState<EmailOffer | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [success, setSuccess] = useState(false);
-  const [email, setEmail] = useState("");
-  const [emailId, setEmailId] = useState("");
-  const [code, setCode] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [activationId, setActivationId] = useState("");
+  const [smsCode, setSmsCode] = useState<string | null>(null);
   const [polling, setPolling] = useState(false);
   const [receipt, setReceipt] = useState("");
   const [cancelling, setCancelling] = useState(false);
 
-  const selected = domains.find((d) => d.name === domain);
-  const siteValue = site === "other" ? customSite.trim() : site;
+  const serviceName =
+    EMAIL_SERVICES.find((s) => s.code === service)?.name || service;
 
-  const filteredDomains = useMemo(() => {
-    const q = domainQuery.trim().toLowerCase().replace(/^@/, "");
-    if (!q) return domains;
-    return domains.filter((d) => d.name.toLowerCase().includes(q));
-  }, [domains, domainQuery]);
+  const filteredCountries = useMemo(() => {
+    const q = countryQuery.trim().toLowerCase();
+    if (!q) return offers;
+    return offers.filter(
+      (o) =>
+        o.countryName.toLowerCase().includes(q) ||
+        (o.iso || "").toLowerCase().includes(q),
+    );
+  }, [offers, countryQuery]);
 
-  const canSubmit = useMemo(
-    () =>
-      Boolean(
-        domain &&
-          siteValue &&
-          selected &&
-          !submitting &&
-          !frozen &&
-          canAffordUsd(selected.costUsd),
-      ),
-    [domain, siteValue, selected, submitting, frozen, canAffordUsd],
+  const canSubmit = Boolean(
+    selected && !submitting && !frozen && canAffordUsd(selected.priceUsd),
   );
 
   useEffect(() => {
+    if (!service) return;
     let cancelled = false;
-    const siteForDomains = siteValue.trim().toLowerCase();
-
-    if (!siteForDomains) {
-      setDomains([]);
-      setDomain("");
-      setLoading(false);
-      return;
-    }
-
-    const timer = window.setTimeout(async () => {
-      setLoading(true);
-      setDomains([]);
-      setDomain("");
-      setDomainOpen(false);
-      setDomainQuery("");
+    (async () => {
+      setLoadingOffers(true);
+      setSelected(null);
+      setCountryQuery("");
+      setCountryOpen(false);
+      setError(null);
       try {
         const res = await fetch(
-          `/api/herosms/emails/domains?site=${encodeURIComponent(siteForDomains)}`,
+          `/api/herosms/prices?service=${encodeURIComponent(service)}`,
         );
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Failed to load domains");
+        if (!res.ok) throw new Error(data.error || "Failed to load prices");
         if (cancelled) return;
-        const list = (data.domains ?? []) as Domain[];
-        setDomains(list);
-        if (list[0]?.name) setDomain(list[0].name);
+        const list = (data.offers ?? []) as EmailOffer[];
+        setOffers(list);
+        if (list[0]) setSelected(list[0]);
       } catch (e) {
         if (!cancelled) {
-          setDomains([]);
-          setError(e instanceof Error ? e.message : "Failed to load domains");
+          setOffers([]);
+          setError(e instanceof Error ? e.message : "Failed to load prices");
         }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setLoadingOffers(false);
       }
-    }, site === "other" ? 400 : 0);
-
+    })();
     return () => {
       cancelled = true;
-      window.clearTimeout(timer);
     };
-  }, [siteValue, site]);
+  }, [service]);
 
   useEffect(() => {
-    if (!success || !emailId || code) return;
+    if (!success || !activationId || smsCode) return;
     let cancelled = false;
     let tries = 0;
 
@@ -154,18 +137,13 @@ export default function EmailRentPage() {
       setPolling(true);
       try {
         const res = await fetch(
-          `/api/herosms/status/email/${encodeURIComponent(emailId)}`,
+          `/api/herosms/status/number/${encodeURIComponent(activationId)}`,
         );
         const data = await res.json();
-        const value = data.data?.value || data.data?.code;
-        if (value) {
-          setCode(String(value));
-          setMessage(data.data?.message || null);
+        if (data.code) {
+          setSmsCode(String(data.code));
           setPolling(false);
           return;
-        }
-        if (data.data?.status === "OK" && data.data?.message) {
-          setMessage(data.data.message);
         }
       } catch {
         // keep polling
@@ -178,22 +156,28 @@ export default function EmailRentPage() {
     return () => {
       cancelled = true;
     };
-  }, [success, emailId, code]);
+  }, [success, activationId, smsCode]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!canSubmit || !selected) return;
+    if (!selected || !canSubmit) return;
     setSubmitting(true);
     setError(null);
     try {
-      const res = await fetch("/api/herosms/purchase/email", {
+      const res = await fetch("/api/herosms/purchase/number", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          site: siteValue,
-          domain: selected.name,
-          priceUsd: selected.costUsd,
-          priceLocal: selected.costLocal,
+          heroCountryId: selected.countryId,
+          countrySlug: selected.countrySlug,
+          countryName: selected.countryName,
+          iso: selected.iso,
+          service: selected.service,
+          serviceName: selected.serviceName,
+          operator: selected.operator,
+          costUsd: selected.costUsd ?? selected.priceUsd,
+          priceUsd: selected.priceUsd,
+          priceLocal: selected.priceLocal,
         }),
       });
       const data = await res.json();
@@ -205,11 +189,10 @@ export default function EmailRentPage() {
         });
         throw new Error(data.error || "Purchase failed");
       }
-      setEmail(data.email);
-      setEmailId(data.emailId);
+      setPhoneNumber(data.phoneNumber);
+      setActivationId(data.activationId);
       setReceipt(data.amountFormatted);
-      setCode(null);
-      setMessage(null);
+      setSmsCode(null);
       setSuccess(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Purchase failed");
@@ -218,24 +201,23 @@ export default function EmailRentPage() {
     }
   }
 
-  async function onCancelEmail() {
-    if (!emailId || code || cancelling) return;
+  async function onCancel() {
+    if (!activationId || smsCode || cancelling) return;
     setCancelling(true);
     setError(null);
     try {
       const res = await fetch(
-        `/api/herosms/status/email/${encodeURIComponent(emailId)}`,
+        `/api/herosms/status/email/${encodeURIComponent(activationId)}`,
         { method: "DELETE" },
       );
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Could not cancel email");
+      if (!res.ok) throw new Error(data.error || "Could not cancel number");
       setSuccess(false);
-      setEmail("");
-      setEmailId("");
-      setCode(null);
-      setMessage(null);
+      setPhoneNumber("");
+      setActivationId("");
+      setSmsCode(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not cancel email");
+      setError(err instanceof Error ? err.message : "Could not cancel number");
     } finally {
       setCancelling(false);
     }
@@ -247,7 +229,7 @@ export default function EmailRentPage() {
     <AppShell hideNav>
       <PageHeader
         title="Rent Email"
-        subtitle="Temporary inboxes for OTP & sign-ups · billed in USD"
+        subtitle="SMS numbers for Gmail, Hotmail & more · 5sim · billed in USD"
         backHref="/services"
       />
 
@@ -255,8 +237,8 @@ export default function EmailRentPage() {
         {success ? (
           <MotionSection key="success">
             <ServiceSuccess
-              title="Email reserved!"
-              subtitle="Copy the address and watch for codes."
+              title="Number ready!"
+              subtitle={`Use this number for ${serviceName} signup OTP.`}
               amountLabel="Amount charged"
               amount={receipt}
               onDismiss={() => setSuccess(false)}
@@ -266,41 +248,37 @@ export default function EmailRentPage() {
                 icon: "home",
               }}
               tertiaryAction={{
-                label: "Rent another email",
+                label: "Get another number",
                 onClick: () => {
                   setSuccess(false);
-                  setEmail("");
-                  setEmailId("");
-                  setCode(null);
+                  setPhoneNumber("");
+                  setActivationId("");
+                  setSmsCode(null);
                 },
                 icon: "plus",
               }}
             >
               <div className="space-y-3">
-                <CopyRow label="Email address" value={email} />
+                <CopyRow label="Phone number" value={phoneNumber} />
                 <CopyRow
-                  label="Code / message"
-                  value={
-                    code ||
-                    message ||
-                    (polling ? "Waiting for email…" : "—")
-                  }
-                  mono={!code && !message}
+                  label="SMS code"
+                  value={smsCode || (polling ? "Waiting for SMS…" : "—")}
+                  mono={!smsCode}
                 />
-                {polling && !code ? (
+                {polling && !smsCode ? (
                   <p className="inline-flex items-center gap-2 text-xs text-muted-foreground">
                     <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                    Checking inbox for codes…
+                    Waiting for verification SMS…
                   </p>
                 ) : null}
-                {!code ? (
+                {!smsCode ? (
                   <button
                     type="button"
-                    onClick={onCancelEmail}
+                    onClick={onCancel}
                     disabled={cancelling}
                     className="h-10 w-full rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:bg-muted disabled:opacity-50"
                   >
-                    {cancelling ? "Cancelling…" : "Cancel this email"}
+                    {cancelling ? "Cancelling…" : "Cancel this number"}
                   </button>
                 ) : null}
               </div>
@@ -318,63 +296,62 @@ export default function EmailRentPage() {
                   <Mail className="h-5 w-5" />
                 </span>
                 <div>
-                  <h2 className="text-base font-semibold">Where will you use it?</h2>
+                  <h2 className="text-base font-semibold">Email service</h2>
                   <p className="text-xs text-muted-foreground">
-                    Site that needs email verification
+                    Get an SMS number for mailbox signup
                   </p>
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
-                {SITES.map((s) => (
+                {EMAIL_SERVICES.map((s) => (
                   <button
-                    key={s.id}
+                    key={s.code}
                     type="button"
-                    onClick={() => setSite(s.id)}
+                    onClick={() => setService(s.code)}
                     className={cn(
                       "rounded-full px-3.5 py-2 text-sm font-semibold",
-                      site === s.id
+                      service === s.code
                         ? "bg-primary text-white"
                         : "bg-muted text-foreground",
                     )}
                   >
-                    {s.label}
+                    {s.name}
                   </button>
                 ))}
               </div>
-              {site === "other" ? (
-                <input
-                  value={customSite}
-                  onChange={(e) => setCustomSite(e.target.value)}
-                  placeholder="example.com"
-                  className="mt-3 h-12 w-full rounded-[14px] border border-border bg-background px-4 text-sm outline-none focus:border-primary"
-                />
-              ) : null}
             </MotionSection>
 
             <MotionSection
               delay={0.05}
               className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6"
             >
-              <h2 className="mb-1 text-base font-semibold">Email domain</h2>
+              <h2 className="mb-1 text-base font-semibold">Country</h2>
               <p className="mb-3 text-xs text-muted-foreground">
-                Search and pick a domain for {siteValue || "your site"}
+                Pick a market with stock for {serviceName}
               </p>
 
-              {loading ? (
+              {loadingOffers ? (
                 <div className="h-12 animate-pulse rounded-[14px] bg-muted" />
               ) : (
                 <button
                   type="button"
-                  disabled={!domains.length}
+                  disabled={!offers.length}
                   onClick={() => {
-                    setDomainQuery("");
-                    setDomainOpen(true);
+                    setCountryQuery("");
+                    setCountryOpen(true);
                   }}
-                  className={cn(
-                    "flex h-12 w-full items-center gap-2 rounded-[14px] border border-border bg-background px-3.5 text-left outline-none transition hover:bg-muted/40 focus:border-primary disabled:cursor-not-allowed disabled:opacity-50",
-                  )}
+                  className="flex h-12 w-full items-center gap-2 rounded-[14px] border border-border bg-background px-3.5 text-left outline-none transition hover:bg-muted/40 focus:border-primary disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <Inbox className="h-4 w-4 shrink-0 text-primary" />
+                  {selected?.flagUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={selected.flagUrl}
+                      alt=""
+                      className="h-4 w-6 rounded-sm object-cover"
+                    />
+                  ) : (
+                    <Globe2 className="h-4 w-4 shrink-0 text-primary" />
+                  )}
                   <span
                     className={cn(
                       "min-w-0 flex-1 truncate text-sm font-semibold",
@@ -382,41 +359,39 @@ export default function EmailRentPage() {
                     )}
                   >
                     {selected
-                      ? `@${selected.name}`
-                      : domains.length
-                        ? "Select a domain"
-                        : siteValue
-                          ? "No domains in stock"
-                          : "Enter a site first"}
+                      ? selected.countryName
+                      : offers.length
+                        ? "Select a country"
+                        : "No stock right now"}
                   </span>
                   {selected ? (
                     <span className="shrink-0 text-sm font-bold text-primary">
-                      {money(selected.costUsd)}
+                      {money(selected.priceUsd)}
                     </span>
                   ) : null}
                   <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
                 </button>
               )}
 
-              {!loading && !domains.length && siteValue ? (
+              {!loadingOffers && !offers.length ? (
                 <p className="mt-2 text-xs text-muted-foreground">
-                  No domains in stock for {siteValue}. Try another site.
+                  No numbers in stock for {serviceName}. Try another service.
                 </p>
               ) : null}
 
-              <DomainPickerSheet
-                open={domainOpen}
-                onOpenChange={setDomainOpen}
+              <CountryPickerSheet
+                open={countryOpen}
+                onOpenChange={setCountryOpen}
                 isMobile={isMobile}
-                query={domainQuery}
-                onQueryChange={setDomainQuery}
-                options={filteredDomains}
-                value={domain}
+                query={countryQuery}
+                onQueryChange={setCountryQuery}
+                options={filteredCountries}
+                value={selected?.countryId ?? null}
                 formatPrice={money}
-                onSelect={(name) => {
-                  setDomain(name);
-                  setDomainOpen(false);
-                  setDomainQuery("");
+                onSelect={(offer) => {
+                  setSelected(offer);
+                  setCountryOpen(false);
+                  setCountryQuery("");
                 }}
               />
             </MotionSection>
@@ -427,11 +402,14 @@ export default function EmailRentPage() {
             >
               <h2 className="text-base font-semibold">Order summary</h2>
               <div className="mt-3 space-y-2 text-sm">
-                <Row label="Site" value={siteValue || "—"} />
-                <Row label="Domain" value={domain ? `@${domain}` : "—"} />
+                <Row label="Service" value={serviceName} />
+                <Row
+                  label="Country"
+                  value={selected?.countryName || "—"}
+                />
                 <Row
                   label="Amount"
-                  value={selected ? money(selected.costUsd) : money(0)}
+                  value={selected ? money(selected.priceUsd) : money(0)}
                   accent
                 />
                 <div className="flex items-center gap-2 border-t border-border pt-3 font-semibold">
@@ -441,7 +419,6 @@ export default function EmailRentPage() {
               </div>
             </MotionSection>
 
-            {/* Desktop: clear gap between instructions and rent button */}
             <div className="hidden pt-4 sm:block">
               <motion.button
                 type="submit"
@@ -450,18 +427,17 @@ export default function EmailRentPage() {
                 className="btn-primary h-12 w-full max-w-md text-base disabled:opacity-50"
               >
                 {submitting
-                  ? "Reserving…"
+                  ? "Getting number…"
                   : frozen
                     ? "Wallet unavailable"
-                    : selected && !canAffordUsd(selected.costUsd)
+                    : selected && !canAffordUsd(selected.priceUsd)
                       ? "Insufficient USD balance"
                       : selected
-                        ? `Rent email · ${money(selected.costUsd)}`
+                        ? `Get number · ${money(selected.priceUsd)}`
                         : "Continue"}
               </motion.button>
             </div>
 
-            {/* Mobile: space = visual gap + sticky CTA height */}
             <div
               aria-hidden
               className="h-[calc(1.5rem+5.5rem+env(safe-area-inset-bottom))] sm:hidden"
@@ -474,13 +450,13 @@ export default function EmailRentPage() {
                 className="btn-primary h-12 w-full text-base disabled:opacity-50"
               >
                 {submitting
-                  ? "Reserving…"
+                  ? "Getting number…"
                   : frozen
                     ? "Wallet unavailable"
-                    : selected && !canAffordUsd(selected.costUsd)
+                    : selected && !canAffordUsd(selected.priceUsd)
                       ? "Insufficient USD balance"
                       : selected
-                        ? `Rent · ${money(selected.costUsd)}`
+                        ? `Get · ${money(selected.priceUsd)}`
                         : "Continue"}
               </button>
             </div>
@@ -497,7 +473,7 @@ export default function EmailRentPage() {
   );
 }
 
-function DomainPickerSheet({
+function CountryPickerSheet({
   open,
   onOpenChange,
   isMobile,
@@ -513,10 +489,10 @@ function DomainPickerSheet({
   isMobile: boolean;
   query: string;
   onQueryChange: (query: string) => void;
-  options: Domain[];
-  value: string;
+  options: EmailOffer[];
+  value: number | null;
   formatPrice: (n: number) => string;
-  onSelect: (name: string) => void;
+  onSelect: (offer: EmailOffer) => void;
 }) {
   const search = (
     <div className="relative">
@@ -524,7 +500,7 @@ function DomainPickerSheet({
       <input
         value={query}
         onChange={(e) => onQueryChange(e.target.value)}
-        placeholder="Search domains…"
+        placeholder="Search countries…"
         className="h-11 w-full rounded-xl border border-border bg-background pr-3 pl-9 text-base outline-none focus:border-primary"
         autoFocus
       />
@@ -532,31 +508,40 @@ function DomainPickerSheet({
   );
 
   const list = options.length ? (
-    options.map((d) => {
-      const active = d.name === value;
+    options.map((o) => {
+      const active = o.countryId === value;
       return (
         <button
-          key={d.name}
+          key={`${o.countrySlug || o.countryId}-${o.operator || "any"}`}
           type="button"
-          onClick={() => onSelect(d.name)}
+          onClick={() => onSelect(o)}
           className={cn(
             "flex min-h-[56px] w-full items-center gap-3 px-4 py-3.5 text-left transition active:bg-muted/70 hover:bg-muted/50",
             active && "bg-oryno-orange-muted",
           )}
         >
-          <Inbox className="h-4 w-4 shrink-0 text-primary" />
+          {o.flagUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={o.flagUrl}
+              alt=""
+              className="h-4 w-6 shrink-0 rounded-sm object-cover"
+            />
+          ) : (
+            <span className="text-base">{o.flagEmoji || "🏳️"}</span>
+          )}
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold text-foreground">
-              @{d.name}
+              {o.countryName}
             </p>
-            {d.count > 0 ? (
+            {o.count > 0 ? (
               <p className="mt-0.5 text-xs text-muted-foreground">
-                {d.count.toLocaleString()} in stock
+                {o.count.toLocaleString()} in stock
               </p>
             ) : null}
           </div>
           <span className="shrink-0 text-sm font-bold tabular-nums text-primary">
-            {formatPrice(d.costUsd)}
+            {formatPrice(o.priceUsd)}
           </span>
           {active ? (
             <Check className="h-4 w-4 shrink-0 text-primary" strokeWidth={2.25} />
@@ -569,8 +554,8 @@ function DomainPickerSheet({
   ) : (
     <p className="px-4 py-8 text-center text-sm text-muted-foreground">
       {query.trim()
-        ? "No domains match your search"
-        : "No domains available for this site"}
+        ? "No countries match your search"
+        : "No countries available for this service"}
     </p>
   );
 
@@ -586,10 +571,10 @@ function DomainPickerSheet({
         <DrawerContent className="h-[min(78dvh,640px)] max-h-[78dvh] w-full max-w-full rounded-t-[28px] border-border sm:mx-auto sm:max-w-lg">
           <DrawerHeader className="shrink-0 gap-1 border-b border-border px-4 pb-3 pt-1 text-left sm:px-5">
             <DrawerTitle className="text-base sm:text-lg">
-              Select domain
+              Select country
             </DrawerTitle>
             <DrawerDescription className="text-xs sm:text-sm">
-              Search and choose an email domain
+              SMS number for email signup
             </DrawerDescription>
           </DrawerHeader>
           <div className="shrink-0 border-b border-border px-4 py-3 sm:px-5">
@@ -610,9 +595,9 @@ function DomainPickerSheet({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[85vh] overflow-hidden rounded-[24px] p-0 sm:max-w-md">
         <DialogHeader className="border-b border-border px-5 py-4 text-left">
-          <DialogTitle>Select domain</DialogTitle>
+          <DialogTitle>Select country</DialogTitle>
           <DialogDescription>
-            Search and choose an email domain
+            SMS number for email signup
           </DialogDescription>
         </DialogHeader>
         <div className="border-b border-border px-4 py-3">{search}</div>

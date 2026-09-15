@@ -2,15 +2,19 @@ import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
 import { createNotification } from "@/lib/notifications-service";
 import { formatMoney } from "@/lib/transactions";
-import { herosmsErrorToEnglish, purchaseEmailActivation } from "@/lib/herosms";
-import { publicServiceError } from "@/lib/service-errors";
 import {
-  actionLockHttpStatus,
-  withUserActionLock,
-} from "@/lib/wallet/action-lock";
+  fivesimErrorToEnglish,
+  isFivesimLive,
+  numbersProvider,
+  purchaseFivesimNumber,
+  resolveFivesimProduct,
+} from "@/lib/fivesim";
+import { publicServiceError } from "@/lib/service-errors";
+import { actionLockHttpStatus } from "@/lib/wallet/action-lock";
 
 export const runtime = "nodejs";
 
+/** Rent Email now buys a 5sim SMS number for mailbox signup (not a temp inbox). */
 export async function POST(req: Request) {
   try {
     const user = await ensureAppUser();
@@ -18,84 +22,125 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    if (numbersProvider() !== "fivesim" || !isFivesimLive()) {
+      return NextResponse.json(
+        {
+          error:
+            "Email signup numbers require FIVESIM_API_KEY with FIVESIM_DEMO=false.",
+        },
+        { status: 503 },
+      );
+    }
+
     const body = (await req.json()) as {
       site?: string;
       domain?: string;
+      service?: string;
+      serviceName?: string;
+      countrySlug?: string;
+      countryName?: string;
+      iso?: string | null;
+      operator?: string;
       priceUsd?: number;
+      costUsd?: number;
       priceLocal?: number;
     };
 
-    if (!body.site?.trim() || !body.domain?.trim()) {
+    const service = resolveFivesimProduct(
+      (body.service || body.site || "").trim(),
+    );
+    const countrySlug = (
+      body.countrySlug ||
+      body.domain ||
+      ""
+    )
+      .trim()
+      .toLowerCase();
+    const countryName = (body.countryName || countrySlug).trim();
+
+    if (!service || !countrySlug) {
       return NextResponse.json(
-        { error: "Site and domain are required" },
+        { error: "Select an email service and country" },
         { status: 400 },
       );
     }
 
-    console.log("[herosms-purchase-email] request", {
-      site: body.site,
-      domain: body.domain,
-      priceUsd: body.priceUsd,
-      priceLocal: body.priceLocal,
-    });
+    const costUsd = Number(body.costUsd);
+    const priceUsd =
+      Number.isFinite(costUsd) && costUsd > 0
+        ? costUsd
+        : Number(body.priceUsd);
+    if (!Number.isFinite(priceUsd) || priceUsd <= 0) {
+      return NextResponse.json(
+        { error: "Invalid price — refresh and try again" },
+        { status: 400 },
+      );
+    }
 
     const { withSpendLock } = await import("@/lib/wallet/action-lock");
-    const result = await withSpendLock(
+      const result = await withSpendLock(
       user.id,
       Number(body.priceLocal) || 0,
       user.countryCode,
       () =>
-      purchaseEmailActivation({
-        userId: user.id,
-        countryCode: user.countryCode,
-        site: body.site!.trim(),
-        domain: body.domain!.trim(),
-        priceUsd: Number(body.priceUsd) || 0.1,
-        priceLocal: Number(body.priceLocal) || undefined,
-      }),
+        purchaseFivesimNumber({
+          userId: user.id,
+          countryCode: user.countryCode,
+          countrySlug,
+          countryName,
+          iso: body.iso ?? null,
+          service,
+          serviceName: body.serviceName || service,
+          operator: body.operator,
+          priceUsd,
+          costUsd:
+            Number.isFinite(costUsd) && costUsd > 0 ? costUsd : undefined,
+          priceLocal: Number(body.priceLocal) || 0,
+        }),
     );
-
-    console.log("[herosms-purchase-email] ok", {
-      simulated: result.simulated,
-      emailId: result.emailId,
-      email: result.email,
-    });
 
     const amountFormatted = formatMoney(result.amount, result.currency);
 
     try {
       await createNotification({
         userId: user.id,
-        title: "Email reserved",
-        body: `${result.email} is ready for ${result.site}`,
+        title: "Email signup number ready",
+        body: `${result.phoneNumber} for ${body.serviceName || service}`,
         type: "email",
         metadata: {
           href: "/services/emails",
-          emailId: result.emailId,
+          activationId: result.activationId,
           transactionId: result.transactionId,
+          provider: "fivesim",
         },
       });
     } catch (e) {
-      console.error("[herosms-email-notify]", e);
+      console.error("[rent-email-notify]", e);
     }
 
     return NextResponse.json({
       ok: true,
       simulated: result.simulated,
-      email: result.email,
-      emailId: result.emailId,
-      site: result.site,
-      domain: result.domain,
+      // Back-compat fields for older clients
+      email: result.phoneNumber,
+      emailId: result.activationId,
+      phoneNumber: result.phoneNumber,
+      activationId: result.activationId,
+      site: service,
+      domain: countrySlug,
+      service,
+      serviceName: body.serviceName || service,
       transactionId: result.transactionId,
       wallet: result.wallet,
       amountFormatted,
-      message: "Email reserved — watch inbox for codes",
+      message: "Number reserved — wait for SMS code",
+      provider: "fivesim",
     });
   } catch (error) {
-    console.error("[herosms-purchase-email]", error);
+    console.error("[rent-email-purchase-5sim]", error);
     const raw =
-      error instanceof Error ? error.message : "Failed to rent email";
-    const errorMessage = publicServiceError(herosmsErrorToEnglish(raw));
+      error instanceof Error ? error.message : "Failed to rent number";
+    const errorMessage = publicServiceError(fivesimErrorToEnglish(raw));
     const lower = errorMessage.toLowerCase();
     const code = lower.includes("unavailable")
       ? "SERVICE_UNAVAILABLE"
@@ -104,7 +149,12 @@ export async function POST(req: Request) {
         : "PURCHASE_FAILED";
 
     return NextResponse.json(
-      { error: errorMessage, code: actionLockHttpStatus(error) ? "action_in_progress" : code },
+      {
+        error: errorMessage,
+        code: actionLockHttpStatus(error)
+          ? "action_in_progress"
+          : code,
+      },
       { status: actionLockHttpStatus(error) || 400 },
     );
   }

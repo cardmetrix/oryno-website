@@ -1,15 +1,42 @@
 import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
 import {
-  getHerosmsEmailDomains,
-  isHerosmsDemoMode,
-  normalizeEmailSite,
-  usdToLocalPrice,
-} from "@/lib/herosms";
-import { currencyForCountry } from "@/lib/wallet";
+  FIVESIM_EMAIL_SERVICES,
+  fivesimErrorToEnglish,
+  isFivesimLive,
+  listFivesimOffers,
+  numbersProvider,
+} from "@/lib/fivesim";
 
 export const runtime = "nodejs";
 
+function resolveEmailProduct(site: string) {
+  const raw = site.trim().toLowerCase();
+  if (!raw) return "";
+  const host = raw.replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];
+  const map: Record<string, string> = {
+    google: "google",
+    "google.com": "google",
+    gmail: "google",
+    "gmail.com": "google",
+    hotmail: "hotmail",
+    "hotmail.com": "hotmail",
+    microsoft: "microsoft",
+    "microsoft.com": "microsoft",
+    outlook: "microsoft",
+    "outlook.com": "microsoft",
+    yahoo: "yahoo",
+    "yahoo.com": "yahoo",
+    protonmail: "protonmail",
+    "proton.me": "protonmail",
+    "protonmail.com": "protonmail",
+  };
+  if (map[raw] || map[host]) return map[raw] || map[host];
+  if (FIVESIM_EMAIL_SERVICES.some((s) => s.code === raw)) return raw;
+  return "";
+}
+
+/** Country offers for email-signup SMS via 5sim (replaces HeroSMS inbox domains). */
 export async function GET(req: Request) {
   try {
     const user = await ensureAppUser();
@@ -17,79 +44,72 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { searchParams } = new URL(req.url);
-    const site = normalizeEmailSite(searchParams.get("site") || "");
-    if (!site) {
-      return NextResponse.json(
-        { error: "Select a site to load email domains" },
-        { status: 400 },
-      );
-    }
-
-    const currency = currencyForCountry(user.countryCode);
-    const demo = isHerosmsDemoMode();
-
-    // Temporary emails are live-only — never serve fake catalog domains.
-    if (demo) {
+    if (numbersProvider() !== "fivesim" || !isFivesimLive()) {
       return NextResponse.json(
         {
           error:
-            "Email rental is not configured for live yet. Set HEROSMS_API_KEY and HEROSMS_DEMO=false on the server.",
+            "Email signup numbers require FIVESIM_API_KEY with FIVESIM_DEMO=false.",
           demo: true,
           domains: [],
+          offers: [],
         },
         { status: 503 },
       );
     }
 
-    console.log("[herosms-email-domains] LIVE fetch", { site });
-    const live = await getHerosmsEmailDomains(site);
-    console.log("[herosms-email-domains] LIVE ok", {
-      site,
-      count: live.length,
+    const { searchParams } = new URL(req.url);
+    const site = searchParams.get("site") || searchParams.get("service") || "";
+    const product = resolveEmailProduct(site);
+    if (!product) {
+      return NextResponse.json(
+        {
+          error:
+            "Select an email service (google, hotmail, microsoft, yahoo, protonmail)",
+        },
+        { status: 400 },
+      );
+    }
+
+    const { serviceName, offers } = await listFivesimOffers({
+      service: product,
+      userCountryCode: user.countryCode,
     });
 
-    if (!live.length) {
-      return NextResponse.json({
-        ok: true,
-        demo: false,
-        site,
-        domains: [],
-        message: "No domains in stock for that site right now. Try another site.",
-      });
-    }
-
-    const list = [];
-    for (const d of live) {
-      const costUsd = Number(d.cost) || 0.1;
-      const domainName = String(d.name || "").toLowerCase();
-      const { local } = await usdToLocalPrice(
-        costUsd,
-        user.countryCode,
-        `email:${site}:${domainName}`,
-        "email",
-      );
-      list.push({
-        name: d.name,
-        costUsd,
-        costLocal: local,
-        currency,
-        count: Number(d.count) || 0,
-      });
-    }
+    // Keep `domains` shape for older clients: countrySlug as name.
+    const domains = offers.map((o) => ({
+      name: o.countrySlug,
+      costUsd: o.priceUsd,
+      costLocal: o.priceLocal,
+      currency: o.currency,
+      count: o.count,
+      countryName: o.countryName,
+      countrySlug: o.countrySlug,
+      iso: o.iso,
+      flagUrl: o.flagUrl,
+      flagEmoji: o.flagEmoji,
+      countryId: o.countryId,
+      operator: o.operator,
+      service: o.service,
+      serviceName: o.serviceName,
+    }));
 
     return NextResponse.json({
       ok: true,
       demo: false,
-      site,
-      domains: list,
+      provider: "fivesim",
+      site: product,
+      service: product,
+      serviceName,
+      domains,
+      offers,
     });
   } catch (error) {
-    console.error("[herosms-email-domains]", error);
+    console.error("[email-domains-5sim]", error);
     return NextResponse.json(
       {
-        error:
-          error instanceof Error ? error.message : "Failed to load domains",
+        error: fivesimErrorToEnglish(
+          error instanceof Error ? error.message : "Failed to load offers",
+        ),
       },
       { status: 400 },
     );

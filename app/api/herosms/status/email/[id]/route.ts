@@ -1,15 +1,17 @@
 import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
 import {
-  cancelEmail,
-  herosmsErrorToEnglish,
-  isHerosmsDemoMode,
-  pollEmailStatus,
-} from "@/lib/herosms";
+  cancelFivesimNumber,
+  fivesimErrorToEnglish,
+  isFivesimLive,
+  numbersProvider,
+  pollFivesimNumberStatus,
+} from "@/lib/fivesim";
 import { publicServiceError } from "@/lib/service-errors";
 
 export const runtime = "nodejs";
 
+/** Status for Rent Email activations — now 5sim SMS numbers only. */
 export async function GET(
   _req: Request,
   ctx: { params: Promise<{ id: string }> },
@@ -20,19 +22,38 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    if (numbersProvider() !== "fivesim" || !isFivesimLive()) {
+      return NextResponse.json(
+        {
+          error:
+            "Email signup numbers require FIVESIM_API_KEY with FIVESIM_DEMO=false.",
+        },
+        { status: 503 },
+      );
+    }
+
     const { id } = await ctx.params;
     if (!id) {
       return NextResponse.json({ error: "Missing id" }, { status: 400 });
     }
 
-    const status = await pollEmailStatus(id, user.id);
-    return NextResponse.json({ ok: true, demo: false, data: status });
+    const status = await pollFivesimNumberStatus(id, user.id);
+    return NextResponse.json({
+      ok: true,
+      ...status,
+      // Back-compat with old inbox poller
+      data: {
+        value: status.code,
+        code: status.code,
+        status: status.status,
+      },
+    });
   } catch (error) {
-    console.error("[herosms-email-status]", error);
+    console.error("[rent-email-status-5sim]", error);
     return NextResponse.json(
       {
         error: publicServiceError(
-          herosmsErrorToEnglish(
+          fivesimErrorToEnglish(
             error instanceof Error ? error.message : "Failed to get status",
           ),
         ),
@@ -42,7 +63,6 @@ export async function GET(
   }
 }
 
-/** Cancel an unused live email activation on HeroSMS. */
 export async function DELETE(
   _req: Request,
   ctx: { params: Promise<{ id: string }> },
@@ -53,11 +73,11 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (isHerosmsDemoMode()) {
+    if (numbersProvider() !== "fivesim" || !isFivesimLive()) {
       return NextResponse.json(
         {
           error:
-            "Email rental is not configured for live. Set HEROSMS_API_KEY and HEROSMS_DEMO=false.",
+            "Email signup numbers require FIVESIM_API_KEY with FIVESIM_DEMO=false.",
         },
         { status: 503 },
       );
@@ -65,18 +85,24 @@ export async function DELETE(
 
     const { id } = await ctx.params;
     if (!id?.trim()) {
-      return NextResponse.json({ error: "Missing email id" }, { status: 400 });
+      return NextResponse.json({ error: "Missing activation id" }, { status: 400 });
     }
 
-    await cancelEmail(id.trim());
-    return NextResponse.json({ ok: true, cancelled: true, emailId: id });
+    await cancelFivesimNumber(id.trim());
+    return NextResponse.json({
+      ok: true,
+      cancelled: true,
+      emailId: id,
+      activationId: id,
+      provider: "fivesim",
+    });
   } catch (error) {
-    console.error("[herosms-email-cancel]", error);
+    console.error("[rent-email-cancel-5sim]", error);
     return NextResponse.json(
       {
         error: publicServiceError(
-          herosmsErrorToEnglish(
-            error instanceof Error ? error.message : "Could not cancel email",
+          fivesimErrorToEnglish(
+            error instanceof Error ? error.message : "Could not cancel number",
           ),
         ),
       },
