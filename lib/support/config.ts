@@ -15,7 +15,6 @@ export const SUPPORT_TOPICS = [
   "Bill Payments",
   "Gift Cards",
   "Virtual Numbers",
-  "Rent Email",
   "USD Virtual Card",
   "Account & Security",
   "Other",

@@ -4,7 +4,6 @@ export type ServiceInstructionId =
   | "bills"
   | "social"
   | "virtual-numbers"
-  | "emails"
   | "gift-cards"
   | "betting"
   | "catalog";
@@ -67,16 +66,6 @@ export const SERVICE_INSTRUCTIONS: Record<
       "Pick a country with stock available (flags show each market).",
       "Pay from your wallet to reserve the number, then copy it into the app.",
       "Stay on the page — the SMS code appears here when it arrives.",
-    ],
-  },
-  emails: {
-    subtitle: "Follow these steps to rent a temporary email",
-    steps: [
-      "Fund your wallet before renting an inbox.",
-      "Choose the site you are signing up for (e.g. Telegram, Google).",
-      "Pick an available email domain and confirm the price.",
-      "Pay from your wallet — copy the address into the signup form.",
-      "Wait on this page for the verification code; it updates automatically.",
     ],
   },
   "gift-cards": {

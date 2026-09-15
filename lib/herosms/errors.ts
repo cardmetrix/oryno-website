@@ -79,12 +79,3 @@ export function herosmsErrorToEnglish(raw: unknown): string {
 }
 
 /** Normalize signup site for email rentals (host only, lowercase). */
-export function normalizeEmailSite(site: string) {
-  return site
-    .trim()
-    .toLowerCase()
-    .replace(/^https?:\/\//, "")
-    .replace(/^www\./, "")
-    .replace(/\/.*$/, "")
-    .replace(/[?#].*$/, "");
-}

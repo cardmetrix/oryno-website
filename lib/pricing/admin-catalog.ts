@@ -12,11 +12,6 @@ import {
   listFivesimOffers,
 } from "@/lib/fivesim";
 import {
-  FALLBACK_EMAIL_DOMAINS,
-  getAnymessageEmailDomains,
-  isAnymessageDemoMode,
-} from "@/lib/anymessage";
-import {
   fetchReloadlyCountries,
   fetchReloadlyProducts,
   isReloadlyDemoMode,
@@ -93,15 +88,6 @@ const VTPASS_CATEGORIES: Array<{
   { id: "data", label: "Data" },
   { id: "tv-subscription", label: "TV" },
   { id: "electricity-bill", label: "Electricity" },
-];
-
-const EMAIL_SITES: CatalogFilterOption[] = [
-  { id: "telegram.com", label: "Telegram" },
-  { id: "google.com", label: "Google" },
-  { id: "instagram.com", label: "Instagram" },
-  { id: "facebook.com", label: "Facebook" },
-  { id: "discord.com", label: "Discord" },
-  { id: "openai.com", label: "OpenAI" },
 ];
 
 function diversifyJapCatalog<
@@ -212,80 +198,6 @@ export async function loadAdminPricingCatalog(input: {
   }
 
   if (input.provider === "herosms") {
-    const channel = (input.params.channel || "numbers") as "numbers" | "emails";
-    applied.channel = channel;
-
-    if (channel === "emails") {
-      const site = (input.params.site || "telegram.com").toLowerCase();
-      applied.site = site;
-      const demo = isAnymessageDemoMode();
-      let domains = FALLBACK_EMAIL_DOMAINS;
-      if (!demo) {
-        try {
-          const live = await getAnymessageEmailDomains(site);
-          if (live?.length) domains = live;
-        } catch {
-          // keep fallback
-        }
-      }
-      const quote = await quoteLocalUsd(currency);
-      const items: AdminCatalogItem[] = [];
-      for (const d of domains) {
-        const domainName = String(d.name || "").toLowerCase();
-        const costUsd = Number(d.cost) || 0.1;
-        const serviceKey = `email:${site}:${domainName}`;
-        const priced = await priceUsdToLocal({
-          provider: "herosms",
-          serviceKey,
-          usd: costUsd,
-          buyRate: quote.buyRate,
-          source: "email",
-        });
-        const ov = await withOverride("herosms", serviceKey, priced);
-        items.push({
-          serviceKey,
-          title: `@${domainName}`,
-          subtitle: `Email · ${site}`,
-          details: `Cost $${costUsd} · stock ${Number(d.count) || 0}`,
-          currency,
-          costUsd,
-          costLocal: null,
-          ...ov,
-          meta: { site, domain: domainName, count: Number(d.count) || 0 },
-        });
-      }
-      return {
-        ok: true,
-        provider: "herosms",
-        currency,
-        filters: {
-          fields: [
-            {
-              key: "channel",
-              label: "Channel",
-              options: [
-                { id: "numbers", label: "Virtual numbers" },
-                { id: "emails", label: "Emails" },
-              ],
-              required: true,
-            },
-            {
-              key: "site",
-              label: "Site",
-              options: EMAIL_SITES,
-              required: true,
-            },
-          ],
-          applied,
-        },
-        items,
-        demo,
-        hint: demo
-          ? "Set ANYMESSAGE_API_TOKEN and ANYMESSAGE_DEMO=false to load live email domains."
-          : "Live AnyMessage inbox domains.",
-      };
-    }
-
     const services = FIVESIM_POPULAR_SERVICES;
     const service = input.params.service || services[0]?.code || "whatsapp";
     applied.service = service;
@@ -334,15 +246,6 @@ export async function loadAdminPricingCatalog(input: {
       currency,
       filters: {
         fields: [
-          {
-            key: "channel",
-            label: "Channel",
-            options: [
-              { id: "numbers", label: "Virtual numbers" },
-              { id: "emails", label: "Emails" },
-            ],
-            required: true,
-          },
           {
             key: "service",
             label: "App / service",

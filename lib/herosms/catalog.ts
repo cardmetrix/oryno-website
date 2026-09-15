@@ -54,14 +54,6 @@ export const POPULAR_SERVICES: HeroService[] = [
   { code: "ot", name: "Any other" },
 ];
 
-export const FALLBACK_EMAIL_DOMAINS = [
-  { name: "gmail.com", cost: 0.15, count: 100 },
-  { name: "outlook.com", cost: 0.12, count: 80 },
-  { name: "mail.com", cost: 0.08, count: 120 },
-  { name: "hotmail.com", cost: 0.12, count: 60 },
-  { name: "yahoo.com", cost: 0.1, count: 50 },
-  { name: "gmx.com", cost: 0.08, count: 90 },
-];
 
 /** Demo countries with logos when API key is missing. */
 export const FALLBACK_COUNTRIES: HeroCountry[] = [

@@ -15,7 +15,7 @@ export const EXTERNAL_API_CATALOG = {
     "Mobile and third-party clients should use this surface.",
     "Provider secrets never leave the ORYNO server.",
     "Friendly /services/* aliases are remapped to provider routes.",
-    "Virtual numbers and email-signup SMS use 5sim via /services/numbers and /services/emails.",
+    "Virtual numbers use 5sim via /services/numbers.",
   ],
   endpoints: {
     auth: ["POST /auth/sync", "POST /auth/logout"],
@@ -68,9 +68,6 @@ export const EXTERNAL_API_CATALOG = {
       "GET /services/numbers/prices",
       "POST /services/numbers/purchase",
       "GET /services/numbers/status/:id",
-      "GET /services/emails/domains",
-      "POST /services/emails/purchase",
-      "GET /services/emails/status/:id",
     ],
     public: ["GET /geo/country", "POST /geo/country"],
   },

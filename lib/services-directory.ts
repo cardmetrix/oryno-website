@@ -1,7 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import {
   Activity,
-  Mail,
   Phone,
   Smartphone,
   Trophy,
@@ -41,7 +40,6 @@ const {
   currencySymbol,
   billProviders,
   virtualNumbers,
-  emailRentals,
 } = activeCountryConfig;
 
 export const servicesDirectory: ServiceDirectoryItem[] = [
@@ -136,21 +134,6 @@ export const servicesDirectory: ServiceDirectoryItem[] = [
     accent: "#FF6A00",
     icon: Phone,
     stats: `${virtualNumbers.length}+ offers`,
-  },
-  {
-    id: "emails",
-    href: "/services/emails",
-    label: "Rent Email",
-    shortDescription: "Temporary inboxes for OTP",
-    longDescription:
-      "Rent temporary emails for sign-ups and verification — pick a domain and grab codes from your inbox.",
-    category: "Lifestyle",
-    tags: ["Rent", "OTP", "Inbox"],
-    eta: "Instant inbox",
-    accent: "#FF6A00",
-    popular: true,
-    icon: Mail,
-    stats: `${emailRentals.length} rentals`,
   },
   {
     id: "gift-cards-live",

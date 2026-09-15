@@ -7,7 +7,6 @@ import {
   Tv,
   Phone,
   Megaphone,
-  Mail,
   ShieldCheck,
   Trophy,
 } from "lucide-react";
@@ -60,12 +59,6 @@ const features: {
     title: "Virtual Numbers",
     description:
       "Purchase numbers by country for SMS verification and rentals.",
-  },
-  {
-    icon: Mail,
-    title: "Rent Email",
-    description:
-      "Temporary inboxes for OTP and sign-ups — rent a domain and receive codes.",
   },
   {
     icon: Megaphone,

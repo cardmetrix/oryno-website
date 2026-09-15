@@ -44,9 +44,9 @@ export const DEFAULT_ONBOARDING_SLIDES = [
   },
   {
     key: "numbers",
-    title: "Numbers, emails & boost",
+    title: "Numbers & boost",
     subtitle:
-      "Virtual numbers, temp emails, and social media boosting — ready when you are.",
+      "Virtual numbers and social media boosting — ready when you are.",
     imagePath: "/onboarding/virtual-numbers.png",
     accent: "#FF8124",
     sortOrder: 4,

@@ -27,7 +27,7 @@ const CTA_BY_TYPE: Partial<
   bill: { href: "/history" },
   social: { href: "/services/social" },
   virtual_number: { href: "/services/virtual-numbers" },
-  email: { href: "/services/emails" },
+  email: { href: "/history" },
   promo: { href: "/notifications" },
   referral: { href: "/referrals" },
 };

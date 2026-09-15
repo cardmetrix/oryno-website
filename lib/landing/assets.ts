@@ -10,8 +10,7 @@ export type LandingAssetSlot =
   | "gallery_gift_cards_live"
   | "gallery_data"
   | "gallery_bills"
-  | "gallery_virtual_numbers"
-  | "gallery_emails";
+  | "gallery_virtual_numbers";
 
 export type LandingAssetGroup = "auth" | "landing";
 
@@ -129,17 +128,6 @@ export const LANDING_ASSET_SLOTS: LandingAssetDefinition[] = [
     galleryLabel: "Virtual Numbers",
     galleryAlt: "ORYNO virtual numbers for SMS verification",
     galleryFile: "virtual-numbers.png",
-  },
-  {
-    slot: "gallery_emails",
-    label: "Gallery · Rent Email",
-    description: "Screenshots section — Emails.",
-    defaultPath: "/screenshots/emails.png",
-    group: "landing",
-    sortOrder: 100,
-    galleryLabel: "Rent Email",
-    galleryAlt: "ORYNO temporary email rental for OTP and sign-ups",
-    galleryFile: "emails.png",
   },
 ];
 

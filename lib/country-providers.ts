@@ -252,27 +252,6 @@ export const SERVICE_PROVIDERS: CountryServiceProvider[] = [
     notes:
       "Only live rail for /services/virtual-numbers. Get the API key from 5sim → profile → Get API key. Fund the 5sim balance before purchases will succeed.",
   },
-  {
-    id: "anymessage",
-    name: "AnyMessage",
-    role: "Temporary email inboxes for signup OTP",
-    services: ["emails"],
-    countries: ["NG", "GH", "KE", "ZA"],
-    signupUrl: "https://anymessage.shop",
-    dashboardUrl: "https://anymessage.shop",
-    apiKeysUrl: "https://anymessage.shop",
-    docsUrl: "https://anymessage.shop/en/docs",
-    credentials: [
-      { env: "ANYMESSAGE_API_TOKEN", label: "API token from dashboard" },
-      { env: "ANYMESSAGE_DEMO", label: "true to force offline; false for live" },
-      {
-        env: "ANYMESSAGE_DEFAULT_EMAIL_USD",
-        label: "Fallback wholesale USD when quantity has no price (default 0.05)",
-      },
-    ],
-    notes:
-      "Primary live rail for /services/emails. Register at anymessage.shop, copy API token, and fund the wallet.",
-  },
 ];
 
 export const BEST_PROVIDER_BY_SERVICE: Record<
@@ -288,7 +267,6 @@ export const BEST_PROVIDER_BY_SERVICE: Record<
     "gift-cards-sell": "sogo",
     social: "jap",
     "virtual-numbers": "fivesim",
-    emails: "anymessage",
     wallet: "flutterwave",
   },
   GH: {
@@ -300,7 +278,6 @@ export const BEST_PROVIDER_BY_SERVICE: Record<
     "gift-cards-sell": "sogo",
     social: "jap",
     "virtual-numbers": "fivesim",
-    emails: "anymessage",
     wallet: "flutterwave",
   },
   KE: {
@@ -312,7 +289,6 @@ export const BEST_PROVIDER_BY_SERVICE: Record<
     "gift-cards-sell": "sogo",
     social: "jap",
     "virtual-numbers": "fivesim",
-    emails: "anymessage",
     wallet: "flutterwave",
   },
   ZA: {
@@ -324,7 +300,6 @@ export const BEST_PROVIDER_BY_SERVICE: Record<
     "gift-cards-sell": "sogo",
     social: "jap",
     "virtual-numbers": "fivesim",
-    emails: "anymessage",
     wallet: "flutterwave",
   },
 };

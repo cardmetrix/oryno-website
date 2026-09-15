@@ -98,7 +98,7 @@ type CatalogResponse = {
 
 const PROVIDER_LABELS: Record<ProviderKey, string> = {
   jap: "Social (JAP)",
-  herosms: "5sim Numbers + AnyMessage Emails",
+  herosms: "5sim Numbers",
   reloadly: "Gift cards (buy)",
   sogo: "Gift cards (sell)",
   vtpass: "Airtime / Data / Bills (VTpass)",
@@ -335,7 +335,6 @@ export default function AdminPricingPage() {
       if (key === "channel") {
         delete next.service;
         delete next.site;
-        if (value === "emails") next.site = "telegram.com";
       }
       if (key === "identifier") {
         delete next.serviceID;
@@ -513,21 +512,6 @@ export default function AdminPricingPage() {
 
           <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             {(catalog?.filters.fields ?? []).map((field) => {
-              // Hide service picker when on emails channel, and site when on numbers
-              if (
-                catalogProvider === "herosms" &&
-                field.key === "service" &&
-                (catalogFilters.channel || "numbers") === "emails"
-              ) {
-                return null;
-              }
-              if (
-                catalogProvider === "herosms" &&
-                field.key === "site" &&
-                (catalogFilters.channel || "numbers") !== "emails"
-              ) {
-                return null;
-              }
               return (
                 <label key={field.key} className="text-sm">
                   <span className="mb-1 block text-muted-foreground">

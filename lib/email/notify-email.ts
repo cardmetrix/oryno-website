@@ -27,7 +27,7 @@ const CTA_BY_TYPE: Partial<
     label: "Open numbers",
     href: "/services/virtual-numbers",
   },
-  email: { label: "Open emails", href: "/services/emails" },
+  email: { label: "View history", href: "/history" },
   referral: { label: "View referrals", href: "/referrals" },
 };
 

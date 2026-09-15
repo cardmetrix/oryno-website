@@ -119,6 +119,20 @@ const nextConfig = {
       },
     ],
   },
+  async redirects() {
+    return [
+      {
+        source: "/services/emails",
+        destination: "/services",
+        permanent: true,
+      },
+      {
+        source: "/services/emails/:path*",
+        destination: "/services",
+        permanent: true,
+      },
+    ];
+  },
 }
 
 export default nextConfig
