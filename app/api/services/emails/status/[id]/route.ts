@@ -10,3 +10,11 @@ export async function GET(
   const mod = await import("@/app/api/herosms/status/email/[id]/route");
   return mod.GET(req as never, ctx as never);
 }
+
+export async function DELETE(
+  req: NextRequest,
+  ctx: { params: Promise<{ id: string }> },
+) {
+  const mod = await import("@/app/api/herosms/status/email/[id]/route");
+  return mod.DELETE(req as never, ctx as never);
+}

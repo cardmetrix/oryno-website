@@ -76,6 +76,7 @@ export default function EmailRentPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [polling, setPolling] = useState(false);
   const [receipt, setReceipt] = useState("");
+  const [cancelling, setCancelling] = useState(false);
 
   const selected = domains.find((d) => d.name === domain);
   const siteValue = site === "other" ? customSite.trim() : site;
@@ -217,6 +218,29 @@ export default function EmailRentPage() {
     }
   }
 
+  async function onCancelEmail() {
+    if (!emailId || code || cancelling) return;
+    setCancelling(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/herosms/status/email/${encodeURIComponent(emailId)}`,
+        { method: "DELETE" },
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not cancel email");
+      setSuccess(false);
+      setEmail("");
+      setEmailId("");
+      setCode(null);
+      setMessage(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not cancel email");
+    } finally {
+      setCancelling(false);
+    }
+  }
+
   const money = (n: number) => formatUsd(n);
 
   return (
@@ -268,6 +292,16 @@ export default function EmailRentPage() {
                     <RefreshCw className="h-3.5 w-3.5 animate-spin" />
                     Checking inbox for codes…
                   </p>
+                ) : null}
+                {!code ? (
+                  <button
+                    type="button"
+                    onClick={onCancelEmail}
+                    disabled={cancelling}
+                    className="h-10 w-full rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:bg-muted disabled:opacity-50"
+                  >
+                    {cancelling ? "Cancelling…" : "Cancel this email"}
+                  </button>
                 ) : null}
               </div>
             </ServiceSuccess>

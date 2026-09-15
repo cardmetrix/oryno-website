@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
 import {
-  FALLBACK_EMAIL_DOMAINS,
   getHerosmsEmailDomains,
   isHerosmsDemoMode,
   normalizeEmailSite,
@@ -29,22 +28,39 @@ export async function GET(req: Request) {
 
     const currency = currencyForCountry(user.countryCode);
     const demo = isHerosmsDemoMode();
-    let domains = FALLBACK_EMAIL_DOMAINS;
 
-    if (!demo) {
-      console.log("[herosms-email-domains] LIVE fetch", { site });
-      const live = await getHerosmsEmailDomains(site);
-      domains = live;
-      console.log("[herosms-email-domains] LIVE ok", {
+    // Temporary emails are live-only — never serve fake catalog domains.
+    if (demo) {
+      return NextResponse.json(
+        {
+          error:
+            "Email rental is not configured for live yet. Set HEROSMS_API_KEY and HEROSMS_DEMO=false on the server.",
+          demo: true,
+          domains: [],
+        },
+        { status: 503 },
+      );
+    }
+
+    console.log("[herosms-email-domains] LIVE fetch", { site });
+    const live = await getHerosmsEmailDomains(site);
+    console.log("[herosms-email-domains] LIVE ok", {
+      site,
+      count: live.length,
+    });
+
+    if (!live.length) {
+      return NextResponse.json({
+        ok: true,
+        demo: false,
         site,
-        count: domains.length,
+        domains: [],
+        message: "No domains in stock for that site right now. Try another site.",
       });
-    } else {
-      console.log("[herosms-email-domains] DEMO fallback domains", { site });
     }
 
     const list = [];
-    for (const d of domains) {
+    for (const d of live) {
       const costUsd = Number(d.cost) || 0.1;
       const domainName = String(d.name || "").toLowerCase();
       const { local } = await usdToLocalPrice(
@@ -64,7 +80,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json({
       ok: true,
-      demo,
+      demo: false,
       site,
       domains: list,
     });

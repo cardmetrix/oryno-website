@@ -48,8 +48,8 @@ export async function POST(req: Request) {
       purchaseEmailActivation({
         userId: user.id,
         countryCode: user.countryCode,
-        site: body.site.trim(),
-        domain: body.domain.trim(),
+        site: body.site!.trim(),
+        domain: body.domain!.trim(),
         priceUsd: Number(body.priceUsd) || 0.1,
         priceLocal: Number(body.priceLocal) || undefined,
       }),

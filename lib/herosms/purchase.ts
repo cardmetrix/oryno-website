@@ -440,7 +440,7 @@ export async function purchaseEmailActivation(input: {
 
     if (isHerosmsDemoMode()) {
       throw new Error(
-        "HeroSMS is not configured for live purchases. Set HEROSMS_API_KEY and HEROSMS_DEMO=false.",
+        "HeroSMS is not configured for live purchases. Set HEROSMS_API_KEY and HEROSMS_DEMO=false, then fund the HeroSMS wallet.",
       );
     }
     // OpenAPI: POST /emails body is { site, domain } only
@@ -548,36 +548,54 @@ export async function pollNumberStatus(
 }
 
 export async function pollEmailStatus(emailId: string, userId?: string) {
-  const status =
-    emailId.startsWith("demo_") || isHerosmsDemoMode()
-      ? {
-          id: emailId,
-          status: "OK",
-          value: "482913",
-          message: "Your verification code is 482913",
-          demo: true as const,
-        }
-      : await getHerosmsEmailStatus(emailId);
-
   if (emailId.startsWith("demo_") || isHerosmsDemoMode()) {
-    console.log(LOG_PREFIX, "poll email DEMO", { emailId });
-  } else {
-    console.log(LOG_PREFIX, "poll email LIVE", { emailId });
+    console.log(LOG_PREFIX, "poll email DEMO blocked", { emailId });
+    throw new Error(
+      "Email rental is not configured for live. Set HEROSMS_API_KEY and HEROSMS_DEMO=false.",
+    );
   }
 
-  const code = String(
-    (status as { value?: string; code?: string }).value ||
-      (status as { value?: string; code?: string }).code ||
-      "",
-  ).trim();
+  const status = await getHerosmsEmailStatus(emailId);
+  console.log(LOG_PREFIX, "poll email LIVE", { emailId });
+
+  const rawStatus = String(status.status || "").toUpperCase();
+  const code = extractEmailCode(status);
+  const message =
+    typeof status.message === "string" && status.message.trim()
+      ? status.message.trim()
+      : null;
+
   const done =
     Boolean(code) &&
-    /ok|received|completed/i.test(String(status.status || "OK"));
-  if (done) {
+    (rawStatus === "OK" ||
+      /ok|received|completed|success/i.test(rawStatus) ||
+      Boolean(code));
+
+  if (done && code) {
     await maybeNotifyEmailCode(emailId, code, userId);
   }
 
-  return status;
+  return {
+    ...status,
+    value: code || status.value || null,
+    code: code || null,
+    message,
+    status: rawStatus || status.status || "PENDING",
+  };
+}
+
+function extractEmailCode(status: {
+  value?: string;
+  code?: string;
+  message?: string;
+}) {
+  const direct = String(status.value || status.code || "").trim();
+  if (direct) return direct;
+  const message = String(status.message || "");
+  const match =
+    message.match(/\b(\d{4,8})\b/) ||
+    message.match(/\b([A-Z0-9]{4,10})\b/i);
+  return match?.[1]?.trim() || "";
 }
 
 async function findServiceTx(externalRef: string, userId?: string) {
