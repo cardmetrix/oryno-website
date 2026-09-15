@@ -277,23 +277,9 @@ function plansFromGroupedData(
   return out;
 }
 
-/** Pairgate enforces ~30 req/min — space catalog GETs ≥2.1s apart. */
-let dataFetchChain: Promise<unknown> = Promise.resolve();
-let lastDataFetchAt = 0;
-const PAIRGATE_GET_GAP_MS = 2100;
-
+/** Use shared pairgateFetch queue (rate-limited in http.ts). */
 async function pairgateCatalogGet(path: string) {
-  const run = dataFetchChain.then(async () => {
-    const wait = Math.max(0, PAIRGATE_GET_GAP_MS - (Date.now() - lastDataFetchAt));
-    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
-    lastDataFetchAt = Date.now();
-    return pairgateFetch(path, { method: "GET" });
-  });
-  dataFetchChain = run.then(
-    () => undefined,
-    () => undefined,
-  );
-  return run;
+  return pairgateFetch(path, { method: "GET" });
 }
 
 type DataPlanCache = {
@@ -366,11 +352,7 @@ async function fetchDataPlansForType(
   // Always use live catalog paths — /test/data-plans returns empty arrays
   const path = `/data-plans?provider_id=${encodeURIComponent(slug)}&plan_type=${encodeURIComponent(planType)}`;
   try {
-    let { ok, status, json } = await pairgateCatalogGet(path);
-    if (status === 429) {
-      await new Promise((r) => setTimeout(r, PAIRGATE_GET_GAP_MS));
-      ({ ok, status, json } = await pairgateCatalogGet(path));
-    }
+    const { ok, status, json } = await pairgateCatalogGet(path);
     if (!isPairgateHttpOk(ok, status, json) || !json.data) return [];
     return plansFromGroupedData(
       json.data as Record<string, unknown>,
@@ -429,11 +411,20 @@ export async function listCableVariations(
   const slug = normalizePairgateTv(providerSlug);
   const serviceName =
     TV_PROVIDERS.find((s) => s.serviceID === slug)?.name || slug.toUpperCase();
-  const path = pairgateApiPath(
+
+  const cacheKey = `cable:${slug}`;
+  const cached = dataPlanCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return {
+      serviceName: cached.serviceName,
+      variations: cached.variations,
+    };
+  }
+
+  // Live catalog only — /test/cable-plans is empty
+  const { ok, status, json } = await pairgateCatalogGet(
     `/cable-plans?provider_id=${encodeURIComponent(slug)}`,
-    `/test/cable-plans?provider_id=${encodeURIComponent(slug)}`,
   );
-  const { ok, status, json } = await pairgateFetch(path, { method: "GET" });
   if (!isPairgateHttpOk(ok, status, json) || !json.data) {
     throw new Error(pairgateErrorMessage(json, "Could not load cable plans"));
   }
@@ -441,6 +432,13 @@ export async function listCableVariations(
   variations.sort(
     (a, b) => (Number(a.charged_amount) || 0) - (Number(b.charged_amount) || 0),
   );
+
+  dataPlanCache.set(cacheKey, {
+    expiresAt: Date.now() + DATA_PLAN_CACHE_MS,
+    serviceName,
+    variations,
+  });
+
   return { serviceName, variations };
 }
 
@@ -495,16 +493,20 @@ export async function verifyPairgateCable(input: {
       message: pairgateErrorMessage(json, "Could not verify smartcard"),
     };
   }
+  // Pairgate sometimes returns status:true with a blank customer_name.
   const valid = data.status === true || data.status === "true";
-  const name = String(data.customer_name || "").trim();
-  if (!valid || !name) {
+  if (!valid) {
     return {
       ok: false,
       customerName: null,
-      message: pairgateErrorMessage(json, "Could not verify smartcard"),
+      message: "Invalid smartcard / IUC number",
     };
   }
-  return { ok: true, customerName: name };
+  const name = String(data.customer_name || "").trim();
+  return {
+    ok: true,
+    customerName: name || "Verified customer",
+  };
 }
 
 export async function verifyPairgateElectricity(input: {
@@ -537,14 +539,20 @@ export async function verifyPairgateElectricity(input: {
   }
   const valid = data.status === true || data.status === "true";
   const name = String(data.customer_name || "").trim();
-  if (!valid || !name) {
+  // Invalid meters often come back as status:false + "Unknown Customer"
+  if (!valid) {
     return {
       ok: false,
       customerName: null,
-      message: pairgateErrorMessage(json, "Could not verify meter"),
+      message: "Invalid meter number for this disco",
     };
   }
-  return { ok: true, customerName: name };
+  return {
+    ok: true,
+    customerName: name && name.toLowerCase() !== "unknown customer"
+      ? name
+      : "Verified customer",
+  };
 }
 
 export async function lookupPairgateDataPlanAmount(input: {

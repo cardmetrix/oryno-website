@@ -34,6 +34,7 @@ export async function POST(req: Request) {
       variationCode?: string;
       subscriptionType?: string;
       quantity?: number;
+      recipientName?: string | null;
     };
 
     if (
@@ -69,6 +70,7 @@ export async function POST(req: Request) {
               phone: body.phone || "",
               amount: Number(body.amount),
               variationCode: body.variationCode!,
+              recipientName: body.recipientName,
             })
           : purchaseBill({
               userId: user.id,

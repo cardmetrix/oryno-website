@@ -62,6 +62,9 @@ async function findOrderByRefs(referenceCode: string, clientRef: string) {
       })) ||
       (await db.query.transactions.findFirst({
         where: sql`${transactions.metadata}->>'requestId' = ${ref}`,
+      })) ||
+      (await db.query.transactions.findFirst({
+        where: sql`${transactions.metadata}->>'pairgateReference' = ${ref}`,
       }));
     if (!tx) continue;
 

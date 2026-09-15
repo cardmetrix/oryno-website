@@ -837,10 +837,15 @@ export async function purchasePairgateBill(input: {
 
     if (!result.ok) throw new Error(result.message);
 
-    // Electricity tokens arrive via webhook; stay processing unless sandbox.
-    // Cable completes immediately on success (same as airtime/data).
+    const pin =
+      typeof result.data.pin === "string" && result.data.pin.trim()
+        ? String(result.data.pin).trim()
+        : null;
+
+    // Electricity tokens arrive via webhook; stay processing unless we already
+    // have a pin (sandbox / rare sync responses). Cable completes on accept.
     const finalStatus =
-      input.category === "electricity" && !result.simulated
+      input.category === "electricity" && !result.simulated && !pin
         ? ("processing" as const)
         : ("completed" as const);
 
@@ -848,7 +853,10 @@ export async function purchasePairgateBill(input: {
       .update(billPayments)
       .set({
         status: finalStatus,
+        // Keep Pairgate TRX code as providerRef for webhook matching.
+        // Client ORYBIL… ref stays on the transaction metadata.requestId.
         providerRef: result.referenceCode || prepared.requestId,
+        ...(pin ? { tokenOrReceipt: pin } : {}),
         updatedAt: new Date(),
       })
       .where(eq(billPayments.id, payment.id));
@@ -861,17 +869,23 @@ export async function purchasePairgateBill(input: {
       simulated: result.simulated,
       orderId: payment.id,
       billCategory: input.category,
+      ...(pin ? { token: pin } : {}),
     });
 
     return {
-      payment,
+      payment: {
+        ...payment,
+        status: finalStatus,
+        providerRef: result.referenceCode || prepared.requestId,
+        tokenOrReceipt: pin,
+      },
       transactionId: prepared.transaction.id,
       wallet: toWalletSummary(prepared.wallet),
       requestId: result.referenceCode || prepared.requestId,
       status: finalStatus,
       simulated: result.simulated,
       response: result.data,
-      token: null as string | null,
+      token: pin,
     };
   } catch (error) {
     const reason = error instanceof Error ? error.message : "Payment failed";

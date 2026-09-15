@@ -47,7 +47,16 @@ export default function BillsPage() {
   const localCurrencyBills = isGhana || isKenya || isSouthAfrica;
   const billsLive = isNigeria || localCurrencyBills;
   const hasWaterTab = isGhana || isKenya || isSouthAfrica;
-  const minBillAmount = isSouthAfrica ? 10 : isKenya ? 50 : isGhana ? 1 : 100;
+  const minBillAmount =
+    isNigeria && category === "electricity"
+      ? 1000
+      : isSouthAfrica
+        ? 10
+        : isKenya
+          ? 50
+          : isGhana
+            ? 1
+            : 100;
 
   const [category, setCategory] = useState<BillCategory>("tv");
   const [services, setServices] = useState<VtpassServiceOption[]>([]);
@@ -65,9 +74,12 @@ export default function BillsPage() {
   const [verifyHint, setVerifyHint] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [receipt, setReceipt] = useState("");
+  const [paymentId, setPaymentId] = useState<string | null>(null);
+  const [transactionId, setTransactionId] = useState<string | null>(null);
 
   const selectedService = services.find((s) => s.serviceID === serviceID);
   const selectedVariation = variations.find(
@@ -82,8 +94,11 @@ export default function BillsPage() {
   }, [category, selectedVariation, amount]);
 
   const canSubmit = useMemo(() => {
+    const verifiedOk = !isNigeria || Boolean(customerName);
     return (
       Boolean(serviceID && variationCode && customerRef.trim().length >= 6) &&
+      verifiedOk &&
+      !verifying &&
       amountNumber >= minBillAmount &&
       !submitting &&
       billsLive &&
@@ -94,6 +109,9 @@ export default function BillsPage() {
     serviceID,
     variationCode,
     customerRef,
+    customerName,
+    verifying,
+    isNigeria,
     amountNumber,
     submitting,
     minBillAmount,
@@ -220,13 +238,58 @@ export default function BillsPage() {
       } finally {
         if (!cancelled) setVerifying(false);
       }
-    }, 550);
+    }, 800);
 
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
     };
   }, [billsLive, serviceID, customerRef, category, variationCode]);
+
+  // Poll Pairgate electricity token after async purchase.
+  useEffect(() => {
+    if (!pending || !paymentId) return;
+    let cancelled = false;
+    let attempts = 0;
+
+    const tick = async () => {
+      attempts += 1;
+      try {
+        const res = await fetch(
+          `/api/vtpass/purchase/bill/status?paymentId=${encodeURIComponent(paymentId)}`,
+        );
+        const data = await res.json();
+        if (cancelled || !res.ok) return;
+        if (data.token) setToken(String(data.token));
+        if (data.status === "completed") {
+          setPending(false);
+          setSuccess(true);
+          return;
+        }
+        if (data.status === "failed") {
+          setPending(false);
+          setSuccess(false);
+          setError(data.failureReason || "Bill payment failed");
+          return;
+        }
+      } catch {
+        // keep polling
+      }
+      if (!cancelled && attempts < 40) {
+        window.setTimeout(tick, 3000);
+      } else if (!cancelled) {
+        // Still processing — leave pending screen with history link
+        setPending(false);
+        setSuccess(true);
+      }
+    };
+
+    const timer = window.setTimeout(tick, 2500);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [pending, paymentId]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -244,13 +307,22 @@ export default function BillsPage() {
           customerRef: customerRef.trim(),
           amount: amountNumber,
           variationCode,
+          recipientName: customerName,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Payment failed");
       setReceipt(data.amountFormatted);
       setToken(data.token || null);
-      setSuccess(true);
+      setPaymentId(data.paymentId || null);
+      setTransactionId(data.transactionId || null);
+      if (data.status === "processing" && !data.token) {
+        setPending(true);
+        setSuccess(true);
+      } else {
+        setPending(false);
+        setSuccess(true);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Payment failed");
     } finally {
@@ -324,11 +396,29 @@ export default function BillsPage() {
         {success ? (
           <MotionSection key="success">
             <ServiceSuccess
-              title="Bill paid!"
-              subtitle={`${selectedService?.name || "Bill"} paid successfully.`}
+              variant={pending && !token ? "pending" : "success"}
+              title={
+                pending && !token
+                  ? "Payment processing"
+                  : token
+                    ? "Bill paid!"
+                    : "Bill paid!"
+              }
+              subtitle={
+                pending && !token
+                  ? `${selectedService?.name || "Bill"} is processing. Your electricity token will appear here shortly.`
+                  : `${selectedService?.name || "Bill"} paid successfully.`
+              }
               amountLabel="Amount charged"
               amount={receipt || money(amountNumber)}
-              onDismiss={() => setSuccess(false)}
+              reference={transactionId}
+              onDismiss={() => {
+                setSuccess(false);
+                setPending(false);
+                setToken(null);
+                setPaymentId(null);
+                setTransactionId(null);
+              }}
               secondaryAction={{
                 label: "Back to Home",
                 href: "/dashboard",
@@ -338,7 +428,10 @@ export default function BillsPage() {
                 label: "Pay another bill",
                 onClick: () => {
                   setSuccess(false);
+                  setPending(false);
                   setToken(null);
+                  setPaymentId(null);
+                  setTransactionId(null);
                 },
                 icon: "plus",
               }}
@@ -346,6 +439,10 @@ export default function BillsPage() {
               {token ? (
                 <p className="break-all rounded-[14px] border border-border bg-muted/50 px-3 py-2 text-xs font-medium">
                   Token / receipt: {token}
+                </p>
+              ) : pending ? (
+                <p className="rounded-[14px] border border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+                  Waiting for disco token… this usually takes a few seconds.
                 </p>
               ) : null}
             </ServiceSuccess>
@@ -600,6 +697,10 @@ export default function BillsPage() {
                 ? "Processing…"
                 : frozen
                   ? "Wallet unavailable"
+                  : isNigeria && !customerName
+                    ? verifying
+                      ? "Verifying account…"
+                      : "Verify account to continue"
                   : amountNumber > 0 && !canAfford(amountNumber)
                     ? "Insufficient balance"
                     : `Pay bill · ${money(amountNumber)}`}

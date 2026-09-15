@@ -81,6 +81,12 @@ export async function GET(req: Request) {
           image: s.image,
           minAmount: s.minAmount,
           maxAmount: s.maxAmount,
+          customerLabel:
+            identifier === "tv-subscription"
+              ? "Smartcard / IUC"
+              : identifier === "electricity-bill"
+                ? "Meter number"
+                : undefined,
         })),
       });
     }

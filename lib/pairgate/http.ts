@@ -37,6 +37,11 @@ export function hasPairgateKeys() {
   return Boolean(pairgateApiKey());
 }
 
+/** Serialize Pairgate calls — their API rate-limits ~1 request / 2s. */
+let pairgateRequestChain: Promise<unknown> = Promise.resolve();
+let lastPairgateRequestAt = 0;
+const PAIRGATE_MIN_GAP_MS = 2100;
+
 export function pairgateApiPath(livePath: string, testPath: string) {
   return isPairgateSandbox() ? testPath : livePath;
 }
@@ -53,28 +58,72 @@ export async function pairgateFetch(
   path: string,
   init?: RequestInit,
 ): Promise<{ ok: boolean; status: number; json: PairgateEnvelope }> {
-  const res = await fetch(`${pairgateBaseUrl()}${path}`, {
-    ...init,
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${pairgateApiKey()}`,
-      ...(init?.headers || {}),
-    },
-    cache: "no-store",
+  // Pairgate enforces ~30 req/min and rejects overlapping in-flight calls.
+  const run = pairgateRequestChain.then(async () => {
+    const wait = Math.max(
+      0,
+      PAIRGATE_MIN_GAP_MS - (Date.now() - lastPairgateRequestAt),
+    );
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    lastPairgateRequestAt = Date.now();
+
+    const res = await fetch(`${pairgateBaseUrl()}${path}`, {
+      ...init,
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${pairgateApiKey()}`,
+        ...(init?.headers || {}),
+      },
+      cache: "no-store",
+    });
+    const text = await res.text();
+    let json: PairgateEnvelope = {};
+    try {
+      json = JSON.parse(text) as PairgateEnvelope;
+    } catch {
+      const err = new Error("Pairgate returned an invalid response") as Error & {
+        status?: number;
+      };
+      err.status = 503;
+      throw err;
+    }
+
+    // Soft rate-limit: one automatic retry after the required wait.
+    if (res.status === 429) {
+      await new Promise((r) => setTimeout(r, PAIRGATE_MIN_GAP_MS));
+      lastPairgateRequestAt = Date.now();
+      const retry = await fetch(`${pairgateBaseUrl()}${path}`, {
+        ...init,
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${pairgateApiKey()}`,
+          ...(init?.headers || {}),
+        },
+        cache: "no-store",
+      });
+      const retryText = await retry.text();
+      try {
+        json = JSON.parse(retryText) as PairgateEnvelope;
+      } catch {
+        const err = new Error(
+          "Pairgate returned an invalid response",
+        ) as Error & { status?: number };
+        err.status = 503;
+        throw err;
+      }
+      return { ok: retry.ok, status: retry.status, json };
+    }
+
+    return { ok: res.ok, status: res.status, json };
   });
-  const text = await res.text();
-  let json: PairgateEnvelope = {};
-  try {
-    json = JSON.parse(text) as PairgateEnvelope;
-  } catch {
-    const err = new Error("Pairgate returned an invalid response") as Error & {
-      status?: number;
-    };
-    err.status = 503;
-    throw err;
-  }
-  return { ok: res.ok, status: res.status, json };
+
+  pairgateRequestChain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
 }
 
 export function pairgateErrorMessage(json: PairgateEnvelope, fallback: string) {
