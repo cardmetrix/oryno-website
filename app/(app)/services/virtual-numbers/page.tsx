@@ -47,12 +47,14 @@ import { cn } from "@/lib/utils";
 type HeroService = { code: string; name: string };
 type HeroOffer = {
   countryId: number;
+  countrySlug?: string;
   countryName: string;
   iso: string | null;
   flagUrl: string | null;
   flagEmoji: string;
   service: string;
   serviceName: string;
+  operator?: string;
   costUsd?: number;
   priceUsd: number;
   priceLocal: number;
@@ -64,7 +66,7 @@ export default function VirtualNumbersPage() {
   const isMobile = useIsMobile();
   const { canAffordUsd, frozen } = useWalletBalance();
   const [services, setServices] = useState<HeroService[]>([]);
-  const [service, setService] = useState("wa");
+  const [service, setService] = useState("whatsapp");
   const [offers, setOffers] = useState<HeroOffer[]>([]);
   const [liveMode, setLiveMode] = useState(false);
   const [loadingServices, setLoadingServices] = useState(true);
@@ -221,10 +223,12 @@ export default function VirtualNumbersPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           heroCountryId: selected.countryId,
+          countrySlug: selected.countrySlug,
           countryName: selected.countryName,
           iso: selected.iso,
           service: selected.service,
           serviceName: selected.serviceName,
+          operator: selected.operator,
           costUsd: selected.costUsd ?? selected.priceUsd,
           priceUsd: selected.priceUsd,
           priceLocal: selected.priceLocal,
@@ -252,7 +256,7 @@ export default function VirtualNumbersPage() {
         title="Virtual Numbers"
         subtitle={
           liveMode
-            ? "Live SMS numbers · billed in USD"
+            ? "Live SMS via 5sim · billed in USD"
             : "SMS verification numbers · billed in USD"
         }
         backHref="/services"

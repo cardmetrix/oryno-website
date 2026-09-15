@@ -4,6 +4,12 @@ import { quoteLocalUsd } from "@/lib/fx/customer-quote";
 import { createUsdPricer, usdFromLocalRetail } from "@/lib/pricing/service-pricing";
 import { currencyForCountry } from "@/lib/wallet";
 import {
+  fivesimErrorToEnglish,
+  isFivesimLive,
+  listFivesimOffers,
+  numbersProvider,
+} from "@/lib/fivesim";
+import {
   FALLBACK_COUNTRIES,
   getHerosmsPrices,
   herosmsErrorToEnglish,
@@ -11,7 +17,11 @@ import {
   POPULAR_SERVICES,
   type HeroPriceOffer,
 } from "@/lib/herosms";
-import { resolveCountryIso, countryFlagUrl, countryFlagEmoji } from "@/lib/herosms/countries";
+import {
+  resolveCountryIso,
+  countryFlagUrl,
+  countryFlagEmoji,
+} from "@/lib/herosms/countries";
 
 export const runtime = "nodejs";
 
@@ -23,8 +33,39 @@ export async function GET(req: Request) {
     }
 
     const { searchParams } = new URL(req.url);
-    const service = searchParams.get("service") || "ot";
+    const service = searchParams.get("service") || "whatsapp";
     const countryParam = searchParams.get("country");
+    const provider = numbersProvider();
+
+    if (provider === "fivesim") {
+      if (!isFivesimLive()) {
+        return NextResponse.json(
+          {
+            error:
+              "Virtual numbers require FIVESIM_API_KEY with FIVESIM_DEMO=false.",
+          },
+          { status: 503 },
+        );
+      }
+
+      const { product, serviceName, offers, quote } = await listFivesimOffers({
+        service,
+        countryCode: countryParam,
+        userCountryCode: user.countryCode,
+      });
+
+      return NextResponse.json({
+        ok: true,
+        demo: false,
+        provider: "fivesim",
+        service: product,
+        serviceName,
+        currency: "USD",
+        fx: quote,
+        offers,
+      });
+    }
+
     const localCurrency = currencyForCountry(user.countryCode);
     const quote = await quoteLocalUsd(localCurrency);
     const price = await createUsdPricer("herosms");
@@ -46,7 +87,6 @@ export async function GET(req: Request) {
       POPULAR_SERVICES.find((s) => s.code === service)?.name || service;
 
     if (isHerosmsDemoMode()) {
-      console.log("[herosms-prices] DEMO catalog", { service, countryParam });
       const countries = countryParam
         ? FALLBACK_COUNTRIES.filter((c) => String(c.id) === countryParam)
         : FALLBACK_COUNTRIES;
@@ -72,6 +112,7 @@ export async function GET(req: Request) {
       return NextResponse.json({
         ok: true,
         demo: true,
+        provider: "herosms",
         service,
         serviceName,
         currency: "USD",
@@ -80,34 +121,28 @@ export async function GET(req: Request) {
       });
     }
 
-    console.log("[herosms-prices] LIVE catalog", { service, countryParam });
     const prices = await getHerosmsPrices({
       service,
       ...(countryParam ? { country: Number(countryParam) } : {}),
     });
 
     const offers: HeroPriceOffer[] = [];
-
     for (const [countryId, value] of Object.entries(prices)) {
       const id = Number(countryId);
       if (!Number.isFinite(id)) continue;
 
       let cost = 0;
       let count = 0;
-
       if (value && typeof value === "object") {
         const row = value as Record<string, unknown>;
-        // Shape A: { cost, count }
         if ("cost" in row) {
           cost = Number(row.cost) || 0;
           count = Number(row.count) || 0;
         } else if (service in row) {
-          // Shape B: { [service]: { cost, count } }
           const nested = row[service] as Record<string, unknown> | undefined;
           cost = Number(nested?.cost) || 0;
           count = Number(nested?.count) || 0;
         } else {
-          // Shape C: first nested service entry
           const first = Object.values(row)[0] as Record<string, unknown> | undefined;
           if (first && typeof first === "object") {
             cost = Number(first.cost) || 0;
@@ -115,15 +150,12 @@ export async function GET(req: Request) {
           }
         }
       }
-
-      // Live: only show countries with stock
       if (cost <= 0 || count <= 0) continue;
 
       const fallback = FALLBACK_COUNTRIES.find((c) => c.id === id);
       const iso = resolveCountryIso(id, fallback?.name) || fallback?.iso || null;
       const name = fallback?.name || `Country ${id}`;
       const priced = retailFor(cost, `${id}:${service}`);
-
       offers.push({
         countryId: id,
         countryName: name,
@@ -138,7 +170,6 @@ export async function GET(req: Request) {
       });
     }
 
-    // Enrich names from live countries when possible (cached lightly via parallel call)
     try {
       const { getHerosmsCountries } = await import("@/lib/herosms");
       const live = await getHerosmsCountries();
@@ -157,14 +188,11 @@ export async function GET(req: Request) {
     }
 
     offers.sort((a, b) => a.priceUsd - b.priceUsd);
-    console.log("[herosms-prices] LIVE offers", {
-      service,
-      count: offers.length,
-    });
 
     return NextResponse.json({
       ok: true,
       demo: false,
+      provider: "herosms",
       service,
       serviceName,
       currency: "USD",
@@ -172,12 +200,18 @@ export async function GET(req: Request) {
       offers,
     });
   } catch (error) {
-    console.error("[herosms-prices] LIVE failed", error);
+    console.error("[numbers-prices]", error);
+    const provider = numbersProvider();
     return NextResponse.json(
       {
-        error: herosmsErrorToEnglish(
-          error instanceof Error ? error.message : "Failed to load prices",
-        ),
+        error:
+          provider === "fivesim"
+            ? fivesimErrorToEnglish(
+                error instanceof Error ? error.message : "Failed to load prices",
+              )
+            : herosmsErrorToEnglish(
+                error instanceof Error ? error.message : "Failed to load prices",
+              ),
       },
       { status: 400 },
     );

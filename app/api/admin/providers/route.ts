@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { withAdminApi } from "@/lib/admin/api";
 import { isHerosmsDemoMode, isHerosmsLive } from "@/lib/herosms/client";
+import { isFivesimDemoMode, isFivesimLive } from "@/lib/fivesim/client";
 import { isJapDemoMode, isJapLive } from "@/lib/jap/client";
 import {
   hasFlutterwaveKeys,
@@ -61,9 +62,19 @@ export async function GET() {
         }),
       },
       {
+        id: "fivesim",
+        name: "5sim",
+        type: "Virtual numbers",
+        country: "Global",
+        status: modeLabel({
+          configured: isFivesimLive() || !isFivesimDemoMode(),
+          demo: isFivesimDemoMode(),
+        }),
+      },
+      {
         id: "herosms",
         name: "HeroSMS",
-        type: "Virtual numbers / Emails",
+        type: "Emails (+ numbers fallback)",
         country: "Global",
         status: modeLabel({
           configured: isHerosmsLive() || !isHerosmsDemoMode(),

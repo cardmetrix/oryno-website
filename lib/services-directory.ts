@@ -96,7 +96,7 @@ export const servicesDirectory: ServiceDirectoryItem[] = [
   {
     id: "betting",
     href: "/services/betting",
-    label: "Betting Funding",
+    label: "Betting",
     shortDescription: "Fund SportyBet, Bet9ja & more",
     longDescription:
       "Verify a betting account ID and credit local bookmakers from your ORYNO wallet.",

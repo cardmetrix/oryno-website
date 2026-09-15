@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
 import {
+  fivesimErrorToEnglish,
+  isFivesimLive,
+  listFivesimServices,
+  numbersProvider,
+} from "@/lib/fivesim";
+import {
   getHerosmsServices,
   herosmsErrorToEnglish,
   isHerosmsDemoMode,
@@ -16,11 +22,31 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const provider = numbersProvider();
+
+    if (provider === "fivesim") {
+      if (!isFivesimLive()) {
+        return NextResponse.json(
+          {
+            error:
+              "Virtual numbers require FIVESIM_API_KEY with FIVESIM_DEMO=false.",
+          },
+          { status: 503 },
+        );
+      }
+      const services = await listFivesimServices();
+      return NextResponse.json({
+        ok: true,
+        demo: false,
+        provider: "fivesim",
+        services,
+      });
+    }
+
     const demo = isHerosmsDemoMode();
-    console.log("[herosms-services]", demo ? "DEMO" : "LIVE");
+    console.log("[numbers-services]", demo ? "DEMO herosms" : "LIVE herosms");
 
     let services = demo ? POPULAR_SERVICES : await getHerosmsServices();
-
     if (!services.length) {
       if (!demo) {
         return NextResponse.json(
@@ -31,7 +57,6 @@ export async function GET() {
       services = POPULAR_SERVICES;
     }
 
-    // Put popular codes first
     const popularCodes = new Set(POPULAR_SERVICES.map((s) => s.code));
     services = [...services].sort((a, b) => {
       const ap = popularCodes.has(a.code) ? 0 : 1;
@@ -43,15 +68,22 @@ export async function GET() {
     return NextResponse.json({
       ok: true,
       demo,
+      provider: "herosms",
       services,
     });
   } catch (error) {
-    console.error("[herosms-services] LIVE failed", error);
+    console.error("[numbers-services]", error);
+    const provider = numbersProvider();
     return NextResponse.json(
       {
-        error: herosmsErrorToEnglish(
-          error instanceof Error ? error.message : "Failed to load services",
-        ),
+        error:
+          provider === "fivesim"
+            ? fivesimErrorToEnglish(
+                error instanceof Error ? error.message : "Failed to load services",
+              )
+            : herosmsErrorToEnglish(
+                error instanceof Error ? error.message : "Failed to load services",
+              ),
       },
       { status: 400 },
     );

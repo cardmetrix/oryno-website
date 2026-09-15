@@ -1,6 +1,14 @@
 import { NextResponse } from "next/server";
+import { eq } from "drizzle-orm";
 import { ensureAppUser } from "@/lib/auth/current-user";
-import { pollNumberStatus } from "@/lib/herosms";
+import { db } from "@/lib/db";
+import { transactions } from "@/lib/db/schema";
+import {
+  fivesimErrorToEnglish,
+  numbersProvider,
+  pollFivesimNumberStatus,
+} from "@/lib/fivesim";
+import { pollNumberStatus, herosmsErrorToEnglish } from "@/lib/herosms";
 
 export const runtime = "nodejs";
 
@@ -19,14 +27,36 @@ export async function GET(
       return NextResponse.json({ error: "Missing id" }, { status: 400 });
     }
 
+    const tx = await db.query.transactions.findFirst({
+      where: eq(transactions.externalRef, id.slice(0, 120)),
+    });
+    const meta = (tx?.metadata || {}) as Record<string, unknown>;
+    const storedProvider =
+      meta.provider === "fivesim" || meta.provider === "herosms"
+        ? meta.provider
+        : null;
+    const provider = storedProvider || numbersProvider();
+
+    if (provider === "fivesim") {
+      const status = await pollFivesimNumberStatus(id, user.id);
+      return NextResponse.json({ ok: true, ...status });
+    }
+
     const status = await pollNumberStatus(id, user.id);
     return NextResponse.json({ ok: true, ...status });
   } catch (error) {
-    console.error("[herosms-number-status]", error);
+    console.error("[numbers-status]", error);
+    const provider = numbersProvider();
     return NextResponse.json(
       {
         error:
-          error instanceof Error ? error.message : "Failed to get status",
+          provider === "fivesim"
+            ? fivesimErrorToEnglish(
+                error instanceof Error ? error.message : "Failed to get status",
+              )
+            : herosmsErrorToEnglish(
+                error instanceof Error ? error.message : "Failed to get status",
+              ),
       },
       { status: 400 },
     );

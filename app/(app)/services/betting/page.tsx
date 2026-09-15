@@ -2,13 +2,12 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Search, Wallet } from "lucide-react";
+import { Wallet } from "lucide-react";
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
 import { ServiceSuccess } from "@/components/app/service-success";
 import { ErrorAlertModal } from "@/components/app/error-alert-modal";
-import { ServiceInstructions } from "@/components/app/service-instructions";
 import {
   VtpassServicePicker,
   type VtpassServiceOption,
@@ -42,6 +41,7 @@ export default function BettingPage() {
   const [amount, setAmount] = useState("2000");
   const [verifying, setVerifying] = useState(false);
   const [customerName, setCustomerName] = useState<string | null>(null);
+  const [verifyHint, setVerifyHint] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,6 +56,7 @@ export default function BettingPage() {
   const canSubmit = useMemo(() => {
     return (
       Boolean(serviceID && customerRef.trim().length >= 6 && customerName) &&
+      !verifying &&
       amountNumber >= minAmount &&
       !submitting &&
       !frozen &&
@@ -65,6 +66,7 @@ export default function BettingPage() {
     serviceID,
     customerRef,
     customerName,
+    verifying,
     amountNumber,
     minAmount,
     submitting,
@@ -104,29 +106,49 @@ export default function BettingPage() {
     };
   }, [country.code]);
 
-  async function verifyCustomer() {
-    if (!serviceID || customerRef.trim().length < 6) return;
-    setVerifying(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/betting/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          serviceID,
-          customerRef: customerRef.trim(),
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Verification failed");
-      setCustomerName(data.customerName || "Verified customer");
-    } catch (e) {
+  // Auto-verify betting account when ID is long enough (same pattern as bills).
+  useEffect(() => {
+    if (!serviceID || customerRef.trim().length < 6) {
       setCustomerName(null);
-      setError(e instanceof Error ? e.message : "Verification failed");
-    } finally {
       setVerifying(false);
+      setVerifyHint(null);
+      return;
     }
-  }
+
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      setVerifying(true);
+      setVerifyHint(null);
+      try {
+        const res = await fetch("/api/betting/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            serviceID,
+            customerRef: customerRef.trim(),
+          }),
+        });
+        const data = await res.json();
+        if (cancelled) return;
+        if (!res.ok) throw new Error(data.error || "Verification failed");
+        setCustomerName(data.customerName || "Verified customer");
+        setVerifyHint(null);
+      } catch (e) {
+        if (cancelled) return;
+        setCustomerName(null);
+        setVerifyHint(
+          e instanceof Error ? e.message : "Could not verify that account",
+        );
+      } finally {
+        if (!cancelled) setVerifying(false);
+      }
+    }, 800);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [serviceID, customerRef]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -163,6 +185,7 @@ export default function BettingPage() {
     setToken(null);
     setTransactionId(null);
     setCustomerName(null);
+    setVerifyHint(null);
   }
 
   const money = (n: number) => formatCountryMoney(n, country.code);
@@ -213,9 +236,7 @@ export default function BettingPage() {
           </MotionSection>
         ) : (
           <form key="form" onSubmit={onSubmit} className="space-y-4 sm:space-y-5">
-
             <MotionSection className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6">
-         
               <div className="md:hidden">
                 <SelectSheet
                   label="Bookmaker"
@@ -228,6 +249,7 @@ export default function BettingPage() {
                   onChange={(id) => {
                     setServiceID(id);
                     setCustomerName(null);
+                    setVerifyHint(null);
                   }}
                   loading={loadingServices}
                   emptyText="No bookmakers available"
@@ -248,6 +270,7 @@ export default function BettingPage() {
                   onChange={(id) => {
                     setServiceID(id);
                     setCustomerName(null);
+                    setVerifyHint(null);
                   }}
                   loading={loadingServices}
                   columns="grid-cols-2 sm:grid-cols-3 lg:grid-cols-4"
@@ -262,31 +285,27 @@ export default function BettingPage() {
               <label className="mb-2 block text-sm font-medium">
                 Betting account ID
               </label>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <input
-                  value={customerRef}
-                  onChange={(e) => {
-                    setCustomerRef(e.target.value.replace(/\s+/g, ""));
-                    setCustomerName(null);
-                  }}
-                  placeholder="e.g. 12345678"
-                  inputMode="numeric"
-                  className="h-12 w-full rounded-[14px] border border-border bg-background px-4 text-sm outline-none focus:border-primary"
-                />
-                <button
-                  type="button"
-                  onClick={verifyCustomer}
-                  disabled={verifying || customerRef.trim().length < 6}
-                  className="btn-secondary inline-flex h-12 shrink-0 items-center justify-center gap-2 px-4 disabled:opacity-50"
-                >
-                  <Search className="h-4 w-4" />
-                  {verifying ? "Checking…" : "Verify"}
-                </button>
-              </div>
-              {customerName ? (
+              <input
+                value={customerRef}
+                onChange={(e) => {
+                  setCustomerRef(e.target.value.replace(/\s+/g, ""));
+                  setCustomerName(null);
+                  setVerifyHint(null);
+                }}
+                placeholder="e.g. 12345678"
+                inputMode="numeric"
+                className="h-12 w-full rounded-[14px] border border-border bg-background px-4 text-sm outline-none focus:border-primary"
+              />
+              {verifying ? (
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Checking account…
+                </p>
+              ) : customerName ? (
                 <p className="mt-2 text-sm font-medium text-[var(--oryno-success)]">
                   {customerName}
                 </p>
+              ) : verifyHint ? (
+                <p className="mt-2 text-sm text-destructive">{verifyHint}</p>
               ) : null}
             </MotionSection>
 
@@ -327,7 +346,14 @@ export default function BettingPage() {
               <div className="mt-3 space-y-2 text-sm">
                 <Row label="Bookmaker" value={selectedService?.name ?? "—"} />
                 <Row label="Account ID" value={customerRef || "—"} />
-                <Row label="Customer" value={customerName || "Verify first"} />
+                <Row
+                  label="Customer"
+                  value={
+                    verifying
+                      ? "Checking…"
+                      : customerName || (verifyHint ? "Not verified" : "—")
+                  }
+                />
                 <Row label="Amount" value={money(amountNumber)} accent />
                 <div className="flex items-center gap-2 border-t border-border pt-3 font-semibold">
                   <Wallet className="h-4 w-4 text-primary" />
@@ -346,6 +372,10 @@ export default function BettingPage() {
                 ? "Funding…"
                 : frozen
                   ? "Wallet unavailable"
+                  : !customerName
+                    ? verifying
+                      ? "Verifying account…"
+                      : "Verify account to continue"
                   : amountNumber > 0 && !canAfford(amountNumber)
                     ? "Insufficient balance"
                     : `Fund wallet · ${money(amountNumber)}`}
