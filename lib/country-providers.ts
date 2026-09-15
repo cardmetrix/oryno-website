@@ -114,12 +114,12 @@ export const SERVICE_PROVIDERS: CountryServiceProvider[] = [
       { env: "BETTING_DEMO", label: "true to force local demo" },
     ],
     notes:
-      "Primary Nigeria betting rail. Create a ClubKonnect (Nellobyte) account, copy UserID + APIKey, fund the ClubKonnect wallet, then set CLUBKONNECT_USER_ID and CLUBKONNECT_API_KEY with BETTING_DEMO=false.",
+      "Nigeria betting uses ClubKonnect only (no VTU Africa). Create a ClubKonnect account, copy UserID + APIKey, enable betting API with support, fund the wallet, then set CLUBKONNECT_USER_ID and CLUBKONNECT_API_KEY with BETTING_DEMO=false.",
   },
   {
     id: "vtu-africa",
     name: "VTU Africa",
-    role: "Betting wallet funding for Ghana, Kenya, and South Africa",
+    role: "Betting wallet funding for Ghana, Kenya, and South Africa only",
     services: ["betting"],
     countries: ["GH", "KE", "ZA"],
     signupUrl: "https://vtuafrica.com.ng",
@@ -131,7 +131,7 @@ export const SERVICE_PROVIDERS: CountryServiceProvider[] = [
       { env: "BETTING_DEMO", label: "true to force local demo" },
     ],
     notes:
-      "Used when the user country is GH, KE, or ZA. Coverage depends on VTU Africa’s bookmaker list for those markets; keep the wallet funded.",
+      "Used only for GH, KE, and ZA — never for Nigeria. Keep the wallet funded.",
   },
   {
     id: "hubtel",
