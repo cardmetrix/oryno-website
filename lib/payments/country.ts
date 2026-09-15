@@ -57,7 +57,6 @@ export function fundPresetsForCountry(countryCode?: string | null) {
   }
 }
 
-
 export function demoBanksForCountry(
   countryCode?: string | null,
 ): CountryBank[] {
