@@ -47,16 +47,6 @@ export default function BillsPage() {
   const localCurrencyBills = isGhana || isKenya || isSouthAfrica;
   const billsLive = isNigeria || localCurrencyBills;
   const hasWaterTab = isGhana || isKenya || isSouthAfrica;
-  const minBillAmount =
-    isNigeria && category === "electricity"
-      ? 1000
-      : isSouthAfrica
-        ? 10
-        : isKenya
-          ? 50
-          : isGhana
-            ? 1
-            : 100;
 
   const [category, setCategory] = useState<BillCategory>("tv");
   const [services, setServices] = useState<VtpassServiceOption[]>([]);
@@ -80,6 +70,17 @@ export default function BillsPage() {
   const [receipt, setReceipt] = useState("");
   const [paymentId, setPaymentId] = useState<string | null>(null);
   const [transactionId, setTransactionId] = useState<string | null>(null);
+
+  const minBillAmount =
+    isNigeria && category === "electricity"
+      ? 1000
+      : isSouthAfrica
+        ? 10
+        : isKenya
+          ? 50
+          : isGhana
+            ? 1
+            : 100;
 
   const selectedService = services.find((s) => s.serviceID === serviceID);
   const selectedVariation = variations.find(
