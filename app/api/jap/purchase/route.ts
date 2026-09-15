@@ -3,10 +3,7 @@ import { ensureAppUser } from "@/lib/auth/current-user";
 import { createNotification } from "@/lib/notifications-service";
 import { formatMoney } from "@/lib/transactions";
 import { japErrorToEnglish, purchaseJapBoost } from "@/lib/jap";
-import {
-  actionLockHttpStatus,
-  withUserActionLock,
-} from "@/lib/wallet/action-lock";
+import { actionLockHttpStatus } from "@/lib/wallet/action-lock";
 
 export const runtime = "nodejs";
 
@@ -65,24 +62,24 @@ export async function POST(req: Request) {
       Number(body.priceLocal) || 0,
       user.countryCode,
       () =>
-      purchaseJapBoost({
-      userId: user.id,
-      countryCode: user.countryCode,
-      serviceId: Number(body.serviceId),
-      serviceName: body.serviceName.trim(),
-      platform: body.platform || "Other",
-      metric: body.metric || "Boost",
-      link: body.link.trim(),
-      quantity: Number(body.quantity) || 0,
-      rateUsd: Number(body.rateUsd) || 0,
-      priceLocal: Number(body.priceLocal) || undefined,
-      comments: body.comments,
-      }),
+        purchaseJapBoost({
+          userId: user.id,
+          countryCode: user.countryCode,
+          serviceId: Number(body.serviceId),
+          serviceName: body.serviceName!.trim(),
+          platform: body.platform || "Other",
+          metric: body.metric || "Boost",
+          link: body.link!.trim(),
+          quantity: Number(body.quantity) || 0,
+          rateUsd: Number(body.rateUsd) || undefined,
+          priceLocal: Number(body.priceLocal) || undefined,
+          comments: body.comments,
+        }),
     );
 
     console.log("[jap-purchase] ok", {
-      simulated: result.simulated,
       orderId: result.orderId,
+      transactionId: result.transactionId,
     });
 
     const amountFormatted = formatMoney(result.amount, result.currency);
@@ -91,10 +88,10 @@ export async function POST(req: Request) {
       await createNotification({
         userId: user.id,
         title: "Boost ordered",
-        body: `${body.quantity?.toLocaleString()} ${body.metric || "boost"} for ${body.platform || "social"} is processing`,
+        body: `${result.quantity.toLocaleString()} ${result.metric} for ${result.platform} is processing`,
         type: "social",
         metadata: {
-          href: "/services/social",
+          href: `/history/${result.transactionId}`,
           orderId: result.orderId,
           transactionId: result.transactionId,
         },
@@ -105,15 +102,14 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       ok: true,
-      simulated: result.simulated,
+      simulated: false,
+      provider: "jap",
       orderId: result.orderId,
       socialOrderId: result.socialOrderId,
       transactionId: result.transactionId,
       wallet: result.wallet,
       amountFormatted,
-      message: result.simulated
-        ? "Demo boost placed — add your API key for live orders"
-        : "Boost ordered successfully",
+      message: "Boost ordered successfully",
     });
   } catch (error) {
     console.error("[jap-purchase]", error);

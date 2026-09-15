@@ -13,6 +13,7 @@ import {
   RefreshCw,
   RotateCcw,
   Share2,
+  TrendingUp,
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -35,6 +36,14 @@ function isVirtualNumberTx(tx: TransactionReceipt) {
     tx.category === "numbers" ||
     Boolean(metaString(tx.metadata, "activationId")) ||
     Boolean(metaString(tx.metadata, "phoneNumber"))
+  );
+}
+
+function isSocialBoostTx(tx: TransactionReceipt) {
+  return (
+    tx.category === "social" ||
+    metaString(tx.metadata, "kind") === "social_boost" ||
+    Boolean(metaString(tx.metadata, "japOrderId"))
   );
 }
 
@@ -253,6 +262,9 @@ export default function TransactionReceiptPage({
                   {isVirtualNumberTx(tx) ? (
                     <VirtualNumberDetails meta={tx.metadata} />
                   ) : null}
+                  {isSocialBoostTx(tx) ? (
+                    <SocialBoostDetails meta={tx.metadata} />
+                  ) : null}
                 </div>
               </div>
 
@@ -265,6 +277,12 @@ export default function TransactionReceiptPage({
           {isVirtualNumberTx(tx) ? (
             <MotionSection delay={0.04} className="mt-5">
               <VirtualNumberCodePanel tx={tx} />
+            </MotionSection>
+          ) : null}
+
+          {isSocialBoostTx(tx) ? (
+            <MotionSection delay={0.04} className="mt-5">
+              <SocialBoostStatusPanel tx={tx} />
             </MotionSection>
           ) : null}
 
@@ -315,6 +333,115 @@ function VirtualNumberDetails({
       {phone ? <DetailRow label="Phone" value={phone} mono /> : null}
       {service ? <DetailRow label="Service" value={service} /> : null}
     </>
+  );
+}
+
+function SocialBoostDetails({
+  meta,
+}: {
+  meta: Record<string, unknown> | null;
+}) {
+  const link = metaString(meta, "link");
+  const qty = meta?.quantity;
+  const quantity =
+    typeof qty === "number"
+      ? qty.toLocaleString()
+      : typeof qty === "string"
+        ? qty
+        : null;
+  if (!link && !quantity) return null;
+  return (
+    <>
+      {quantity ? <DetailRow label="Quantity" value={quantity} /> : null}
+      {link ? <DetailRow label="Link" value={link} mono /> : null}
+    </>
+  );
+}
+
+function SocialBoostStatusPanel({ tx }: { tx: TransactionReceipt }) {
+  const orderId =
+    metaString(tx.metadata, "japOrderId") || tx.externalRef;
+  const cached = metaString(tx.metadata, "japStatus");
+
+  const [status, setStatus] = useState<string | null>(cached);
+  const [remains, setRemains] = useState<string | null>(null);
+  const [fetching, setFetching] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchStatus = useCallback(async () => {
+    if (!orderId) {
+      setError("Order id missing for this boost");
+      return;
+    }
+    setFetching(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/jap/status/${encodeURIComponent(orderId)}`,
+        { cache: "no-store" },
+      );
+      const data = (await res.json()) as {
+        error?: string;
+        data?: {
+          status?: string;
+          remains?: string;
+          start_count?: string;
+        };
+      };
+      if (!res.ok) throw new Error(data.error || "Could not get status");
+      if (data.data?.status) setStatus(String(data.data.status));
+      if (data.data?.remains != null) setRemains(String(data.data.remains));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not get status");
+    } finally {
+      setFetching(false);
+    }
+  }, [orderId]);
+
+  useEffect(() => {
+    if (!orderId) return;
+    if (cached && /complet|partial|cancel|fail/i.test(cached)) return;
+    void fetchStatus();
+  }, [orderId, cached, fetchStatus]);
+
+  if (!orderId) return null;
+
+  return (
+    <div className="overflow-hidden rounded-[28px] border border-border bg-background shadow-[var(--shadow-soft)]">
+      <div className="flex items-center gap-2 border-b border-border px-5 py-3.5">
+        <TrendingUp className="h-4 w-4 text-primary" />
+        <p className="text-sm font-semibold text-foreground">Boost status</p>
+      </div>
+      <div className="space-y-3 px-5 py-4">
+        <div className="rounded-[16px] bg-muted/50 px-3.5 py-3">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            Provider status
+          </p>
+          <p className="mt-0.5 text-sm font-semibold text-foreground">
+            {status || (fetching ? "Checking…" : "—")}
+          </p>
+          {remains != null && remains !== "" ? (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Remaining: {remains}
+            </p>
+          ) : null}
+        </div>
+        {error ? <p className="text-xs text-destructive">{error}</p> : null}
+        <button
+          type="button"
+          disabled={!orderId || fetching}
+          onClick={() => void fetchStatus()}
+          className="btn-primary inline-flex h-11 w-full items-center justify-center gap-2 text-sm disabled:opacity-50"
+        >
+          {fetching ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <RefreshCw className="h-4 w-4" />
+          )}
+          Refresh status
+        </button>
+      </div>
+    </div>
   );
 }
 

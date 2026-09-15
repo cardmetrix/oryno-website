@@ -16,6 +16,7 @@ export const EXTERNAL_API_CATALOG = {
     "Provider secrets never leave the ORYNO server.",
     "Friendly /services/* aliases are remapped to provider routes.",
     "Virtual numbers use 5sim via /services/numbers.",
+    "Social boosting uses JustAnotherPanel via /services/social.",
   ],
   endpoints: {
     auth: ["POST /auth/sync", "POST /auth/logout"],
@@ -57,6 +58,7 @@ export const EXTERNAL_API_CATALOG = {
       "POST /services/betting/fund",
       "GET /services/social?platform=",
       "POST /services/social/purchase",
+      "GET /services/social/status/:id",
       "GET /services/gift-cards/countries",
       "GET /services/gift-cards/products",
       "POST /services/gift-cards/buy",

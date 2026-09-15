@@ -43,6 +43,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useWalletBalance } from "@/hooks/use-wallet-balance";
 import { formatUsd } from "@/lib/country";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 type HeroService = { code: string; name: string };
 type HeroOffer = {
@@ -305,6 +306,7 @@ export default function VirtualNumbersPage() {
                   label="SMS code"
                   value={smsCode || (polling ? "Waiting for SMS…" : "—")}
                   mono={!smsCode}
+                  copyable={Boolean(smsCode)}
                 />
                 {polling && !smsCode ? (
                   <p className="inline-flex items-center gap-2 text-xs text-muted-foreground">
@@ -690,32 +692,67 @@ function CopyRow({
   label,
   value,
   mono,
+  copyable = true,
 }: {
   label: string;
   value: string;
   mono?: boolean;
+  /** When false, hide the copy control (e.g. waiting placeholder). */
+  copyable?: boolean;
 }) {
+  const [copied, setCopied] = useState(false);
+  const canCopy =
+    copyable &&
+    Boolean(value?.trim()) &&
+    value !== "—" &&
+    !/waiting/i.test(value);
+
+  async function onCopy() {
+    if (!canCopy) return;
+    try {
+      await navigator.clipboard.writeText(value.trim());
+      setCopied(true);
+      toast.success(`${label} copied`);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch {
+      toast.error(`Couldn’t copy ${label.toLowerCase()}`);
+    }
+  }
+
   return (
     <div className="flex items-center justify-between gap-3 rounded-[16px] border border-border bg-muted/40 px-4 py-3">
-      <div className="min-w-0">
-        <p className="text-[11px] text-muted-foreground">{label}</p>
+      <div className="min-w-0 flex-1 text-left">
+        <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+          {label}
+        </p>
         <p
           className={cn(
-            "truncate text-sm font-bold",
-            mono && "text-muted-foreground",
+            "mt-0.5 truncate text-sm font-bold tabular-nums text-foreground",
+            mono && "font-mono tracking-wide text-muted-foreground",
+            canCopy && "font-mono tracking-wide text-foreground",
           )}
         >
           {value}
         </p>
       </div>
-      {value && value !== "—" && !value.includes("Waiting") ? (
+      {canCopy ? (
         <button
           type="button"
-          onClick={() => navigator.clipboard.writeText(value)}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] border border-border bg-background"
-          aria-label="Copy"
+          onClick={() => void onCopy()}
+          className={cn(
+            "inline-flex h-10 shrink-0 items-center gap-1.5 rounded-[12px] border border-border bg-background px-3 text-xs font-semibold transition",
+            copied
+              ? "border-[var(--oryno-success)]/40 text-[var(--oryno-success)]"
+              : "text-foreground hover:bg-muted",
+          )}
+          aria-label={`Copy ${label}`}
         >
-          <Copy className="h-4 w-4" />
+          {copied ? (
+            <Check className="h-4 w-4" strokeWidth={2.25} />
+          ) : (
+            <Copy className="h-4 w-4" strokeWidth={2} />
+          )}
+          {copied ? "Copied" : "Copy"}
         </button>
       ) : null}
     </div>

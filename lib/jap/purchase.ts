@@ -4,7 +4,6 @@ import {
   socialOrders,
   socialPackages,
   transactions,
-  wallets,
 } from "@/lib/db/schema";
 import { quoteLocalUsd } from "@/lib/fx/customer-quote";
 import { resolveCountryCode } from "@/lib/country";
@@ -24,7 +23,6 @@ import {
   isJapLive,
 } from "./client";
 import {
-  FALLBACK_JAP_SERVICES,
   isCustomCommentsService,
   japUsdCost,
   normalizeCustomComments,
@@ -144,44 +142,48 @@ export async function purchaseJapBoost(input: {
   metric: string;
   link: string;
   quantity: number;
-  rateUsd: number;
+  /** Ignored for pricing — server uses live catalog rate. */
+  rateUsd?: number;
   priceLocal?: number;
   comments?: string | string[];
 }) {
   const link = input.link.trim();
   if (link.length < 4) throw new Error("Enter a valid profile or post link");
 
-  let providerService:
-    | { service: number; type: string; name: string; min: number; max: number }
-    | undefined;
-  try {
-    const live = isJapDemoMode()
-      ? FALLBACK_JAP_SERVICES
-      : await getJapServices();
-    providerService = live.find((s) => s.service === input.serviceId);
-  } catch {
-    providerService = FALLBACK_JAP_SERVICES.find(
-      (s) => s.service === input.serviceId,
+  if (isJapDemoMode()) {
+    throw new Error(
+      "JustAnotherPanel is not configured for live purchases. Set JAP_API_KEY and JAP_DEMO=false.",
     );
   }
 
-  const needsComments = isCustomCommentsService(
-    providerService ?? {
-      type: "",
-      name: input.serviceName,
-    },
-  );
+  let liveServices: Awaited<ReturnType<typeof getJapServices>>;
+  try {
+    liveServices = await getJapServices();
+  } catch {
+    throw new Error(
+      "Could not load boost catalog from the provider. Try again in a moment.",
+    );
+  }
 
+  const providerService = liveServices.find(
+    (s) => s.service === input.serviceId,
+  );
+  if (!providerService || !(providerService.rate > 0)) {
+    throw new Error("That boost package is no longer available. Pick another.");
+  }
+
+  const serviceName = providerService.name || input.serviceName;
+  const needsComments = isCustomCommentsService(providerService);
   const comments = normalizeCustomComments(input.comments);
   let quantity = Number(input.quantity);
+  const min = Math.max(1, providerService.min || 1);
+  const max = Math.max(min, providerService.max || 1_000_000);
 
   if (needsComments) {
     if (!comments.length) {
       throw new Error("Add at least one custom comment");
     }
     quantity = comments.length;
-    const min = Math.max(1, providerService?.min || 1);
-    const max = Math.max(min, providerService?.max || 1_000_000);
     if (quantity < min) {
       throw new Error(`Add at least ${min.toLocaleString()} custom comments`);
     }
@@ -192,28 +194,34 @@ export async function purchaseJapBoost(input: {
     }
   } else if (comments.length) {
     throw new Error("This package does not accept custom comments");
-  }
-
-  if (!Number.isFinite(quantity) || quantity <= 0) {
-    throw new Error("Enter a valid quantity");
+  } else {
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      throw new Error("Enter a valid quantity");
+    }
+    if (quantity < min) {
+      throw new Error(`Minimum quantity is ${min.toLocaleString()}`);
+    }
+    if (quantity > max) {
+      throw new Error(`Maximum quantity is ${max.toLocaleString()}`);
+    }
   }
 
   const commentsPayload = needsComments ? comments.join("\n") : undefined;
 
-  const wholesaleUsd = japUsdCost(input.rateUsd, quantity);
+  // Always price from provider catalog rate — never trust client rateUsd.
+  const wholesaleUsd = japUsdCost(providerService.rate, quantity);
   const { usd, local, quote, companyCharge } = await usdRetailJapPrice(
     wholesaleUsd,
     input.countryCode,
     String(input.serviceId),
   );
-  // Always charge admin/server retail USD — ignore client-posted amounts.
   const chargeAmount = usd;
   const currency = "USD";
 
   const pkg = await ensureSocialPackage({
     countryCode: resolveCountryCode(input.countryCode),
     platform: input.platform,
-    name: input.serviceName,
+    name: serviceName,
     metric: input.metric,
     quantity,
     price: chargeAmount,
@@ -227,16 +235,14 @@ export async function purchaseJapBoost(input: {
     quantity,
     needsComments,
     commentsCount: comments.length,
+    providerRate: providerService.rate,
     wholesaleUsd,
     chargeAmount,
     currency,
     buyRate: quote.buyRate,
   });
 
-  // Fail before debiting wallet when live provider is down / empty
-  if (!isJapDemoMode()) {
-    await assertJapReady(Math.max(0.01, wholesaleUsd * 0.5));
-  }
+  await assertJapReady(Math.max(0.01, wholesaleUsd * 0.5));
 
   const debit = await debitUsdWallet({
     userId: input.userId,
@@ -254,27 +260,19 @@ export async function purchaseJapBoost(input: {
       priceUsd: chargeAmount,
       priceLocal: local,
       buyRate: quote.buyRate,
-      ...(needsComments ? { customComments: true, commentsCount: comments.length } : {}),
+      ...(needsComments
+        ? { customComments: true, commentsCount: comments.length }
+        : {}),
     },
   });
 
   try {
-    let orderId: string;
-    let simulated = false;
-
-    if (isJapDemoMode()) {
-      throw new Error(
-        "JustAnotherPanel is not configured for live purchases. Set JAP_API_KEY and JAP_DEMO=false.",
-      );
-    }
     const placed = await addJapOrder({
       service: input.serviceId,
       link,
-      ...(needsComments
-        ? { comments: commentsPayload }
-        : { quantity }),
+      ...(needsComments ? { comments: commentsPayload } : { quantity }),
     });
-    orderId = placed.orderId;
+    const orderId = placed.orderId;
     console.log(LOG_PREFIX, "purchase LIVE", { orderId });
 
     const [order] = await db
@@ -306,7 +304,7 @@ export async function purchaseJapBoost(input: {
           japServiceId: input.serviceId,
           quantity,
           link,
-          simulated,
+          simulated: false,
           ...(needsComments
             ? { customComments: true, commentsCount: comments.length }
             : {}),
@@ -318,7 +316,9 @@ export async function purchaseJapBoost(input: {
     scheduleReferralCheck(input.userId);
 
     try {
-      const { recognizeUsdServiceProfit } = await import("@/lib/company/recognize");
+      const { recognizeUsdServiceProfit } = await import(
+        "@/lib/company/recognize"
+      );
       await recognizeUsdServiceProfit({
         source: "social",
         transactionId: debit.transaction.id,
@@ -340,7 +340,7 @@ export async function purchaseJapBoost(input: {
     }
 
     return {
-      simulated,
+      simulated: false,
       orderId,
       socialOrderId: order?.id,
       transactionId: debit.transaction.id,
@@ -348,6 +348,9 @@ export async function purchaseJapBoost(input: {
       currency,
       wallet: toWalletSummary(debit.wallet),
       package: pkg,
+      quantity,
+      metric: input.metric,
+      platform: input.platform,
     };
   } catch (error) {
     const reason = japErrorToEnglish(
@@ -364,7 +367,17 @@ export async function purchaseJapBoost(input: {
   }
 }
 
-export async function pollJapOrderStatus(orderId: string) {
+function mapJapStatusToOrder(
+  raw: string,
+): "processing" | "completed" | "failed" | "cancelled" {
+  const s = raw.toLowerCase();
+  if (/cancel|refund/.test(s)) return "cancelled";
+  if (/fail|error|reject/.test(s)) return "failed";
+  if (/complet|partial|done|success|finish/.test(s)) return "completed";
+  return "processing";
+}
+
+export async function pollJapOrderStatus(orderId: string, userId?: string) {
   if (orderId.startsWith("demo_") || isJapDemoMode()) {
     console.log(LOG_PREFIX, "poll DEMO", { orderId });
     return {
@@ -373,8 +386,109 @@ export async function pollJapOrderStatus(orderId: string) {
       remains: "0",
       charge: "0",
       currency: "USD",
+      orderStatus: "processing" as const,
     };
   }
+
+  const ref = orderId.slice(0, 120);
+  const owned = userId
+    ? await db.query.socialOrders.findFirst({
+        where: and(
+          eq(socialOrders.providerRef, ref),
+          eq(socialOrders.userId, userId),
+        ),
+      })
+    : await db.query.socialOrders.findFirst({
+        where: eq(socialOrders.providerRef, ref),
+      });
+
+  if (userId && !owned) {
+    throw new Error("Order not found");
+  }
+
   console.log(LOG_PREFIX, "poll LIVE", { orderId });
-  return getJapOrderStatus(orderId);
+  const data = await getJapOrderStatus(orderId);
+  const rawStatus = String(data.status || "In progress");
+  const orderStatus = mapJapStatusToOrder(rawStatus);
+
+  if (owned && owned.status !== orderStatus) {
+    await db
+      .update(socialOrders)
+      .set({
+        status: orderStatus,
+        failureReason:
+          orderStatus === "failed" || orderStatus === "cancelled"
+            ? rawStatus.slice(0, 500)
+            : null,
+        updatedAt: new Date(),
+      })
+      .where(eq(socialOrders.id, owned.id));
+  }
+
+  if (
+    owned &&
+    (orderStatus === "completed" ||
+      orderStatus === "failed" ||
+      orderStatus === "cancelled")
+  ) {
+    await maybeNotifyBoostStatus({
+      order: owned,
+      orderId: ref,
+      rawStatus,
+      orderStatus,
+      userId: userId || owned.userId,
+    });
+  }
+
+  return {
+    ...data,
+    status: rawStatus,
+    orderStatus,
+  };
+}
+
+async function maybeNotifyBoostStatus(input: {
+  order: { id: string; transactionId: string | null; userId: string };
+  orderId: string;
+  rawStatus: string;
+  orderStatus: "completed" | "failed" | "cancelled" | "processing";
+  userId: string;
+}) {
+  if (!input.order.transactionId) return;
+  const tx = await db.query.transactions.findFirst({
+    where: eq(transactions.id, input.order.transactionId),
+  });
+  if (!tx) return;
+  const meta = (tx.metadata || {}) as Record<string, unknown>;
+  if (meta.statusNotifiedAt) return;
+
+  await db
+    .update(transactions)
+    .set({
+      metadata: {
+        ...meta,
+        statusNotifiedAt: new Date().toISOString(),
+        japStatus: input.rawStatus,
+        orderStatus: input.orderStatus,
+      },
+      updatedAt: new Date(),
+    })
+    .where(eq(transactions.id, tx.id));
+
+  const { notifyServiceEvent } = await import("@/lib/notify/service-events");
+  const done = input.orderStatus === "completed";
+  await notifyServiceEvent({
+    userId: input.userId,
+    title: done ? "Boost completed" : "Boost update",
+    body: done
+      ? "Your social boost finished successfully."
+      : `Your boost status is now: ${input.rawStatus}`,
+    type: "social",
+    href: `/history/${tx.id}`,
+    metadata: {
+      orderId: input.orderId,
+      transactionId: tx.id,
+      status: input.rawStatus,
+    },
+  });
 }

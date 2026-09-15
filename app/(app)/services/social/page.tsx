@@ -162,6 +162,7 @@ export default function SocialBoostPage() {
 
   const [success, setSuccess] = useState(false);
   const [orderId, setOrderId] = useState("");
+  const [transactionId, setTransactionId] = useState("");
   const [receipt, setReceipt] = useState("");
   const [statusLabel, setStatusLabel] = useState<string | null>(null);
   const [polling, setPolling] = useState(false);
@@ -191,8 +192,16 @@ export default function SocialBoostPage() {
         );
         setPlatforms(nextPlatforms);
         setServices(list);
-        if (data.fallback && !list.length) {
-          setError("Boost catalog is temporarily unavailable. Try again shortly.");
+        if (data.demo) {
+          setError(
+            "Social boosting is not live yet. Set JAP_API_KEY and JAP_DEMO=false on the server.",
+          );
+        } else if (data.fallback) {
+          setError(
+            "Live boost catalog timed out — showing limited packages. Refresh before ordering.",
+          );
+        } else if (!list.length) {
+          setError("No boost packages available right now. Try again shortly.");
         }
 
         const firstPlatform =
@@ -366,6 +375,7 @@ export default function SocialBoostPage() {
   ]);
 
   const canSubmit = useMemo(() => {
+    if (!liveMode) return false;
     if (!selected || submitting || frozen || !quantityValid || quantity == null) {
       return false;
     }
@@ -374,6 +384,7 @@ export default function SocialBoostPage() {
     const link = profileUrl.trim();
     return link.length > 4 && /^(https?:\/\/|@|t\.me\/)/i.test(link);
   }, [
+    liveMode,
     selected,
     submitting,
     frozen,
@@ -607,6 +618,7 @@ export default function SocialBoostPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Purchase failed");
       setOrderId(data.orderId);
+      setTransactionId(data.transactionId || "");
       setReceipt(data.amountFormatted);
       setStatusLabel(data.simulated ? "Demo · In progress" : "Pending");
       setSuccess(true);
@@ -619,7 +631,9 @@ export default function SocialBoostPage() {
 
   const submitLabel = submitting
     ? "Processing…"
-    : frozen
+    : !liveMode
+      ? "Boosting unavailable"
+      : frozen
       ? "Wallet unavailable"
       : amount > 0 && !canAffordUsd(amount)
         ? "Insufficient USD balance"
@@ -659,6 +673,15 @@ export default function SocialBoostPage() {
               amount={receipt}
               reference={orderId}
               onDismiss={() => setSuccess(false)}
+              primaryAction={
+                transactionId
+                  ? {
+                      label: "View in History",
+                      href: `/history/${transactionId}`,
+                      icon: "receipt",
+                    }
+                  : undefined
+              }
               secondaryAction={{
                 label: "Back to Home",
                 href: "/dashboard",
@@ -669,6 +692,8 @@ export default function SocialBoostPage() {
                 onClick: () => {
                   setSuccess(false);
                   setStatusLabel(null);
+                  setOrderId("");
+                  setTransactionId("");
                   setQuantityText("");
                   setCommentsDraft(EMPTY_COMMENTS_DRAFT);
                 },
