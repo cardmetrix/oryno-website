@@ -8,31 +8,41 @@ import {
   clubKonnectFund,
   clubKonnectVerify,
   hasClubKonnectKeys,
+  isClubKonnectAccountMismatch,
 } from "./clubkonnect";
 import { hasVtuAfricaKeys, vtuAfricaFund, vtuAfricaVerify } from "./vtu-africa";
 
 export type BettingRail = "clubkonnect" | "vtu-africa";
 
-/** Nigeria → ClubKonnect; GH / KE / ZA → VTU Africa. */
+/** Preferred rail: Nigeria → ClubKonnect; GH / KE / ZA → VTU Africa. */
 export function bettingRailForCountry(
   countryCode?: string | null,
 ): BettingRail {
   return resolveCountryCode(countryCode) === "NG" ? "clubkonnect" : "vtu-africa";
 }
 
+/**
+ * Nigeria is live if ClubKonnect OR VTU Africa keys exist (VTU is fallback when
+ * ClubKonnect returns ACCOUNT_MISMATCH / empty verify).
+ */
 export function hasBettingKeys(countryCode?: string | null) {
-  const rail = bettingRailForCountry(countryCode);
-  return rail === "clubkonnect" ? hasClubKonnectKeys() : hasVtuAfricaKeys();
+  const code = resolveCountryCode(countryCode);
+  if (code === "NG") {
+    return hasClubKonnectKeys() || hasVtuAfricaKeys();
+  }
+  return hasVtuAfricaKeys();
 }
 
-/** @deprecated Prefer hasBettingKeys(country). Kept for callers that only check NG. */
+/** @deprecated Prefer hasBettingKeys(country). */
 export function bettingApiKey() {
   return (
     process.env.CLUBKONNECT_API_KEY ||
     process.env.VTU_AFRICA_API_KEY ||
     process.env.BETTING_API_KEY ||
     ""
-  ).trim();
+  )
+    .split("#")[0]
+    .trim();
 }
 
 export function isBettingDemoForced() {
@@ -47,7 +57,6 @@ export function isBettingDemoForced() {
   return flag === "true" || flag === "1" || flag === "yes";
 }
 
-/** Live when the country’s rail has keys and demo is not forced. */
 export function isBettingLiveCountry(countryCode?: string | null) {
   const code = resolveCountryCode(countryCode);
   return (
@@ -56,7 +65,6 @@ export function isBettingLiveCountry(countryCode?: string | null) {
   );
 }
 
-/** Demo when keys are missing for that country’s rail, or BETTING_DEMO is set. */
 export function isBettingDemoMode(countryCode?: string | null) {
   return isBettingDemoForced() || !hasBettingKeys(countryCode);
 }
@@ -99,14 +107,14 @@ export async function verifyBettingCustomer(input: {
   rail?: BettingRail;
 }> {
   const provider = findBettingProvider(input.serviceID, input.countryCode);
-  const rail = bettingRailForCountry(input.countryCode);
+  const preferred = bettingRailForCountry(input.countryCode);
   if (!provider) {
     return {
       ok: false,
       demo: isBettingDemoMode(input.countryCode),
       customerName: null,
       message: "Unknown betting provider",
-      rail,
+      rail: preferred,
     };
   }
   const customerId = normalizeBettingCustomerId(input.customerId);
@@ -118,23 +126,67 @@ export async function verifyBettingCustomer(input: {
       demo: true,
       customerName: demo.name,
       message: demo.message,
-      rail,
+      rail: preferred,
     };
   }
 
-  if (rail === "clubkonnect") {
-    const result = await clubKonnectVerify({
-      serviceID: provider.serviceID,
-      customerId,
-    });
-    return { ...result, demo: false, rail };
+  // Nigeria: ClubKonnect first, VTU Africa fallback when CK account cannot vend.
+  if (preferred === "clubkonnect") {
+    if (hasClubKonnectKeys()) {
+      const ck = await clubKonnectVerify({
+        serviceID: provider.serviceID,
+        customerId,
+      });
+      if (ck.ok) return { ...ck, demo: false, rail: "clubkonnect" };
+
+      if (hasVtuAfricaKeys() && isClubKonnectAccountMismatch(ck.message)) {
+        const vtu = await vtuAfricaVerify({
+          serviceID: provider.serviceID,
+          customerId,
+        });
+        if (vtu.ok) return { ...vtu, demo: false, rail: "vtu-africa" };
+        return {
+          ok: false,
+          demo: false,
+          customerName: null,
+          message: vtu.message || ck.message,
+          rail: "vtu-africa",
+        };
+      }
+
+      // Soft-fallback: any CK verify miss with VTU available (keeps NG live).
+      if (hasVtuAfricaKeys()) {
+        const vtu = await vtuAfricaVerify({
+          serviceID: provider.serviceID,
+          customerId,
+        });
+        if (vtu.ok) return { ...vtu, demo: false, rail: "vtu-africa" };
+        return {
+          ok: false,
+          demo: false,
+          customerName: null,
+          message: vtu.message || ck.message,
+          rail: "vtu-africa",
+        };
+      }
+
+      return { ...ck, demo: false, rail: "clubkonnect" };
+    }
+
+    if (hasVtuAfricaKeys()) {
+      const vtu = await vtuAfricaVerify({
+        serviceID: provider.serviceID,
+        customerId,
+      });
+      return { ...vtu, demo: false, rail: "vtu-africa" };
+    }
   }
 
   const result = await vtuAfricaVerify({
     serviceID: provider.serviceID,
     customerId,
   });
-  return { ...result, demo: false, rail };
+  return { ...result, demo: false, rail: "vtu-africa" };
 }
 
 export async function fundBettingAccount(input: {
@@ -152,14 +204,14 @@ export async function fundBettingAccount(input: {
   rail?: BettingRail;
 }> {
   const provider = findBettingProvider(input.serviceID, input.countryCode);
-  const rail = bettingRailForCountry(input.countryCode);
+  const preferred = bettingRailForCountry(input.countryCode);
   if (!provider) {
     return {
       ok: false,
       demo: isBettingDemoMode(input.countryCode),
       reference: input.reference,
       message: "Unknown betting provider",
-      rail,
+      rail: preferred,
     };
   }
   const customerId = normalizeBettingCustomerId(input.customerId);
@@ -171,7 +223,7 @@ export async function fundBettingAccount(input: {
         demo: true,
         reference: input.reference,
         message: "Demo funding failed",
-        rail,
+        rail: preferred,
       };
     }
     return {
@@ -179,19 +231,45 @@ export async function fundBettingAccount(input: {
       demo: true,
       reference: `DEMO-${input.reference}`,
       message: "Demo betting wallet funded",
-      rail,
+      rail: preferred,
     };
   }
 
-  if (rail === "clubkonnect") {
-    const funded = await clubKonnectFund({
-      serviceID: provider.serviceID,
-      customerId,
-      amount: input.amount,
-      reference: input.reference,
-      phone: input.phone,
-    });
-    return { ...funded, demo: false, rail };
+  if (preferred === "clubkonnect") {
+    if (hasClubKonnectKeys()) {
+      const ck = await clubKonnectFund({
+        serviceID: provider.serviceID,
+        customerId,
+        amount: input.amount,
+        reference: input.reference,
+        phone: input.phone,
+      });
+      if (ck.ok) return { ...ck, demo: false, rail: "clubkonnect" };
+
+      if (hasVtuAfricaKeys()) {
+        const vtu = await vtuAfricaFund({
+          serviceID: provider.serviceID,
+          customerId,
+          amount: input.amount,
+          reference: input.reference,
+          phone: input.phone,
+        });
+        return { ...vtu, demo: false, rail: "vtu-africa" };
+      }
+
+      return { ...ck, demo: false, rail: "clubkonnect" };
+    }
+
+    if (hasVtuAfricaKeys()) {
+      const vtu = await vtuAfricaFund({
+        serviceID: provider.serviceID,
+        customerId,
+        amount: input.amount,
+        reference: input.reference,
+        phone: input.phone,
+      });
+      return { ...vtu, demo: false, rail: "vtu-africa" };
+    }
   }
 
   const funded = await vtuAfricaFund({
@@ -201,5 +279,5 @@ export async function fundBettingAccount(input: {
     reference: input.reference,
     phone: input.phone,
   });
-  return { ...funded, demo: false, rail };
+  return { ...funded, demo: false, rail: "vtu-africa" };
 }

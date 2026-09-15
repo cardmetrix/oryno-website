@@ -8,61 +8,66 @@
  * - Types:  /APIBettingTypeV2.asp?UserID=
  *
  * Docs: https://www.clubkonnect.com/APIParaGetBettingV1.asp
+ * BettingCompany codes are product IDs like `product-nairabet`, `prd-sporty-bet`.
  */
 
-/** Map ORYNO catalog serviceIDs → ClubKonnect BettingCompany codes. */
+/** Map ORYNO catalog serviceIDs → ClubKonnect BettingCompany product codes. */
 const CLUBKONNECT_COMPANY_CODES: Record<string, string> = {
+  nairabet: "product-nairabet",
+  bangbet: "product-bang-bet",
+  betway: "product-bet-way",
+  betland: "product-bet-land",
+  betking: "product-bet-king",
+  "1xbet": "product-1x-bet",
+  naijabet: "product-naija-bet",
+  sportybet: "prd-sporty-bet",
+  merrybet: "product-merry-bet",
+  // Legacy / alternate codes still accepted by some accounts
   bet9ja: "BET9JA",
-  sportybet: "SPORTYBET",
-  "1xbet": "1XBET",
-  betking: "BETKING",
   melbet: "MELBET",
-  betway: "BETWAY",
-  nairabet: "NAIRABET",
-  merrybet: "MERRYBET",
-  naijabet: "NAIJABET",
-  bangbet: "BANGBET",
   livescorebet: "LIVESCOREBET",
   cloudbet: "CLOUDBET",
   betbiga: "BETBIGA",
   paripesa: "PARIPESA",
   nairamillion: "NAIRAMILLION",
   mylottohub: "MYLOTTOHUB",
-  betland: "BETLAND",
   betlion: "BETLION",
   supabet: "SUPABET",
   msport: "MSPORT",
   hallabet: "HALLABET",
 };
 
+/** Strip inline `# comments` and quotes from .env values. */
+function cleanEnv(raw: string) {
+  return raw
+    .split("#")[0]
+    .trim()
+    .replace(/^["']|["']$/g, "");
+}
+
 /** ClubKonnect UserID looks like CK123 — never the literal string "your_userid". */
 export function clubKonnectUserId() {
-  const raw = (
-    process.env.CLUBKONNECT_USER_ID ||
-    process.env.NELLOBYTE_USER_ID ||
-    ""
-  ).trim();
+  const raw = cleanEnv(
+    process.env.CLUBKONNECT_USER_ID || process.env.NELLOBYTE_USER_ID || "",
+  );
   if (!raw || /^your[_-]?userid$/i.test(raw)) return "";
   return raw;
 }
 
 export function clubKonnectApiKey() {
-  return (
-    process.env.CLUBKONNECT_API_KEY ||
-    process.env.NELLOBYTE_API_KEY ||
-    ""
-  ).trim();
+  return cleanEnv(
+    process.env.CLUBKONNECT_API_KEY || process.env.NELLOBYTE_API_KEY || "",
+  );
 }
 
 export function clubKonnectBaseUrl() {
-  return (
-    process.env.CLUBKONNECT_BASE_URL ||
-    "https://www.nellobytesystems.com"
+  return cleanEnv(
+    process.env.CLUBKONNECT_BASE_URL || "https://www.nellobytesystems.com",
   ).replace(/\/$/, "");
 }
 
 export function clubKonnectCallbackUrl() {
-  return (process.env.CLUBKONNECT_CALLBACK_URL || "").trim();
+  return cleanEnv(process.env.CLUBKONNECT_CALLBACK_URL || "");
 }
 
 export function hasClubKonnectKeys() {
@@ -72,6 +77,13 @@ export function hasClubKonnectKeys() {
 export function clubKonnectCompanyCode(serviceID: string) {
   const key = serviceID.trim().toLowerCase();
   return CLUBKONNECT_COMPANY_CODES[key] || key.toUpperCase();
+}
+
+/** True when ClubKonnect says the API key / account cannot vend (need support). */
+export function isClubKonnectAccountMismatch(message?: string | null) {
+  return /ACCOUNT_MISMATCH|contact support|not (enabled|activated)|empty response/i.test(
+    message || "",
+  );
 }
 
 type ClubJson = Record<string, unknown>;
@@ -118,7 +130,8 @@ function humanStatus(status: string) {
   const map: Record<string, string> = {
     INVALID_CREDENTIALS: "Invalid ClubKonnect UserID or API key",
     MISSING_CREDENTIALS: "ClubKonnect credentials are incomplete",
-    MISSING_USERID: "Set CLUBKONNECT_USER_ID (from ClubKonnect My Account / Developer API)",
+    MISSING_USERID:
+      "Set CLUBKONNECT_USER_ID (from ClubKonnect My Account / Developer API)",
     MISSING_APIKEY: "Set CLUBKONNECT_API_KEY",
     MISSING_BETTINGCOMPANY: "Unknown betting company code",
     MISSING_AMOUNT: "Enter a valid amount",
@@ -126,6 +139,8 @@ function humanStatus(status: string) {
     MINIMUM_100: "Minimum funding is ₦100",
     MINIMUM_50000: "Minimum funding is ₦50,000 for this provider",
     INVALID_CUSTOMERID: "Invalid betting account ID",
+    ACCOUNT_MISMATCH_CONTACT_SUPPORT:
+      "ClubKonnect account mismatch — regenerate the API key while logged in as this UserID, or contact ClubKonnect support to enable betting API",
     MISSING_PHONE_NUMBER:
       "Invalid ClubKonnect UserID — use your real UserID (e.g. CK123), not your_userid",
   };
@@ -146,7 +161,7 @@ export async function clubKonnectVerify(input: {
   const name = String(json.customer_name || json.customername || "").trim();
   const status = String(json.status || json.statuscode || "").toUpperCase();
 
-  if (status.includes("INVALID") || status.includes("MISSING")) {
+  if (status.includes("INVALID") || status.includes("MISSING") || status.includes("MISMATCH")) {
     return {
       ok: false,
       customerName: null,
@@ -158,7 +173,9 @@ export async function clubKonnectVerify(input: {
     return {
       ok: false,
       customerName: null,
-      message: "Could not verify betting account",
+      message: name
+        ? "Could not verify betting account"
+        : "ClubKonnect returned an empty response — betting API may not be enabled on this account (contact ClubKonnect support)",
     };
   }
 
@@ -186,7 +203,12 @@ async function clubKonnectQuery(input: {
   const reference = String(json.orderid || input.orderId || input.requestId || "");
 
   if (code === "200" || status === "ORDER_COMPLETED" || /success/i.test(status)) {
-    return { done: true, ok: true, reference, message: remark || "Betting wallet funded" };
+    return {
+      done: true,
+      ok: true,
+      reference,
+      message: remark || "Betting wallet funded",
+    };
   }
 
   if (
@@ -231,7 +253,12 @@ export async function clubKonnectFund(input: {
   const status = String(json.status || "").toUpperCase();
   const orderId = String(json.orderid || "").trim();
 
-  if (status.includes("INVALID") || status.includes("MISSING") || status.startsWith("MINIMUM_")) {
+  if (
+    status.includes("INVALID") ||
+    status.includes("MISSING") ||
+    status.includes("MISMATCH") ||
+    status.startsWith("MINIMUM_")
+  ) {
     return {
       ok: false,
       reference: input.reference,
@@ -247,7 +274,6 @@ export async function clubKonnectFund(input: {
     };
   }
 
-  // ORDER_RECEIVED / pending — poll until completed or timeout
   if (code === "100" || status === "ORDER_RECEIVED" || orderId) {
     const pollRef = orderId || input.reference;
     for (let i = 0; i < 8; i++) {
@@ -263,7 +289,6 @@ export async function clubKonnectFund(input: {
         };
       }
     }
-    // Still pending after polls — treat as accepted (callback / later reconcile)
     return {
       ok: true,
       reference: pollRef,
@@ -274,6 +299,6 @@ export async function clubKonnectFund(input: {
   return {
     ok: false,
     reference: orderId || input.reference,
-    message: status || String(json.message || "Betting funding failed"),
+    message: humanStatus(status) || String(json.message || "Betting funding failed"),
   };
 }
