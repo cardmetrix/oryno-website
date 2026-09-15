@@ -16,8 +16,7 @@ import { notifyServiceEvent } from "@/lib/notify/service-events";
 import { currencyForCountry, toWalletSummary } from "@/lib/wallet";
 import { debitUsdWallet } from "@/lib/wallet-usd";
 import { refundFailedDebit } from "@/lib/wallet/ledger";
-import { countryFlagEmoji } from "@/lib/herosms/countries";
-import { usdRetailNumberPrice } from "@/lib/herosms/purchase";
+import { countryFlagEmoji } from "./flags";
 import {
   assertFivesimReady,
   buyFivesimActivation,
@@ -32,12 +31,39 @@ import {
 } from "./client";
 import {
   enrichCountry,
+  FIVESIM_EMAIL_SERVICES,
   FIVESIM_POPULAR_SERVICES,
   resolveFivesimProduct,
   type FivesimPriceOffer,
 } from "./catalog";
 
 const LOG_PREFIX = "[5sim-purchase]";
+
+async function usdRetailNumberPrice(
+  usd: number,
+  countryCode?: string | null,
+  serviceKey?: string | null,
+) {
+  const { priceUsdToLocal } = await import("@/lib/pricing/service-pricing");
+  const currency = currencyForCountry(countryCode);
+  const quote = await quoteLocalUsd(currency);
+  const priced = await priceUsdToLocal({
+    provider: "herosms",
+    serviceKey,
+    usd,
+    buyRate: quote.buyRate,
+    source: "virtual_number",
+  });
+  return {
+    usd: usdFromLocalRetail(priced.local, quote.buyRate),
+    local: priced.local,
+    currency: "USD" as const,
+    localCurrency: currency,
+    quote,
+    markup: priced.markup,
+    companyCharge: priced.companyCharge,
+  };
+}
 
 async function ensureOffer(input: {
   countryCode: string;
@@ -95,7 +121,9 @@ export async function listFivesimOffers(input: {
 }> {
   const product = resolveFivesimProduct(input.service);
   const serviceName =
-    FIVESIM_POPULAR_SERVICES.find((s) => s.code === product)?.name || product;
+    FIVESIM_POPULAR_SERVICES.find((s) => s.code === product)?.name ||
+    FIVESIM_EMAIL_SERVICES.find((s) => s.code === product)?.name ||
+    product;
 
   const [prices, countries] = await Promise.all([
     getFivesimPricesByProduct(product),

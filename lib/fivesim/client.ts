@@ -53,18 +53,13 @@ export function isFivesimDemoMode() {
 }
 
 export function fivesimMarkup() {
-  const raw = Number(
-    process.env.FIVESIM_MARKUP || process.env.HEROSMS_MARKUP || "1.15",
-  );
+  const raw = Number(process.env.FIVESIM_MARKUP || "1.15");
   return Number.isFinite(raw) && raw >= 1 ? raw : 1.15;
 }
 
-/** Prefer 5sim for virtual numbers when configured. */
-export function numbersProvider(): "fivesim" | "herosms" {
-  const forced = cleanEnv(process.env.NUMBERS_PROVIDER || "").toLowerCase();
-  if (forced === "herosms") return "herosms";
-  if (forced === "fivesim") return "fivesim";
-  return isFivesimLive() ? "fivesim" : "herosms";
+/** Numbers and email-signup SMS are 5sim only. */
+export function numbersProvider(): "fivesim" {
+  return "fivesim";
 }
 
 let loggedMode = false;
@@ -99,17 +94,24 @@ export function fivesimErrorToEnglish(message: string) {
     return "No numbers in stock for that country and service. Try another country.";
   }
 
-  // 5sim provider wallet empty / too low
   if (
     lower === "no_balance" ||
     lower.includes("not enough user balance") ||
-    lower.includes("not enough balance")
+    lower.includes("not enough rating")
   ) {
     return "No numbers available right now. Try another country or try again later.";
   }
 
-  if (lower.includes("bad token") || lower.includes("unauthorized")) {
-    return "Virtual number provider credentials are invalid.";
+  if (
+    lower.includes("bad token") ||
+    lower.includes("unauthorized") ||
+    lower.includes("bad country") ||
+    lower.includes("bad operator") ||
+    lower.includes("no product") ||
+    lower.includes("select country") ||
+    lower.includes("select operator")
+  ) {
+    return "That country or service is not available. Refresh and try again.";
   }
   if (lower.includes("price") && lower.includes("max")) {
     return "Price changed — refresh and try again.";
@@ -117,7 +119,43 @@ export function fivesimErrorToEnglish(message: string) {
   if (lower.includes("server offline") || lower.includes("internal")) {
     return "Virtual number provider is temporarily offline.";
   }
+  if (lower.includes("order has sms") || lower.includes("order expired")) {
+    return "This number can no longer be cancelled.";
+  }
   return raw.length > 160 ? "Virtual number request failed" : raw;
+}
+
+function errorMessageFromBody(json: unknown, text: string, status: number) {
+  if (typeof json === "string" && json.trim()) return json.trim();
+  if (json && typeof json === "object") {
+    const row = json as { message?: string; error?: string };
+    if (typeof row.message === "string" && row.message.trim()) {
+      return row.message.trim();
+    }
+    if (typeof row.error === "string" && row.error.trim()) {
+      return row.error.trim();
+    }
+  }
+  const plain = String(text || "").trim();
+  if (plain && !plain.startsWith("{") && !plain.startsWith("[")) return plain;
+  return `5sim error (${status})`;
+}
+
+function isPlainErrorBody(json: unknown) {
+  if (typeof json !== "string") return false;
+  const t = json.trim().toLowerCase();
+  if (!t || t.startsWith("{") || t.startsWith("[")) return false;
+  return (
+    t.includes("no free phones") ||
+    t.includes("not enough") ||
+    t.includes("bad ") ||
+    t.includes("no product") ||
+    t.includes("select ") ||
+    t.includes("server offline") ||
+    t.includes("order not found") ||
+    t.includes("order expired") ||
+    t.includes("order has sms")
+  );
 }
 
 async function fivesimFetch(
@@ -160,14 +198,11 @@ async function fivesimFetch(
     json = text;
   }
 
-  if (!res.ok) {
-    const msg =
-      typeof json === "string"
-        ? json
-        : typeof (json as { message?: string })?.message === "string"
-          ? String((json as { message: string }).message)
-          : text || `5sim error (${res.status})`;
-    throw new Error(fivesimErrorToEnglish(msg));
+  // 5sim returns HTTP 200 with a plain error string for "no free phones".
+  if (!res.ok || isPlainErrorBody(json)) {
+    throw new Error(
+      fivesimErrorToEnglish(errorMessageFromBody(json, text, res.status)),
+    );
   }
 
   return json;
@@ -287,7 +322,8 @@ export async function buyFivesimActivation(input: {
 }) {
   const country = input.country.trim().toLowerCase();
   const product = input.product.trim().toLowerCase();
-  const operator = (input.operator || "any").trim().toLowerCase() || "any";
+  // Docs: maxPrice only applies when operator is "any".
+  const operator = "any";
   if (!country || !product) throw new Error("Country and product are required");
 
   const qs = new URLSearchParams();

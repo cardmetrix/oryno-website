@@ -7,17 +7,11 @@ import {
   JAP_PLATFORMS,
 } from "@/lib/jap";
 import {
-  FALLBACK_COUNTRIES,
-  FALLBACK_EMAIL_DOMAINS,
-  getHerosmsEmailDomains,
-  getHerosmsPrices,
-  getHerosmsServices,
-  isHerosmsDemoMode,
-  POPULAR_SERVICES,
-  resolveCountryIso,
-  countryFlagEmoji,
-  countryFlagUrl,
-} from "@/lib/herosms";
+  FIVESIM_EMAIL_SERVICES,
+  FIVESIM_POPULAR_SERVICES,
+  isFivesimDemoMode,
+  listFivesimOffers,
+} from "@/lib/fivesim";
 import {
   fetchReloadlyCountries,
   fetchReloadlyProducts,
@@ -98,13 +92,11 @@ const VTPASS_CATEGORIES: Array<{
 ];
 
 const EMAIL_SITES: CatalogFilterOption[] = [
-  { id: "telegram.com", label: "Telegram" },
-  { id: "instagram.com", label: "Instagram" },
-  { id: "facebook.com", label: "Facebook" },
-  { id: "tiktok.com", label: "TikTok" },
-  { id: "x.com", label: "X / Twitter" },
-  { id: "discord.com", label: "Discord" },
-  { id: "whatsapp.com", label: "WhatsApp" },
+  { id: "google", label: "Google / Gmail" },
+  { id: "hotmail", label: "Hotmail" },
+  { id: "microsoft", label: "Microsoft / Outlook" },
+  { id: "yahoo", label: "Yahoo Mail" },
+  { id: "protonmail", label: "Proton Mail" },
 ];
 
 function diversifyJapCatalog<
@@ -218,166 +210,53 @@ export async function loadAdminPricingCatalog(input: {
     const channel = (input.params.channel || "numbers") as "numbers" | "emails";
     applied.channel = channel;
 
-    if (channel === "emails") {
-      const site = (input.params.site || "telegram.com").toLowerCase();
-      applied.site = site;
-      const demo = isHerosmsDemoMode();
-      let domains = FALLBACK_EMAIL_DOMAINS;
-      if (!demo) {
-        try {
-          const live = await getHerosmsEmailDomains(site);
-          if (live?.length) domains = live;
-        } catch {
-          // keep fallback
-        }
-      }
-      const quote = await quoteLocalUsd(currency);
-      const items: AdminCatalogItem[] = [];
-      for (const d of domains) {
-        const domainName = String(d.name || "").toLowerCase();
-        const costUsd = Number(d.cost) || 0.1;
-        const serviceKey = `email:${site}:${domainName}`;
-        const priced = await priceUsdToLocal({
-          provider: "herosms",
-          serviceKey,
-          usd: costUsd,
-          buyRate: quote.buyRate,
-          source: "email",
-        });
-        const ov = await withOverride("herosms", serviceKey, priced);
-        items.push({
-          serviceKey,
-          title: `@${domainName}`,
-          subtitle: `Email · ${site}`,
-          details: `Cost $${costUsd} · stock ${Number(d.count) || 0}`,
-          currency,
-          costUsd,
-          costLocal: null,
-          ...ov,
-          meta: { site, domain: domainName, count: Number(d.count) || 0 },
-        });
-      }
-      return {
-        ok: true,
-        provider: "herosms",
-        currency,
-        filters: {
-          fields: [
-            {
-              key: "channel",
-              label: "Channel",
-              options: [
-                { id: "numbers", label: "Virtual numbers" },
-                { id: "emails", label: "Emails" },
-              ],
-              required: true,
-            },
-            {
-              key: "site",
-              label: "Site",
-              options: EMAIL_SITES,
-              required: true,
-            },
-          ],
-          applied,
-        },
-        items,
-        demo,
-      };
-    }
-
-    let services = POPULAR_SERVICES;
-    try {
-      const live = await getHerosmsServices();
-      if (live?.length) services = live;
-    } catch {
-      // keep popular
-    }
-    const service = input.params.service || services[0]?.code || "ot";
+    const services =
+      channel === "emails" ? FIVESIM_EMAIL_SERVICES : FIVESIM_POPULAR_SERVICES;
+    const service =
+      (channel === "emails"
+        ? input.params.site || input.params.service
+        : input.params.service) ||
+      services[0]?.code ||
+      "whatsapp";
     applied.service = service;
+    if (channel === "emails") applied.site = service;
+
     const serviceName =
       services.find((s) => s.code === service)?.name || service;
-
-    const demo = isHerosmsDemoMode();
+    const demo = isFivesimDemoMode();
     const quote = await quoteLocalUsd(currency);
     const items: AdminCatalogItem[] = [];
 
-    if (demo) {
-      for (const c of FALLBACK_COUNTRIES) {
-        const priceUsd = 0.12 + (c.id % 7) * 0.03;
-        const serviceKey = `${c.id}:${service}`;
+    if (!demo) {
+      const { offers } = await listFivesimOffers({ service });
+      for (const offer of offers) {
+        const serviceKey = `${offer.countrySlug}:${offer.service}`;
         const priced = await priceUsdToLocal({
           provider: "herosms",
           serviceKey,
-          usd: priceUsd,
+          usd: offer.costUsd,
           buyRate: quote.buyRate,
+          source: "virtual_number",
         });
         const ov = await withOverride("herosms", serviceKey, priced);
         items.push({
           serviceKey,
-          title: `${c.name} · ${serviceName}`,
-          subtitle: `Virtual number · ${service}`,
-          details: `Country #${c.id} · cost $${priceUsd.toFixed(3)} · stock demo`,
+          title: `${offer.countryName} · ${serviceName}`,
+          subtitle:
+            channel === "emails"
+              ? `Email signup SMS · ${service}`
+              : `Virtual number · ${service}`,
+          details: `${offer.countrySlug} · cost $${offer.costUsd} · stock ${offer.count}`,
           currency,
-          costUsd: priceUsd,
-          costLocal: null,
-          ...ov,
-          meta: { countryId: c.id, service, count: 50 },
-        });
-      }
-    } else {
-      const prices = await getHerosmsPrices({ service });
-      for (const [countryId, value] of Object.entries(prices)) {
-        const id = Number(countryId);
-        if (!Number.isFinite(id)) continue;
-        let cost = 0;
-        let count = 0;
-        if (value && typeof value === "object") {
-          const row = value as Record<string, unknown>;
-          if ("cost" in row) {
-            cost = Number(row.cost) || 0;
-            count = Number(row.count) || 0;
-          } else if (service in row) {
-            const nested = row[service] as Record<string, unknown> | undefined;
-            cost = Number(nested?.cost) || 0;
-            count = Number(nested?.count) || 0;
-          } else {
-            const first = Object.values(row)[0] as
-              | Record<string, unknown>
-              | undefined;
-            if (first && typeof first === "object") {
-              cost = Number(first.cost) || 0;
-              count = Number(first.count) || 0;
-            }
-          }
-        }
-        if (cost <= 0 || count <= 0) continue;
-        const fallback = FALLBACK_COUNTRIES.find((c) => c.id === id);
-        const name = fallback?.name || `Country ${id}`;
-        const serviceKey = `${id}:${service}`;
-        const priced = await priceUsdToLocal({
-          provider: "herosms",
-          serviceKey,
-          usd: cost,
-          buyRate: quote.buyRate,
-        });
-        const ov = await withOverride("herosms", serviceKey, priced);
-        const iso = resolveCountryIso(id, name) || fallback?.iso || null;
-        items.push({
-          serviceKey,
-          title: `${name} · ${serviceName}`,
-          subtitle: `Virtual number · ${service}`,
-          details: `Country #${id}${iso ? ` (${iso})` : ""} · cost $${cost} · stock ${count}`,
-          currency,
-          costUsd: cost,
+          costUsd: offer.costUsd,
           costLocal: null,
           ...ov,
           meta: {
-            countryId: id,
-            service,
-            count,
-            flagEmoji: iso ? countryFlagEmoji(iso) : "🏳️",
-            flagUrl: iso ? countryFlagUrl(iso) : null,
+            countrySlug: offer.countrySlug,
+            service: offer.service,
+            count: offer.count,
+            flagEmoji: offer.flagEmoji,
+            flagUrl: offer.flagUrl,
           },
         });
       }
@@ -395,21 +274,31 @@ export async function loadAdminPricingCatalog(input: {
             label: "Channel",
             options: [
               { id: "numbers", label: "Virtual numbers" },
-              { id: "emails", label: "Emails" },
+              { id: "emails", label: "Email signup SMS" },
             ],
             required: true,
           },
-          {
-            key: "service",
-            label: "App / service",
-            options: services.map((s) => ({ id: s.code, label: s.name })),
-            required: true,
-          },
+          channel === "emails"
+            ? {
+                key: "site",
+                label: "Mailbox",
+                options: EMAIL_SITES,
+                required: true,
+              }
+            : {
+                key: "service",
+                label: "App / service",
+                options: services.map((s) => ({ id: s.code, label: s.name })),
+                required: true,
+              },
         ],
         applied,
       },
       items,
       demo,
+      hint: demo
+        ? "Set FIVESIM_API_KEY and FIVESIM_DEMO=false to load live 5sim prices."
+        : "Live 5sim activation prices. Fund the 5sim wallet before customer purchases will succeed.",
     };
   }
 

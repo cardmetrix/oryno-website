@@ -62,16 +62,6 @@ export const EXTERNAL_PATH_ALIASES: Record<string, string> = {
   "/services/gift-cards/sell/catalog": "/sogo/catalog",
   "/services/gift-cards/sell/rates": "/sogo/rates",
   "/services/gift-cards/sell": "/sogo/sell",
-
-  // Virtual numbers / temp emails
-  "/services/numbers/countries": "/herosms/countries",
-  "/services/numbers/services": "/herosms/services",
-  "/services/numbers/prices": "/herosms/prices",
-  "/services/numbers/purchase": "/herosms/purchase/number",
-  "/services/numbers/status": "/herosms/status/number",
-  "/services/emails/domains": "/herosms/emails/domains",
-  "/services/emails/purchase": "/herosms/purchase/email",
-  "/services/emails/status": "/herosms/status/email",
 };
 
 export function normalizeExternalPath(pathname: string): string {

@@ -26,7 +26,7 @@ export default function AdminVirtualNumbersPage() {
         title="Virtual Numbers"
         subtitle={
           data
-            ? `${data.totalRented} active rentals · HeroSMS inventory`
+            ? `${data.totalRented} active rentals · 5sim inventory`
             : "Stock for buy & rent SMS verification inventory"
         }
       />

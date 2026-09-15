@@ -1,10 +1,58 @@
-import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
+import { ensureAppUser } from "@/lib/auth/current-user";
+import {
+  fivesimErrorToEnglish,
+  isFivesimLive,
+  listFivesimOffers,
+} from "@/lib/fivesim";
 
 export const runtime = "nodejs";
 
-/** Friendly mobile alias → /api/herosms/prices/route. */
+export async function GET(req: Request) {
+  try {
+    const user = await ensureAppUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (!isFivesimLive()) {
+      return NextResponse.json(
+        {
+          error:
+            "Virtual numbers require FIVESIM_API_KEY with FIVESIM_DEMO=false.",
+        },
+        { status: 503 },
+      );
+    }
 
-export async function GET(req: NextRequest, ctx: unknown) {
-  const mod = await import("@/app/api/herosms/prices/route");
-  return mod.GET(req as never, ctx as never);
+    const { searchParams } = new URL(req.url);
+    const service = searchParams.get("service") || "whatsapp";
+    const countryParam = searchParams.get("country");
+
+    const { product, serviceName, offers, quote } = await listFivesimOffers({
+      service,
+      countryCode: countryParam,
+      userCountryCode: user.countryCode,
+    });
+
+    return NextResponse.json({
+      ok: true,
+      demo: false,
+      provider: "fivesim",
+      service: product,
+      serviceName,
+      currency: "USD",
+      fx: quote,
+      offers,
+    });
+  } catch (error) {
+    console.error("[numbers-prices]", error);
+    return NextResponse.json(
+      {
+        error: fivesimErrorToEnglish(
+          error instanceof Error ? error.message : "Failed to load prices",
+        ),
+      },
+      { status: 400 },
+    );
+  }
 }

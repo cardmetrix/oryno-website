@@ -23,7 +23,7 @@ export type VirtualNumberOffer = {
   smsCapable: boolean;
 };
 
-/** Temporary email rentals (HeroSMS-style verification inboxes) */
+/** Temporary email-signup SMS (5sim mailbox products). */
 export type EmailRentOffer = {
   id: string;
   provider: string;

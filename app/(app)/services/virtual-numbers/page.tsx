@@ -126,7 +126,7 @@ export default function VirtualNumbersPage() {
     (async () => {
       setLoadingServices(true);
       try {
-        const res = await fetch("/api/herosms/services");
+        const res = await fetch("/api/services/numbers/services");
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
         if (cancelled) return;
@@ -157,7 +157,7 @@ export default function VirtualNumbersPage() {
       setError(null);
       try {
         const res = await fetch(
-          `/api/herosms/prices?service=${encodeURIComponent(service)}`,
+          `/api/services/numbers/prices?service=${encodeURIComponent(service)}`,
         );
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
@@ -191,7 +191,7 @@ export default function VirtualNumbersPage() {
       setPolling(true);
       try {
         const res = await fetch(
-          `/api/herosms/status/number/${encodeURIComponent(activationId)}`,
+          `/api/services/numbers/status/${encodeURIComponent(activationId)}`,
         );
         const data = await res.json();
         if (data.code) {
@@ -218,7 +218,7 @@ export default function VirtualNumbersPage() {
     setSubmitting(true);
     setError(null);
     try {
-      const res = await fetch("/api/herosms/purchase/number", {
+      const res = await fetch("/api/services/numbers/purchase", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

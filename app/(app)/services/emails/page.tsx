@@ -104,7 +104,7 @@ export default function EmailRentPage() {
       setError(null);
       try {
         const res = await fetch(
-          `/api/herosms/prices?service=${encodeURIComponent(service)}`,
+          `/api/services/numbers/prices?service=${encodeURIComponent(service)}`,
         );
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Failed to load prices");
@@ -137,7 +137,7 @@ export default function EmailRentPage() {
       setPolling(true);
       try {
         const res = await fetch(
-          `/api/herosms/status/number/${encodeURIComponent(activationId)}`,
+          `/api/services/emails/status/${encodeURIComponent(activationId)}`,
         );
         const data = await res.json();
         if (data.code) {
@@ -164,7 +164,7 @@ export default function EmailRentPage() {
     setSubmitting(true);
     setError(null);
     try {
-      const res = await fetch("/api/herosms/purchase/number", {
+      const res = await fetch("/api/services/emails/purchase", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -174,7 +174,6 @@ export default function EmailRentPage() {
           iso: selected.iso,
           service: selected.service,
           serviceName: selected.serviceName,
-          operator: selected.operator,
           costUsd: selected.costUsd ?? selected.priceUsd,
           priceUsd: selected.priceUsd,
           priceLocal: selected.priceLocal,
@@ -207,7 +206,7 @@ export default function EmailRentPage() {
     setError(null);
     try {
       const res = await fetch(
-        `/api/herosms/status/email/${encodeURIComponent(activationId)}`,
+        `/api/services/emails/status/${encodeURIComponent(activationId)}`,
         { method: "DELETE" },
       );
       const data = await res.json();

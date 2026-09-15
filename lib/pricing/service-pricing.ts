@@ -33,7 +33,9 @@ function envMarkup(provider: PricingProvider): number {
     return Number.isFinite(raw) && raw >= 1 ? raw : 1.3;
   }
   if (provider === "herosms") {
-    const raw = Number(process.env.HEROSMS_MARKUP || "1.15");
+    const raw = Number(
+      process.env.FIVESIM_MARKUP || process.env.HEROSMS_MARKUP || "1.15",
+    );
     return Number.isFinite(raw) && raw >= 1 ? raw : 1.15;
   }
   if (provider === "reloadly") {

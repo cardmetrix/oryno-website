@@ -1,4 +1,4 @@
-import { countryFlagEmoji, countryFlagUrl } from "../herosms/countries";
+import { countryFlagEmoji, countryFlagUrl } from "./flags";
 
 export type FivesimService = {
   /** 5sim product slug (whatsapp, telegram, …) */
