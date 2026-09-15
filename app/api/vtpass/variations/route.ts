@@ -30,6 +30,7 @@ import {
 } from "@/lib/vtpass";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 async function keDataCatalogResponse(serviceID: string, operatorId: string) {
   const fx = await getDisplayFx("KE");

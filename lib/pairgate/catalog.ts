@@ -255,7 +255,16 @@ function plansFromGroupedData(
       if (!planId) continue;
       const name = String(plan.name || planId).trim();
       const price = Number(plan.price) || 0;
-      const label = planType ? `${name} (${planType})` : name;
+      const duration =
+        plan.duration != null ? String(plan.duration).trim() : "";
+      const withDuration =
+        duration && !/\bday/i.test(name)
+          ? `${name} · ${duration} day${duration === "1" ? "" : "s"}`
+          : name;
+      const label =
+        planType && !withDuration.includes(`(${planType})`)
+          ? `${withDuration} (${planType})`
+          : withDuration;
       out.push({
         variation_code: planId,
         name: label,
@@ -268,6 +277,111 @@ function plansFromGroupedData(
   return out;
 }
 
+/** Pairgate enforces ~30 req/min — space catalog GETs ≥2.1s apart. */
+let dataFetchChain: Promise<unknown> = Promise.resolve();
+let lastDataFetchAt = 0;
+const PAIRGATE_GET_GAP_MS = 2100;
+
+async function pairgateCatalogGet(path: string) {
+  const run = dataFetchChain.then(async () => {
+    const wait = Math.max(0, PAIRGATE_GET_GAP_MS - (Date.now() - lastDataFetchAt));
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    lastDataFetchAt = Date.now();
+    return pairgateFetch(path, { method: "GET" });
+  });
+  dataFetchChain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
+type DataPlanCache = {
+  expiresAt: number;
+  serviceName: string;
+  variations: PairgateVariation[];
+};
+const dataPlanCache = new Map<string, DataPlanCache>();
+const DATA_PLAN_CACHE_MS = 10 * 60 * 1000;
+
+type CategoriesCache = {
+  expiresAt: number;
+  bySlug: Map<string, string[]>;
+};
+let categoriesCache: CategoriesCache | null = null;
+
+async function dataPlanTypesFor(slug: string): Promise<string[]> {
+  if (categoriesCache && categoriesCache.expiresAt > Date.now()) {
+    return categoriesCache.bySlug.get(slug) || [...DATA_PLAN_TYPES];
+  }
+
+  const bySlug = new Map<string, string[]>();
+  try {
+    const { ok, status, json } = await pairgateCatalogGet(
+      "/data-plans/categories",
+    );
+    if (isPairgateHttpOk(ok, status, json) && json.data != null) {
+      const raw = json.data;
+
+      if (Array.isArray(raw)) {
+        for (const row of raw) {
+          if (!row || typeof row !== "object") continue;
+          const item = row as Record<string, unknown>;
+          const name = String(item.provider_name || item.name || "");
+          const network = normalizePairgateNetwork(name);
+          const planType = String(item.plan_type || "").trim();
+          if (!network || !planType) continue;
+          const list = bySlug.get(network) || [];
+          if (!list.includes(planType)) list.push(planType);
+          bySlug.set(network, list);
+        }
+      } else if (typeof raw === "object") {
+        for (const [name, list] of Object.entries(
+          raw as Record<string, unknown>,
+        )) {
+          if (!Array.isArray(list)) continue;
+          bySlug.set(
+            normalizePairgateNetwork(name),
+            list.map(String).filter(Boolean),
+          );
+        }
+      }
+    }
+  } catch (error) {
+    console.error("[pairgate-data-categories]", slug, error);
+  }
+
+  categoriesCache = {
+    expiresAt: Date.now() + DATA_PLAN_CACHE_MS,
+    bySlug,
+  };
+
+  return bySlug.get(slug) || [...DATA_PLAN_TYPES];
+}
+
+async function fetchDataPlansForType(
+  slug: string,
+  planType: string,
+): Promise<PairgateVariation[]> {
+  // Always use live catalog paths — /test/data-plans returns empty arrays
+  const path = `/data-plans?provider_id=${encodeURIComponent(slug)}&plan_type=${encodeURIComponent(planType)}`;
+  try {
+    let { ok, status, json } = await pairgateCatalogGet(path);
+    if (status === 429) {
+      await new Promise((r) => setTimeout(r, PAIRGATE_GET_GAP_MS));
+      ({ ok, status, json } = await pairgateCatalogGet(path));
+    }
+    if (!isPairgateHttpOk(ok, status, json) || !json.data) return [];
+    return plansFromGroupedData(
+      json.data as Record<string, unknown>,
+      planType,
+    );
+  } catch (error) {
+    console.error("[pairgate-data-plans]", slug, planType, error);
+    return [];
+  }
+}
+
 export async function listDataVariations(
   providerSlug: string,
 ): Promise<{ serviceName: string; variations: PairgateVariation[] }> {
@@ -275,29 +389,20 @@ export async function listDataVariations(
   const serviceName =
     DATA_NETWORKS.find((s) => s.serviceID === slug)?.name || slug.toUpperCase();
 
-  const results = await Promise.all(
-    DATA_PLAN_TYPES.map(async (planType) => {
-      const path = pairgateApiPath(
-        `/data-plans?provider_id=${encodeURIComponent(slug)}&plan_type=${planType}`,
-        `/test/data-plans?provider_id=${encodeURIComponent(slug)}&plan_type=${planType}`,
-      );
-      try {
-        const { ok, status, json } = await pairgateFetch(path, { method: "GET" });
-        if (!isPairgateHttpOk(ok, status, json) || !json.data) return [];
-        return plansFromGroupedData(
-          json.data as Record<string, unknown>,
-          planType,
-        );
-      } catch (error) {
-        console.error("[pairgate-data-plans]", slug, planType, error);
-        return [];
-      }
-    }),
-  );
+  const cached = dataPlanCache.get(slug);
+  if (cached && cached.expiresAt > Date.now()) {
+    return {
+      serviceName: cached.serviceName,
+      variations: cached.variations,
+    };
+  }
 
-  const seen = new Set<string>();
+  const planTypes = await dataPlanTypesFor(slug);
   const variations: PairgateVariation[] = [];
-  for (const batch of results) {
+  const seen = new Set<string>();
+
+  for (const planType of planTypes) {
+    const batch = await fetchDataPlansForType(slug, planType);
     for (const v of batch) {
       if (seen.has(v.variation_code)) continue;
       seen.add(v.variation_code);
@@ -308,6 +413,12 @@ export async function listDataVariations(
   variations.sort(
     (a, b) => (Number(a.charged_amount) || 0) - (Number(b.charged_amount) || 0),
   );
+
+  dataPlanCache.set(slug, {
+    expiresAt: Date.now() + DATA_PLAN_CACHE_MS,
+    serviceName,
+    variations,
+  });
 
   return { serviceName, variations };
 }
