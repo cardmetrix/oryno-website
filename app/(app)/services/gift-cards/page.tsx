@@ -250,6 +250,7 @@ function GiftCardsPageContent() {
   const [sellLoading, setSellLoading] = useState(true);
   const [sellDemo, setSellDemo] = useState(false);
   const [sellUnavailable, setSellUnavailable] = useState(false);
+  const [sellPartnerError, setSellPartnerError] = useState<string | null>(null);
   const [selectedSell, setSelectedSell] = useState<SellBrand | null>(null);
   const [cardType, setCardType] = useState<"ecode" | "physical">("physical");
   const [cardCountry, setCardCountry] = useState("US");
@@ -342,6 +343,13 @@ function GiftCardsPageContent() {
         setSellDemo(Boolean(catalog.demo));
         setSellUnavailable(
           Boolean(catalog.unavailable || ratesJson.unavailable),
+        );
+        setSellPartnerError(
+          (typeof ratesJson.partnerError === "string" &&
+            ratesJson.partnerError) ||
+            (typeof catalog.partnerError === "string" &&
+              catalog.partnerError) ||
+            null,
         );
         const next: Record<string, number | null> = {};
         for (const row of ratesJson.simplified ?? []) {
@@ -509,6 +517,11 @@ function GiftCardsPageContent() {
           if (typeof data.demo === "boolean") {
             setSellDemo(Boolean(data.demo));
           }
+          if (typeof data.partnerError === "string" && data.partnerError) {
+            setSellPartnerError(data.partnerError);
+          } else if (data.unavailable === false) {
+            setSellPartnerError(null);
+          }
         }
       } catch (e) {
         if (!cancelled) {
@@ -600,7 +613,8 @@ function GiftCardsPageContent() {
       setError(
         sellDemo
           ? "Gift card selling is not live yet. Check Sogo credentials."
-          : "Live sell rates are unavailable right now. Please try again shortly.",
+          : sellPartnerError ||
+              "Live sell rates are unavailable right now. Please try again shortly.",
       );
       return;
     }
@@ -754,7 +768,8 @@ function GiftCardsPageContent() {
           <p className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-100">
             {sellDemo
               ? "Sell is not live — set SOGO_SECRET_KEY (sogo_sk_live_…) and SOGO_DEMO=false on the server."
-              : "Sogo live rates are temporarily unavailable. You can browse, but selling is paused until the partner responds."}
+              : sellPartnerError ||
+                "Sogo live rates are temporarily unavailable. You can browse, but selling is paused until the partner responds."}
           </p>
         ) : null}
         {mode === "buy" && buyDemo ? (

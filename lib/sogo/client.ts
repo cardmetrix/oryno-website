@@ -105,7 +105,6 @@ export async function sogoRequest<T>(
   const { idempotencyKey, headers: initHeaders, ...rest } = init || {};
   const headers: Record<string, string> = {
     Authorization: `Bearer ${key}`,
-    "X-API-Key": key,
     Accept: "application/json",
     ...mergeHeaders(initHeaders),
   };
@@ -178,9 +177,11 @@ async function sogoRequestWithRetry<T>(
       last = error;
       const err = error as { status?: number; code?: string; message?: string };
       const msg = (err.message || "").toLowerCase();
-      // Product flag from Sogo, not a blip — don't wait out retries.
+      // Product / account flags from Sogo — don't wait out retries.
       if (
-        /not currently available via the partner api|could not accept this gift card/.test(
+        err.code === "account_suspended" ||
+        err.code === "kyb_verification_required" ||
+        /account has been suspended|not currently available via the partner api|could not accept this gift card|approve gift card selling/i.test(
           msg,
         )
       ) {
@@ -237,6 +238,8 @@ export function isSogoUnavailableError(error: unknown) {
 let giftCardsPartnerLive = false;
 /** Whether the last rates fetch returned provider rows (not local fallback). */
 let lastSellRatesFromProvider = false;
+/** Last partner API failure message (for admin/UI diagnostics). */
+let lastGiftCardsPartnerError: string | null = null;
 
 export function isSogoGiftCardsPartnerLive() {
   return giftCardsPartnerLive;
@@ -246,8 +249,13 @@ export function isSogoSellRatesFromProvider() {
   return lastSellRatesFromProvider;
 }
 
+export function getSogoGiftCardsPartnerError() {
+  return lastGiftCardsPartnerError;
+}
+
 export async function fetchSogoSellCatalog(): Promise<GiftCardBrandView[]> {
   if (isSogoDemoMode()) {
+    lastGiftCardsPartnerError = null;
     return FALLBACK_GIFT_CARD_CATALOG.map(toBrandView);
   }
 
@@ -265,6 +273,7 @@ export async function fetchSogoSellCatalog(): Promise<GiftCardBrandView[]> {
           : [];
     // HTTP 200 means credentials work.
     giftCardsPartnerLive = true;
+    lastGiftCardsPartnerError = null;
     if (!rows.length) {
       console.warn("[sogo-catalog] empty provider catalog — using fallback list");
       return FALLBACK_GIFT_CARD_CATALOG.map(toBrandView);
@@ -274,6 +283,9 @@ export async function fetchSogoSellCatalog(): Promise<GiftCardBrandView[]> {
       .filter((b) => b.active && b.slug);
   } catch (error) {
     giftCardsPartnerLive = false;
+    lastSellRatesFromProvider = false;
+    lastGiftCardsPartnerError =
+      error instanceof Error ? error.message : "Sogo catalog request failed";
     console.error("[sogo-catalog]", error);
     return FALLBACK_GIFT_CARD_CATALOG.map(toBrandView);
   }
@@ -324,6 +336,7 @@ export async function fetchSogoSellRates(slug?: string): Promise<SogoRateEntry[]
           : [];
     // Auth succeeded.
     giftCardsPartnerLive = true;
+    lastGiftCardsPartnerError = null;
     if (!rows.length) {
       lastSellRatesFromProvider = false;
       console.warn("[sogo-rates] empty provider rates", { slug });
@@ -334,6 +347,8 @@ export async function fetchSogoSellRates(slug?: string): Promise<SogoRateEntry[]
   } catch (error) {
     giftCardsPartnerLive = false;
     lastSellRatesFromProvider = false;
+    lastGiftCardsPartnerError =
+      error instanceof Error ? error.message : "Sogo rates request failed";
     console.error("[sogo-rates]", error);
     return demoRates();
   }

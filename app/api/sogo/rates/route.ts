@@ -4,6 +4,7 @@ import { getSogoPayoutShare } from "@/lib/pricing/service-pricing";
 import {
   extractNgnRate,
   fetchSogoSellRates,
+  getSogoGiftCardsPartnerError,
   isSogoDemoMode,
   isSogoGiftCardsPartnerLive,
   isSogoSellRatesFromProvider,
@@ -39,6 +40,7 @@ export async function GET(req: Request) {
     const partnerLive = isSogoGiftCardsPartnerLive();
     const ratesFromProvider = isSogoSellRatesFromProvider();
     const unavailable = !demo && (!partnerLive || !ratesFromProvider);
+    const partnerError = getSogoGiftCardsPartnerError();
     const source = demo
       ? "demo"
       : ratesFromProvider
@@ -61,6 +63,8 @@ export async function GET(req: Request) {
           payoutShare,
           demo,
           unavailable: unavailable || !quote.live,
+          partnerError:
+            unavailable || !quote.live ? partnerError : null,
           source: quote.live ? "provider" : source,
         });
       } catch (quoteError) {
@@ -71,6 +75,9 @@ export async function GET(req: Request) {
           payoutShare,
           demo,
           unavailable: true,
+          partnerError:
+            partnerError ||
+            (quoteError instanceof Error ? quoteError.message : null),
           source,
           error: sogoErrorToEnglish(
             quoteError instanceof Error
@@ -108,6 +115,7 @@ export async function GET(req: Request) {
       payoutShare,
       demo,
       unavailable,
+      partnerError: unavailable ? partnerError : null,
       source,
     });
   } catch (error) {

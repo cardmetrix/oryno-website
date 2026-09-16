@@ -66,6 +66,7 @@ export default function GiftCardsLivePage() {
   const [sellLoading, setSellLoading] = useState(true);
   const [sellDemo, setSellDemo] = useState(false);
   const [sellUnavailable, setSellUnavailable] = useState(false);
+  const [sellPartnerError, setSellPartnerError] = useState<string | null>(null);
   const [sellQuery, setSellQuery] = useState("");
   const [sellCategory, setSellCategory] = useState("All");
 
@@ -119,6 +120,11 @@ export default function GiftCardsLivePage() {
       setSellBrands(catalog.brands ?? []);
       setSellDemo(Boolean(catalog.demo || ratesJson.demo));
       setSellUnavailable(Boolean(catalog.unavailable || ratesJson.unavailable));
+      setSellPartnerError(
+        (typeof ratesJson.partnerError === "string" && ratesJson.partnerError) ||
+          (typeof catalog.partnerError === "string" && catalog.partnerError) ||
+          null,
+      );
 
       // API exposes NGN-per-$1 on `simplified` (raw `rates` has nested provider shape).
       const map: Record<string, number | null> = {};
@@ -271,8 +277,17 @@ export default function GiftCardsLivePage() {
                   {sellLoading
                     ? "Loading…"
                     : `${filteredSell.length} brands · tap to sell`}
-                  {sellDemo ? " · demo rates" : sellUnavailable ? " · indicative rates" : ""}
+                  {sellDemo
+                    ? " · demo rates"
+                    : sellUnavailable
+                      ? " · indicative rates"
+                      : ""}
                 </p>
+                {sellUnavailable && sellPartnerError ? (
+                  <p className="mt-1 text-[11px] text-amber-800 dark:text-amber-200">
+                    {sellPartnerError}
+                  </p>
+                ) : null}
               </div>
               <TrendingUp className="h-5 w-5 text-primary" />
             </div>

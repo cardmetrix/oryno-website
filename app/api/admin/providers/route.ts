@@ -12,7 +12,14 @@ import {
   isReloadlyDemoMode,
   isReloadlySandbox,
 } from "@/lib/reloadly/client";
-import { isSogoDemoMode, isSogoSandbox, fetchSogoNgnBalance } from "@/lib/sogo/client";
+import {
+  fetchSogoNgnBalance,
+  fetchSogoSellCatalog,
+  getSogoGiftCardsPartnerError,
+  isSogoDemoMode,
+  isSogoGiftCardsPartnerLive,
+  isSogoSandbox,
+} from "@/lib/sogo/client";
 import { isVtpassDemoMode, isVtpassSandbox } from "@/lib/vtpass/client";
 
 export const runtime = "nodejs";
@@ -21,7 +28,9 @@ function modeLabel(input: {
   configured: boolean;
   demo: boolean;
   sandbox?: boolean;
+  blocked?: boolean;
 }) {
+  if (input.blocked) return "Blocked";
   if (!input.configured || input.demo) return "Demo";
   if (input.sandbox) return "Sandbox";
   return "Live";
@@ -29,7 +38,17 @@ function modeLabel(input: {
 
 export async function GET() {
   return withAdminApi(async () => {
-    const sogoBalance = isSogoDemoMode() ? null : await fetchSogoNgnBalance();
+    let sogoPartnerError: string | null = null;
+    if (!isSogoDemoMode()) {
+      await fetchSogoSellCatalog();
+      if (!isSogoGiftCardsPartnerLive()) {
+        sogoPartnerError = getSogoGiftCardsPartnerError();
+      }
+    }
+    const sogoBalance =
+      isSogoDemoMode() || sogoPartnerError
+        ? null
+        : await fetchSogoNgnBalance();
     let reloadlyBalance: { balance: number; currencyCode: string } | null = null;
     let reloadlyBalanceError: string | null = null;
     if (hasReloadlyKeys() && !isReloadlyDemoMode()) {
@@ -50,9 +69,11 @@ export async function GET() {
           configured: !isSogoDemoMode(),
           demo: isSogoDemoMode(),
           sandbox: isSogoSandbox(),
+          blocked: Boolean(sogoPartnerError),
         }),
-        note:
-          sogoBalance == null
+        note: sogoPartnerError
+          ? sogoPartnerError
+          : sogoBalance == null
             ? isSogoDemoMode()
               ? "Demo mode"
               : null

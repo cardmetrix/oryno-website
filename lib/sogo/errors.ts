@@ -6,6 +6,8 @@ const CODE_HINTS: Record<string, string> = {
   invalid_scope: "This service is temporarily unavailable.",
   secret_key_required: "This service is temporarily unavailable.",
   environment_mismatch: "This service is temporarily unavailable.",
+  account_suspended:
+    "Sogo API access is suspended on this account. The website may still work, but API sell is blocked until Sogo support reactivates Gift Card Selling API access.",
   insufficient_funds: SERVICE_UNAVAILABLE,
   validation_failed: "Check the details and try again.",
   idempotency_key_required: "Please try again.",
@@ -19,7 +21,7 @@ const CODE_HINTS: Record<string, string> = {
   kyc_tier_insufficient:
     "This service is not fully set up yet. Please try again later.",
   kyb_verification_required:
-    "This service is not fully set up yet. Please try again later.",
+    "Sogo still needs to approve Gift Card Selling API access for this app. Contact Sogo support after KYB.",
 };
 
 function firstFieldError(errors?: Record<string, string[] | string>) {
@@ -40,6 +42,16 @@ export function sogoErrorToEnglish(
   if (field) return publicServiceError(field.slice(0, 220));
 
   const m = (message || "").toLowerCase();
+
+  if (code === "account_suspended" || m.includes("account has been suspended")) {
+    return CODE_HINTS.account_suspended;
+  }
+  if (
+    code === "kyb_verification_required" ||
+    (m.includes("gift card") && m.includes("approv"))
+  ) {
+    return CODE_HINTS.kyb_verification_required;
+  }
 
   if (m.includes("not enabled on") && m.includes("gift card")) {
     return publicServiceError(message);
