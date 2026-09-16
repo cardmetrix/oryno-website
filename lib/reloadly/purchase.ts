@@ -181,6 +181,8 @@ export async function buyGiftCard(input: {
   productId: number;
   unitPrice: number;
   quantity?: number;
+  /** Product catalog country (Reloadly ISO), not the user's wallet country. */
+  productCountryCode?: string | null;
 }) {
   if (isReloadlyDemoMode()) {
     throw new Error(
@@ -198,11 +200,20 @@ export async function buyGiftCard(input: {
 
   let product = await fetchReloadlyProduct(input.productId);
   if (!product) {
-    const catalog = await fetchReloadlyProducts({});
+    const hint = (input.productCountryCode || "US").toUpperCase();
+    const catalog = await fetchReloadlyProducts({ countryCode: hint });
     product =
       catalog.find((p) => p.productId === input.productId) ?? null;
   }
   if (!product) throw new Error("Gift card product not found");
+
+  const orderCountryCode = (
+    input.productCountryCode ||
+    product.countryCode ||
+    "US"
+  )
+    .trim()
+    .toUpperCase();
 
   const amount = Number(input.unitPrice);
   const denomType = (product.denominationType || "FIXED").toUpperCase();
@@ -234,8 +245,12 @@ export async function buyGiftCard(input: {
     countryCode: input.countryCode,
   });
 
-  // Fail fast on provider auth/balance before debiting the user wallet
-  await assertReloadlyReady(0.01);
+  const quantity = Math.max(1, Math.floor(input.quantity || 1));
+  // Fail fast on provider auth/balance before debiting the user wallet.
+  // Estimate USD cost from Reloadly sender map + fee when available.
+  const estimatedUsd =
+    (price.usdFace + (product.senderFee || 0)) * quantity;
+  await assertReloadlyReady(Math.max(0.01, estimatedUsd * 0.5));
 
   const brand = await ensureBrand(product.brandName, product.brandName);
   const customIdentifier = `oryno-${randomUUID()}`;
@@ -250,6 +265,7 @@ export async function buyGiftCard(input: {
     metadata: {
       productId: product.productId,
       unitPrice: input.unitPrice,
+      productCountryCode: orderCountryCode,
       customIdentifier,
       orderReference: reference,
     },
@@ -275,8 +291,9 @@ export async function buyGiftCard(input: {
   try {
     const { order: providerOrder, simulated } = await placeReloadlyOrder({
       productId: product.productId,
+      countryCode: orderCountryCode,
       unitPrice: input.unitPrice,
-      quantity: input.quantity || 1,
+      quantity,
       customIdentifier,
       senderName: (input.displayName || "ORYNO").slice(0, 80),
       recipientEmail: email,

@@ -79,4 +79,6 @@ export type BuyProductView = {
   /** Map recipient face value → approximate sender/charge amount (provider currency or USD) */
   senderPriceMap: Record<string, number>;
   redeemHint: string | null;
+  supportsPreOrder?: boolean;
+  senderFee?: number;
 };

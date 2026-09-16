@@ -254,5 +254,7 @@ export function toBuyProductView(p: ReloadlyProduct): BuyProductView {
       Object.entries(map).map(([k, v]) => [String(k), Number(v)]),
     ),
     redeemHint: p.redeemInstruction?.concise || null,
+    supportsPreOrder: Boolean(p.supportsPreOrder),
+    senderFee: Number.isFinite(Number(p.senderFee)) ? Number(p.senderFee) : 0,
   };
 }

@@ -671,6 +671,7 @@ function GiftCardsPageContent() {
           productId: selectedBuy.productId,
           unitPrice: Number(buyAmount),
           email: buyEmail.trim(),
+          countryCode: selectedBuy.countryCode,
         }),
       });
       const data = await res.json();

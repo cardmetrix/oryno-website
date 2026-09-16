@@ -39,12 +39,31 @@ export function reloadlyErrorToEnglish(message: string, code?: string) {
   if (
     m.includes("denomination") ||
     m.includes("unitprice") ||
-    m.includes("unit price")
+    m.includes("unit price") ||
+    m.includes("amount is not valid") ||
+    m.includes("invalid amount")
   ) {
     return "That amount isn’t available for this card. Pick another value.";
   }
-  if (m.includes("email")) {
+  if (
+    m.includes("countrycode") ||
+    m.includes("country code") ||
+    m.includes("invalid country")
+  ) {
+    return "This gift card isn’t available for that country right now.";
+  }
+  if (
+    m.includes("out of stock") ||
+    m.includes("not in stock") ||
+    m.includes("product is currently unavailable")
+  ) {
+    return "This gift card is out of stock. Try another brand or amount.";
+  }
+  if (m.includes("email") || m.includes("recipient")) {
     return "Enter a valid email to receive the gift card.";
+  }
+  if (m.includes("sendername") || m.includes("sender name")) {
+    return "Sender name was rejected. Please try again.";
   }
   return publicServiceError(
     message.replace(/\bReloadly\b/gi, "gift card service").slice(0, 220),
@@ -55,5 +74,6 @@ export function reloadlyBuyHttpStatus(message: string) {
   const m = (message || "").toLowerCase();
   if (m.includes("unauthorized")) return 401;
   if (m.includes("insufficient")) return 422;
+  if (m.includes("out of stock") || m.includes("unavailable")) return 503;
   return 400;
 }

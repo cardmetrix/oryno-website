@@ -28,6 +28,7 @@ export async function POST(req: Request) {
       unitPrice?: number;
       email?: string;
       quantity?: number;
+      countryCode?: string;
     };
 
     const productId = Number(body.productId);
@@ -56,6 +57,7 @@ export async function POST(req: Request) {
         productId,
         unitPrice,
         quantity: body.quantity || 1,
+        productCountryCode: body.countryCode,
       }),
     );
     const fx = await getDisplayFx(user.countryCode);

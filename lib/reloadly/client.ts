@@ -550,11 +550,14 @@ export async function fetchReloadlyProduct(
 
 export async function placeReloadlyOrder(input: {
   productId: number;
+  countryCode: string;
   unitPrice: number;
   quantity?: number;
   customIdentifier: string;
   senderName: string;
   recipientEmail: string;
+  /** Prefer true when the product is out of stock but supports pre-order. */
+  preOrder?: boolean;
 }): Promise<{ order: ReloadlyOrderResponse; simulated: boolean }> {
   if (isReloadlyDemoMode()) {
     throw new Error(
@@ -562,31 +565,72 @@ export async function placeReloadlyOrder(input: {
     );
   }
 
+  const countryCode = input.countryCode.trim().toUpperCase() || "US";
+  const senderName = sanitizeReloadlySenderName(input.senderName);
+  const quantity = Math.max(1, Math.floor(input.quantity || 1));
+  const unitPrice = roundMoney(Number(input.unitPrice));
+
   console.log(LOG_PREFIX, "place order LIVE", {
     productId: input.productId,
-    unitPrice: input.unitPrice,
-    quantity: input.quantity || 1,
+    countryCode,
+    unitPrice,
+    quantity,
+    preOrder: Boolean(input.preOrder),
+    senderName,
   });
 
-  const order = await reloadlyFetch<ReloadlyOrderResponse>("/orders", {
-    method: "POST",
-    body: JSON.stringify({
-      productId: input.productId,
-      quantity: input.quantity || 1,
-      unitPrice: input.unitPrice,
-      customIdentifier: input.customIdentifier,
-      senderName: input.senderName,
-      recipientEmail: input.recipientEmail,
-      preOrder: false,
-    }),
-  });
+  const body = {
+    productId: input.productId,
+    countryCode,
+    quantity,
+    unitPrice,
+    customIdentifier: input.customIdentifier.slice(0, 100),
+    senderName,
+    recipientEmail: input.recipientEmail.trim().toLowerCase(),
+    preOrder: Boolean(input.preOrder),
+  };
 
-  console.log(LOG_PREFIX, "place order ok", {
-    transactionId: order.transactionId,
-    status: order.status,
-  });
+  try {
+    const order = await reloadlyFetch<ReloadlyOrderResponse>("/orders", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
 
-  return { order, simulated: false };
+    console.log(LOG_PREFIX, "place order ok", {
+      transactionId: order.transactionId,
+      status: order.status,
+    });
+
+    return { order, simulated: false };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    // Auto-retry as pre-order when the brand is temporarily out of stock.
+    if (
+      !input.preOrder &&
+      /out of stock|not available|pre-?order|insufficient stock/i.test(message)
+    ) {
+      console.warn(LOG_PREFIX, "retrying order as preOrder", {
+        productId: input.productId,
+        reason: truncate(message, 160),
+      });
+      return placeReloadlyOrder({ ...input, preOrder: true });
+    }
+    throw error;
+  }
+}
+
+function sanitizeReloadlySenderName(raw?: string | null) {
+  const cleaned = String(raw || "")
+    .replace(/[^a-zA-Z\s.'-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 80);
+  if (cleaned.length >= 2) return cleaned;
+  return "ORYNO";
+}
+
+function roundMoney(n: number) {
+  return Math.round((Number(n) || 0) * 100) / 100;
 }
 
 export async function fetchReloadlyBalance(): Promise<{
