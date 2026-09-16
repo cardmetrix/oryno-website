@@ -7,6 +7,7 @@ import {
   isFlutterwaveDemoMode,
 } from "@/lib/flutterwave/client";
 import {
+  fetchReloadlyBalance,
   hasReloadlyKeys,
   isReloadlyDemoMode,
   isReloadlySandbox,
@@ -29,6 +30,16 @@ function modeLabel(input: {
 export async function GET() {
   return withAdminApi(async () => {
     const sogoBalance = isSogoDemoMode() ? null : await fetchSogoNgnBalance();
+    let reloadlyBalance: { balance: number; currencyCode: string } | null = null;
+    let reloadlyBalanceError: string | null = null;
+    if (hasReloadlyKeys() && !isReloadlyDemoMode()) {
+      try {
+        reloadlyBalance = await fetchReloadlyBalance();
+      } catch (e) {
+        reloadlyBalanceError =
+          e instanceof Error ? e.message : "Failed to load Reloadly balance";
+      }
+    }
     const providers = [
       {
         id: "sogo",
@@ -90,6 +101,15 @@ export async function GET() {
           demo: isReloadlyDemoMode(),
           sandbox: isReloadlySandbox(),
         }),
+        note: reloadlyBalanceError
+          ? `Balance check failed: ${reloadlyBalanceError}`
+          : reloadlyBalance == null
+            ? isReloadlyDemoMode()
+              ? "Demo mode"
+              : null
+            : reloadlyBalance.balance <= 0
+              ? `Reloadly Gift Cards wallet is ${reloadlyBalance.currencyCode} 0. Fund it in the Reloadly dashboard before buys will succeed.`
+              : `Reloadly Gift Cards wallet ${reloadlyBalance.currencyCode} ${reloadlyBalance.balance.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
       },
       {
         id: "flutterwave",

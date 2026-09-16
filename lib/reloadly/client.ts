@@ -666,7 +666,7 @@ export async function assertReloadlyReady(minBalance = 0.01) {
   console.log(LOG_PREFIX, "balance", bal);
   if (!Number.isFinite(bal.balance) || bal.balance < minBalance) {
     throw new Error(
-      "This service is unavailable. Please try again later.",
+      `PROVIDER_BALANCE_LOW: Reloadly balance ${bal.currencyCode} ${bal.balance} < required ${minBalance}`,
     );
   }
   return { demo: false as const, ...bal };

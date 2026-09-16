@@ -3,6 +3,7 @@ import { ensureAppUser } from "@/lib/auth/current-user";
 import { createNotification } from "@/lib/notifications-service";
 import {
   buyGiftCard,
+  reloadlyBuyErrorCode,
   reloadlyBuyHttpStatus,
   reloadlyErrorToEnglish,
 } from "@/lib/reloadly";
@@ -98,12 +99,16 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     console.error("[reloadly-buy]", error);
-    const message = reloadlyErrorToEnglish(
-      error instanceof Error ? error.message : "Failed to buy gift card",
-    );
+    const raw =
+      error instanceof Error ? error.message : "Failed to buy gift card";
+    const code = reloadlyBuyErrorCode(raw);
+    const message = reloadlyErrorToEnglish(raw);
     return NextResponse.json(
-      { error: message },
-      { status: actionLockHttpStatus(error) || reloadlyBuyHttpStatus(message) },
+      { error: message, code },
+      {
+        status:
+          actionLockHttpStatus(error) || reloadlyBuyHttpStatus(raw),
+      },
     );
   }
 }
