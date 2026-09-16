@@ -42,21 +42,40 @@ export async function GET(req: Request) {
         : "provider";
 
     if (slug && amount > 0) {
-      const quote = await quoteGiftCardSell({
-        slug,
-        cardCurrency,
-        cardType,
-        subType,
-        cardAmount: amount,
-      });
-      return NextResponse.json({
-        rates,
-        quote,
-        payoutShare,
-        demo: isSogoDemoMode(),
-        unavailable,
-        source,
-      });
+      try {
+        const quote = await quoteGiftCardSell({
+          slug,
+          cardCurrency,
+          cardType,
+          subType,
+          cardAmount: amount,
+          requireLive: false,
+        });
+        return NextResponse.json({
+          rates,
+          quote,
+          payoutShare,
+          demo: isSogoDemoMode() || Boolean(quote.demo),
+          unavailable: unavailable || !quote.live,
+          source: quote.live ? "provider" : source,
+        });
+      } catch (quoteError) {
+        console.error("[sogo-rates-quote]", quoteError);
+        // Still return catalog rates so the UI can render; quote may be null.
+        return NextResponse.json({
+          rates,
+          quote: null,
+          payoutShare,
+          demo: isSogoDemoMode(),
+          unavailable: true,
+          source,
+          error: sogoErrorToEnglish(
+            quoteError instanceof Error
+              ? quoteError.message
+              : "Failed to quote this card",
+          ),
+        });
+      }
     }
 
     const simplified = rates.map((entry) => {

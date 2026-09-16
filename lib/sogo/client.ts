@@ -324,26 +324,6 @@ export function extractNgnRate(input: {
   const { entry, currency, cardType, subType } = input;
   if (!entry?.rates) return null;
 
-  const rateMap = entry.rates as Record<string, unknown>;
-  const currencyKey =
-    Object.keys(rateMap).find(
-      (k) => k.toUpperCase() === currency.toUpperCase(),
-    ) || currency.toUpperCase();
-  const byCurrency = rateMap[currencyKey] as
-    | Record<string, unknown>
-    | undefined;
-  if (!byCurrency || typeof byCurrency !== "object") return null;
-
-  const typeKey =
-    Object.keys(byCurrency).find(
-      (k) =>
-        k.toLowerCase() === cardType.toLowerCase() ||
-        (cardType === "ecode" &&
-          ["e_code", "e-code", "code"].includes(k.toLowerCase())),
-    ) || cardType;
-  const bucket = byCurrency[typeKey];
-  if (bucket == null) return null;
-
   const asNumber = (v: unknown): number | null => {
     if (typeof v === "number" && Number.isFinite(v) && v > 0) return v;
     if (typeof v === "string") {
@@ -353,40 +333,123 @@ export function extractNgnRate(input: {
     return null;
   };
 
-  const direct = asNumber(bucket);
-  if (direct != null) return direct;
+  const rateMap = entry.rates as Record<string, unknown>;
 
-  if (typeof bucket !== "object") return null;
-  const record = bucket as Record<string, unknown>;
+  const readPhysical = (
+    bucket: Record<string, unknown>,
+    preferredSub: string,
+  ): number | null => {
+    const direct = asNumber(bucket);
+    if (direct != null) return direct;
 
-  if (cardType === "ecode") {
-    const ngn = asNumber(record.NGN ?? record.ngn);
-    if (ngn != null) return ngn;
-    for (const v of Object.values(record)) {
+    // Shape A: { NGN: { cash_receipt: 1400 } }  (our demo mirror)
+    const ngnNode = bucket.NGN ?? bucket.ngn;
+    if (ngnNode && typeof ngnNode === "object") {
+      const nested = ngnNode as Record<string, unknown>;
+      const preferred = asNumber(nested[preferredSub]);
+      if (preferred != null) return preferred;
+      for (const v of Object.values(nested)) {
+        const n = asNumber(v);
+        if (n != null) return n;
+      }
+    }
+    const ngnDirect = asNumber(ngnNode);
+    if (ngnDirect != null) return ngnDirect;
+
+    // Shape B: { cash_receipt: { NGN: 1400 } } or { cash_receipt: 1400 }
+    const subNode = bucket[preferredSub];
+    const subDirect = asNumber(subNode);
+    if (subDirect != null) return subDirect;
+    if (subNode && typeof subNode === "object") {
+      const nested = subNode as Record<string, unknown>;
+      const n = asNumber(nested.NGN ?? nested.ngn);
+      if (n != null) return n;
+      for (const v of Object.values(nested)) {
+        const found = asNumber(v);
+        if (found != null) return found;
+      }
+    }
+
+    for (const v of Object.values(bucket)) {
       const n = asNumber(v);
       if (n != null) return n;
+      if (v && typeof v === "object") {
+        const nested = v as Record<string, unknown>;
+        const n2 = asNumber(nested.NGN ?? nested.ngn ?? nested[preferredSub]);
+        if (n2 != null) return n2;
+      }
     }
     return null;
-  }
+  };
 
-  const ngnNode = record.NGN ?? record.ngn;
-  const ngnDirect = asNumber(ngnNode);
-  if (ngnDirect != null) return ngnDirect;
+  // Preferred: rates[currency][cardType]...
+  const currencyKey =
+    Object.keys(rateMap).find(
+      (k) => k.toUpperCase() === currency.toUpperCase(),
+    ) || currency.toUpperCase();
+  const byCurrency = rateMap[currencyKey] as
+    | Record<string, unknown>
+    | undefined;
 
-  if (ngnNode && typeof ngnNode === "object") {
-    const nested = ngnNode as Record<string, unknown>;
-    const sub = subType || "cash_receipt";
-    const preferred = asNumber(nested[sub]);
-    if (preferred != null) return preferred;
-    for (const v of Object.values(nested)) {
-      const n = asNumber(v);
-      if (n != null) return n;
+  if (byCurrency && typeof byCurrency === "object") {
+    const typeKey =
+      Object.keys(byCurrency).find(
+        (k) =>
+          k.toLowerCase() === cardType.toLowerCase() ||
+          (cardType === "ecode" &&
+            ["e_code", "e-code", "code"].includes(k.toLowerCase())),
+      ) || cardType;
+    const bucket = byCurrency[typeKey];
+    if (bucket != null) {
+      if (typeof bucket !== "object") {
+        const direct = asNumber(bucket);
+        if (direct != null) return direct;
+      } else if (cardType === "ecode") {
+        const record = bucket as Record<string, unknown>;
+        const ngn = asNumber(record.NGN ?? record.ngn);
+        if (ngn != null) return ngn;
+        for (const v of Object.values(record)) {
+          const n = asNumber(v);
+          if (n != null) return n;
+        }
+      } else {
+        const found = readPhysical(
+          bucket as Record<string, unknown>,
+          subType || "cash_receipt",
+        );
+        if (found != null) return found;
+      }
     }
   }
 
-  if (subType) {
-    const n = asNumber(record[subType]);
-    if (n != null) return n;
+  // Alternate: rates[cardType][currency]... (some Sogo payloads)
+  const typeRootKey =
+    Object.keys(rateMap).find(
+      (k) =>
+        k.toLowerCase() === cardType.toLowerCase() ||
+        (cardType === "ecode" &&
+          ["e_code", "e-code", "code"].includes(k.toLowerCase())),
+    ) || null;
+  if (typeRootKey) {
+    const typeRoot = rateMap[typeRootKey];
+    if (typeof typeRoot === "object" && typeRoot) {
+      const record = typeRoot as Record<string, unknown>;
+      const currencyNode =
+        record[currencyKey] ?? record.NGN ?? record.ngn ?? record.USD;
+      const direct = asNumber(currencyNode);
+      if (direct != null) return direct;
+      if (currencyNode && typeof currencyNode === "object") {
+        const found = readPhysical(
+          currencyNode as Record<string, unknown>,
+          subType || "cash_receipt",
+        );
+        if (found != null) return found;
+      }
+      if (cardType === "physical") {
+        const found = readPhysical(record, subType || "cash_receipt");
+        if (found != null) return found;
+      }
+    }
   }
 
   return null;

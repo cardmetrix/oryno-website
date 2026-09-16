@@ -501,7 +501,15 @@ function GiftCardsPageContent() {
         const res = await fetch(`/api/sogo/rates?${qs}`);
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Failed to quote");
-        if (!cancelled) setSellQuote(data.quote ?? null);
+        if (!cancelled) {
+          setSellQuote(data.quote ?? null);
+          if (typeof data.unavailable === "boolean") {
+            setSellUnavailable(Boolean(data.unavailable));
+          }
+          if (typeof data.demo === "boolean") {
+            setSellDemo(Boolean(data.demo));
+          }
+        }
       } catch (e) {
         if (!cancelled) {
           setSellQuote(null);

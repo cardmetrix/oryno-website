@@ -102,10 +102,14 @@ export async function quoteGiftCardSell(input: {
   cardType: SogoCardType;
   subType?: SogoPhysicalSubType | null;
   cardAmount: number;
+  /** When true (sell submit), refuse fallback/demo rates. Rates UI passes false. */
+  requireLive?: boolean;
 }) {
+  const requireLive = Boolean(input.requireLive);
   const rates = await fetchSogoSellRates(input.slug);
-  const live = isSogoDemoMode() || isSogoGiftCardsPartnerLive();
-  if (!live) {
+  const partnerLive = isSogoDemoMode() || isSogoGiftCardsPartnerLive();
+
+  if (requireLive && !partnerLive) {
     throw Object.assign(
       new Error(
         "Gift card selling is temporarily unavailable. Please try again shortly.",
@@ -129,17 +133,25 @@ export async function quoteGiftCardSell(input: {
     ratePerUnit = extractNgnRate({
       entry,
       currency: "USD",
+      cardType: input.cardType,
+      subType: input.subType,
+    });
+  }
+  if (ratePerUnit == null || ratePerUnit <= 0) {
+    ratePerUnit = extractNgnRate({
+      entry,
+      currency: "USD",
       cardType: "ecode",
     });
   }
   if (ratePerUnit == null || ratePerUnit <= 0) {
-    if (isSogoDemoMode()) {
-      ratePerUnit = FALLBACK_DEMO_RATES_NGN[input.slug] ?? 1400;
-    } else {
+    const fallback = FALLBACK_DEMO_RATES_NGN[input.slug] ?? 1400;
+    if (requireLive && !isSogoDemoMode()) {
       throw new Error(
         "No live sell rate for this card. Try another brand or amount.",
       );
     }
+    ratePerUnit = fallback;
   }
 
   const providerPayout =
@@ -156,13 +168,13 @@ export async function quoteGiftCardSell(input: {
   });
 
   return {
-    ratePerUnit, // exact NGN-per-unit from provider (or demo mirror)
+    ratePerUnit,
     providerPayout,
     userPayout: priced.local,
     companyCharge: priced.companyCharge,
     currency: "NGN" as const,
     share,
-    demo: isSogoDemoMode(),
+    demo: isSogoDemoMode() || !partnerLive,
     live: !isSogoDemoMode() && isSogoGiftCardsPartnerLive(),
   };
 }
@@ -218,6 +230,7 @@ export async function sellGiftCard(input: {
     cardType: input.cardType,
     subType: input.subType,
     cardAmount: input.cardAmount,
+    requireLive: true,
   });
 
   if (!quote.live) {
