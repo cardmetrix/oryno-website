@@ -466,10 +466,12 @@ export async function fetchReloadlyProducts(options?: {
     if (isAccessDeniedMessage(message)) {
       console.warn(
         LOG_PREFIX,
-        "products auth failed — demo catalog fallback",
+        "products auth failed — refusing silent demo catalog",
         truncate(message, 160),
       );
-      return demoProducts(country, q);
+      throw new Error(
+        "Gift card buying is not available right now. Check Reloadly live credentials and try again.",
+      );
     }
     throw error;
   }

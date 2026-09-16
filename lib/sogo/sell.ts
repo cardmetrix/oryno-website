@@ -18,6 +18,7 @@ import {
   extractNgnRate,
   fetchSogoSellRates,
   isSogoDemoMode,
+  isSogoGiftCardsPartnerLive,
   isSogoUnavailableError,
   submitSogoGiftCardSell,
 } from "./client";
@@ -103,6 +104,16 @@ export async function quoteGiftCardSell(input: {
   cardAmount: number;
 }) {
   const rates = await fetchSogoSellRates(input.slug);
+  const live = isSogoDemoMode() || isSogoGiftCardsPartnerLive();
+  if (!live) {
+    throw Object.assign(
+      new Error(
+        "Gift card selling is temporarily unavailable. Please try again shortly.",
+      ),
+      { status: 503 },
+    );
+  }
+
   const entry =
     rates.find((r) => r.slug?.toLowerCase() === input.slug.toLowerCase()) ??
     rates[0];
@@ -122,7 +133,13 @@ export async function quoteGiftCardSell(input: {
     });
   }
   if (ratePerUnit == null || ratePerUnit <= 0) {
-    ratePerUnit = FALLBACK_DEMO_RATES_NGN[input.slug] ?? 1400;
+    if (isSogoDemoMode()) {
+      ratePerUnit = FALLBACK_DEMO_RATES_NGN[input.slug] ?? 1400;
+    } else {
+      throw new Error(
+        "No live sell rate for this card. Try another brand or amount.",
+      );
+    }
   }
 
   const providerPayout =
@@ -146,6 +163,7 @@ export async function quoteGiftCardSell(input: {
     currency: "NGN" as const,
     share,
     demo: isSogoDemoMode(),
+    live: !isSogoDemoMode() && isSogoGiftCardsPartnerLive(),
   };
 }
 
@@ -185,6 +203,15 @@ export async function sellGiftCard(input: {
     throw new Error("Select the European country for this card");
   }
 
+  if (isSogoDemoMode()) {
+    throw Object.assign(
+      new Error(
+        "Gift card selling requires live Sogo credentials. Set SOGO_SECRET_KEY and SOGO_DEMO=false.",
+      ),
+      { status: 503 },
+    );
+  }
+
   const quote = await quoteGiftCardSell({
     slug: input.slug,
     cardCurrency: input.cardCurrency,
@@ -192,6 +219,15 @@ export async function sellGiftCard(input: {
     subType: input.subType,
     cardAmount: input.cardAmount,
   });
+
+  if (!quote.live) {
+    throw Object.assign(
+      new Error(
+        "Gift card selling is temporarily unavailable. Please try again shortly.",
+      ),
+      { status: 503 },
+    );
+  }
 
   const brand = await ensureBrand(input.slug, input.brandName);
   const walletCurrency = currencyForCountry(input.countryCode);

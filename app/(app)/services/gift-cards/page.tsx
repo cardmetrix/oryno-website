@@ -278,6 +278,7 @@ function GiftCardsPageContent() {
   const [buyCountries, setBuyCountries] = useState(FALLBACK_BUY_COUNTRIES);
   const [buyLoading, setBuyLoading] = useState(false);
   const [buyDemo, setBuyDemo] = useState(false);
+  const [buySandbox, setBuySandbox] = useState(false);
   const [buyCountry, setBuyCountry] = useState(
     () => (countryParam || "US").toUpperCase(),
   );
@@ -386,6 +387,7 @@ function GiftCardsPageContent() {
           });
         }
         setBuyDemo(Boolean(data.demo));
+        setBuySandbox(Boolean(data.sandbox));
       } catch {
         if (!cancelled) setBuyCountries(FALLBACK_BUY_COUNTRIES);
       }
@@ -410,6 +412,7 @@ function GiftCardsPageContent() {
         if (cancelled) return;
         setBuyProducts(data.products ?? []);
         setBuyDemo(Boolean(data.demo));
+        setBuySandbox(Boolean(data.sandbox));
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : "Failed to load products");
@@ -585,6 +588,14 @@ function GiftCardsPageContent() {
   async function onSellSubmit(e: FormEvent) {
     e.preventDefault();
     if (!selectedSell) return;
+    if (sellDemo || sellUnavailable) {
+      setError(
+        sellDemo
+          ? "Gift card selling is not live yet. Check Sogo credentials."
+          : "Live sell rates are unavailable right now. Please try again shortly.",
+      );
+      return;
+    }
     if (cardType === "ecode" && !code.trim()) {
       setError("Enter the gift card code");
       return;
@@ -643,6 +654,12 @@ function GiftCardsPageContent() {
   async function onBuySubmit(e: FormEvent) {
     e.preventDefault();
     if (!selectedBuy) return;
+    if (buyDemo) {
+      setError(
+        "Gift card buying is not live yet. Check Reloadly credentials.",
+      );
+      return;
+    }
     if (frozen || (buyQuote && !canAfford(buyQuote.local))) return;
     setBuySubmitting(true);
     setError(null);
@@ -724,6 +741,25 @@ function GiftCardsPageContent() {
             </button>
           ))}
         </div>
+        {mode === "sell" && (sellDemo || sellUnavailable) ? (
+          <p className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-100">
+            {sellDemo
+              ? "Sell is not live — Sogo credentials are missing or SOGO_DEMO is on."
+              : "Live Sogo rates are down. Selling is paused until rates come back."}
+          </p>
+        ) : null}
+        {mode === "buy" && buyDemo ? (
+          <p className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-100">
+            Buy is not live — Reloadly credentials are missing or RELOADLY_DEMO is
+            on.
+          </p>
+        ) : null}
+        {mode === "buy" && !buyDemo && buySandbox ? (
+          <p className="mt-3 rounded-xl border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs text-sky-900 dark:text-sky-100">
+            Reloadly sandbox mode — set RELOADLY_SANDBOX=false for production
+            cards.
+          </p>
+        ) : null}
       </MotionSection>
 
       <AnimatePresence mode="wait">
@@ -1032,10 +1068,19 @@ function GiftCardsPageContent() {
                     ) : null}
                     <button
                       type="submit"
-                      disabled={sellSubmitting || !sellQuote}
+                      disabled={
+                        sellSubmitting ||
+                        !sellQuote ||
+                        sellDemo ||
+                        sellUnavailable
+                      }
                       className="btn-primary mt-4 flex h-12 w-full items-center justify-center disabled:opacity-60"
                     >
-                      {sellSubmitting ? "Submitting…" : "Sell gift card"}
+                      {sellSubmitting
+                        ? "Submitting…"
+                        : sellDemo || sellUnavailable
+                          ? "Selling unavailable"
+                          : "Sell gift card"}
                     </button>
                   </MotionSection>
                 </form>
@@ -1285,6 +1330,7 @@ function GiftCardsPageContent() {
                         !buyQuote ||
                         !buyEmail.trim() ||
                         frozen ||
+                        buyDemo ||
                         !canAfford(buyQuote.local)
                       }
                       className="btn-primary mt-4 flex h-12 w-full items-center justify-center gap-2 disabled:opacity-60"
@@ -1292,11 +1338,13 @@ function GiftCardsPageContent() {
                       <ShoppingBag className="h-4 w-4" />
                       {buySubmitting
                         ? "Buying…"
-                        : frozen
-                          ? "Wallet unavailable"
-                          : buyQuote && !canAfford(buyQuote.local)
-                            ? "Insufficient balance"
-                            : "Buy gift card"}
+                        : buyDemo
+                          ? "Buying unavailable"
+                          : frozen
+                            ? "Wallet unavailable"
+                            : buyQuote && !canAfford(buyQuote.local)
+                              ? "Insufficient balance"
+                              : "Buy gift card"}
                     </button>
                   </MotionSection>
                 </form>

@@ -182,6 +182,12 @@ export async function buyGiftCard(input: {
   unitPrice: number;
   quantity?: number;
 }) {
+  if (isReloadlyDemoMode()) {
+    throw new Error(
+      "Gift card buying requires live Reloadly credentials. Set RELOADLY_CLIENT_ID / RELOADLY_CLIENT_SECRET and RELOADLY_DEMO=false.",
+    );
+  }
+
   const email = input.email.trim().toLowerCase();
   if (!email || !email.includes("@")) {
     throw new Error("Enter a valid email to receive the gift card");

@@ -7,6 +7,10 @@ import { formatCountryMoney } from "@/lib/country";
 import { getDisplayFx } from "@/lib/display-currency";
 import { convertNgnToLocal } from "@/lib/fx/rates";
 import { publicServiceError } from "@/lib/service-errors";
+import {
+  actionLockHttpStatus,
+  withUserActionLock,
+} from "@/lib/wallet/action-lock";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -78,21 +82,23 @@ export async function POST(req: Request) {
       );
     });
 
-    const result = await sellGiftCard({
-      userId: user.id,
-      countryCode: user.countryCode,
-      slug: body.slug.trim().toLowerCase(),
-      brandName: body.brandName,
-      cardCountry: body.cardCountry.trim().toUpperCase(),
-      cardType: body.cardType,
-      subType: body.subType,
-      cardCurrency: body.cardCurrency.trim().toUpperCase(),
-      cardAmount,
-      additionalInfo: body.additionalInfo,
-      images,
-      specificCountry: body.specificCountry,
-      idempotencyKey: body.idempotencyKey || randomUUID(),
-    });
+    const result = await withUserActionLock(user.id, () =>
+      sellGiftCard({
+        userId: user.id,
+        countryCode: user.countryCode,
+        slug: body.slug.trim().toLowerCase(),
+        brandName: body.brandName,
+        cardCountry: body.cardCountry.trim().toUpperCase(),
+        cardType: body.cardType,
+        subType: body.subType,
+        cardCurrency: body.cardCurrency.trim().toUpperCase(),
+        cardAmount,
+        additionalInfo: body.additionalInfo,
+        images,
+        specificCountry: body.specificCountry,
+        idempotencyKey: body.idempotencyKey || randomUUID(),
+      }),
+    );
     const fx = await getDisplayFx(user.countryCode);
     const amountFormatted = formatCountryMoney(
       convertNgnToLocal(result.amount, fx.ngnToLocal),
@@ -139,7 +145,8 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     console.error("[sogo-sell]", error);
-    const status = httpStatusFor(error);
+    const status =
+      actionLockHttpStatus(error) || httpStatusFor(error);
     return NextResponse.json(
       {
         error: publicServiceError(
