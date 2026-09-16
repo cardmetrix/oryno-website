@@ -235,9 +235,15 @@ export function isSogoUnavailableError(error: unknown) {
 
 /** True after a successful live catalog or rates response in this process. */
 let giftCardsPartnerLive = false;
+/** Whether the last rates fetch returned provider rows (not local fallback). */
+let lastSellRatesFromProvider = false;
 
 export function isSogoGiftCardsPartnerLive() {
   return giftCardsPartnerLive;
+}
+
+export function isSogoSellRatesFromProvider() {
+  return lastSellRatesFromProvider;
 }
 
 export async function fetchSogoSellCatalog(): Promise<GiftCardBrandView[]> {
@@ -246,19 +252,23 @@ export async function fetchSogoSellCatalog(): Promise<GiftCardBrandView[]> {
   }
 
   try {
-    const json = await sogoRequest<{ data: SogoCatalogBrand[] }>(
-      "/gift-cards/sell/catalog",
-    );
+    const json = await sogoRequest<{
+      data?: SogoCatalogBrand[];
+      brands?: SogoCatalogBrand[];
+    }>("/gift-cards/sell/catalog");
     const rows = Array.isArray(json?.data)
       ? json.data
-      : Array.isArray((json as { brands?: SogoCatalogBrand[] })?.brands)
-        ? ((json as { brands: SogoCatalogBrand[] }).brands)
-        : [];
+      : Array.isArray(json?.brands)
+        ? json.brands
+        : Array.isArray(json)
+          ? (json as SogoCatalogBrand[])
+          : [];
+    // HTTP 200 means credentials work.
+    giftCardsPartnerLive = true;
     if (!rows.length) {
-      giftCardsPartnerLive = false;
+      console.warn("[sogo-catalog] empty provider catalog — using fallback list");
       return FALLBACK_GIFT_CARD_CATALOG.map(toBrandView);
     }
-    giftCardsPartnerLive = true;
     return rows
       .map((row) => toBrandView(normalizeCatalogBrand(row)))
       .filter((b) => b.active && b.slug);
@@ -294,22 +304,36 @@ export async function fetchSogoSellRates(slug?: string): Promise<SogoRateEntry[]
     });
   };
 
-  if (isSogoDemoMode()) return demoRates();
+  if (isSogoDemoMode()) {
+    lastSellRatesFromProvider = false;
+    return demoRates();
+  }
 
   try {
     const qs = slug ? `?slug=${encodeURIComponent(slug)}` : "";
-    const json = await sogoRequest<{ data: SogoRateEntry[] }>(
-      `/gift-cards/sell/rates${qs}`,
-    );
-    const rows = Array.isArray(json?.data) ? json.data : [];
+    const json = await sogoRequest<{
+      data?: SogoRateEntry[];
+      rates?: SogoRateEntry[];
+    }>(`/gift-cards/sell/rates${qs}`);
+    const rows = Array.isArray(json?.data)
+      ? json.data
+      : Array.isArray(json?.rates)
+        ? json.rates
+        : Array.isArray(json)
+          ? (json as SogoRateEntry[])
+          : [];
+    // Auth succeeded.
+    giftCardsPartnerLive = true;
     if (!rows.length) {
-      giftCardsPartnerLive = false;
+      lastSellRatesFromProvider = false;
+      console.warn("[sogo-rates] empty provider rates", { slug });
       return demoRates();
     }
-    giftCardsPartnerLive = true;
+    lastSellRatesFromProvider = true;
     return rows;
   } catch (error) {
     giftCardsPartnerLive = false;
+    lastSellRatesFromProvider = false;
     console.error("[sogo-rates]", error);
     return demoRates();
   }

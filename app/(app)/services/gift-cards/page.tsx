@@ -339,7 +339,7 @@ function GiftCardsPageContent() {
         if (!catalogRes.ok) throw new Error(catalog.error || "Failed to load");
         if (cancelled) return;
         setSellBrands(catalog.brands ?? []);
-        setSellDemo(Boolean(catalog.demo || ratesJson.demo));
+        setSellDemo(Boolean(catalog.demo));
         setSellUnavailable(
           Boolean(catalog.unavailable || ratesJson.unavailable),
         );
@@ -753,8 +753,8 @@ function GiftCardsPageContent() {
         {mode === "sell" && (sellDemo || sellUnavailable) ? (
           <p className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-100">
             {sellDemo
-              ? "Sell is not live — Sogo credentials are missing or SOGO_DEMO is on."
-              : "Live Sogo rates are down. Selling is paused until rates come back."}
+              ? "Sell is not live — set SOGO_SECRET_KEY (sogo_sk_live_…) and SOGO_DEMO=false on the server."
+              : "Sogo live rates are temporarily unavailable. You can browse, but selling is paused until the partner responds."}
           </p>
         ) : null}
         {mode === "buy" && buyDemo ? (

@@ -6,6 +6,7 @@ import {
   fetchSogoSellRates,
   isSogoDemoMode,
   isSogoGiftCardsPartnerLive,
+  isSogoSellRatesFromProvider,
   quoteGiftCardSell,
   sogoErrorToEnglish,
 } from "@/lib/sogo";
@@ -34,12 +35,15 @@ export async function GET(req: Request) {
     const payoutShare = await getSogoPayoutShare();
 
     const rates = await fetchSogoSellRates(slug);
-    const unavailable = !isSogoDemoMode() && !isSogoGiftCardsPartnerLive();
-    const source = isSogoDemoMode()
+    const demo = isSogoDemoMode();
+    const partnerLive = isSogoGiftCardsPartnerLive();
+    const ratesFromProvider = isSogoSellRatesFromProvider();
+    const unavailable = !demo && (!partnerLive || !ratesFromProvider);
+    const source = demo
       ? "demo"
-      : unavailable
-        ? "fallback"
-        : "provider";
+      : ratesFromProvider
+        ? "provider"
+        : "fallback";
 
     if (slug && amount > 0) {
       try {
@@ -55,18 +59,17 @@ export async function GET(req: Request) {
           rates,
           quote,
           payoutShare,
-          demo: isSogoDemoMode() || Boolean(quote.demo),
+          demo,
           unavailable: unavailable || !quote.live,
           source: quote.live ? "provider" : source,
         });
       } catch (quoteError) {
         console.error("[sogo-rates-quote]", quoteError);
-        // Still return catalog rates so the UI can render; quote may be null.
         return NextResponse.json({
           rates,
           quote: null,
           payoutShare,
-          demo: isSogoDemoMode(),
+          demo,
           unavailable: true,
           source,
           error: sogoErrorToEnglish(
@@ -103,7 +106,7 @@ export async function GET(req: Request) {
       rates,
       simplified,
       payoutShare,
-      demo: isSogoDemoMode(),
+      demo,
       unavailable,
       source,
     });

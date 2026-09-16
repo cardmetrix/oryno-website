@@ -19,6 +19,7 @@ import {
   fetchSogoSellRates,
   isSogoDemoMode,
   isSogoGiftCardsPartnerLive,
+  isSogoSellRatesFromProvider,
   isSogoUnavailableError,
   submitSogoGiftCardSell,
 } from "./client";
@@ -107,7 +108,12 @@ export async function quoteGiftCardSell(input: {
 }) {
   const requireLive = Boolean(input.requireLive);
   const rates = await fetchSogoSellRates(input.slug);
-  const partnerLive = isSogoDemoMode() || isSogoGiftCardsPartnerLive();
+  // Re-read after fetch — successful provider calls mark the partner live.
+  const ratesFromProvider = isSogoSellRatesFromProvider();
+  const partnerLive =
+    !isSogoDemoMode() &&
+    isSogoGiftCardsPartnerLive() &&
+    ratesFromProvider;
 
   if (requireLive && !partnerLive) {
     throw Object.assign(
@@ -174,8 +180,9 @@ export async function quoteGiftCardSell(input: {
     companyCharge: priced.companyCharge,
     currency: "NGN" as const,
     share,
-    demo: isSogoDemoMode() || !partnerLive,
-    live: !isSogoDemoMode() && isSogoGiftCardsPartnerLive(),
+    // demo = credentials/SOGO_DEMO only. Fallback rates while keys exist = unavailable.
+    demo: isSogoDemoMode(),
+    live: partnerLive,
   };
 }
 
