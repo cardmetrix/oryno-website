@@ -129,7 +129,10 @@ export default function AdminRevenuePage() {
       const json = (await res.json()) as RevenueResponse & { error?: string };
       if (!res.ok) throw new Error(json.error || "Failed to load revenue");
       setData(json);
-      setDraft(json.config);
+      setDraft({
+        ...json.config,
+        virtualNumberByService: json.config.virtualNumberByService ?? {},
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load revenue");
     } finally {
@@ -150,21 +153,61 @@ export default function AdminRevenuePage() {
     return map;
   }, [data?.sources]);
 
-  async function saveCharges() {
-    if (!draft) return;
+  async function saveCharges(nextConfig?: CompanyChargesConfig) {
+    const config = nextConfig ?? draft;
+    if (!config) return;
     setSaving(true);
     try {
+      const payload: CompanyChargesConfig = {
+        ...config,
+        virtualNumberByService: config.virtualNumberByService ?? {},
+      };
       const res = await fetch("/api/admin/revenue", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "save_charges", config: draft }),
+        body: JSON.stringify({ action: "save_charges", config: payload }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Save failed");
+      if (json.config) {
+        setDraft(json.config as CompanyChargesConfig);
+      } else {
+        setDraft(payload);
+      }
       toast.success("Company charges and conversion rates saved");
       await load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function persistVnConfig(
+    next: CompanyChargesConfig,
+    successMessage: string,
+  ) {
+    setDraft(next);
+    setSaving(true);
+    try {
+      const payload: CompanyChargesConfig = {
+        ...next,
+        virtualNumberByService: next.virtualNumberByService ?? {},
+      };
+      const res = await fetch("/api/admin/revenue", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "save_charges", config: payload }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Save failed");
+      const saved = (json.config as CompanyChargesConfig | undefined) ?? payload;
+      setDraft(saved);
+      if (data) setData({ ...data, config: saved });
+      toast.success(successMessage);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Save failed");
+      await load();
     } finally {
       setSaving(false);
     }
@@ -231,26 +274,26 @@ export default function AdminRevenuePage() {
     patch: Partial<
       NonNullable<CompanyChargesConfig["virtualNumberByService"]>[string]
     >,
-  ) {
-    if (!draft) return;
+  ): CompanyChargesConfig | null {
+    if (!draft) return null;
     const key = slug.trim().toLowerCase();
-    if (!key) return;
+    if (!key) return null;
     const current = draft.virtualNumberByService?.[key] ?? {
       mode: "percent" as const,
       value: 0,
       enabled: true,
       label: key,
     };
-    setDraft({
+    return {
       ...draft,
       virtualNumberByService: {
         ...(draft.virtualNumberByService ?? {}),
         [key]: { ...current, ...patch },
       },
-    });
+    };
   }
 
-  function addVnService(preferredSlug?: string) {
+  async function addVnService(preferredSlug?: string) {
     if (!draft) return;
     const custom = customServiceSlug
       .trim()
@@ -275,7 +318,7 @@ export default function AdminRevenuePage() {
       return;
     }
     const known = VIRTUAL_NUMBER_SERVICE_OPTIONS.find((c) => c.slug === slug);
-    setDraft({
+    const next: CompanyChargesConfig = {
       ...draft,
       virtualNumberByService: {
         ...(draft.virtualNumberByService ?? {}),
@@ -286,15 +329,15 @@ export default function AdminRevenuePage() {
           label: known?.label || slug,
         },
       },
-    });
+    };
     const nextAvailable = VIRTUAL_NUMBER_SERVICE_OPTIONS.find(
-      (c) => c.slug !== slug && !draft.virtualNumberByService?.[c.slug],
+      (c) => c.slug !== slug && !next.virtualNumberByService?.[c.slug],
     );
     if (nextAvailable) setServiceToAdd(nextAvailable.slug);
     setCustomServiceSlug("");
     setVnValue("10");
     setVnMode("percent");
-    toast.success(`Added ${known?.label || slug}`);
+    await persistVnConfig(next, `Saved ${known?.label || slug}`);
   }
 
   function startEditVn(slug: string) {
@@ -312,7 +355,7 @@ export default function AdminRevenuePage() {
     setEditValue("");
   }
 
-  function saveEditVn() {
+  async function saveEditVn() {
     if (!draft || !editingSlug) return;
     const value = Number(editValue);
     if (!Number.isFinite(value) || value < 0) {
@@ -323,22 +366,25 @@ export default function AdminRevenuePage() {
       toast.error("Percent cannot be over 100");
       return;
     }
-    setVnService(editingSlug, {
+    const next = setVnService(editingSlug, {
       mode: editMode,
       value,
       enabled: editEnabled,
     });
-    toast.success("App revenue updated");
+    if (!next) return;
     cancelEditVn();
+    await persistVnConfig(next, "App revenue updated");
   }
 
-  function removeVnService(slug: string) {
+  async function removeVnService(slug: string) {
     if (!draft) return;
     if (editingSlug === slug) cancelEditVn();
-    const next = { ...(draft.virtualNumberByService ?? {}) };
-    delete next[slug];
-    setDraft({ ...draft, virtualNumberByService: next });
-    toast.success("App removed");
+    const nextMap = { ...(draft.virtualNumberByService ?? {}) };
+    delete nextMap[slug];
+    await persistVnConfig(
+      { ...draft, virtualNumberByService: nextMap },
+      "App removed",
+    );
   }
 
   function setFxCurrency(
@@ -502,8 +548,8 @@ export default function AdminRevenuePage() {
           <AdminCard title="Virtual number revenue" delay={0.06} className="mb-5">
             <p className="mb-4 text-sm text-muted-foreground">
               Choose a social media / app the numbers support, set the revenue
-              (percent or flat ₦), then add it. That charge applies for that app
-              in every country — edit or remove anytime.
+              (percent or flat ₦), then add it. Changes save immediately and
+              apply for that app in every country.
             </p>
 
             {(() => {
@@ -585,10 +631,11 @@ export default function AdminRevenuePage() {
                     </label>
                     <button
                       type="button"
-                      onClick={() => addVnService(selectValue)}
-                      className="h-11 rounded-[12px] bg-primary px-4 text-sm font-semibold text-primary-foreground"
+                      disabled={saving}
+                      onClick={() => void addVnService(selectValue)}
+                      className="h-11 rounded-[12px] bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50"
                     >
-                      Add app
+                      {saving ? "Saving…" : "Add app"}
                     </button>
                   </div>
                 </div>
@@ -673,8 +720,9 @@ export default function AdminRevenuePage() {
                                   <div className="flex flex-wrap gap-2">
                                     <button
                                       type="button"
-                                      onClick={saveEditVn}
-                                      className="h-9 rounded-[10px] bg-primary px-3 text-xs font-semibold text-primary-foreground"
+                                      disabled={saving}
+                                      onClick={() => void saveEditVn()}
+                                      className="h-9 rounded-[10px] bg-primary px-3 text-xs font-semibold text-primary-foreground disabled:opacity-50"
                                     >
                                       Save
                                     </button>
@@ -722,8 +770,9 @@ export default function AdminRevenuePage() {
                                     </button>
                                     <button
                                       type="button"
-                                      onClick={() => removeVnService(slug)}
-                                      className="h-9 rounded-[10px] border border-border px-3 text-xs font-semibold text-destructive"
+                                      disabled={saving}
+                                      onClick={() => void removeVnService(slug)}
+                                      className="h-9 rounded-[10px] border border-border px-3 text-xs font-semibold text-destructive disabled:opacity-50"
                                     >
                                       Remove
                                     </button>

@@ -204,12 +204,17 @@ export async function purchaseFivesimNumber(input: {
       : input.priceUsd;
 
   const serviceKey = `${countrySlug}:${product}`;
-  const { usd, local, quote } = await usdRetailNumberPrice(
+  const { usd, local, quote, companyCharge, markup } = await usdRetailNumberPrice(
     wholesaleUsd,
     input.countryCode,
     serviceKey,
   );
   const chargeAmount = usd;
+  const chargeUsd = roundMoney(
+    companyCharge > 0 && quote.buyRate > 0
+      ? companyCharge / quote.buyRate
+      : 0,
+  );
 
   const offer = await ensureOffer({
     countryCode: (input.iso || input.countryCode || "NG").slice(0, 2).toUpperCase(),
@@ -227,6 +232,8 @@ export async function purchaseFivesimNumber(input: {
     countrySlug,
     wholesaleUsd,
     chargeAmount,
+    chargeUsd,
+    companyCharge,
   });
 
   await assertFivesimReady(Math.max(0.01, wholesaleUsd * 0.5));
@@ -245,6 +252,9 @@ export async function purchaseFivesimNumber(input: {
       priceUsd: chargeAmount,
       priceLocal: local,
       buyRate: quote.buyRate,
+      markup,
+      companyChargeLocal: companyCharge,
+      chargeUsd: Math.max(0, chargeUsd),
     },
   });
 
@@ -297,6 +307,11 @@ export async function purchaseFivesimNumber(input: {
           expiresAt: expiresAt.toISOString(),
           costUsd: wholesaleUsd,
           priceUsd: chargeAmount,
+          priceLocal: local,
+          buyRate: quote.buyRate,
+          markup,
+          companyChargeLocal: companyCharge,
+          chargeUsd: Math.max(0, chargeUsd),
         },
       })
       .where(eq(transactions.id, prepared.transaction.id));
@@ -587,10 +602,15 @@ async function maybeNotifyNumberCode(
       .where(eq(userVirtualNumbers.id, tx.relatedOrderId));
   }
 
-  // Recognize profit only once the SMS is delivered.
+  // Recognize profit only once the SMS is delivered (same ledger split as social).
   try {
     const wholesaleUsd = Number(meta.costUsd) || 0;
     const customerUsd = Number(meta.priceUsd) || Number(tx.amount) || 0;
+    const storedChargeUsd = Number(meta.chargeUsd);
+    const chargeUsd =
+      Number.isFinite(storedChargeUsd) && storedChargeUsd > 0
+        ? roundMoney(storedChargeUsd)
+        : 0;
     if (customerUsd > 0) {
       const { recognizeUsdServiceProfit } = await import(
         "@/lib/company/recognize"
@@ -601,11 +621,15 @@ async function maybeNotifyNumberCode(
         userId: tx.userId,
         customerUsd,
         providerUsd: wholesaleUsd > 0 ? wholesaleUsd : customerUsd,
+        chargeUsd: Math.max(0, chargeUsd),
         description: "Virtual number SMS received",
         metadata: {
           provider: "fivesim",
           activationId,
           service: meta.service,
+          countrySlug: meta.countrySlug,
+          companyChargeLocal: meta.companyChargeLocal,
+          chargeUsd: Math.max(0, chargeUsd),
         },
       });
     }
