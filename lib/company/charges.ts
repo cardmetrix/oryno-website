@@ -77,20 +77,19 @@ export function countrySlugFromServiceKey(serviceKey?: string | null) {
 }
 
 /**
- * Overall virtual-number charge, or a country-specific override when enabled.
+ * Country-specific virtual-number revenue only.
+ * Countries without a configured row get no company charge.
  */
 export function resolveVirtualNumberCharge(
   config: CompanyChargesConfig,
   countrySlug?: string | null,
 ): ServiceCharge {
-  const overall = config.services.virtual_number;
+  const none: ServiceCharge = { mode: "percent", value: 0, enabled: false };
   const key = countrySlug?.trim().toLowerCase();
-  if (!key) return overall;
+  if (!key) return none;
   const country = config.virtualNumberByCountry?.[key];
-  if (!country) return overall;
-  // Enabled country row overrides the overall setting (even when value is 0).
-  if (country.enabled) return country;
-  return overall;
+  if (!country || !country.enabled) return none;
+  return country;
 }
 
 function normalizeFxCurrency(raw: unknown): FxCurrencyOverride {

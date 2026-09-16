@@ -40,7 +40,7 @@ export type CompanyChargesConfig = {
   services: Record<CompanyChargeSource, ServiceCharge>;
   /**
    * Per-destination-country revenue for virtual numbers (5sim country slug).
-   * When a country row is enabled, it overrides `services.virtual_number`.
+   * Only enabled country rows apply a company charge; there is no overall VN fee.
    */
   virtualNumberByCountry: Record<string, VirtualNumberCountryCharge>;
   fx: {
@@ -56,7 +56,7 @@ export const DEFAULT_COMPANY_CHARGES: CompanyChargesConfig = {
     fx_conversion: { mode: "percent", value: 0, enabled: false },
     gift_card_buy: { mode: "flat", value: 0, enabled: true },
     gift_card_sell: { mode: "flat", value: 0, enabled: true },
-    virtual_number: { mode: "percent", value: 0, enabled: true },
+    virtual_number: { mode: "percent", value: 0, enabled: false },
     social: { mode: "flat", value: 0, enabled: true },
     email: { mode: "flat", value: 0, enabled: true },
     withdraw: { mode: "flat", value: 50, enabled: true },

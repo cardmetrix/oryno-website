@@ -105,6 +105,12 @@ export default function AdminRevenuePage() {
     VIRTUAL_NUMBER_COUNTRY_OPTIONS[0]?.slug || "nigeria",
   );
   const [customCountrySlug, setCustomCountrySlug] = useState("");
+  const [vnMode, setVnMode] = useState<"flat" | "percent">("percent");
+  const [vnValue, setVnValue] = useState("10");
+  const [editingSlug, setEditingSlug] = useState<string | null>(null);
+  const [editMode, setEditMode] = useState<"flat" | "percent">("percent");
+  const [editValue, setEditValue] = useState("");
+  const [editEnabled, setEditEnabled] = useState(true);
   const [payoutAmount, setPayoutAmount] = useState("");
   const [payoutCurrency, setPayoutCurrency] = useState("NGN");
   const [payoutLabel, setPayoutLabel] = useState("ORYNO business account");
@@ -242,38 +248,95 @@ export default function AdminRevenuePage() {
     });
   }
 
-  function addVnCountry() {
+  function addVnCountry(preferredSlug?: string) {
     if (!draft) return;
-    const custom = customCountrySlug.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "");
-    const slug = custom || countryToAdd;
-    if (!slug) return;
+    const custom = customCountrySlug
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]/g, "");
+    const slug = custom || preferredSlug || countryToAdd;
+    if (!slug) {
+      toast.error("Select a country");
+      return;
+    }
     if (draft.virtualNumberByCountry?.[slug]) {
-      toast.error("That country is already in the list");
+      toast.error("That country is already added — use Edit instead");
+      return;
+    }
+    const value = Number(vnValue);
+    if (!Number.isFinite(value) || value < 0) {
+      toast.error("Enter a valid revenue amount");
+      return;
+    }
+    if (vnMode === "percent" && value > 100) {
+      toast.error("Percent cannot be over 100");
       return;
     }
     const known = VIRTUAL_NUMBER_COUNTRY_OPTIONS.find((c) => c.slug === slug);
-    const overall = draft.services.virtual_number;
     setDraft({
       ...draft,
       virtualNumberByCountry: {
         ...(draft.virtualNumberByCountry ?? {}),
         [slug]: {
-          mode: overall.mode === "percent" ? "percent" : "percent",
-          value: overall.mode === "percent" ? overall.value : 0,
+          mode: vnMode,
+          value,
           enabled: true,
           label: known?.label || slug,
         },
       },
     });
+    const nextAvailable = VIRTUAL_NUMBER_COUNTRY_OPTIONS.find(
+      (c) => c.slug !== slug && !draft.virtualNumberByCountry?.[c.slug],
+    );
+    if (nextAvailable) setCountryToAdd(nextAvailable.slug);
     setCustomCountrySlug("");
+    setVnValue("10");
+    setVnMode("percent");
     toast.success(`Added ${known?.label || slug}`);
+  }
+
+  function startEditVn(slug: string) {
+    if (!draft) return;
+    const row = draft.virtualNumberByCountry?.[slug];
+    if (!row) return;
+    setEditingSlug(slug);
+    setEditMode(row.mode);
+    setEditValue(String(row.value));
+    setEditEnabled(row.enabled);
+  }
+
+  function cancelEditVn() {
+    setEditingSlug(null);
+    setEditValue("");
+  }
+
+  function saveEditVn() {
+    if (!draft || !editingSlug) return;
+    const value = Number(editValue);
+    if (!Number.isFinite(value) || value < 0) {
+      toast.error("Enter a valid revenue amount");
+      return;
+    }
+    if (editMode === "percent" && value > 100) {
+      toast.error("Percent cannot be over 100");
+      return;
+    }
+    setVnCountry(editingSlug, {
+      mode: editMode,
+      value,
+      enabled: editEnabled,
+    });
+    toast.success("Country revenue updated");
+    cancelEditVn();
   }
 
   function removeVnCountry(slug: string) {
     if (!draft) return;
+    if (editingSlug === slug) cancelEditVn();
     const next = { ...(draft.virtualNumberByCountry ?? {}) };
     delete next[slug];
     setDraft({ ...draft, virtualNumberByCountry: next });
+    toast.success("Country removed");
   }
 
   function setFxCurrency(
@@ -344,43 +407,33 @@ export default function AdminRevenuePage() {
               These amounts are added to the customer total with no “service
               charge” label, except withdrawals, which always show the ₦ fee.
               Flat charges are in Naira and converted for other countries.
-              For virtual numbers you can set an overall percent, then override
-              individual destination countries.
             </p>
             <div className="space-y-3">
-              {data.sources.map((source) => {
-                const charge = draft.services[source.id];
-                const isVirtualNumber = source.id === "virtual_number";
-                const vnCountries = Object.entries(
-                  draft.virtualNumberByCountry ?? {},
-                ).sort(([a], [b]) => a.localeCompare(b));
-                const availableCountries = VIRTUAL_NUMBER_COUNTRY_OPTIONS.filter(
-                  (c) => !draft.virtualNumberByCountry?.[c.slug],
-                );
-
-                return (
-                  <div
-                    key={source.id}
-                    className="rounded-[16px] border border-border px-4 py-3"
-                  >
-                    <div className="grid gap-3 sm:grid-cols-12 sm:items-center">
+              {data.sources
+                .filter((source) => source.id !== "virtual_number")
+                .map((source) => {
+                  const charge = draft.services[source.id];
+                  return (
+                    <div
+                      key={source.id}
+                      className="grid gap-3 rounded-[16px] border border-border px-4 py-3 sm:grid-cols-12 sm:items-center"
+                    >
                       <div className="sm:col-span-4">
                         <p className="text-sm font-semibold text-foreground">
                           {source.label}
-                          {isVirtualNumber ? " · overall" : ""}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {isVirtualNumber
-                            ? "Default for all countries unless a country override is enabled"
-                            : source.silent
-                              ? "Silent — baked into the price the customer sees"
-                              : "Shown on the withdrawal screen"}
+                          {source.silent
+                            ? "Silent — baked into the price the customer sees"
+                            : "Shown on the withdrawal screen"}
                         </p>
                       </div>
                       <label className="sm:col-span-2">
                         <span className="sr-only">Mode</span>
                         <select
-                          value={source.id === "withdraw" ? "flat" : charge.mode}
+                          value={
+                            source.id === "withdraw" ? "flat" : charge.mode
+                          }
                           disabled={source.id === "withdraw"}
                           onChange={(e) =>
                             setService(source.id, {
@@ -439,140 +492,244 @@ export default function AdminRevenuePage() {
                         Enabled
                       </label>
                     </div>
+                  );
+                })}
+            </div>
+          </AdminCard>
 
-                    {isVirtualNumber ? (
-                      <div className="mt-4 space-y-3 border-t border-border pt-4">
-                        <div className="flex flex-wrap items-end justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-semibold text-foreground">
-                              Per-country revenue
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              Enabled country rows override the overall virtual
-                              number charge for that destination.
-                            </p>
-                          </div>
-                          <div className="flex flex-wrap items-end gap-2">
-                            <label className="text-xs">
-                              <span className="mb-1 block text-muted-foreground">
-                                Country
-                              </span>
-                              <select
-                                value={countryToAdd}
-                                onChange={(e) => setCountryToAdd(e.target.value)}
-                                className="h-10 min-w-[160px] rounded-[12px] border border-border bg-background px-3 text-sm"
-                              >
-                                {availableCountries.map((c) => (
-                                  <option key={c.slug} value={c.slug}>
-                                    {c.label}
-                                  </option>
-                                ))}
-                                {availableCountries.length === 0 ? (
-                                  <option value="">All listed</option>
-                                ) : null}
-                              </select>
-                            </label>
-                            <label className="text-xs">
-                              <span className="mb-1 block text-muted-foreground">
-                                Or custom slug
-                              </span>
-                              <input
-                                value={customCountrySlug}
-                                onChange={(e) =>
-                                  setCustomCountrySlug(e.target.value)
-                                }
-                                placeholder="e.g. netherlands"
-                                className="h-10 w-40 rounded-[12px] border border-border bg-background px-3 text-sm"
-                              />
-                            </label>
-                            <button
-                              type="button"
-                              onClick={addVnCountry}
-                              className="h-10 rounded-[12px] bg-primary px-4 text-sm font-semibold text-primary-foreground"
-                            >
-                              Add country
-                            </button>
-                          </div>
-                        </div>
+          <AdminCard title="Virtual number revenue" delay={0.06} className="mb-5">
+            <p className="mb-4 text-sm text-muted-foreground">
+              Choose a destination country, set the revenue (percent or flat ₦),
+              then add it. Only countries you add get a company charge — edit or
+              remove anytime.
+            </p>
 
-                        {vnCountries.length === 0 ? (
-                          <p className="rounded-[12px] bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-                            No country overrides yet — overall percent applies
-                            to every destination.
-                          </p>
-                        ) : (
-                          <div className="space-y-2">
-                            {vnCountries.map(([slug, row]) => (
-                              <div
-                                key={slug}
-                                className="grid gap-2 rounded-[12px] border border-border/80 bg-muted/20 px-3 py-2.5 sm:grid-cols-12 sm:items-center"
-                              >
-                                <div className="sm:col-span-3">
-                                  <p className="text-sm font-semibold text-foreground">
-                                    {row.label || slug}
-                                  </p>
-                                  <p className="font-mono text-[11px] text-muted-foreground">
-                                    {slug}
-                                  </p>
-                                </div>
-                                <label className="sm:col-span-2">
+            {(() => {
+              const availableCountries = VIRTUAL_NUMBER_COUNTRY_OPTIONS.filter(
+                (c) => !draft.virtualNumberByCountry?.[c.slug],
+              );
+              const selectValue = availableCountries.some(
+                (c) => c.slug === countryToAdd,
+              )
+                ? countryToAdd
+                : availableCountries[0]?.slug || "";
+
+              return (
+            <div className="mb-5 rounded-[16px] border border-dashed border-border bg-muted/20 p-4">
+              <p className="mb-3 text-sm font-semibold text-foreground">
+                Add country
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5 lg:items-end">
+                <label className="text-sm lg:col-span-1">
+                  <span className="mb-1 block text-muted-foreground">
+                    Country
+                  </span>
+                  <select
+                    value={selectValue}
+                    onChange={(e) => setCountryToAdd(e.target.value)}
+                    disabled={availableCountries.length === 0}
+                    className="h-11 w-full rounded-[12px] border border-border bg-background px-3 text-sm disabled:opacity-60"
+                  >
+                    {availableCountries.length === 0 ? (
+                      <option value="">All listed added</option>
+                    ) : (
+                      availableCountries.map((c) => (
+                        <option key={c.slug} value={c.slug}>
+                          {c.label}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </label>
+                <label className="text-sm lg:col-span-1">
+                  <span className="mb-1 block text-muted-foreground">
+                    Custom slug (optional)
+                  </span>
+                  <input
+                    value={customCountrySlug}
+                    onChange={(e) => setCustomCountrySlug(e.target.value)}
+                    placeholder="e.g. netherlands"
+                    className="h-11 w-full rounded-[12px] border border-border bg-background px-3 text-sm"
+                  />
+                </label>
+                <label className="text-sm">
+                  <span className="mb-1 block text-muted-foreground">Type</span>
+                  <select
+                    value={vnMode}
+                    onChange={(e) =>
+                      setVnMode(e.target.value as "flat" | "percent")
+                    }
+                    className="h-11 w-full rounded-[12px] border border-border bg-background px-3 text-sm"
+                  >
+                    <option value="percent">Percent %</option>
+                    <option value="flat">Flat ₦</option>
+                  </select>
+                </label>
+                <label className="text-sm">
+                  <span className="mb-1 block text-muted-foreground">
+                    Revenue
+                  </span>
+                  <input
+                    inputMode="decimal"
+                    value={vnValue}
+                    onChange={(e) => setVnValue(e.target.value)}
+                    placeholder={vnMode === "percent" ? "e.g. 15" : "e.g. 50"}
+                    className="h-11 w-full rounded-[12px] border border-border bg-background px-3 text-sm"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => addVnCountry(selectValue)}
+                  className="h-11 rounded-[12px] bg-primary px-4 text-sm font-semibold text-primary-foreground"
+                >
+                  Add country
+                </button>
+              </div>
+            </div>
+              );
+            })()}
+
+            {Object.keys(draft.virtualNumberByCountry ?? {}).length === 0 ? (
+              <p className="rounded-[14px] bg-muted/40 px-4 py-6 text-center text-sm text-muted-foreground">
+                No countries yet. Add one above to start charging revenue on
+                virtual numbers.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[640px] text-left text-sm">
+                  <thead className="text-xs uppercase tracking-wide text-muted-foreground">
+                    <tr>
+                      <th className="pb-2 pr-3 font-medium">Country</th>
+                      <th className="pb-2 pr-3 font-medium">Type</th>
+                      <th className="pb-2 pr-3 font-medium">Revenue</th>
+                      <th className="pb-2 pr-3 font-medium">Status</th>
+                      <th className="pb-2 font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(draft.virtualNumberByCountry ?? {})
+                      .sort(([a], [b]) => a.localeCompare(b))
+                      .map(([slug, row]) => {
+                        const isEditing = editingSlug === slug;
+                        return (
+                          <tr
+                            key={slug}
+                            className="border-t border-border align-middle"
+                          >
+                            <td className="py-3 pr-3">
+                              <p className="font-semibold text-foreground">
+                                {row.label || slug}
+                              </p>
+                              <p className="font-mono text-[11px] text-muted-foreground">
+                                {slug}
+                              </p>
+                            </td>
+                            {isEditing ? (
+                              <>
+                                <td className="py-3 pr-3">
                                   <select
-                                    value={row.mode}
+                                    value={editMode}
                                     onChange={(e) =>
-                                      setVnCountry(slug, {
-                                        mode: e.target.value as
-                                          | "flat"
-                                          | "percent",
-                                      })
+                                      setEditMode(
+                                        e.target.value as "flat" | "percent",
+                                      )
                                     }
-                                    className="h-9 w-full rounded-[10px] border border-border bg-background px-2 text-sm"
+                                    className="h-10 w-full max-w-[120px] rounded-[10px] border border-border bg-background px-2 text-sm"
                                   >
+                                    <option value="percent">Percent %</option>
                                     <option value="flat">Flat ₦</option>
-                                    <option value="percent">Percent</option>
                                   </select>
-                                </label>
-                                <label className="sm:col-span-3">
+                                </td>
+                                <td className="py-3 pr-3">
                                   <input
                                     inputMode="decimal"
-                                    value={String(row.value)}
+                                    value={editValue}
                                     onChange={(e) =>
-                                      setVnCountry(slug, {
-                                        value: Number(e.target.value),
-                                      })
+                                      setEditValue(e.target.value)
                                     }
-                                    className="h-9 w-full rounded-[10px] border border-border bg-background px-2 text-sm"
+                                    className="h-10 w-28 rounded-[10px] border border-border bg-background px-2 text-sm"
                                   />
-                                </label>
-                                <label className="flex items-center gap-2 text-sm sm:col-span-2">
-                                  <input
-                                    type="checkbox"
-                                    checked={row.enabled}
-                                    onChange={(e) =>
-                                      setVnCountry(slug, {
-                                        enabled: e.target.checked,
-                                      })
+                                </td>
+                                <td className="py-3 pr-3">
+                                  <label className="inline-flex items-center gap-2 text-sm">
+                                    <input
+                                      type="checkbox"
+                                      checked={editEnabled}
+                                      onChange={(e) =>
+                                        setEditEnabled(e.target.checked)
+                                      }
+                                      className="h-4 w-4 accent-primary"
+                                    />
+                                    {editEnabled ? "On" : "Off"}
+                                  </label>
+                                </td>
+                                <td className="py-3">
+                                  <div className="flex flex-wrap gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={saveEditVn}
+                                      className="h-9 rounded-[10px] bg-primary px-3 text-xs font-semibold text-primary-foreground"
+                                    >
+                                      Save
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={cancelEditVn}
+                                      className="h-9 rounded-[10px] border border-border px-3 text-xs font-semibold"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                </td>
+                              </>
+                            ) : (
+                              <>
+                                <td className="py-3 pr-3 text-muted-foreground">
+                                  {row.mode === "percent" ? "Percent" : "Flat ₦"}
+                                </td>
+                                <td className="py-3 pr-3 font-semibold tabular-nums">
+                                  {row.mode === "percent"
+                                    ? `${row.value}%`
+                                    : `₦${row.value}`}
+                                </td>
+                                <td className="py-3 pr-3">
+                                  <span
+                                    className={
+                                      row.enabled
+                                        ? "rounded-full bg-[var(--oryno-success)]/15 px-2 py-0.5 text-xs font-semibold text-[var(--oryno-success)]"
+                                        : "rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground"
                                     }
-                                    className="h-4 w-4 accent-primary"
-                                  />
-                                  On
-                                </label>
-                                <button
-                                  type="button"
-                                  onClick={() => removeVnCountry(slug)}
-                                  className="h-9 rounded-[10px] border border-border px-2 text-xs font-semibold text-destructive sm:col-span-2"
-                                >
-                                  Remove
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ) : null}
-                  </div>
-                );
-              })}
-            </div>
+                                  >
+                                    {row.enabled ? "Active" : "Off"}
+                                  </span>
+                                </td>
+                                <td className="py-3">
+                                  <div className="flex flex-wrap gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => startEditVn(slug)}
+                                      className="h-9 rounded-[10px] border border-border px-3 text-xs font-semibold"
+                                    >
+                                      Edit
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => removeVnCountry(slug)}
+                                      className="h-9 rounded-[10px] border border-border px-3 text-xs font-semibold text-destructive"
+                                    >
+                                      Remove
+                                    </button>
+                                  </div>
+                                </td>
+                              </>
+                            )}
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </AdminCard>
 
           <AdminCard title="Conversion rates by country" delay={0.08} className="mb-5">
