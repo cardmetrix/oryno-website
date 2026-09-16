@@ -69,7 +69,6 @@ export default function VirtualNumbersPage() {
   const [services, setServices] = useState<HeroService[]>([]);
   const [service, setService] = useState("whatsapp");
   const [offers, setOffers] = useState<HeroOffer[]>([]);
-  const [liveMode, setLiveMode] = useState(false);
   const [loadingServices, setLoadingServices] = useState(true);
   const [loadingOffers, setLoadingOffers] = useState(false);
 
@@ -136,7 +135,6 @@ export default function VirtualNumbersPage() {
         if (!res.ok) throw new Error(data.error);
         if (cancelled) return;
         setServices(data.services ?? []);
-        setLiveMode(data.demo === false);
         if (data.services?.[0]?.code) setService(data.services[0].code);
       } catch (e) {
         if (!cancelled) {
@@ -169,7 +167,6 @@ export default function VirtualNumbersPage() {
         if (cancelled) return;
         const list: HeroOffer[] = data.offers ?? [];
         setOffers(list);
-        if (typeof data.demo === "boolean") setLiveMode(data.demo === false);
         if (list[0]) setSelected(list[0]);
       } catch (e) {
         if (!cancelled) {
@@ -282,11 +279,7 @@ export default function VirtualNumbersPage() {
     <AppShell hideNav>
       <PageHeader
         title="Virtual Numbers"
-        subtitle={
-          liveMode
-            ? "Live SMS via 5sim · billed in USD"
-            : "SMS verification numbers · billed in USD"
-        }
+        subtitle="Get verification numbers worldwide · billed in USD"
         backHref="/services"
       />
 

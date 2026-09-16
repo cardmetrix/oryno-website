@@ -125,9 +125,9 @@ export const servicesDirectory: ServiceDirectoryItem[] = [
     id: "virtual-numbers",
     href: "/services/virtual-numbers",
     label: "Virtual Numbers",
-    shortDescription: "Buy or rent SMS lines",
+    shortDescription: "Get verification numbers worldwide",
     longDescription:
-      "Get verification numbers worldwide — buy permanently or rent short-term for OTP SMS.",
+      "Get SMS verification numbers worldwide for WhatsApp, Telegram, and more — pay from your ORYNO wallet.",
     category: "Lifestyle",
     tags: ["Buy", "Rent", "SMS"],
     eta: "Ready in minutes",
