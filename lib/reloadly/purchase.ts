@@ -136,17 +136,53 @@ async function refundDebit(input: {
   await refundFailedDebit(input);
 }
 
+/** Reloadly map keys may be "10", "10.0", or "10.00". */
+function lookupSenderUsd(
+  map: Record<string, number> | undefined,
+  unitPrice: number,
+): number | null {
+  if (!map) return null;
+  const direct = map[String(unitPrice)];
+  if (Number.isFinite(direct) && direct > 0) return direct;
+  const rounded = map[unitPrice.toFixed(2)];
+  if (Number.isFinite(rounded) && rounded > 0) return rounded;
+  const match = Object.entries(map).find(
+    ([k, v]) => Math.abs(Number(k) - unitPrice) < 0.001 && Number(v) > 0,
+  );
+  return match ? Number(match[1]) : null;
+}
+
 export async function quoteGiftCardBuy(input: {
   product: BuyProductView;
   unitPrice: number;
   countryCode?: string | null;
 }) {
-  const key = String(input.unitPrice);
-  const mappedUsd = input.product.senderPriceMap[key];
-  const usdFace =
-    Number.isFinite(mappedUsd) && mappedUsd > 0
-      ? mappedUsd
-      : input.unitPrice;
+  const mappedUsd = lookupSenderUsd(
+    input.product.senderPriceMap,
+    input.unitPrice,
+  );
+  // Prefer Reloadly's sender (USD) map. Do not treat recipient face value as USD
+  // when the map is missing — that breaks NGN/GBP/EUR cards.
+  let usdFace: number;
+  if (mappedUsd != null) {
+    usdFace = mappedUsd;
+  } else if (
+    (input.product.recipientCurrency || "").toUpperCase() === "USD"
+  ) {
+    usdFace = input.unitPrice;
+  } else {
+    // Conservative FX estimate for ledger quoting when Reloadly omits the map.
+    const { getUsdMidRate } = await import("@/lib/fx/rates");
+    try {
+      const mid = await getUsdMidRate(
+        input.product.recipientCurrency.toUpperCase(),
+      );
+      usdFace =
+        mid.midRate > 0 ? input.unitPrice / mid.midRate : input.unitPrice;
+    } catch {
+      usdFace = input.unitPrice;
+    }
+  }
 
   // Ledger is always NGN; display converts to the account country.
   const quote = await quoteLocalUsd(nigeriaServiceLedgerCurrency());
@@ -246,11 +282,14 @@ export async function buyGiftCard(input: {
   });
 
   const quantity = Math.max(1, Math.floor(input.quantity || 1));
-  // Fail fast on provider auth/balance before debiting the user wallet.
-  // Estimate USD cost from Reloadly sender map + fee when available.
-  const estimatedUsd =
-    (price.usdFace + (product.senderFee || 0)) * quantity;
-  await assertReloadlyReady(Math.max(0.01, estimatedUsd * 0.5));
+  // Only use mapped sender USD for the preflight balance check.
+  // Falling back to face value wrongly treats NGN/GBP amounts as USD.
+  const mappedSenderUsd = lookupSenderUsd(product.senderPriceMap, input.unitPrice);
+  const minProviderBalance =
+    mappedSenderUsd != null
+      ? Math.max(0.01, mappedSenderUsd * quantity * 0.5)
+      : 0.01;
+  await assertReloadlyReady(minProviderBalance);
 
   const brand = await ensureBrand(product.brandName, product.brandName);
   const customIdentifier = `oryno-${randomUUID()}`;

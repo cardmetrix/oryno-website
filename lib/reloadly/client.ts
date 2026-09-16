@@ -607,7 +607,9 @@ export async function placeReloadlyOrder(input: {
     // Auto-retry as pre-order when the brand is temporarily out of stock.
     if (
       !input.preOrder &&
-      /out of stock|not available|pre-?order|insufficient stock/i.test(message)
+      /out of stock|insufficient stock|pre-?order required|supports pre-?order/i.test(
+        message,
+      )
     ) {
       console.warn(LOG_PREFIX, "retrying order as preOrder", {
         productId: input.productId,

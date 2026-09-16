@@ -73,7 +73,13 @@ export function reloadlyErrorToEnglish(message: string, code?: string) {
 export function reloadlyBuyHttpStatus(message: string) {
   const m = (message || "").toLowerCase();
   if (m.includes("unauthorized")) return 401;
-  if (m.includes("insufficient")) return 422;
-  if (m.includes("out of stock") || m.includes("unavailable")) return 503;
+  if (
+    m.includes("insufficient") ||
+    m.includes("out of stock") ||
+    m.includes("temporarily unavailable") ||
+    m.includes("try again later")
+  ) {
+    return 422;
+  }
   return 400;
 }
