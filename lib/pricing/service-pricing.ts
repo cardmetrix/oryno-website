@@ -4,8 +4,8 @@ import { platformSettings, servicePriceOverrides } from "@/lib/db/schema";
 import { roundMoney } from "@/lib/fx/rates";
 import {
   applySilentCharge,
-  countrySlugFromServiceKey,
   getCompanyCharges,
+  productSlugFromServiceKey,
   resolveVirtualNumberCharge,
   type CompanyChargeSource,
 } from "@/lib/company/charges";
@@ -267,7 +267,7 @@ export async function createUsdPricer(
     if (chargeKey === "virtual_number") {
       charge = resolveVirtualNumberCharge(
         charges,
-        countrySlugFromServiceKey(serviceKey),
+        productSlugFromServiceKey(serviceKey),
       );
     }
     if (!charge) {

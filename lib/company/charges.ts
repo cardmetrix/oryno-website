@@ -8,18 +8,19 @@ import {
   type CompanyChargesConfig,
   type FxCurrencyOverride,
   type ServiceCharge,
-  type VirtualNumberCountryCharge,
+  type VirtualNumberServiceCharge,
 } from "@/lib/company/charge-types";
 
 export {
   COMPANY_CHARGE_SOURCES,
   DEFAULT_COMPANY_CHARGES,
-  VIRTUAL_NUMBER_COUNTRY_OPTIONS,
+  VIRTUAL_NUMBER_SERVICE_OPTIONS,
   type CompanyChargeSource,
   type ChargeMode,
   type CompanyChargesConfig,
   type FxCurrencyOverride,
   type ServiceCharge,
+  type VirtualNumberServiceCharge,
   type VirtualNumberCountryCharge,
 } from "@/lib/company/charge-types";
 
@@ -49,10 +50,10 @@ function normalizeCharge(
   };
 }
 
-function normalizeVirtualNumberCountry(
+function normalizeVirtualNumberService(
   raw: unknown,
   fallbackLabel?: string,
-): VirtualNumberCountryCharge {
+): VirtualNumberServiceCharge {
   const base = normalizeCharge(raw, {
     mode: "percent",
     value: 0,
@@ -60,7 +61,7 @@ function normalizeVirtualNumberCountry(
   });
   const input =
     raw && typeof raw === "object"
-      ? (raw as Partial<VirtualNumberCountryCharge>)
+      ? (raw as Partial<VirtualNumberServiceCharge>)
       : {};
   const label =
     typeof input.label === "string" && input.label.trim()
@@ -69,27 +70,33 @@ function normalizeVirtualNumberCountry(
   return label ? { ...base, label } : base;
 }
 
-/** Extract 5sim country slug from a pricing service key (`nigeria:whatsapp`). */
-export function countrySlugFromServiceKey(serviceKey?: string | null) {
+/** Extract 5sim product slug from a pricing service key (`nigeria:whatsapp`). */
+export function productSlugFromServiceKey(serviceKey?: string | null) {
   if (!serviceKey) return null;
-  const slug = serviceKey.split(":")[0]?.trim().toLowerCase();
-  return slug || null;
+  const parts = serviceKey.split(":");
+  const product = (parts[1] ?? parts[0])?.trim().toLowerCase();
+  return product || null;
+}
+
+/** @deprecated Use productSlugFromServiceKey */
+export function countrySlugFromServiceKey(serviceKey?: string | null) {
+  return productSlugFromServiceKey(serviceKey);
 }
 
 /**
- * Country-specific virtual-number revenue only.
- * Countries without a configured row get no company charge.
+ * Social/app-specific virtual-number revenue (applies for all countries).
+ * Products without a configured row get no company charge.
  */
 export function resolveVirtualNumberCharge(
   config: CompanyChargesConfig,
-  countrySlug?: string | null,
+  productSlug?: string | null,
 ): ServiceCharge {
   const none: ServiceCharge = { mode: "percent", value: 0, enabled: false };
-  const key = countrySlug?.trim().toLowerCase();
+  const key = productSlug?.trim().toLowerCase();
   if (!key) return none;
-  const country = config.virtualNumberByCountry?.[key];
-  if (!country || !country.enabled) return none;
-  return country;
+  const row = config.virtualNumberByService?.[key];
+  if (!row || !row.enabled) return none;
+  return row;
 }
 
 function normalizeFxCurrency(raw: unknown): FxCurrencyOverride {
@@ -119,7 +126,9 @@ function normalizeFxCurrency(raw: unknown): FxCurrencyOverride {
 export function normalizeCompanyCharges(raw: unknown): CompanyChargesConfig {
   const base = structuredClone(DEFAULT_COMPANY_CHARGES);
   if (!raw || typeof raw !== "object") return base;
-  const input = raw as Partial<CompanyChargesConfig>;
+  const input = raw as Partial<CompanyChargesConfig> & {
+    virtualNumberByCountry?: Record<string, VirtualNumberServiceCharge>;
+  };
 
   const withdrawFeeNgn = clampNumber(
     input.withdrawFeeNgn,
@@ -138,25 +147,25 @@ export function normalizeCompanyCharges(raw: unknown): CompanyChargesConfig {
     enabled: services.withdraw.enabled,
   };
 
-  const virtualNumberByCountry: Record<string, VirtualNumberCountryCharge> = {
-    ...base.virtualNumberByCountry,
+  const virtualNumberByService: Record<string, VirtualNumberServiceCharge> = {
+    ...base.virtualNumberByService,
   };
-  const incomingCountries = (
-    input as Partial<CompanyChargesConfig>
-  ).virtualNumberByCountry;
-  if (incomingCountries && typeof incomingCountries === "object") {
-    for (const [slugRaw, value] of Object.entries(incomingCountries)) {
+  const incomingServices =
+    input.virtualNumberByService &&
+    typeof input.virtualNumberByService === "object"
+      ? input.virtualNumberByService
+      : null;
+  if (incomingServices) {
+    for (const [slugRaw, value] of Object.entries(incomingServices)) {
       const slug = slugRaw.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "");
       if (!slug) continue;
       if (value == null) {
-        delete virtualNumberByCountry[slug];
+        delete virtualNumberByService[slug];
         continue;
       }
-      virtualNumberByCountry[slug] = normalizeVirtualNumberCountry(
+      virtualNumberByService[slug] = normalizeVirtualNumberService(
         value,
-        typeof (value as VirtualNumberCountryCharge).label === "string"
-          ? (value as VirtualNumberCountryCharge).label
-          : slug,
+        typeof value.label === "string" ? value.label : slug,
       );
     }
   }
@@ -176,7 +185,7 @@ export function normalizeCompanyCharges(raw: unknown): CompanyChargesConfig {
   return {
     withdrawFeeNgn,
     services,
-    virtualNumberByCountry,
+    virtualNumberByService,
     fx: {
       defaultSpreadPercent: clampNumber(
         input.fx?.defaultSpreadPercent,

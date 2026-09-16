@@ -20,10 +20,13 @@ export type ServiceCharge = {
   enabled: boolean;
 };
 
-/** Optional display label for a virtual-number country charge row. */
-export type VirtualNumberCountryCharge = ServiceCharge & {
+/** Optional display label for a virtual-number social/service charge row. */
+export type VirtualNumberServiceCharge = ServiceCharge & {
   label?: string;
 };
+
+/** @deprecated Use VirtualNumberServiceCharge */
+export type VirtualNumberCountryCharge = VirtualNumberServiceCharge;
 
 export type FxCurrencyOverride = {
   /** Local units the customer pays per $1 (buy USD). */
@@ -39,10 +42,10 @@ export type CompanyChargesConfig = {
   withdrawFeeNgn: number;
   services: Record<CompanyChargeSource, ServiceCharge>;
   /**
-   * Per-destination-country revenue for virtual numbers (5sim country slug).
-   * Only enabled country rows apply a company charge; there is no overall VN fee.
+   * Per-social / product revenue for virtual numbers (5sim product slug).
+   * Applies for that app across all countries when the row is enabled.
    */
-  virtualNumberByCountry: Record<string, VirtualNumberCountryCharge>;
+  virtualNumberByService: Record<string, VirtualNumberServiceCharge>;
   fx: {
     /** Default ±% on mid-market when a currency has no buy/sell override. */
     defaultSpreadPercent: number;
@@ -62,7 +65,7 @@ export const DEFAULT_COMPANY_CHARGES: CompanyChargesConfig = {
     withdraw: { mode: "flat", value: 50, enabled: true },
     betting: { mode: "percent", value: 1, enabled: true },
   },
-  virtualNumberByCountry: {},
+  virtualNumberByService: {},
   fx: {
     defaultSpreadPercent: 1,
     currencies: {
@@ -74,42 +77,23 @@ export const DEFAULT_COMPANY_CHARGES: CompanyChargesConfig = {
   },
 };
 
-/** Common 5sim country slugs for admin country-revenue pickers. */
-export const VIRTUAL_NUMBER_COUNTRY_OPTIONS: Array<{
+/** Social / apps that virtual numbers support (5sim product slugs). */
+export const VIRTUAL_NUMBER_SERVICE_OPTIONS: Array<{
   slug: string;
   label: string;
 }> = [
-  { slug: "nigeria", label: "Nigeria" },
-  { slug: "ghana", label: "Ghana" },
-  { slug: "kenya", label: "Kenya" },
-  { slug: "southafrica", label: "South Africa" },
-  { slug: "england", label: "United Kingdom" },
-  { slug: "usa", label: "USA" },
-  { slug: "canada", label: "Canada" },
-  { slug: "india", label: "India" },
-  { slug: "indonesia", label: "Indonesia" },
-  { slug: "philippines", label: "Philippines" },
-  { slug: "brazil", label: "Brazil" },
-  { slug: "germany", label: "Germany" },
-  { slug: "france", label: "France" },
-  { slug: "spain", label: "Spain" },
-  { slug: "italy", label: "Italy" },
-  { slug: "netherlands", label: "Netherlands" },
-  { slug: "poland", label: "Poland" },
-  { slug: "ukraine", label: "Ukraine" },
-  { slug: "russia", label: "Russia" },
-  { slug: "turkey", label: "Turkey" },
-  { slug: "egypt", label: "Egypt" },
-  { slug: "morocco", label: "Morocco" },
-  { slug: "china", label: "China" },
-  { slug: "hongkong", label: "Hong Kong" },
-  { slug: "australia", label: "Australia" },
-  { slug: "mexico", label: "Mexico" },
-  { slug: "argentina", label: "Argentina" },
-  { slug: "colombia", label: "Colombia" },
-  { slug: "vietnam", label: "Vietnam" },
-  { slug: "thailand", label: "Thailand" },
-  { slug: "malaysia", label: "Malaysia" },
-  { slug: "pakistan", label: "Pakistan" },
-  { slug: "bangladesh", label: "Bangladesh" },
+  { slug: "whatsapp", label: "WhatsApp" },
+  { slug: "telegram", label: "Telegram" },
+  { slug: "google", label: "Google / Gmail" },
+  { slug: "instagram", label: "Instagram" },
+  { slug: "facebook", label: "Facebook" },
+  { slug: "tiktok", label: "TikTok" },
+  { slug: "twitter", label: "Twitter / X" },
+  { slug: "discord", label: "Discord" },
+  { slug: "tinder", label: "Tinder" },
+  { slug: "microsoft", label: "Microsoft" },
+  { slug: "amazon", label: "Amazon" },
+  { slug: "openai", label: "OpenAI / ChatGPT" },
+  { slug: "viber", label: "Viber" },
+  { slug: "other", label: "Any other" },
 ];

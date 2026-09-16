@@ -12,7 +12,7 @@ import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AdminTable } from "@/components/admin/admin-table";
 import { StatCard } from "@/components/admin/stat-card";
 import type { CompanyChargesConfig } from "@/lib/company/charge-types";
-import { VIRTUAL_NUMBER_COUNTRY_OPTIONS } from "@/lib/company/charge-types";
+import { VIRTUAL_NUMBER_SERVICE_OPTIONS } from "@/lib/company/charge-types";
 
 type SourceRow = {
   id: keyof CompanyChargesConfig["services"];
@@ -101,10 +101,10 @@ export default function AdminRevenuePage() {
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState<CompanyChargesConfig | null>(null);
   const [saving, setSaving] = useState(false);
-  const [countryToAdd, setCountryToAdd] = useState(
-    VIRTUAL_NUMBER_COUNTRY_OPTIONS[0]?.slug || "nigeria",
+  const [serviceToAdd, setServiceToAdd] = useState(
+    VIRTUAL_NUMBER_SERVICE_OPTIONS[0]?.slug || "whatsapp",
   );
-  const [customCountrySlug, setCustomCountrySlug] = useState("");
+  const [customServiceSlug, setCustomServiceSlug] = useState("");
   const [vnMode, setVnMode] = useState<"flat" | "percent">("percent");
   const [vnValue, setVnValue] = useState("10");
   const [editingSlug, setEditingSlug] = useState<string | null>(null);
@@ -222,18 +222,20 @@ export default function AdminRevenuePage() {
         id === "withdraw" && patch.value != null
           ? Number(patch.value)
           : draft.withdrawFeeNgn,
-      virtualNumberByCountry: draft.virtualNumberByCountry ?? {},
+      virtualNumberByService: draft.virtualNumberByService ?? {},
     });
   }
 
-  function setVnCountry(
+  function setVnService(
     slug: string,
-    patch: Partial<NonNullable<CompanyChargesConfig["virtualNumberByCountry"]>[string]>,
+    patch: Partial<
+      NonNullable<CompanyChargesConfig["virtualNumberByService"]>[string]
+    >,
   ) {
     if (!draft) return;
     const key = slug.trim().toLowerCase();
     if (!key) return;
-    const current = draft.virtualNumberByCountry?.[key] ?? {
+    const current = draft.virtualNumberByService?.[key] ?? {
       mode: "percent" as const,
       value: 0,
       enabled: true,
@@ -241,26 +243,26 @@ export default function AdminRevenuePage() {
     };
     setDraft({
       ...draft,
-      virtualNumberByCountry: {
-        ...(draft.virtualNumberByCountry ?? {}),
+      virtualNumberByService: {
+        ...(draft.virtualNumberByService ?? {}),
         [key]: { ...current, ...patch },
       },
     });
   }
 
-  function addVnCountry(preferredSlug?: string) {
+  function addVnService(preferredSlug?: string) {
     if (!draft) return;
-    const custom = customCountrySlug
+    const custom = customServiceSlug
       .trim()
       .toLowerCase()
       .replace(/[^a-z0-9_-]/g, "");
-    const slug = custom || preferredSlug || countryToAdd;
+    const slug = custom || preferredSlug || serviceToAdd;
     if (!slug) {
-      toast.error("Select a country");
+      toast.error("Select a social media / app");
       return;
     }
-    if (draft.virtualNumberByCountry?.[slug]) {
-      toast.error("That country is already added — use Edit instead");
+    if (draft.virtualNumberByService?.[slug]) {
+      toast.error("That app is already added — use Edit instead");
       return;
     }
     const value = Number(vnValue);
@@ -272,11 +274,11 @@ export default function AdminRevenuePage() {
       toast.error("Percent cannot be over 100");
       return;
     }
-    const known = VIRTUAL_NUMBER_COUNTRY_OPTIONS.find((c) => c.slug === slug);
+    const known = VIRTUAL_NUMBER_SERVICE_OPTIONS.find((c) => c.slug === slug);
     setDraft({
       ...draft,
-      virtualNumberByCountry: {
-        ...(draft.virtualNumberByCountry ?? {}),
+      virtualNumberByService: {
+        ...(draft.virtualNumberByService ?? {}),
         [slug]: {
           mode: vnMode,
           value,
@@ -285,11 +287,11 @@ export default function AdminRevenuePage() {
         },
       },
     });
-    const nextAvailable = VIRTUAL_NUMBER_COUNTRY_OPTIONS.find(
-      (c) => c.slug !== slug && !draft.virtualNumberByCountry?.[c.slug],
+    const nextAvailable = VIRTUAL_NUMBER_SERVICE_OPTIONS.find(
+      (c) => c.slug !== slug && !draft.virtualNumberByService?.[c.slug],
     );
-    if (nextAvailable) setCountryToAdd(nextAvailable.slug);
-    setCustomCountrySlug("");
+    if (nextAvailable) setServiceToAdd(nextAvailable.slug);
+    setCustomServiceSlug("");
     setVnValue("10");
     setVnMode("percent");
     toast.success(`Added ${known?.label || slug}`);
@@ -297,7 +299,7 @@ export default function AdminRevenuePage() {
 
   function startEditVn(slug: string) {
     if (!draft) return;
-    const row = draft.virtualNumberByCountry?.[slug];
+    const row = draft.virtualNumberByService?.[slug];
     if (!row) return;
     setEditingSlug(slug);
     setEditMode(row.mode);
@@ -321,22 +323,22 @@ export default function AdminRevenuePage() {
       toast.error("Percent cannot be over 100");
       return;
     }
-    setVnCountry(editingSlug, {
+    setVnService(editingSlug, {
       mode: editMode,
       value,
       enabled: editEnabled,
     });
-    toast.success("Country revenue updated");
+    toast.success("App revenue updated");
     cancelEditVn();
   }
 
-  function removeVnCountry(slug: string) {
+  function removeVnService(slug: string) {
     if (!draft) return;
     if (editingSlug === slug) cancelEditVn();
-    const next = { ...(draft.virtualNumberByCountry ?? {}) };
+    const next = { ...(draft.virtualNumberByService ?? {}) };
     delete next[slug];
-    setDraft({ ...draft, virtualNumberByCountry: next });
-    toast.success("Country removed");
+    setDraft({ ...draft, virtualNumberByService: next });
+    toast.success("App removed");
   }
 
   function setFxCurrency(
@@ -468,8 +470,8 @@ export default function AdminRevenuePage() {
                                     value,
                                   },
                                 },
-                                virtualNumberByCountry:
-                                  draft.virtualNumberByCountry ?? {},
+                                virtualNumberByService:
+                                  draft.virtualNumberByService ?? {},
                               });
                               return;
                             }
@@ -499,107 +501,111 @@ export default function AdminRevenuePage() {
 
           <AdminCard title="Virtual number revenue" delay={0.06} className="mb-5">
             <p className="mb-4 text-sm text-muted-foreground">
-              Choose a destination country, set the revenue (percent or flat ₦),
-              then add it. Only countries you add get a company charge — edit or
-              remove anytime.
+              Choose a social media / app the numbers support, set the revenue
+              (percent or flat ₦), then add it. That charge applies for that app
+              in every country — edit or remove anytime.
             </p>
 
             {(() => {
-              const availableCountries = VIRTUAL_NUMBER_COUNTRY_OPTIONS.filter(
-                (c) => !draft.virtualNumberByCountry?.[c.slug],
+              const availableServices = VIRTUAL_NUMBER_SERVICE_OPTIONS.filter(
+                (c) => !draft.virtualNumberByService?.[c.slug],
               );
-              const selectValue = availableCountries.some(
-                (c) => c.slug === countryToAdd,
+              const selectValue = availableServices.some(
+                (c) => c.slug === serviceToAdd,
               )
-                ? countryToAdd
-                : availableCountries[0]?.slug || "";
+                ? serviceToAdd
+                : availableServices[0]?.slug || "";
 
               return (
-            <div className="mb-5 rounded-[16px] border border-dashed border-border bg-muted/20 p-4">
-              <p className="mb-3 text-sm font-semibold text-foreground">
-                Add country
-              </p>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5 lg:items-end">
-                <label className="text-sm lg:col-span-1">
-                  <span className="mb-1 block text-muted-foreground">
-                    Country
-                  </span>
-                  <select
-                    value={selectValue}
-                    onChange={(e) => setCountryToAdd(e.target.value)}
-                    disabled={availableCountries.length === 0}
-                    className="h-11 w-full rounded-[12px] border border-border bg-background px-3 text-sm disabled:opacity-60"
-                  >
-                    {availableCountries.length === 0 ? (
-                      <option value="">All listed added</option>
-                    ) : (
-                      availableCountries.map((c) => (
-                        <option key={c.slug} value={c.slug}>
-                          {c.label}
-                        </option>
-                      ))
-                    )}
-                  </select>
-                </label>
-                <label className="text-sm lg:col-span-1">
-                  <span className="mb-1 block text-muted-foreground">
-                    Custom slug (optional)
-                  </span>
-                  <input
-                    value={customCountrySlug}
-                    onChange={(e) => setCustomCountrySlug(e.target.value)}
-                    placeholder="e.g. netherlands"
-                    className="h-11 w-full rounded-[12px] border border-border bg-background px-3 text-sm"
-                  />
-                </label>
-                <label className="text-sm">
-                  <span className="mb-1 block text-muted-foreground">Type</span>
-                  <select
-                    value={vnMode}
-                    onChange={(e) =>
-                      setVnMode(e.target.value as "flat" | "percent")
-                    }
-                    className="h-11 w-full rounded-[12px] border border-border bg-background px-3 text-sm"
-                  >
-                    <option value="percent">Percent %</option>
-                    <option value="flat">Flat ₦</option>
-                  </select>
-                </label>
-                <label className="text-sm">
-                  <span className="mb-1 block text-muted-foreground">
-                    Revenue
-                  </span>
-                  <input
-                    inputMode="decimal"
-                    value={vnValue}
-                    onChange={(e) => setVnValue(e.target.value)}
-                    placeholder={vnMode === "percent" ? "e.g. 15" : "e.g. 50"}
-                    className="h-11 w-full rounded-[12px] border border-border bg-background px-3 text-sm"
-                  />
-                </label>
-                <button
-                  type="button"
-                  onClick={() => addVnCountry(selectValue)}
-                  className="h-11 rounded-[12px] bg-primary px-4 text-sm font-semibold text-primary-foreground"
-                >
-                  Add country
-                </button>
-              </div>
-            </div>
+                <div className="mb-5 rounded-[16px] border border-dashed border-border bg-muted/20 p-4">
+                  <p className="mb-3 text-sm font-semibold text-foreground">
+                    Add social media
+                  </p>
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5 lg:items-end">
+                    <label className="text-sm lg:col-span-1">
+                      <span className="mb-1 block text-muted-foreground">
+                        Social media / app
+                      </span>
+                      <select
+                        value={selectValue}
+                        onChange={(e) => setServiceToAdd(e.target.value)}
+                        disabled={availableServices.length === 0}
+                        className="h-11 w-full rounded-[12px] border border-border bg-background px-3 text-sm disabled:opacity-60"
+                      >
+                        {availableServices.length === 0 ? (
+                          <option value="">All listed added</option>
+                        ) : (
+                          availableServices.map((c) => (
+                            <option key={c.slug} value={c.slug}>
+                              {c.label}
+                            </option>
+                          ))
+                        )}
+                      </select>
+                    </label>
+                    <label className="text-sm lg:col-span-1">
+                      <span className="mb-1 block text-muted-foreground">
+                        Custom slug (optional)
+                      </span>
+                      <input
+                        value={customServiceSlug}
+                        onChange={(e) => setCustomServiceSlug(e.target.value)}
+                        placeholder="e.g. signal"
+                        className="h-11 w-full rounded-[12px] border border-border bg-background px-3 text-sm"
+                      />
+                    </label>
+                    <label className="text-sm">
+                      <span className="mb-1 block text-muted-foreground">
+                        Type
+                      </span>
+                      <select
+                        value={vnMode}
+                        onChange={(e) =>
+                          setVnMode(e.target.value as "flat" | "percent")
+                        }
+                        className="h-11 w-full rounded-[12px] border border-border bg-background px-3 text-sm"
+                      >
+                        <option value="percent">Percent %</option>
+                        <option value="flat">Flat ₦</option>
+                      </select>
+                    </label>
+                    <label className="text-sm">
+                      <span className="mb-1 block text-muted-foreground">
+                        Revenue
+                      </span>
+                      <input
+                        inputMode="decimal"
+                        value={vnValue}
+                        onChange={(e) => setVnValue(e.target.value)}
+                        placeholder={
+                          vnMode === "percent" ? "e.g. 15" : "e.g. 50"
+                        }
+                        className="h-11 w-full rounded-[12px] border border-border bg-background px-3 text-sm"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => addVnService(selectValue)}
+                      className="h-11 rounded-[12px] bg-primary px-4 text-sm font-semibold text-primary-foreground"
+                    >
+                      Add app
+                    </button>
+                  </div>
+                </div>
               );
             })()}
 
-            {Object.keys(draft.virtualNumberByCountry ?? {}).length === 0 ? (
+            {Object.keys(draft.virtualNumberByService ?? {}).length === 0 ? (
               <p className="rounded-[14px] bg-muted/40 px-4 py-6 text-center text-sm text-muted-foreground">
-                No countries yet. Add one above to start charging revenue on
-                virtual numbers.
+                No apps yet. Add WhatsApp, Telegram, or another supported
+                service above to charge revenue on those numbers.
               </p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[640px] text-left text-sm">
                   <thead className="text-xs uppercase tracking-wide text-muted-foreground">
                     <tr>
-                      <th className="pb-2 pr-3 font-medium">Country</th>
+                      <th className="pb-2 pr-3 font-medium">Social media</th>
                       <th className="pb-2 pr-3 font-medium">Type</th>
                       <th className="pb-2 pr-3 font-medium">Revenue</th>
                       <th className="pb-2 pr-3 font-medium">Status</th>
@@ -607,7 +613,7 @@ export default function AdminRevenuePage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {Object.entries(draft.virtualNumberByCountry ?? {})
+                    {Object.entries(draft.virtualNumberByService ?? {})
                       .sort(([a], [b]) => a.localeCompare(b))
                       .map(([slug, row]) => {
                         const isEditing = editingSlug === slug;
@@ -621,7 +627,7 @@ export default function AdminRevenuePage() {
                                 {row.label || slug}
                               </p>
                               <p className="font-mono text-[11px] text-muted-foreground">
-                                {slug}
+                                {slug} · all countries
                               </p>
                             </td>
                             {isEditing ? (
@@ -685,7 +691,9 @@ export default function AdminRevenuePage() {
                             ) : (
                               <>
                                 <td className="py-3 pr-3 text-muted-foreground">
-                                  {row.mode === "percent" ? "Percent" : "Flat ₦"}
+                                  {row.mode === "percent"
+                                    ? "Percent"
+                                    : "Flat ₦"}
                                 </td>
                                 <td className="py-3 pr-3 font-semibold tabular-nums">
                                   {row.mode === "percent"
@@ -714,7 +722,7 @@ export default function AdminRevenuePage() {
                                     </button>
                                     <button
                                       type="button"
-                                      onClick={() => removeVnCountry(slug)}
+                                      onClick={() => removeVnService(slug)}
                                       className="h-9 rounded-[10px] border border-border px-3 text-xs font-semibold text-destructive"
                                     >
                                       Remove

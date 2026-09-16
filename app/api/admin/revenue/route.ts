@@ -147,8 +147,8 @@ export async function PATCH(req: Request) {
         meta: {
           withdrawFeeNgn: config.withdrawFeeNgn,
           currencies: Object.keys(config.fx.currencies),
-          virtualNumberCountries: Object.keys(
-            config.virtualNumberByCountry || {},
+          virtualNumberServices: Object.keys(
+            config.virtualNumberByService || {},
           ),
         },
       });
