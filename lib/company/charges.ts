@@ -8,16 +8,19 @@ import {
   type CompanyChargesConfig,
   type FxCurrencyOverride,
   type ServiceCharge,
+  type VirtualNumberCountryCharge,
 } from "@/lib/company/charge-types";
 
 export {
   COMPANY_CHARGE_SOURCES,
   DEFAULT_COMPANY_CHARGES,
+  VIRTUAL_NUMBER_COUNTRY_OPTIONS,
   type CompanyChargeSource,
   type ChargeMode,
   type CompanyChargesConfig,
   type FxCurrencyOverride,
   type ServiceCharge,
+  type VirtualNumberCountryCharge,
 } from "@/lib/company/charge-types";
 
 const SETTINGS_KEY = "company_charges";
@@ -44,6 +47,50 @@ function normalizeCharge(
     value: clampNumber(input.value, fallback.value, 0, max),
     enabled: typeof input.enabled === "boolean" ? input.enabled : fallback.enabled,
   };
+}
+
+function normalizeVirtualNumberCountry(
+  raw: unknown,
+  fallbackLabel?: string,
+): VirtualNumberCountryCharge {
+  const base = normalizeCharge(raw, {
+    mode: "percent",
+    value: 0,
+    enabled: true,
+  });
+  const input =
+    raw && typeof raw === "object"
+      ? (raw as Partial<VirtualNumberCountryCharge>)
+      : {};
+  const label =
+    typeof input.label === "string" && input.label.trim()
+      ? input.label.trim().slice(0, 80)
+      : fallbackLabel;
+  return label ? { ...base, label } : base;
+}
+
+/** Extract 5sim country slug from a pricing service key (`nigeria:whatsapp`). */
+export function countrySlugFromServiceKey(serviceKey?: string | null) {
+  if (!serviceKey) return null;
+  const slug = serviceKey.split(":")[0]?.trim().toLowerCase();
+  return slug || null;
+}
+
+/**
+ * Overall virtual-number charge, or a country-specific override when enabled.
+ */
+export function resolveVirtualNumberCharge(
+  config: CompanyChargesConfig,
+  countrySlug?: string | null,
+): ServiceCharge {
+  const overall = config.services.virtual_number;
+  const key = countrySlug?.trim().toLowerCase();
+  if (!key) return overall;
+  const country = config.virtualNumberByCountry?.[key];
+  if (!country) return overall;
+  // Enabled country row overrides the overall setting (even when value is 0).
+  if (country.enabled) return country;
+  return overall;
 }
 
 function normalizeFxCurrency(raw: unknown): FxCurrencyOverride {
@@ -92,6 +139,29 @@ export function normalizeCompanyCharges(raw: unknown): CompanyChargesConfig {
     enabled: services.withdraw.enabled,
   };
 
+  const virtualNumberByCountry: Record<string, VirtualNumberCountryCharge> = {
+    ...base.virtualNumberByCountry,
+  };
+  const incomingCountries = (
+    input as Partial<CompanyChargesConfig>
+  ).virtualNumberByCountry;
+  if (incomingCountries && typeof incomingCountries === "object") {
+    for (const [slugRaw, value] of Object.entries(incomingCountries)) {
+      const slug = slugRaw.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "");
+      if (!slug) continue;
+      if (value == null) {
+        delete virtualNumberByCountry[slug];
+        continue;
+      }
+      virtualNumberByCountry[slug] = normalizeVirtualNumberCountry(
+        value,
+        typeof (value as VirtualNumberCountryCharge).label === "string"
+          ? (value as VirtualNumberCountryCharge).label
+          : slug,
+      );
+    }
+  }
+
   const currencies: Record<string, FxCurrencyOverride> = {
     ...base.fx.currencies,
   };
@@ -107,6 +177,7 @@ export function normalizeCompanyCharges(raw: unknown): CompanyChargesConfig {
   return {
     withdrawFeeNgn,
     services,
+    virtualNumberByCountry,
     fx: {
       defaultSpreadPercent: clampNumber(
         input.fx?.defaultSpreadPercent,

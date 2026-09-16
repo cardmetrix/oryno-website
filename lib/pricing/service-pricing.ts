@@ -4,7 +4,9 @@ import { platformSettings, servicePriceOverrides } from "@/lib/db/schema";
 import { roundMoney } from "@/lib/fx/rates";
 import {
   applySilentCharge,
+  countrySlugFromServiceKey,
   getCompanyCharges,
+  resolveVirtualNumberCharge,
   type CompanyChargeSource,
 } from "@/lib/company/charges";
 import {
@@ -251,12 +253,23 @@ export async function createUsdPricer(
   const { quoteLocalUsd } = await import("@/lib/fx/rates");
   const ngnQuote = await quoteLocalUsd("NGN", charges.fx);
   const chargeKey = chargeSourceForProvider(provider, source);
-  const charge =
+  const defaultCharge =
     chargeKey && chargeKey !== "fx_conversion" && chargeKey !== "withdraw"
       ? charges.services[chargeKey]
       : null;
 
-  const bake = (base: number, buyRate: number) => {
+  const bake = (
+    base: number,
+    buyRate: number,
+    serviceKey?: string | null,
+  ) => {
+    let charge = defaultCharge;
+    if (chargeKey === "virtual_number") {
+      charge = resolveVirtualNumberCharge(
+        charges,
+        countrySlugFromServiceKey(serviceKey),
+      );
+    }
     if (!charge) {
       return { total: base, chargeAmount: 0 };
     }
@@ -277,7 +290,7 @@ export async function createUsdPricer(
     const listLocal = roundMoney(input.usd * input.buyRate * markup);
 
     if (!input.serviceKey) {
-      const priced = bake(listLocal, input.buyRate);
+      const priced = bake(listLocal, input.buyRate, null);
       return {
         local: priced.total,
         markup,
@@ -289,7 +302,7 @@ export async function createUsdPricer(
 
     const row = providerMap?.get(input.serviceKey);
     if (!row) {
-      const priced = bake(listLocal, input.buyRate);
+      const priced = bake(listLocal, input.buyRate, input.serviceKey);
       return {
         local: priced.total,
         markup,
@@ -304,7 +317,7 @@ export async function createUsdPricer(
       const local = roundMoney(
         input.usd * input.buyRate * Math.max(1, value),
       );
-      const priced = bake(local, input.buyRate);
+      const priced = bake(local, input.buyRate, input.serviceKey);
       return {
         local: priced.total,
         markup: value,
@@ -315,7 +328,7 @@ export async function createUsdPricer(
     }
 
     const local = applyOverrideMode(listLocal, row.mode, value);
-    const priced = bake(local, input.buyRate);
+    const priced = bake(local, input.buyRate, input.serviceKey);
     return {
       local: priced.total,
       markup,

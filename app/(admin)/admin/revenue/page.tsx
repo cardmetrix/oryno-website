@@ -12,6 +12,7 @@ import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AdminTable } from "@/components/admin/admin-table";
 import { StatCard } from "@/components/admin/stat-card";
 import type { CompanyChargesConfig } from "@/lib/company/charge-types";
+import { VIRTUAL_NUMBER_COUNTRY_OPTIONS } from "@/lib/company/charge-types";
 
 type SourceRow = {
   id: keyof CompanyChargesConfig["services"];
@@ -98,8 +99,12 @@ export default function AdminRevenuePage() {
   const [data, setData] = useState<RevenueResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
   const [draft, setDraft] = useState<CompanyChargesConfig | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [countryToAdd, setCountryToAdd] = useState(
+    VIRTUAL_NUMBER_COUNTRY_OPTIONS[0]?.slug || "nigeria",
+  );
+  const [customCountrySlug, setCustomCountrySlug] = useState("");
   const [payoutAmount, setPayoutAmount] = useState("");
   const [payoutCurrency, setPayoutCurrency] = useState("NGN");
   const [payoutLabel, setPayoutLabel] = useState("ORYNO business account");
@@ -211,7 +216,64 @@ export default function AdminRevenuePage() {
         id === "withdraw" && patch.value != null
           ? Number(patch.value)
           : draft.withdrawFeeNgn,
+      virtualNumberByCountry: draft.virtualNumberByCountry ?? {},
     });
+  }
+
+  function setVnCountry(
+    slug: string,
+    patch: Partial<NonNullable<CompanyChargesConfig["virtualNumberByCountry"]>[string]>,
+  ) {
+    if (!draft) return;
+    const key = slug.trim().toLowerCase();
+    if (!key) return;
+    const current = draft.virtualNumberByCountry?.[key] ?? {
+      mode: "percent" as const,
+      value: 0,
+      enabled: true,
+      label: key,
+    };
+    setDraft({
+      ...draft,
+      virtualNumberByCountry: {
+        ...(draft.virtualNumberByCountry ?? {}),
+        [key]: { ...current, ...patch },
+      },
+    });
+  }
+
+  function addVnCountry() {
+    if (!draft) return;
+    const custom = customCountrySlug.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "");
+    const slug = custom || countryToAdd;
+    if (!slug) return;
+    if (draft.virtualNumberByCountry?.[slug]) {
+      toast.error("That country is already in the list");
+      return;
+    }
+    const known = VIRTUAL_NUMBER_COUNTRY_OPTIONS.find((c) => c.slug === slug);
+    const overall = draft.services.virtual_number;
+    setDraft({
+      ...draft,
+      virtualNumberByCountry: {
+        ...(draft.virtualNumberByCountry ?? {}),
+        [slug]: {
+          mode: overall.mode === "percent" ? "percent" : "percent",
+          value: overall.mode === "percent" ? overall.value : 0,
+          enabled: true,
+          label: known?.label || slug,
+        },
+      },
+    });
+    setCustomCountrySlug("");
+    toast.success(`Added ${known?.label || slug}`);
+  }
+
+  function removeVnCountry(slug: string) {
+    if (!draft) return;
+    const next = { ...(draft.virtualNumberByCountry ?? {}) };
+    delete next[slug];
+    setDraft({ ...draft, virtualNumberByCountry: next });
   }
 
   function setFxCurrency(
@@ -282,82 +344,231 @@ export default function AdminRevenuePage() {
               These amounts are added to the customer total with no “service
               charge” label, except withdrawals, which always show the ₦ fee.
               Flat charges are in Naira and converted for other countries.
+              For virtual numbers you can set an overall percent, then override
+              individual destination countries.
             </p>
             <div className="space-y-3">
               {data.sources.map((source) => {
                 const charge = draft.services[source.id];
+                const isVirtualNumber = source.id === "virtual_number";
+                const vnCountries = Object.entries(
+                  draft.virtualNumberByCountry ?? {},
+                ).sort(([a], [b]) => a.localeCompare(b));
+                const availableCountries = VIRTUAL_NUMBER_COUNTRY_OPTIONS.filter(
+                  (c) => !draft.virtualNumberByCountry?.[c.slug],
+                );
+
                 return (
                   <div
                     key={source.id}
-                    className="grid gap-3 rounded-[16px] border border-border px-4 py-3 sm:grid-cols-12 sm:items-center"
+                    className="rounded-[16px] border border-border px-4 py-3"
                   >
-                    <div className="sm:col-span-4">
-                      <p className="text-sm font-semibold text-foreground">
-                        {source.label}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {source.silent
-                          ? "Silent — baked into the price the customer sees"
-                          : "Shown on the withdrawal screen"}
-                      </p>
-                    </div>
-                    <label className="sm:col-span-2">
-                      <span className="sr-only">Mode</span>
-                      <select
-                        value={source.id === "withdraw" ? "flat" : charge.mode}
-                        disabled={source.id === "withdraw"}
-                        onChange={(e) =>
-                          setService(source.id, {
-                            mode: e.target.value as "flat" | "percent",
-                          })
-                        }
-                        className="h-10 w-full rounded-[12px] border border-border bg-background px-3 text-sm"
-                      >
-                        <option value="flat">Flat ₦</option>
-                        <option value="percent">Percent</option>
-                      </select>
-                    </label>
-                    <label className="sm:col-span-3">
-                      <span className="sr-only">Value</span>
-                      <input
-                        inputMode="decimal"
-                        value={
-                          source.id === "withdraw"
-                            ? String(draft.withdrawFeeNgn)
-                            : String(charge.value)
-                        }
-                        onChange={(e) => {
-                          const value = Number(e.target.value);
-                          if (source.id === "withdraw") {
-                            setDraft({
-                              ...draft,
-                              withdrawFeeNgn: value,
-                              services: {
-                                ...draft.services,
-                                withdraw: {
-                                  ...draft.services.withdraw,
-                                  value,
-                                },
-                              },
-                            });
-                            return;
+                    <div className="grid gap-3 sm:grid-cols-12 sm:items-center">
+                      <div className="sm:col-span-4">
+                        <p className="text-sm font-semibold text-foreground">
+                          {source.label}
+                          {isVirtualNumber ? " · overall" : ""}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {isVirtualNumber
+                            ? "Default for all countries unless a country override is enabled"
+                            : source.silent
+                              ? "Silent — baked into the price the customer sees"
+                              : "Shown on the withdrawal screen"}
+                        </p>
+                      </div>
+                      <label className="sm:col-span-2">
+                        <span className="sr-only">Mode</span>
+                        <select
+                          value={source.id === "withdraw" ? "flat" : charge.mode}
+                          disabled={source.id === "withdraw"}
+                          onChange={(e) =>
+                            setService(source.id, {
+                              mode: e.target.value as "flat" | "percent",
+                            })
                           }
-                          setService(source.id, { value });
-                        }}
-                        className="h-10 w-full rounded-[12px] border border-border bg-background px-3 text-sm"
-                      />
-                    </label>
-                    <label className="flex items-center gap-2 text-sm sm:col-span-3">
-                      <input
-                        type="checkbox"
-                        checked={charge.enabled}
-                        onChange={(e) =>
-                          setService(source.id, { enabled: e.target.checked })
-                        }
-                        className="h-4 w-4 accent-primary"
-                      />
-                      Enabled
-                    </label>
+                          className="h-10 w-full rounded-[12px] border border-border bg-background px-3 text-sm"
+                        >
+                          <option value="flat">Flat ₦</option>
+                          <option value="percent">Percent</option>
+                        </select>
+                      </label>
+                      <label className="sm:col-span-3">
+                        <span className="sr-only">Value</span>
+                        <input
+                          inputMode="decimal"
+                          value={
+                            source.id === "withdraw"
+                              ? String(draft.withdrawFeeNgn)
+                              : String(charge.value)
+                          }
+                          onChange={(e) => {
+                            const value = Number(e.target.value);
+                            if (source.id === "withdraw") {
+                              setDraft({
+                                ...draft,
+                                withdrawFeeNgn: value,
+                                services: {
+                                  ...draft.services,
+                                  withdraw: {
+                                    ...draft.services.withdraw,
+                                    value,
+                                  },
+                                },
+                                virtualNumberByCountry:
+                                  draft.virtualNumberByCountry ?? {},
+                              });
+                              return;
+                            }
+                            setService(source.id, { value });
+                          }}
+                          className="h-10 w-full rounded-[12px] border border-border bg-background px-3 text-sm"
+                        />
+                      </label>
+                      <label className="flex items-center gap-2 text-sm sm:col-span-3">
+                        <input
+                          type="checkbox"
+                          checked={charge.enabled}
+                          onChange={(e) =>
+                            setService(source.id, {
+                              enabled: e.target.checked,
+                            })
+                          }
+                          className="h-4 w-4 accent-primary"
+                        />
+                        Enabled
+                      </label>
+                    </div>
+
+                    {isVirtualNumber ? (
+                      <div className="mt-4 space-y-3 border-t border-border pt-4">
+                        <div className="flex flex-wrap items-end justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-foreground">
+                              Per-country revenue
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Enabled country rows override the overall virtual
+                              number charge for that destination.
+                            </p>
+                          </div>
+                          <div className="flex flex-wrap items-end gap-2">
+                            <label className="text-xs">
+                              <span className="mb-1 block text-muted-foreground">
+                                Country
+                              </span>
+                              <select
+                                value={countryToAdd}
+                                onChange={(e) => setCountryToAdd(e.target.value)}
+                                className="h-10 min-w-[160px] rounded-[12px] border border-border bg-background px-3 text-sm"
+                              >
+                                {availableCountries.map((c) => (
+                                  <option key={c.slug} value={c.slug}>
+                                    {c.label}
+                                  </option>
+                                ))}
+                                {availableCountries.length === 0 ? (
+                                  <option value="">All listed</option>
+                                ) : null}
+                              </select>
+                            </label>
+                            <label className="text-xs">
+                              <span className="mb-1 block text-muted-foreground">
+                                Or custom slug
+                              </span>
+                              <input
+                                value={customCountrySlug}
+                                onChange={(e) =>
+                                  setCustomCountrySlug(e.target.value)
+                                }
+                                placeholder="e.g. netherlands"
+                                className="h-10 w-40 rounded-[12px] border border-border bg-background px-3 text-sm"
+                              />
+                            </label>
+                            <button
+                              type="button"
+                              onClick={addVnCountry}
+                              className="h-10 rounded-[12px] bg-primary px-4 text-sm font-semibold text-primary-foreground"
+                            >
+                              Add country
+                            </button>
+                          </div>
+                        </div>
+
+                        {vnCountries.length === 0 ? (
+                          <p className="rounded-[12px] bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                            No country overrides yet — overall percent applies
+                            to every destination.
+                          </p>
+                        ) : (
+                          <div className="space-y-2">
+                            {vnCountries.map(([slug, row]) => (
+                              <div
+                                key={slug}
+                                className="grid gap-2 rounded-[12px] border border-border/80 bg-muted/20 px-3 py-2.5 sm:grid-cols-12 sm:items-center"
+                              >
+                                <div className="sm:col-span-3">
+                                  <p className="text-sm font-semibold text-foreground">
+                                    {row.label || slug}
+                                  </p>
+                                  <p className="font-mono text-[11px] text-muted-foreground">
+                                    {slug}
+                                  </p>
+                                </div>
+                                <label className="sm:col-span-2">
+                                  <select
+                                    value={row.mode}
+                                    onChange={(e) =>
+                                      setVnCountry(slug, {
+                                        mode: e.target.value as
+                                          | "flat"
+                                          | "percent",
+                                      })
+                                    }
+                                    className="h-9 w-full rounded-[10px] border border-border bg-background px-2 text-sm"
+                                  >
+                                    <option value="flat">Flat ₦</option>
+                                    <option value="percent">Percent</option>
+                                  </select>
+                                </label>
+                                <label className="sm:col-span-3">
+                                  <input
+                                    inputMode="decimal"
+                                    value={String(row.value)}
+                                    onChange={(e) =>
+                                      setVnCountry(slug, {
+                                        value: Number(e.target.value),
+                                      })
+                                    }
+                                    className="h-9 w-full rounded-[10px] border border-border bg-background px-2 text-sm"
+                                  />
+                                </label>
+                                <label className="flex items-center gap-2 text-sm sm:col-span-2">
+                                  <input
+                                    type="checkbox"
+                                    checked={row.enabled}
+                                    onChange={(e) =>
+                                      setVnCountry(slug, {
+                                        enabled: e.target.checked,
+                                      })
+                                    }
+                                    className="h-4 w-4 accent-primary"
+                                  />
+                                  On
+                                </label>
+                                <button
+                                  type="button"
+                                  onClick={() => removeVnCountry(slug)}
+                                  className="h-9 rounded-[10px] border border-border px-2 text-xs font-semibold text-destructive sm:col-span-2"
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ) : null}
                   </div>
                 );
               })}
