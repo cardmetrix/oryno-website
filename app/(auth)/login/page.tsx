@@ -518,7 +518,7 @@ function LoginForm() {
             href={AUTH_LINKS.getStarted}
             className="font-semibold text-black transition-colors hover:text-black"
           >
-            Create Account
+           <span className="text-black"> Create Account</span>
           </Link>
         </p>
       </form>
