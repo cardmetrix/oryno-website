@@ -467,7 +467,7 @@ function LoginForm() {
               name="identifier"
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
-              placeholder="e.g. You@email.com"
+              placeholder="e.g. you@email.com"
               autoComplete="username"
               required
               className={authInputClassName}

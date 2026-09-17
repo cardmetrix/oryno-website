@@ -409,7 +409,7 @@ function RegisterForm() {
               name="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="e.g. john@oryno.com"
+              placeholder="e.g. you@email.com"
               autoComplete="email"
               required
               className={authInputClassName}
