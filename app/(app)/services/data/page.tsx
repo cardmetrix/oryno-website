@@ -2,20 +2,23 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Wallet, Wifi } from "lucide-react";
+import { Wallet } from "lucide-react";
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
 import { ServiceSuccess } from "@/components/app/service-success";
 import { ErrorAlertModal } from "@/components/app/error-alert-modal";
-import {
-  VtpassServicePicker,
-  type VtpassServiceOption,
-} from "@/components/app/vtpass-service-picker";
-import { SelectSheet } from "@/components/app/select-sheet";
+import { TelecomNetworkGrid } from "@/components/app/telecom-network-grid";
+import { PhoneNumberField } from "@/components/app/phone-number-field";
+import { DataPlanGrid } from "@/components/app/data-plan-grid";
+import type { VtpassServiceOption } from "@/components/app/vtpass-service-picker";
 import { useCountry } from "@/components/providers/country-provider";
 import { useWalletBalance } from "@/hooks/use-wallet-balance";
-import { cleanNetworkName, inferDataPlanCategory } from "@/lib/vtpass/catalog";
+import {
+  buildDataPlanFilters,
+  cleanNetworkName,
+  planMatchesFilter,
+} from "@/lib/vtpass/catalog";
 import {
   defaultIntlDataAmount,
   intlDataMinLocal,
@@ -37,8 +40,6 @@ type Variation = {
   fixedPrice: boolean;
 };
 
-const FILTERS = ["All", "Daily", "Weekly", "Monthly"] as const;
-
 export default function DataPage() {
   const {
     country,
@@ -59,7 +60,7 @@ export default function DataPage() {
   const [variations, setVariations] = useState<Variation[]>([]);
   const [loadingPlans, setLoadingPlans] = useState(false);
   const [variationCode, setVariationCode] = useState("");
-  const [filter, setFilter] = useState<(typeof FILTERS)[number]>("All");
+  const [filter, setFilter] = useState("Weekly");
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -71,15 +72,29 @@ export default function DataPage() {
   const selected = variations.find((v) => v.variationCode === variationCode);
   const selectedNetwork = networks.find((n) => n.serviceID === networkId);
 
-  const filtered = useMemo(() => {
-    if (filter === "All") return variations;
-    const target = filter.toLowerCase();
-    return variations.filter(
-      (v) => inferDataPlanCategory(v.name) === target,
-    );
-  }, [variations, filter]);
+  const availableFilters = useMemo(
+    () => buildDataPlanFilters(variations.map((v) => v.name)),
+    [variations],
+  );
 
-  // Keep the selected plan inside the active filter.
+  const activeFilter =
+    filter && availableFilters.includes(filter)
+      ? filter
+      : availableFilters[0] || "Weekly";
+
+  const filtered = useMemo(
+    () =>
+      variations.filter((v) => planMatchesFilter(v.name, activeFilter)),
+    [variations, activeFilter],
+  );
+
+  useEffect(() => {
+    if (!availableFilters.length) return;
+    if (!availableFilters.includes(filter)) {
+      setFilter(availableFilters[0]);
+    }
+  }, [availableFilters, filter]);
+
   useEffect(() => {
     if (!filtered.length) {
       if (variationCode) setVariationCode("");
@@ -271,44 +286,41 @@ export default function DataPage() {
         ? intlDataVariationLabel(countryCode, localAmount)
         : selected!.name;
 
-      const res = await fetch(
-        "/api/vtpass/purchase/data",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(
-            isNigeria
+      const res = await fetch("/api/vtpass/purchase/data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          isNigeria
+            ? {
+                mode: "local",
+                serviceID: networkId,
+                phone,
+                variationCode: selected!.variationCode,
+                variationName: selected!.name,
+                amount: selected!.amount,
+              }
+            : isFlexibleIntl
               ? {
-                  mode: "local",
-                  serviceID: networkId,
+                  mode: "international",
+                  phone,
+                  amount: localAmount,
+                  operatorId: networkId,
+                  countryIso: countryCode,
+                  productTypeId,
+                  flexibleLocalAmount: true,
+                }
+              : {
+                  mode: "international",
                   phone,
                   variationCode: selected!.variationCode,
                   variationName: selected!.name,
                   amount: selected!.amount,
-                }
-              : isFlexibleIntl
-                ? {
-                    mode: "international",
-                    phone,
-                    amount: localAmount,
-                    operatorId: networkId,
-                    countryIso: countryCode,
-                    productTypeId,
-                    flexibleLocalAmount: true,
-                  }
-                : {
-                    mode: "international",
-                    phone,
-                    variationCode: selected!.variationCode,
-                    variationName: selected!.name,
-                    amount: selected!.amount,
-                    operatorId: networkId,
-                    countryIso: countryCode,
-                    productTypeId,
-                  },
-          ),
-        },
-      );
+                  operatorId: networkId,
+                  countryIso: countryCode,
+                  productTypeId,
+                },
+        ),
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Purchase failed");
       setReceipt(data.amountFormatted);
@@ -332,19 +344,7 @@ export default function DataPage() {
 
   return (
     <AppShell hideNav>
-      <PageHeader
-        title="Buy Data"
-        subtitle={
-          countryCode === "ZA"
-            ? "MTN, Vodacom, Cell C & Telkom"
-            : countryCode === "KE"
-              ? "Safaricom, Airtel & Telkom Kenya"
-              : countryCode === "GH"
-                ? "MTN, Telecel & AirtelTigo"
-                : "Daily, weekly & monthly plans"
-        }
-        backHref="/dashboard"
-      />
+      <PageHeader title="Buy Data" backHref="/dashboard" />
 
       <AnimatePresence mode="wait">
         {success ? (
@@ -371,80 +371,42 @@ export default function DataPage() {
           <form
             key="form"
             onSubmit={onSubmit}
-            className="space-y-4 sm:space-y-5"
+            className="space-y-6 pb-8 sm:space-y-7"
           >
-            <MotionSection className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6">
-              <div className="mb-4 flex items-center gap-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-oryno-orange-muted text-primary">
-                  <Wifi className="h-5 w-5" />
-                </span>
-                <div>
-                  <h2 className="text-base font-semibold">Select network</h2>
-                  <p className="text-xs text-muted-foreground">
-                    Networks for {country?.name || "your country"}
-                  </p>
-                </div>
-              </div>
-              <div className="md:hidden">
-                <SelectSheet
-                  label="Network"
-                  title="Select network"
-                  subtitle={`Networks for ${country?.name || "your country"}`}
-                  hint="Tap to choose a network"
-                  value={networkId}
-                  valueLabel={selectedNetwork?.name}
-                  valueImage={selectedNetwork?.image}
-                  onChange={setNetworkId}
-                  loading={loadingNetworks || countryLoading}
-                  emptyText="No networks available"
-                  options={networks.map((n) => ({
-                    id: n.serviceID,
-                    title: n.name,
-                    image: n.image ?? null,
-                    subtitle: "Tap to select",
-                  }))}
-                />
-              </div>
-              <div className="hidden md:block">
-                <VtpassServicePicker
-                  services={networks}
-                  value={networkId}
-                  onChange={setNetworkId}
-                  loading={loadingNetworks || countryLoading}
-                  columns="grid-cols-2 sm:grid-cols-3 lg:grid-cols-4"
-                />
-              </div>
+            <MotionSection className="space-y-3">
+              <h2 className="text-[15px] font-bold text-foreground">
+                Select Network
+              </h2>
+              <TelecomNetworkGrid
+                services={networks}
+                value={networkId}
+                onChange={setNetworkId}
+                loading={loadingNetworks || countryLoading}
+              />
             </MotionSection>
 
-            <MotionSection
-              delay={0.05}
-              className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6"
-            >
-              <label className="mb-2 block text-sm font-medium">
-                Phone number
-              </label>
-              <input
-                type="tel"
+            <MotionSection delay={0.04}>
+              <PhoneNumberField
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={setPhone}
                 placeholder={isNigeria ? "0803 000 0000" : "Recipient number"}
-                className="h-12 w-full rounded-[14px] border border-border bg-background px-4 text-sm outline-none focus:border-primary"
               />
             </MotionSection>
 
             {isFlexibleIntl ? (
-              <MotionSection
-                delay={0.08}
-                className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6"
-              >
-                <label className="mb-2 block text-sm font-medium">Amount</label>
+              <MotionSection delay={0.08} className="space-y-3">
+                <h2 className="text-[15px] font-bold text-foreground">
+                  Amount
+                </h2>
                 <CurrencyAmountInput
                   prefix={currencyPrefix}
                   value={amount}
                   onChange={setAmount}
                   min={minLocal}
+                  className="h-14 rounded-2xl border-0 bg-muted focus-within:border-0 focus-within:ring-2 focus-within:ring-primary/25"
+                  inputClassName="text-[15px] font-medium"
                 />
-                <div className="mt-3 flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2">
                   {amountPresets.map((preset) => (
                     <CurrencyPresetButton
                       key={preset}
@@ -457,62 +419,35 @@ export default function DataPage() {
                 </div>
               </MotionSection>
             ) : (
-              <MotionSection
-                delay={0.08}
-                className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6"
-              >
-                <SelectSheet
-                  label="Data plan"
-                  title="Select data plan"
-                  subtitle="Daily, weekly & monthly bundles"
-                  hint="Tap to choose a plan"
-                  value={variationCode}
-                  valueLabel={selected?.name}
-                  onChange={setVariationCode}
-                  loading={loadingPlans}
-                  emptyText="No plans match this filter"
-                  options={filtered.map((v) => ({
+              <MotionSection delay={0.08}>
+                <DataPlanGrid
+                  plans={variations.map((v) => ({
                     id: v.variationCode,
-                    title: v.name,
-                    subtitle: inferDataPlanCategory(v.name),
-                    trailing: money(v.amount),
+                    name: v.name,
+                    amount: v.amount,
                   }))}
-                  headerExtra={
-                    <div className="flex flex-wrap gap-1.5">
-                      {FILTERS.map((f) => (
-                        <button
-                          key={f}
-                          type="button"
-                          onClick={() => setFilter(f)}
-                          className={cn(
-                            "shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold",
-                            filter === f
-                              ? "bg-primary text-white"
-                              : "bg-muted text-foreground",
-                          )}
-                        >
-                          {f}
-                        </button>
-                      ))}
-                    </div>
-                  }
+                  value={variationCode}
+                  onChange={setVariationCode}
+                  filter={activeFilter}
+                  onFilterChange={setFilter}
+                  formatMoney={money}
+                  loading={loadingPlans}
                 />
               </MotionSection>
             )}
 
             <MotionSection
               delay={0.1}
-              className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6"
+              className="rounded-2xl bg-muted/70 px-4 py-4"
             >
-              <h2 className="text-base font-semibold">Order summary</h2>
-              <div className="mt-3 space-y-2 text-sm">
+              <div className="space-y-2 text-sm">
                 <Row label="Network" value={selectedNetwork?.name ?? "—"} />
                 {!isFlexibleIntl ? (
                   <Row label="Plan" value={selected?.name ?? "—"} />
                 ) : null}
                 <Row label="Phone" value={phone || "—"} />
                 <Row label="Amount" value={amountLabel} accent />
-                <div className="flex items-center gap-2 border-t border-border pt-3 font-semibold">
+                <div className="flex items-center gap-2 border-t border-border/70 pt-3 font-semibold">
                   <Wallet className="h-4 w-4 text-primary" />
                   Pay from wallet
                 </div>

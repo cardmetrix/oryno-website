@@ -472,6 +472,100 @@ export function inferDataPlanCategory(
   return "monthly";
 }
 
+const PLAN_TAG_RULES: { label: string; test: RegExp }[] = [
+  { label: "HOT", test: /\bhot\b/i },
+  { label: "Extra Night", test: /\bextra\s*night\b/i },
+  { label: "Night", test: /\bnight\b/i },
+  { label: "Awoof", test: /\bawoof\b/i },
+  { label: "SME", test: /\bsme\b/i },
+  { label: "Gifting", test: /\bgifting\b/i },
+  { label: "CG Lite", test: /\bcg[_\s-]?lite\b/i },
+  { label: "CG", test: /\(cg\)|\bcg\b/i },
+];
+
+export type DataPlanMeta = {
+  size: string;
+  validity: string;
+  category: "Daily" | "Weekly" | "Monthly";
+  tags: string[];
+  badge: string;
+};
+
+/** Pull size / validity / specialty tags from a provider plan name for card UI. */
+export function parseDataPlanMeta(name: string): DataPlanMeta {
+  const categoryRaw = inferDataPlanCategory(name);
+  const category =
+    categoryRaw === "daily"
+      ? "Daily"
+      : categoryRaw === "weekly"
+        ? "Weekly"
+        : "Monthly";
+
+  const sizeMatch = name.match(
+    /(\d+(?:\.\d+)?)\s*(TB|GB|MB|kb)\b/i,
+  );
+  const size = sizeMatch
+    ? `${sizeMatch[1]}${sizeMatch[2].toUpperCase()}`
+    : name.split(/[·\-–—|(]/)[0]?.trim() || name;
+
+  const dayMatch = name.match(/(\d+)\s*-?\s*days?\b/i);
+  const hourMatch = name.match(/(\d+)\s*-?\s*hours?\b/i);
+  let validity = "";
+  if (dayMatch) {
+    const n = Number(dayMatch[1]);
+    validity = `${n} day${n === 1 ? "" : "s"}`;
+  } else if (hourMatch) {
+    const n = Number(hourMatch[1]);
+    validity = `${n} hour${n === 1 ? "" : "s"}`;
+  } else if (/\bdaily\b/i.test(name)) {
+    validity = "1 day";
+  } else if (/\bweekly\b/i.test(name)) {
+    validity = "7 days";
+  } else if (/\bmonthly\b/i.test(name)) {
+    validity = "30 days";
+  }
+
+  const tags: string[] = [];
+  for (const rule of PLAN_TAG_RULES) {
+    if (rule.test.test(name) && !tags.includes(rule.label)) {
+      // Avoid double-counting Night when Extra Night already matched.
+      if (rule.label === "Night" && tags.includes("Extra Night")) continue;
+      if (rule.label === "CG" && tags.includes("CG Lite")) continue;
+      tags.push(rule.label);
+    }
+  }
+
+  return {
+    size,
+    validity: validity || category,
+    category,
+    tags,
+    badge: tags[0] || category,
+  };
+}
+
+/** Build filter chips present in a plan list (duration + specialty tags). */
+export function buildDataPlanFilters(names: string[]): string[] {
+  const duration = new Set<string>();
+  const specialty = new Set<string>();
+  for (const name of names) {
+    const meta = parseDataPlanMeta(name);
+    duration.add(meta.category);
+    for (const tag of meta.tags) specialty.add(tag);
+  }
+  const order = ["Daily", "Weekly", "Monthly"];
+  const durationList = order.filter((d) => duration.has(d));
+  const specialtyList = [...specialty].sort((a, b) => a.localeCompare(b));
+  return [...durationList, ...specialtyList];
+}
+
+export function planMatchesFilter(name: string, filter: string): boolean {
+  if (!filter || filter === "All") return true;
+  const meta = parseDataPlanMeta(name);
+  if (meta.category === filter) return true;
+  return meta.tags.some((t) => t.toLowerCase() === filter.toLowerCase());
+}
+
 /** Prefer live VTpass CDN host; repair known broken filenames from their API. */
 const SERVICE_IMAGE_OVERRIDES: Record<string, string> = {
   // API returns *-Airtime-VTU.jpg which 404s; working files omit -VTU
