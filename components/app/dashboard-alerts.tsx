@@ -26,7 +26,7 @@ const alerts = [
     title: "Promo unlocked",
     body: "Cashback on your next bill payment",
     time: "1h ago",
-    href: "/services/bills",
+    href: "/services/electricity",
     tone: "text-primary bg-oryno-orange-muted",
   },
   {

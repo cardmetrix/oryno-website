@@ -2,12 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import {
-  Droplets,
-  Tv,
-  Wallet,
-  Zap,
-} from "lucide-react";
+import { Droplets, Tv, Wallet } from "lucide-react";
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
@@ -18,12 +13,13 @@ import {
   type VtpassServiceOption,
 } from "@/components/app/vtpass-service-picker";
 import { SelectSheet } from "@/components/app/select-sheet";
+import { TelecomNetworkGrid } from "@/components/app/telecom-network-grid";
 import { useCountry } from "@/components/providers/country-provider";
 import { useWalletBalance } from "@/hooks/use-wallet-balance";
 import { formatCountryMoney } from "@/lib/country";
 import { cn } from "@/lib/utils";
 
-type BillCategory = "tv" | "electricity" | "water";
+type BillCategory = "tv" | "water";
 
 type Variation = {
   variationCode: string;
@@ -64,23 +60,17 @@ export default function BillsPage() {
   const [verifyHint, setVerifyHint] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [token, setToken] = useState<string | null>(null);
   const [receipt, setReceipt] = useState("");
-  const [paymentId, setPaymentId] = useState<string | null>(null);
   const [transactionId, setTransactionId] = useState<string | null>(null);
 
-  const minBillAmount =
-    isNigeria && category === "electricity"
-      ? 1000
-      : isSouthAfrica
-        ? 10
-        : isKenya
-          ? 50
-          : isGhana
-            ? 1
-            : 100;
+  const minBillAmount = isSouthAfrica
+    ? 10
+    : isKenya
+      ? 50
+      : isGhana
+        ? 1
+        : 100;
 
   const selectedService = services.find((s) => s.serviceID === serviceID);
   const selectedVariation = variations.find(
@@ -122,6 +112,10 @@ export default function BillsPage() {
   ]);
 
   useEffect(() => {
+    if (!hasWaterTab && category === "water") setCategory("tv");
+  }, [hasWaterTab, category]);
+
+  useEffect(() => {
     if (!billsLive) return;
     let cancelled = false;
     (async () => {
@@ -132,11 +126,7 @@ export default function BillsPage() {
       setCustomerName(null);
       try {
         const identifier =
-          category === "tv"
-            ? "tv-subscription"
-            : category === "water"
-              ? "water-bill"
-              : "electricity-bill";
+          category === "water" ? "water-bill" : "tv-subscription";
         const res = await fetch(
           `/api/vtpass/services?identifier=${identifier}`,
         );
@@ -171,11 +161,7 @@ export default function BillsPage() {
       try {
         const res = await fetch(
           `/api/vtpass/variations?serviceID=${encodeURIComponent(serviceID)}&identifier=${
-            category === "tv"
-              ? "tv-subscription"
-              : category === "water"
-                ? "water-bill"
-                : "electricity-bill"
+            category === "water" ? "water-bill" : "tv-subscription"
           }`,
         );
         const data = await res.json();
@@ -198,7 +184,6 @@ export default function BillsPage() {
     };
   }, [serviceID, category]);
 
-  // Auto-verify meter / smartcard / account when the customer ref is long enough.
   useEffect(() => {
     if (!billsLive || !serviceID || customerRef.trim().length < 6) {
       setCustomerName(null);
@@ -247,51 +232,6 @@ export default function BillsPage() {
     };
   }, [billsLive, serviceID, customerRef, category, variationCode]);
 
-  // Poll Pairgate electricity token after async purchase.
-  useEffect(() => {
-    if (!pending || !paymentId) return;
-    let cancelled = false;
-    let attempts = 0;
-
-    const tick = async () => {
-      attempts += 1;
-      try {
-        const res = await fetch(
-          `/api/vtpass/purchase/bill/status?paymentId=${encodeURIComponent(paymentId)}`,
-        );
-        const data = await res.json();
-        if (cancelled || !res.ok) return;
-        if (data.token) setToken(String(data.token));
-        if (data.status === "completed") {
-          setPending(false);
-          setSuccess(true);
-          return;
-        }
-        if (data.status === "failed") {
-          setPending(false);
-          setSuccess(false);
-          setError(data.failureReason || "Bill payment failed");
-          return;
-        }
-      } catch {
-        // keep polling
-      }
-      if (!cancelled && attempts < 40) {
-        window.setTimeout(tick, 3000);
-      } else if (!cancelled) {
-        // Still processing — leave pending screen with history link
-        setPending(false);
-        setSuccess(true);
-      }
-    };
-
-    const timer = window.setTimeout(tick, 2500);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [pending, paymentId]);
-
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (!canSubmit || !selectedService) return;
@@ -314,16 +254,8 @@ export default function BillsPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Payment failed");
       setReceipt(data.amountFormatted);
-      setToken(data.token || null);
-      setPaymentId(data.paymentId || null);
       setTransactionId(data.transactionId || null);
-      if (data.status === "processing" && !data.token) {
-        setPending(true);
-        setSuccess(true);
-      } else {
-        setPending(false);
-        setSuccess(true);
-      }
+      setSuccess(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Payment failed");
     } finally {
@@ -347,37 +279,37 @@ export default function BillsPage() {
         ? GH_PRESETS
         : NG_PRESETS;
   const billsSubtitle = isSouthAfrica
-    ? "DStv, Eskom & Johannesburg Water"
+    ? "DStv, GOtv, StarTimes & water"
     : isKenya
-      ? "DStv, KPLC & Nairobi Water"
+      ? "DStv, GOtv, StarTimes & water"
       : isGhana
-        ? "DStv, ECG & Ghana Water"
-        : "TV subscriptions & electricity";
+        ? "DStv, GOtv & Ghana Water"
+        : "DStv, GOtv & StarTimes";
   const customerLabel =
     selectedService?.customerLabel ||
-    (category === "tv"
-      ? "Smartcard / IUC"
-      : category === "water"
-        ? "Account number"
-        : "Meter number");
+    (category === "water" ? "Account number" : "Smartcard / IUC");
 
   if (!billsLive) {
     return (
       <AppShell hideNav>
         <PageHeader
-          title="Bill Payments"
-          subtitle="TV & electricity"
+          title="TV Bills"
+          subtitle="Cable subscriptions"
           backHref="/services"
         />
         <MotionSection className="rounded-2xl border border-border bg-background p-6 text-center shadow-[var(--shadow-soft)]">
-          <Zap className="mx-auto h-10 w-10 text-primary" />
+          <Tv className="mx-auto h-10 w-10 text-primary" />
           <h2 className="mt-4 text-lg font-bold">
-            {country.name} bills coming next
+            {country.name} TV bills coming next
           </h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            {country.name} bills will go live next. Airtime and data already work.
+            Cable TV payments for {country.name} will go live next. Airtime and
+            data already work.
           </p>
-          <a href="/services/airtime" className="btn-primary mt-6 inline-flex h-12 items-center px-6">
+          <a
+            href="/services/airtime"
+            className="btn-primary mt-6 inline-flex h-12 items-center px-6"
+          >
             Buy airtime instead
           </a>
         </MotionSection>
@@ -388,36 +320,22 @@ export default function BillsPage() {
   return (
     <AppShell hideNav>
       <PageHeader
-        title="Bill Payments"
+        title="TV Bills"
         subtitle={billsSubtitle}
-        backHref="/services"
+        backHref="/dashboard"
       />
 
       <AnimatePresence mode="wait">
         {success ? (
           <MotionSection key="success">
             <ServiceSuccess
-              variant={pending && !token ? "pending" : "success"}
-              title={
-                pending && !token
-                  ? "Payment processing"
-                  : token
-                    ? "Bill paid!"
-                    : "Bill paid!"
-              }
-              subtitle={
-                pending && !token
-                  ? `${selectedService?.name || "Bill"} is processing. Your electricity token will appear here shortly.`
-                  : `${selectedService?.name || "Bill"} paid successfully.`
-              }
+              title="Bill paid!"
+              subtitle={`${selectedService?.name || "TV"} paid successfully.`}
               amountLabel="Amount charged"
               amount={receipt || money(amountNumber)}
               reference={transactionId}
               onDismiss={() => {
                 setSuccess(false);
-                setPending(false);
-                setToken(null);
-                setPaymentId(null);
                 setTransactionId(null);
               }}
               secondaryAction={{
@@ -429,129 +347,71 @@ export default function BillsPage() {
                 label: "Pay another bill",
                 onClick: () => {
                   setSuccess(false);
-                  setPending(false);
-                  setToken(null);
-                  setPaymentId(null);
                   setTransactionId(null);
                 },
                 icon: "plus",
               }}
-            >
-              {token ? (
-                <p className="break-all rounded-[14px] border border-border bg-muted/50 px-3 py-2 text-xs font-medium">
-                  Token / receipt: {token}
-                </p>
-              ) : pending ? (
-                <p className="rounded-[14px] border border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
-                  Waiting for disco token… this usually takes a few seconds.
-                </p>
-              ) : null}
-            </ServiceSuccess>
+            />
           </MotionSection>
         ) : (
-          <form key="form" onSubmit={onSubmit} className="space-y-4 sm:space-y-5">
-            <MotionSection className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6">
-              <div className={cn(
-                "grid gap-2 rounded-[14px] bg-muted/70 p-1",
-                hasWaterTab ? "grid-cols-3" : "grid-cols-2",
-              )}>
-                {(
-                  [
-                    { id: "tv" as const, label: "TV", icon: Tv },
-                    { id: "electricity" as const, label: "Electricity", icon: Zap },
-                    ...(hasWaterTab
-                      ? [{ id: "water" as const, label: "Water", icon: Droplets }]
-                      : []),
-                  ] as const
-                ).map((tab) => {
-                  const active = category === tab.id;
-                  const Icon = tab.icon;
-                  return (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() => setCategory(tab.id)}
-                      className={cn(
-                        "relative flex items-center justify-center gap-2 rounded-[12px] px-3 py-2.5 text-sm font-semibold",
-                        active ? "text-primary" : "text-muted-foreground",
-                      )}
-                    >
-                      {active ? (
-                        <motion.span
-                          layoutId="bill-cat"
-                          className="absolute inset-0 rounded-[12px] bg-background shadow-[var(--shadow-soft)]"
-                          transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                        />
-                      ) : null}
-                      <span className="relative z-10 inline-flex items-center gap-1.5">
-                        <Icon className="h-4 w-4" />
-                        {tab.label}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </MotionSection>
+          <form
+            key="form"
+            onSubmit={onSubmit}
+            className="space-y-6 pb-8 sm:space-y-7"
+          >
+            {hasWaterTab ? (
+              <MotionSection>
+                <div className="grid grid-cols-2 gap-2 rounded-[14px] bg-muted/70 p-1">
+                  {(
+                    [
+                      { id: "tv" as const, label: "TV", icon: Tv },
+                      { id: "water" as const, label: "Water", icon: Droplets },
+                    ] as const
+                  ).map((tab) => {
+                    const active = category === tab.id;
+                    const Icon = tab.icon;
+                    return (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setCategory(tab.id)}
+                        className={cn(
+                          "relative flex items-center justify-center gap-2 rounded-[12px] px-3 py-2.5 text-sm font-semibold",
+                          active ? "text-primary" : "text-muted-foreground",
+                        )}
+                      >
+                        {active ? (
+                          <motion.span
+                            layoutId="bill-cat"
+                            className="absolute inset-0 rounded-[12px] bg-background shadow-[var(--shadow-soft)]"
+                            transition={{
+                              type: "spring",
+                              stiffness: 380,
+                              damping: 30,
+                            }}
+                          />
+                        ) : null}
+                        <span className="relative z-10 inline-flex items-center gap-1.5">
+                          <Icon className="h-4 w-4" />
+                          {tab.label}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </MotionSection>
+            ) : null}
 
-            <MotionSection
-              delay={0.04}
-              className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6"
-            >
-              <h2 className="mb-3 text-base font-semibold">
-                {category === "tv"
-                  ? "TV providers"
-                  : category === "water"
-                    ? "Water"
-                    : localCurrencyBills
-                      ? "Electricity"
-                      : "Electricity discos"}
+            <MotionSection delay={0.04} className="space-y-3">
+              <h2 className="text-[15px] font-bold text-foreground">
+                {category === "water" ? "Select Water Utility" : "Select Provider"}
               </h2>
               <div className="md:hidden">
-                <SelectSheet
-                  label="Provider"
-                  title={
-                    category === "tv"
-                      ? "Select TV provider"
-                      : category === "water"
-                        ? "Select water utility"
-                        : localCurrencyBills
-                          ? "Select electricity provider"
-                          : "Select electricity disco"
-                  }
-                  subtitle={
-                    category === "tv"
-                      ? isSouthAfrica || isKenya || isGhana
-                        ? "DStv, GOtv, StarTimes"
-                        : "DSTV, GOtv, Startimes & more"
-                      : category === "water"
-                        ? isSouthAfrica
-                          ? "Johannesburg Water"
-                          : isKenya
-                            ? "Nairobi Water"
-                            : "Ghana Water Company"
-                        : isSouthAfrica
-                          ? "Eskom & City Power"
-                          : isKenya
-                            ? "KPLC prepaid & postpaid"
-                            : isGhana
-                              ? "ECG prepaid & postpaid"
-                              : "Prepaid & postpaid discos"
-                  }
-                  hint="Tap to choose a provider"
+                <TelecomNetworkGrid
+                  services={services}
                   value={serviceID}
-                  valueLabel={selectedService?.name}
-                  valueImage={selectedService?.image}
                   onChange={setServiceID}
                   loading={loadingServices}
-                  emptyText="No providers available"
-                  options={services.map((s) => ({
-                    id: s.serviceID,
-                    title: s.name,
-                    image: s.image ?? null,
-                    domain: s.domain,
-                    imageFallbacks: s.imageFallbacks,
-                    subtitle: "Tap to select",
-                  }))}
                 />
               </div>
               <div className="hidden md:block">
@@ -565,13 +425,10 @@ export default function BillsPage() {
               </div>
             </MotionSection>
 
-            <MotionSection
-              delay={0.06}
-              className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6"
-            >
-              <label className="mb-2 block text-sm font-medium">
+            <MotionSection delay={0.06} className="space-y-3">
+              <h2 className="text-[15px] font-bold text-foreground">
                 {customerLabel}
-              </label>
+              </h2>
               <input
                 value={customerRef}
                 onChange={(e) => {
@@ -580,40 +437,31 @@ export default function BillsPage() {
                   setVerifyHint(null);
                 }}
                 placeholder={customerLabel}
-                className="h-12 w-full rounded-[14px] border border-border bg-background px-4 text-sm outline-none focus:border-primary"
+                className="h-14 w-full rounded-2xl border-0 bg-muted px-4 text-[15px] font-medium outline-none focus:ring-2 focus:ring-primary/25"
               />
               {verifying ? (
-                <p className="mt-2 text-sm text-muted-foreground">
+                <p className="px-1 text-sm text-muted-foreground">
                   Checking account…
                 </p>
               ) : customerName ? (
-                <p className="mt-2 text-sm font-medium text-[var(--oryno-success)]">
+                <p className="px-1 text-sm font-medium text-[var(--oryno-success)]">
                   {customerName}
                 </p>
               ) : verifyHint ? (
-                <p className="mt-2 text-sm text-destructive">{verifyHint}</p>
+                <p className="px-1 text-sm text-destructive">{verifyHint}</p>
               ) : null}
             </MotionSection>
 
-            <MotionSection
-              delay={0.08}
-              className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6"
-            >
+            <MotionSection delay={0.08}>
               <SelectSheet
-                label={
-                  category === "tv"
-                    ? "Plan"
-                    : category === "water"
-                      ? "Bill type"
-                      : "Meter type"
-                }
+                label={category === "water" ? "Bill type" : "Bouquet"}
                 title={
-                  category === "tv" ? "Select bouquet" : "Select meter type"
+                  category === "tv" ? "Select bouquet" : "Select bill type"
                 }
                 subtitle={
                   category === "tv"
                     ? "Available subscription plans"
-                    : "Prepaid or postpaid"
+                    : "Available bill options"
                 }
                 hint="Tap to choose"
                 value={variationCode}
@@ -629,19 +477,18 @@ export default function BillsPage() {
                 }))}
               />
 
-              {(category === "electricity" ||
-                category === "water" ||
+              {(category === "water" ||
                 (selectedVariation && !selectedVariation.fixedPrice)) && (
-                <div className="mt-4">
-                  <label className="mb-2 block text-sm font-medium">Amount</label>
+                <div className="mt-4 space-y-3">
+                  <label className="block text-sm font-medium">Amount</label>
                   <input
                     type="number"
                     min={minBillAmount}
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
-                    className="h-12 w-full rounded-[14px] border border-border bg-background px-4 text-sm outline-none focus:border-primary"
+                    className="h-14 w-full rounded-2xl border-0 bg-muted px-4 text-[15px] font-medium outline-none focus:ring-2 focus:ring-primary/25"
                   />
-                  <div className="mt-2 flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-2">
                     {amountPresets.map((p) => (
                       <button
                         key={p}
@@ -664,24 +511,17 @@ export default function BillsPage() {
 
             <MotionSection
               delay={0.1}
-              className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6"
+              className="rounded-2xl bg-muted/70 px-4 py-4"
             >
-              <h2 className="text-base font-semibold">Order summary</h2>
-              <div className="mt-3 space-y-2 text-sm">
+              <div className="space-y-2 text-sm">
                 <Row label="Provider" value={selectedService?.name ?? "—"} />
                 <Row
-                  label={
-                    category === "tv"
-                      ? "Smartcard"
-                      : category === "water"
-                        ? "Account"
-                        : "Meter"
-                  }
+                  label={category === "water" ? "Account" : "Smartcard"}
                   value={customerRef || "—"}
                 />
                 <Row label="Plan" value={selectedVariation?.name ?? "—"} />
                 <Row label="Amount" value={money(amountNumber)} accent />
-                <div className="flex items-center gap-2 border-t border-border pt-3 font-semibold">
+                <div className="flex items-center gap-2 border-t border-border/70 pt-3 font-semibold">
                   <Wallet className="h-4 w-4 text-primary" />
                   Pay from wallet
                 </div>
@@ -702,9 +542,9 @@ export default function BillsPage() {
                     ? verifying
                       ? "Verifying account…"
                       : "Verify account to continue"
-                  : amountNumber > 0 && !canAfford(amountNumber)
-                    ? "Insufficient balance"
-                    : `Pay bill · ${money(amountNumber)}`}
+                    : amountNumber > 0 && !canAfford(amountNumber)
+                      ? "Insufficient balance"
+                      : `Pay bill · ${money(amountNumber)}`}
             </motion.button>
           </form>
         )}
@@ -713,7 +553,7 @@ export default function BillsPage() {
       <ErrorAlertModal
         error={error}
         onClose={() => setError(null)}
-        page="Bill Payments"
+        page="TV Bills"
       />
     </AppShell>
   );

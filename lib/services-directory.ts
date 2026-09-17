@@ -5,6 +5,7 @@ import {
   Smartphone,
   Trophy,
   TrendingUp,
+  Tv,
   Wifi,
   Zap,
 } from "lucide-react";
@@ -76,20 +77,35 @@ export const servicesDirectory: ServiceDirectoryItem[] = [
   {
     id: "bills",
     href: "/services/bills",
-    label: "Bill Payments",
-    shortDescription: "TV & electricity",
+    label: "TV Bills",
+    shortDescription: "DStv, GOtv & StarTimes",
     longDescription: `Pay ${billProviders
       .filter((p) => p.category === "TV")
       .slice(0, 3)
       .map((p) => p.name)
-      .join(", ")} plus all electricity discos with wallet balance.`,
+      .join(", ")} and other cable TV subscriptions from your wallet.`,
     category: "Utilities",
-    tags: ["DStv", "GOtv", "IKEDC", "EKEDC"],
+    tags: ["DStv", "GOtv", "StarTimes"],
+    eta: "1–3 mins",
+    accent: "#FF6A00",
+    popular: true,
+    icon: Tv,
+    stats: "Cable TV",
+  },
+  {
+    id: "electricity",
+    href: "/services/electricity",
+    label: "Electricity",
+    shortDescription: "Prepaid & postpaid discos",
+    longDescription:
+      "Buy electricity for IKEDC, EKEDC, AEDC, and all major discos. Verify your meter, pay from your wallet, and receive a token.",
+    category: "Utilities",
+    tags: ["IKEDC", "EKEDC", "AEDC", "Prepaid"],
     eta: "1–3 mins",
     accent: "#FF6A00",
     popular: true,
     icon: Zap,
-    stats: `${billProviders.length}+ providers`,
+    stats: "All discos",
   },
   {
     id: "betting",
@@ -264,30 +280,62 @@ export function getServicesDirectory(countryCode?: string | null) {
       if (country.code === "GH") {
         return {
           ...item,
-          shortDescription: "DStv, ECG & Ghana Water",
+          shortDescription: "DStv, GOtv & Ghana Water",
           longDescription:
-            "Pay DStv Ghana, GOtv, ECG prepaid/postpaid, and Ghana Water from your wallet.",
-          tags: ["DStv", "ECG", "Ghana Water", "GOtv"],
+            "Pay DStv Ghana, GOtv, and Ghana Water from your wallet.",
+          tags: ["DStv", "GOtv", "Ghana Water"],
           stats: "Hubtel",
         };
       }
       if (country.code === "KE") {
         return {
           ...item,
-          shortDescription: "DStv, KPLC & Nairobi Water",
+          shortDescription: "DStv, GOtv & Nairobi Water",
           longDescription:
-            "Pay DStv Kenya, GOtv, StarTimes, Zuku, Kenya Power (KPLC), and Nairobi Water from your wallet.",
-          tags: ["DStv", "KPLC", "Nairobi Water", "Zuku"],
+            "Pay DStv Kenya, GOtv, StarTimes, Zuku, and Nairobi Water from your wallet.",
+          tags: ["DStv", "GOtv", "Nairobi Water", "Zuku"],
           stats: "Reloadly",
         };
       }
       if (country.code === "ZA") {
         return {
           ...item,
-          shortDescription: "DStv, Eskom & Johannesburg Water",
+          shortDescription: "DStv, GOtv & Johannesburg Water",
           longDescription:
-            "Pay DStv South Africa, GOtv, StarTimes, Eskom, City Power, and Johannesburg Water from your wallet.",
-          tags: ["DStv", "Eskom", "City Power", "Johannesburg Water"],
+            "Pay DStv South Africa, GOtv, StarTimes, and Johannesburg Water from your wallet.",
+          tags: ["DStv", "GOtv", "Johannesburg Water"],
+          stats: "Reloadly",
+        };
+      }
+    }
+    if (item.id === "electricity") {
+      if (country.code === "GH") {
+        return {
+          ...item,
+          shortDescription: "ECG prepaid & postpaid",
+          longDescription:
+            "Buy ECG electricity (prepaid and postpaid) from your ORYNO wallet.",
+          tags: ["ECG", "Prepaid", "Postpaid"],
+          stats: "Hubtel",
+        };
+      }
+      if (country.code === "KE") {
+        return {
+          ...item,
+          shortDescription: "Kenya Power (KPLC)",
+          longDescription:
+            "Buy Kenya Power prepaid and postpaid electricity from your wallet.",
+          tags: ["KPLC", "Prepaid", "Postpaid"],
+          stats: "Reloadly",
+        };
+      }
+      if (country.code === "ZA") {
+        return {
+          ...item,
+          shortDescription: "Eskom & City Power",
+          longDescription:
+            "Buy Eskom and City Power electricity from your ORYNO wallet.",
+          tags: ["Eskom", "City Power"],
           stats: "Reloadly",
         };
       }

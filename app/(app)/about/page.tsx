@@ -59,8 +59,8 @@ const services = [
   },
   {
     icon: Zap,
-    title: "Bill Payments",
-    description: "Electricity and essential utilities in a few taps.",
+    title: "Electricity",
+    description: "Prepaid and postpaid discos with instant tokens.",
   },
   {
     icon: Tv,

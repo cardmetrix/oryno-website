@@ -12,7 +12,8 @@ export const USD_CARD_ISSUER = "Maplerad";
 export const SUPPORT_TOPICS = [
   "Wallet & Funding",
   "Airtime / Data",
-  "Bill Payments",
+  "TV Bills",
+  "Electricity",
   "Gift Cards",
   "Virtual Numbers",
   "USD Virtual Card",

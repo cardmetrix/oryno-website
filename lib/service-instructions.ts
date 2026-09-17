@@ -2,6 +2,7 @@ export type ServiceInstructionId =
   | "airtime"
   | "data"
   | "bills"
+  | "electricity"
   | "social"
   | "virtual-numbers"
   | "gift-cards"
@@ -39,13 +40,23 @@ export const SERVICE_INSTRUCTIONS: Record<
     ],
   },
   bills: {
-    subtitle: "Follow these steps to pay TV, electricity, or water bills",
+    subtitle: "Follow these steps to pay TV or water bills",
     steps: [
-      "Nigeria: DStv, GOtv, and discos. Ghana: DStv, ECG, and Ghana Water.",
-      "Choose a category, then pick your provider.",
-      "Enter your smartcard, meter, or account number and verify the name.",
-      "Select a plan or amount, then pay from your wallet.",
-      "Keep the receipt from History — prepaid ECG includes a token.",
+      "Fund your wallet so you can pay for the subscription.",
+      "Pick your TV provider (DStv, GOtv, StarTimes) or water utility where available.",
+      "Enter your smartcard or account number and wait for verification.",
+      "Select a bouquet or amount, then pay from your wallet.",
+      "Keep the receipt from History for your records.",
+    ],
+  },
+  electricity: {
+    subtitle: "Follow these steps to buy electricity",
+    steps: [
+      "Fund your wallet — electricity is paid from your ORYNO balance.",
+      "Select your disco or power utility (IKEDC, EKEDC, ECG, KPLC, Eskom, etc.).",
+      "Enter your meter number and wait for the account name to verify.",
+      "Choose prepaid or postpaid, enter an amount, then pay from your wallet.",
+      "Copy your token from the success screen — also available later in History.",
     ],
   },
   social: {

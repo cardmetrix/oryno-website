@@ -21,11 +21,18 @@ const promos = [
     tone: "from-oryno-charcoal to-[#2a2a2e]",
   },
   {
-    emoji: "🎉",
-    title: "Cashback on bill payments",
-    subtitle: "Earn rewards when you pay electricity & TV bills",
-    href: "/services/bills",
+    emoji: "⚡",
+    title: "Buy electricity",
+    subtitle: "All discos · prepaid & postpaid from your wallet",
+    href: "/services/electricity",
     tone: "from-[#ff7a1a] to-oryno-orange",
+  },
+  {
+    emoji: "📺",
+    title: "Pay TV bills",
+    subtitle: "DStv, GOtv & StarTimes in one tap",
+    href: "/services/bills",
+    tone: "from-oryno-orange to-oryno-orange-soft",
   },
   {
     emoji: "🏆",
