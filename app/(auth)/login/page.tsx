@@ -516,7 +516,7 @@ function LoginForm() {
           Don&apos;t have an account?{" "}
           <Link
             href={AUTH_LINKS.getStarted}
-            className="font-semibold text-black transition-colors hover:text-oryno-charcoal"
+            className="font-semibold text-black"
           >
             Create Account
           </Link>
