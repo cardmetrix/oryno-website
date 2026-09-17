@@ -72,11 +72,22 @@ export default function DataPage() {
 
   const filtered = useMemo(() => {
     if (filter === "All") return variations;
-    return variations.filter((v) => {
-      const cat = inferDataPlanCategory(v.name);
-      return cat === filter.toLowerCase();
-    });
+    const target = filter.toLowerCase();
+    return variations.filter(
+      (v) => inferDataPlanCategory(v.name) === target,
+    );
   }, [variations, filter]);
+
+  // Keep the selected plan inside the active filter.
+  useEffect(() => {
+    if (!filtered.length) {
+      if (variationCode) setVariationCode("");
+      return;
+    }
+    if (!filtered.some((v) => v.variationCode === variationCode)) {
+      setVariationCode(filtered[0].variationCode);
+    }
+  }, [filtered, variationCode]);
 
   const localAmount = Number(amount) || 0;
   const minLocal = isFlexibleIntl ? intlDataMinLocal(countryCode) : 0;

@@ -452,21 +452,23 @@ export function inferDataPlanCategory(
   name: string,
 ): "daily" | "weekly" | "monthly" {
   const lower = name.toLowerCase();
-  if (
-    lower.includes("day") ||
-    lower.includes("daily") ||
-    lower.includes("24 hour") ||
-    /\b1\s*day\b/.test(lower)
-  ) {
-    return "daily";
+
+  // Explicit labels win over day-count heuristics.
+  if (/\bmonthly\b|\bmonth\b/.test(lower)) return "monthly";
+  if (/\bweekly\b|\bweek\b/.test(lower)) return "weekly";
+  if (/\bdaily\b|\b24\s*-?\s*hours?\b/.test(lower)) return "daily";
+
+  // Parse "N day(s)" / "N-day" durations (avoid bare "day" matching "30 days").
+  const dayMatch = lower.match(/(\d+)\s*-?\s*days?\b/);
+  if (dayMatch) {
+    const days = Number(dayMatch[1]);
+    if (days <= 3) return "daily";
+    if (days <= 14) return "weekly";
+    return "monthly";
   }
-  if (
-    lower.includes("week") ||
-    lower.includes("7 day") ||
-    lower.includes("7-day")
-  ) {
-    return "weekly";
-  }
+
+  if (/\bhours?\b/.test(lower)) return "daily";
+
   return "monthly";
 }
 
