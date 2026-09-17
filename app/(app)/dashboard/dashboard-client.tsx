@@ -40,10 +40,10 @@ export function DashboardClient() {
   const loadingTx = isLoading && !data;
 
   return (
-    <AppShell className="pt-4 sm:pt-5">
+    <AppShell>
       <DashboardHeader />
 
-      <div className="grid w-full items-stretch gap-4 sm:gap-5 lg:grid-cols-1 lg:gap-6 lg:has-[.ad-carousel]:grid-cols-[1.35fr_0.85fr]">
+      <div className="grid items-stretch gap-4 sm:gap-5 lg:grid-cols-1 lg:gap-6 lg:has-[.ad-carousel]:grid-cols-[1.35fr_0.85fr]">
         <MotionSection className="min-w-0">
           <WalletCard />
         </MotionSection>
@@ -51,9 +51,9 @@ export function DashboardClient() {
         <AdCarousel />
       </div>
 
-      <MotionSection className="mt-6 w-full">
+      <MotionSection className="mt-6">
         <div className="space-y-4 sm:space-y-5">
-          <MotionSection className="w-full rounded-[28px] border border-border/80 bg-background/90 p-5 shadow-[var(--shadow-soft)] backdrop-blur-sm sm:p-6">
+          <MotionSection className="rounded-[28px] border border-border/80 bg-background/90 p-5 shadow-[var(--shadow-soft)] backdrop-blur-sm sm:p-6">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-base font-semibold text-foreground">
                 Quick Actions
@@ -82,7 +82,7 @@ export function DashboardClient() {
         </div>
       </MotionSection>
 
-      <MotionSection className="mt-6 w-full rounded-[28px] border border-border/80 bg-background/90 p-5 shadow-[var(--shadow-soft)] backdrop-blur-sm sm:p-6">
+      <MotionSection className="mt-6 rounded-[28px] border border-border/80 bg-background/90 p-5 shadow-[var(--shadow-soft)] backdrop-blur-sm sm:p-6">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-base font-semibold text-foreground">
             Recent Transactions
