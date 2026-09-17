@@ -107,20 +107,6 @@ export default function NotificationsPage() {
     }
   }
 
-  async function removeOne(id: string) {
-    setBusyId(id);
-    try {
-      const res = await fetch(
-        `/api/notifications?id=${encodeURIComponent(id)}`,
-        { method: "DELETE" },
-      );
-      if (!res.ok) return;
-      applyPayload((await res.json()) as NotificationsPayload);
-    } finally {
-      setBusyId(null);
-    }
-  }
-
   async function clearRead() {
     const res = await fetch("/api/notifications?clearRead=1", {
       method: "DELETE",
@@ -291,8 +277,8 @@ export default function NotificationsPage() {
                           </div>
                         </button>
 
-                        <div className="flex shrink-0 flex-col gap-1.5">
-                          {item.unread ? (
+                        {item.unread ? (
+                          <div className="flex shrink-0 flex-col gap-1.5">
                             <button
                               type="button"
                               onClick={() => void markOneRead(item.id)}
@@ -300,16 +286,8 @@ export default function NotificationsPage() {
                             >
                               Read
                             </button>
-                          ) : null}
-                          <button
-                            type="button"
-                            onClick={() => void removeOne(item.id)}
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-[10px] border border-border text-muted-foreground transition hover:border-destructive hover:text-destructive"
-                            aria-label="Delete notification"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
+                          </div>
+                        ) : null}
                       </motion.div>
                     );
                   })}

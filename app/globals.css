@@ -47,8 +47,8 @@
   );
   --header-surface: linear-gradient(
     180deg,
-    color-mix(in srgb, var(--background) 92%, transparent) 0%,
-    color-mix(in srgb, var(--muted) 88%, transparent) 100%
+    color-mix(in srgb, var(--background) 96%, transparent) 0%,
+    color-mix(in srgb, var(--background) 88%, transparent) 100%
   );
 
   /* Radius */

@@ -117,7 +117,7 @@ export function ServiceSearch({
         aria-autocomplete="list"
         aria-controls="service-search-listbox"
         className={cn(
-          "h-10 w-full rounded-[14px] border border-border bg-background pr-3 pl-9 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15",
+          "h-10 w-full rounded-[14px] border border-border bg-muted/50 pr-3 pl-9 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-primary focus:bg-background focus:ring-2 focus:ring-primary/15 dark:bg-muted dark:focus:bg-popover",
           inputClassName,
         )}
       />
@@ -126,7 +126,7 @@ export function ServiceSearch({
         <div
           id="service-search-listbox"
           role="listbox"
-          className="absolute top-[calc(100%+6px)] right-0 z-50 max-h-[min(22rem,70vh)] w-[min(100vw-2rem,22rem)] overflow-y-auto rounded-[16px] border border-border bg-background p-1.5 shadow-[var(--shadow-soft)] sm:w-[22rem]"
+          className="absolute top-[calc(100%+6px)] right-0 z-50 max-h-[min(22rem,70vh)] w-[min(100vw-2rem,22rem)] overflow-y-auto rounded-[16px] border border-border bg-popover p-1.5 text-popover-foreground shadow-[var(--shadow-soft)] sm:w-[22rem]"
         >
           {!query.trim() ? (
             <p className="px-2.5 py-2 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
