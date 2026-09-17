@@ -62,7 +62,7 @@ export default function ServicesPage() {
                     Catalog · {services.length} services
                   </p>
                   <p className="truncate text-xs text-white/85">
-                    Airtime, data, bills, betting, boosting, numbers
+                    Airtime, data, electricity, TV, betting & more
                   </p>
                 </div>
                 <span className="shrink-0 rounded-full bg-black/20 px-2 py-0.5 text-[10px] font-bold text-[#ffd29a] ring-1 ring-white/20">
@@ -77,7 +77,7 @@ export default function ServicesPage() {
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search airtime, Bet9ja, DStv…"
+                  placeholder="Search electricity, airtime, DStv…"
                   className="h-9 w-full rounded-[12px] border border-border bg-muted/40 pr-3 pl-9 text-sm outline-none transition focus:border-primary focus:bg-background focus:ring-2 focus:ring-primary/15"
                 />
               </div>

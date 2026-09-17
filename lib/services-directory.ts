@@ -75,6 +75,21 @@ export const servicesDirectory: ServiceDirectoryItem[] = [
     stats: "All networks",
   },
   {
+    id: "electricity",
+    href: "/services/electricity",
+    label: "Electricity",
+    shortDescription: "Prepaid & postpaid discos",
+    longDescription:
+      "Buy electricity for IKEDC, EKEDC, AEDC, and all major discos. Verify your meter, pay from your wallet, and receive a token.",
+    category: "Utilities",
+    tags: ["IKEDC", "EKEDC", "AEDC", "Prepaid"],
+    eta: "1–3 mins",
+    accent: "#FF6A00",
+    popular: true,
+    icon: Zap,
+    stats: "All discos",
+  },
+  {
     id: "bills",
     href: "/services/bills",
     label: "TV Bills",
@@ -91,21 +106,6 @@ export const servicesDirectory: ServiceDirectoryItem[] = [
     popular: true,
     icon: Tv,
     stats: "Cable TV",
-  },
-  {
-    id: "electricity",
-    href: "/services/electricity",
-    label: "Electricity",
-    shortDescription: "Prepaid & postpaid discos",
-    longDescription:
-      "Buy electricity for IKEDC, EKEDC, AEDC, and all major discos. Verify your meter, pay from your wallet, and receive a token.",
-    category: "Utilities",
-    tags: ["IKEDC", "EKEDC", "AEDC", "Prepaid"],
-    eta: "1–3 mins",
-    accent: "#FF6A00",
-    popular: true,
-    icon: Zap,
-    stats: "All discos",
   },
   {
     id: "betting",
