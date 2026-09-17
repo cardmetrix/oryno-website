@@ -394,7 +394,7 @@ function WalletPageContent() {
   );
 
   return (
-    <AppShell>
+    <AppShell onRefresh={() => load({ soft: true })}>
       <PageHeader
         title="My Wallet"
         subtitle="Balance, payout banks & recent activity"
