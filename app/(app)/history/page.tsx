@@ -3,11 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
-import {
-  Check,
-  ChevronDown,
-  Loader2,
-} from "lucide-react";
+import { Check, ChevronDown, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/app-shell";
 import {
@@ -18,6 +14,13 @@ import {
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
 import { TransactionRow } from "@/components/app/transaction-row";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   buildHistoryMonths,
   collectCategories,
@@ -31,7 +34,7 @@ import { useCountry } from "@/components/providers/country-provider";
 import { useSettlePendingTransactions } from "@/hooks/use-settle-pending-transactions";
 
 type StatementFormat = "pdf" | "xlsx";
-type SheetKind = "category" | "status" | "month" | "statement" | null;
+type SheetKind = "month" | "statement" | null;
 
 export default function HistoryPage() {
   const [items, setItems] = useState<AppTransaction[]>([]);
@@ -104,19 +107,6 @@ export default function HistoryPage() {
 
   const totals = useMemo(() => summarizeCashflow(monthItems), [monthItems]);
 
-  const categoryLabel =
-    category === "all"
-      ? "All Categories"
-      : (categories.find((c) => c.id === category)?.label ?? "Category");
-  const statusLabel =
-    status === "all"
-      ? "All Status"
-      : status === "successful"
-        ? "Successful"
-        : status === "pending"
-          ? "Pending"
-          : "Failed";
-
   const hasActiveFilters = category !== "all" || status !== "all";
 
   async function onEmailStatement(format: StatementFormat) {
@@ -181,16 +171,43 @@ export default function HistoryPage() {
       ) : (
         <>
           <MotionSection className="grid grid-cols-2 gap-2.5">
-            <FilterPill
-              label={categoryLabel}
-              active={category !== "all"}
-              onClick={() => setSheet("category")}
-            />
-            <FilterPill
-              label={statusLabel}
-              active={status !== "all"}
-              onClick={() => setSheet("status")}
-            />
+            <Select value={category} onValueChange={setCategory}>
+              <SelectTrigger
+                aria-label="Filter by category"
+                className={cn(
+                  "h-auto w-full rounded-2xl border-0 bg-muted px-3.5 py-3 text-sm font-semibold shadow-none focus:ring-1 focus:ring-primary/30 focus:ring-offset-0",
+                  category !== "all" ? "text-primary" : "text-foreground",
+                )}
+              >
+                <SelectValue placeholder="All Categories" />
+              </SelectTrigger>
+              <SelectContent className="max-h-72 rounded-2xl">
+                <SelectItem value="all">All Categories</SelectItem>
+                {categories.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={status} onValueChange={setStatus}>
+              <SelectTrigger
+                aria-label="Filter by status"
+                className={cn(
+                  "h-auto w-full rounded-2xl border-0 bg-muted px-3.5 py-3 text-sm font-semibold shadow-none focus:ring-1 focus:ring-primary/30 focus:ring-offset-0",
+                  status !== "all" ? "text-primary" : "text-foreground",
+                )}
+              >
+                <SelectValue placeholder="All Status" />
+              </SelectTrigger>
+              <SelectContent className="max-h-72 rounded-2xl">
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="successful">Successful</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="failed">Failed</SelectItem>
+              </SelectContent>
+            </Select>
           </MotionSection>
 
           <MotionSection
@@ -266,46 +283,6 @@ export default function HistoryPage() {
       )}
 
       <PickerSheet
-        open={sheet === "category"}
-        title="Category"
-        subtitle="Filter by service type"
-        onClose={() => setSheet(null)}
-      >
-        <OptionList
-          value={category}
-          onChange={(id) => {
-            setCategory(id);
-            setSheet(null);
-          }}
-          options={[
-            { id: "all", title: "All Categories" },
-            ...categories.map((c) => ({ id: c.id, title: c.label })),
-          ]}
-        />
-      </PickerSheet>
-
-      <PickerSheet
-        open={sheet === "status"}
-        title="Status"
-        subtitle="Filter by transaction result"
-        onClose={() => setSheet(null)}
-      >
-        <OptionList
-          value={status}
-          onChange={(id) => {
-            setStatus(id);
-            setSheet(null);
-          }}
-          options={[
-            { id: "all", title: "All Status" },
-            { id: "successful", title: "Successful" },
-            { id: "pending", title: "Pending" },
-            { id: "failed", title: "Failed" },
-          ]}
-        />
-      </PickerSheet>
-
-      <PickerSheet
         open={sheet === "month"}
         title="Month"
         subtitle="Choose a statement period"
@@ -351,35 +328,6 @@ export default function HistoryPage() {
         />
       </PickerSheet>
     </AppShell>
-  );
-}
-
-function FilterPill({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "inline-flex w-full items-center justify-between gap-2 rounded-2xl bg-muted px-3.5 py-3 text-sm font-semibold transition",
-        active ? "text-primary ring-1 ring-primary/25" : "text-foreground",
-      )}
-    >
-      <span className="truncate">{label}</span>
-      <ChevronDown
-        className={cn(
-          "h-4 w-4 shrink-0",
-          active ? "text-primary" : "text-muted-foreground",
-        )}
-      />
-    </button>
   );
 }
 
