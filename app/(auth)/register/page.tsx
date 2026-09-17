@@ -381,7 +381,6 @@ function RegisterForm() {
               name="fullName"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
-              placeholder="e.g. John Benson"
               autoComplete="name"
               required
               className={authInputClassName}
@@ -394,7 +393,6 @@ function RegisterForm() {
               name="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="e.g. john_b"
               autoComplete="username"
               required
               minLength={3}
@@ -434,7 +432,7 @@ function RegisterForm() {
           <PasswordField
             label="Password"
             name="password"
-            placeholder="Create robust password"
+            placeholder="Create password"
             autoComplete="new-password"
             required
             minLength={8}
