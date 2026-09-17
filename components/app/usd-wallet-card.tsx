@@ -56,7 +56,7 @@ export function UsdWalletCard({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       className={cn(
-        "relative flex h-full min-h-full flex-col overflow-hidden rounded-[28px] border border-white/10 bg-[#1C1C1E] shadow-[0_18px_40px_rgba(0,0,0,0.28)]",
+        "relative flex h-full min-h-full flex-col overflow-hidden rounded-[28px] border border-white/10 bg-[#1C1C1E]",
         className,
       )}
     >
