@@ -29,8 +29,6 @@ export type PairgateVariation = {
   charged_amount?: number;
 };
 
-const DATA_PLAN_TYPES = ["CG", "CG_LITE", "SME", "GIFTING", "AWOOF"] as const;
-
 const AIRTIME_NETWORKS: PairgateService[] = [
   {
     serviceID: "mtn",
@@ -286,64 +284,19 @@ type DataPlanCache = {
   expiresAt: number;
   serviceName: string;
   variations: PairgateVariation[];
+  /** True once deferred plan types (CG_LITE / AWOOF) have been merged. */
+  complete: boolean;
 };
 const dataPlanCache = new Map<string, DataPlanCache>();
 const DATA_PLAN_CACHE_MS = 10 * 60 * 1000;
-
-type CategoriesCache = {
-  expiresAt: number;
-  bySlug: Map<string, string[]>;
-};
-let categoriesCache: CategoriesCache | null = null;
-
-async function dataPlanTypesFor(slug: string): Promise<string[]> {
-  if (categoriesCache && categoriesCache.expiresAt > Date.now()) {
-    return categoriesCache.bySlug.get(slug) || [...DATA_PLAN_TYPES];
-  }
-
-  const bySlug = new Map<string, string[]>();
-  try {
-    const { ok, status, json } = await pairgateCatalogGet(
-      "/data-plans/categories",
-    );
-    if (isPairgateHttpOk(ok, status, json) && json.data != null) {
-      const raw = json.data;
-
-      if (Array.isArray(raw)) {
-        for (const row of raw) {
-          if (!row || typeof row !== "object") continue;
-          const item = row as Record<string, unknown>;
-          const name = String(item.provider_name || item.name || "");
-          const network = normalizePairgateNetwork(name);
-          const planType = String(item.plan_type || "").trim();
-          if (!network || !planType) continue;
-          const list = bySlug.get(network) || [];
-          if (!list.includes(planType)) list.push(planType);
-          bySlug.set(network, list);
-        }
-      } else if (typeof raw === "object") {
-        for (const [name, list] of Object.entries(
-          raw as Record<string, unknown>,
-        )) {
-          if (!Array.isArray(list)) continue;
-          bySlug.set(
-            normalizePairgateNetwork(name),
-            list.map(String).filter(Boolean),
-          );
-        }
-      }
-    }
-  } catch (error) {
-    console.error("[pairgate-data-categories]", slug, error);
-  }
-
-  categoriesCache = {
-    expiresAt: Date.now() + DATA_PLAN_CACHE_MS,
-    bySlug,
-  };
-
-  return bySlug.get(slug) || [...DATA_PLAN_TYPES];
-}
+/** Prefer these first so the UI can respond before slower promo/lite catalogs. */
+const PRIORITY_PLAN_TYPES = ["CG", "SME", "GIFTING"] as const;
+const DEFERRED_PLAN_TYPES = ["CG_LITE", "AWOOF"] as const;
+const inflightDataPlans = new Map<
+  string,
+  Promise<{ serviceName: string; variations: PairgateVariation[] }>
+>();
+const inflightDeferred = new Set<string>();
 
 async function fetchDataPlansForType(
   slug: string,
@@ -364,6 +317,77 @@ async function fetchDataPlansForType(
   }
 }
 
+function mergePlanBatches(
+  batches: PairgateVariation[][],
+): PairgateVariation[] {
+  const variations: PairgateVariation[] = [];
+  const seen = new Set<string>();
+  for (const batch of batches) {
+    for (const v of batch) {
+      if (seen.has(v.variation_code)) continue;
+      seen.add(v.variation_code);
+      variations.push(v);
+    }
+  }
+  variations.sort(
+    (a, b) => (Number(a.charged_amount) || 0) - (Number(b.charged_amount) || 0),
+  );
+  return variations;
+}
+
+function writeDataPlanCache(
+  slug: string,
+  serviceName: string,
+  variations: PairgateVariation[],
+  complete: boolean,
+) {
+  dataPlanCache.set(slug, {
+    expiresAt: Date.now() + DATA_PLAN_CACHE_MS,
+    serviceName,
+    variations,
+    complete,
+  });
+}
+
+/** Fill remaining plan types without blocking the first response. */
+function scheduleDeferredDataPlans(slug: string, serviceName: string) {
+  if (inflightDeferred.has(slug)) return;
+  inflightDeferred.add(slug);
+  void (async () => {
+    try {
+      const batches = [];
+      for (const planType of DEFERRED_PLAN_TYPES) {
+        batches.push(await fetchDataPlansForType(slug, planType));
+      }
+      const existing = dataPlanCache.get(slug);
+      const merged = mergePlanBatches([
+        existing?.variations ?? [],
+        ...batches,
+      ]);
+      writeDataPlanCache(slug, serviceName, merged, true);
+    } catch (error) {
+      console.error("[pairgate-data-plans-deferred]", slug, error);
+    } finally {
+      inflightDeferred.delete(slug);
+    }
+  })();
+}
+
+async function loadDataVariationsFresh(
+  slug: string,
+  serviceName: string,
+): Promise<{ serviceName: string; variations: PairgateVariation[] }> {
+  // Skip /data-plans/categories (extra ~2s Pairgate gap). Static types match their docs.
+  const batches: PairgateVariation[][] = [];
+  for (const planType of PRIORITY_PLAN_TYPES) {
+    batches.push(await fetchDataPlansForType(slug, planType));
+  }
+  const variations = mergePlanBatches(batches);
+  writeDataPlanCache(slug, serviceName, variations, false);
+  scheduleDeferredDataPlans(slug, serviceName);
+  return { serviceName, variations };
+}
+
 export async function listDataVariations(
   providerSlug: string,
 ): Promise<{ serviceName: string; variations: PairgateVariation[] }> {
@@ -373,36 +397,35 @@ export async function listDataVariations(
 
   const cached = dataPlanCache.get(slug);
   if (cached && cached.expiresAt > Date.now()) {
+    if (!cached.complete) scheduleDeferredDataPlans(slug, serviceName);
     return {
       serviceName: cached.serviceName,
       variations: cached.variations,
     };
   }
 
-  const planTypes = await dataPlanTypesFor(slug);
-  const variations: PairgateVariation[] = [];
-  const seen = new Set<string>();
-
-  for (const planType of planTypes) {
-    const batch = await fetchDataPlansForType(slug, planType);
-    for (const v of batch) {
-      if (seen.has(v.variation_code)) continue;
-      seen.add(v.variation_code);
-      variations.push(v);
+  // Stale-while-revalidate: serve expired catalog instantly, refresh in background.
+  if (cached?.variations.length) {
+    if (!inflightDataPlans.has(slug)) {
+      const refresh = loadDataVariationsFresh(slug, serviceName).finally(() => {
+        inflightDataPlans.delete(slug);
+      });
+      inflightDataPlans.set(slug, refresh);
     }
+    return {
+      serviceName: cached.serviceName,
+      variations: cached.variations,
+    };
   }
 
-  variations.sort(
-    (a, b) => (Number(a.charged_amount) || 0) - (Number(b.charged_amount) || 0),
-  );
+  const existing = inflightDataPlans.get(slug);
+  if (existing) return existing;
 
-  dataPlanCache.set(slug, {
-    expiresAt: Date.now() + DATA_PLAN_CACHE_MS,
-    serviceName,
-    variations,
+  const load = loadDataVariationsFresh(slug, serviceName).finally(() => {
+    inflightDataPlans.delete(slug);
   });
-
-  return { serviceName, variations };
+  inflightDataPlans.set(slug, load);
+  return load;
 }
 
 export async function listCableVariations(
@@ -437,6 +460,7 @@ export async function listCableVariations(
     expiresAt: Date.now() + DATA_PLAN_CACHE_MS,
     serviceName,
     variations,
+    complete: true,
   });
 
   return { serviceName, variations };

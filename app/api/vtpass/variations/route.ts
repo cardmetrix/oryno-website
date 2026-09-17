@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
-import { priceLocalAmount } from "@/lib/pricing/service-pricing";
+import { priceLocalAmount, createLocalPricer } from "@/lib/pricing/service-pricing";
 import { getDisplayFx } from "@/lib/display-currency";
 import { convertLocalToNgn } from "@/lib/fx/rates";
 import {
@@ -200,26 +200,24 @@ export async function GET(req: Request) {
       // Data plans (airtime has no variations)
       if (isDataNetwork || /-data$/i.test(serviceID)) {
         const live = await listDataVariations(serviceID);
-        const priced = await Promise.all(
-          live.variations.map(async (v) => {
-            const base = Number(v.charged_amount) || 0;
-            const result = await priceLocalAmount({
-              provider: "vtpass",
-              serviceKey: `${networkSlug}:${v.variation_code}`,
-              amount: base > 0 ? base : 1000,
-            });
-            return {
-              variationCode: v.variation_code,
-              name: v.name,
-              amount: base > 0 ? result.local : 0,
-              listAmount: base > 0 ? result.listLocal : 0,
-              priceOverride: result.overrideApplied,
-              fixedPrice: true,
-              variationAmount: v.variation_amount,
-              chargedAmount: v.charged_amount,
-            };
-          }),
-        );
+        const price = await createLocalPricer("vtpass");
+        const priced = live.variations.map((v) => {
+          const base = Number(v.charged_amount) || 0;
+          const result = price({
+            serviceKey: `${networkSlug}:${v.variation_code}`,
+            amount: base > 0 ? base : 1000,
+          });
+          return {
+            variationCode: v.variation_code,
+            name: v.name,
+            amount: base > 0 ? result.local : 0,
+            listAmount: base > 0 ? result.listLocal : 0,
+            priceOverride: result.overrideApplied,
+            fixedPrice: true,
+            variationAmount: v.variation_amount,
+            chargedAmount: v.charged_amount,
+          };
+        });
         return NextResponse.json({
           ok: true,
           demo: isPairgateSandbox(),

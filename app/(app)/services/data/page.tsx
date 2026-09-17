@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Wallet, Wifi } from "lucide-react";
 import { AppShell } from "@/components/app/app-shell";
@@ -66,6 +66,7 @@ export default function DataPage() {
   const [receipt, setReceipt] = useState("");
   const [receiptLabel, setReceiptLabel] = useState("");
   const [productTypeId, setProductTypeId] = useState(4);
+  const plansCacheRef = useRef<Map<string, Variation[]>>(new Map());
 
   const selected = variations.find((v) => v.variationCode === variationCode);
   const selectedNetwork = networks.find((n) => n.serviceID === networkId);
@@ -140,6 +141,7 @@ export default function DataPage() {
       setNetworkId("");
       setVariations([]);
       setVariationCode("");
+      plansCacheRef.current.clear();
 
       try {
         if (isNigeria) {
@@ -209,8 +211,24 @@ export default function DataPage() {
     let cancelled = false;
 
     (async () => {
-      setLoadingPlans(true);
-      setVariationCode("");
+      const cacheKey = isNigeria
+        ? `ng:${networkId}`
+        : `intl:${networkId}:${productTypeId}`;
+      const cached = plansCacheRef.current.get(cacheKey);
+      if (cached?.length) {
+        setVariations(cached);
+        setVariationCode((prev) =>
+          cached.some((v) => v.variationCode === prev)
+            ? prev
+            : cached[0]?.variationCode || "",
+        );
+        setLoadingPlans(false);
+      } else {
+        setLoadingPlans(true);
+        setVariationCode("");
+        setVariations([]);
+      }
+
       try {
         const url = isNigeria
           ? `/api/vtpass/variations?serviceID=${encodeURIComponent(networkId)}&identifier=data`
@@ -219,12 +237,18 @@ export default function DataPage() {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Failed to load plans");
         if (cancelled) return;
-        setVariations(data.variations ?? []);
-        if (data.variations?.[0]?.variationCode) {
-          setVariationCode(data.variations[0].variationCode);
+        const next: Variation[] = data.variations ?? [];
+        plansCacheRef.current.set(cacheKey, next);
+        setVariations(next);
+        if (next[0]?.variationCode) {
+          setVariationCode((prev) =>
+            next.some((v) => v.variationCode === prev)
+              ? prev
+              : next[0].variationCode,
+          );
         }
       } catch (e) {
-        if (!cancelled) {
+        if (!cancelled && !cached?.length) {
           setError(e instanceof Error ? e.message : "Failed to load plans");
         }
       } finally {
