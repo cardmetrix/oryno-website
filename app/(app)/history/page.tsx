@@ -4,13 +4,9 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  ArrowDownLeft,
-  ArrowUpRight,
   Check,
   ChevronDown,
-  Download,
   Loader2,
-  PieChart,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/app-shell";
@@ -29,10 +25,7 @@ import {
   formatMoneyAmount,
   summarizeCashflow,
 } from "@/lib/history";
-import {
-  groupTransactionsByDate,
-  type AppTransaction,
-} from "@/lib/transactions";
+import { type AppTransaction } from "@/lib/transactions";
 import { cn } from "@/lib/utils";
 import { useWallet } from "@/hooks/use-wallet";
 import { useSettlePendingTransactions } from "@/hooks/use-settle-pending-transactions";
@@ -63,16 +56,15 @@ export default function HistoryPage() {
         (settled.completed ?? 0) + (settled.reversed ?? 0) + (settled.failed ?? 0) > 0
       ) {
         toast.message("Pending transactions updated", {
-          description: "Older pending withdrawals were completed or returned to your wallet.",
+          description:
+            "Older pending withdrawals were completed or returned to your wallet.",
         });
       }
       const txRes = await fetch("/api/transactions", { cache: "no-store" });
       if (!txRes.ok) throw new Error("Failed");
       const json = (await txRes.json()) as { items: AppTransaction[] };
       setItems(json.items ?? []);
-      setCurrency(
-        (prev) => json.items?.[0]?.currency ?? prev,
-      );
+      setCurrency((prev) => json.items?.[0]?.currency ?? prev);
     } catch {
       setError(true);
       setItems([]);
@@ -113,10 +105,6 @@ export default function HistoryPage() {
   );
 
   const totals = useMemo(() => summarizeCashflow(monthItems), [monthItems]);
-  const groups = useMemo(
-    () => groupTransactionsByDate(monthItems),
-    [monthItems],
-  );
 
   const categoryLabel =
     category === "all"
@@ -168,25 +156,22 @@ export default function HistoryPage() {
   }
 
   return (
-    <AppShell>
+    <AppShell onRefresh={() => load()}>
       <PageHeader
         title="Transactions"
-        subtitle="Wallet activity & statements"
         backHref="/dashboard"
         actions={
           <button
             type="button"
             onClick={() => setSheet("statement")}
             disabled={downloading || loading}
-            style={{ color: "#ff6a00" }}
-         className="inline-flex h-10 items-center justify-center gap-1.5 px-3.5 text-sm font-bold transition hover:opacity-80"
+            className="inline-flex h-10 items-center justify-center px-2 text-sm font-bold text-primary transition hover:opacity-80 disabled:opacity-50"
           >
             {downloading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <Download className="h-4 w-4" />
+              "Download"
             )}
-            Download
           </button>
         }
       />
@@ -197,58 +182,7 @@ export default function HistoryPage() {
         <HistoryError onRetry={() => void load()} />
       ) : (
         <>
-          <MotionSection className="relative overflow-hidden rounded-[28px] border border-border/60 bg-background p-4 sm:p-5">
-            <div className="relative flex flex-wrap items-center justify-between gap-3">
-              <button
-                type="button"
-                onClick={() => setSheet("month")}
-                className="inline-flex items-center gap-2 rounded-2xl border border-border/80 bg-muted/50 px-3.5 py-2.5 text-sm font-bold text-foreground transition hover:border-primary/30 hover:bg-oryno-orange-muted/40"
-              >
-                {activeMonth?.label ?? "—"}
-                <ChevronDown className="h-4 w-4 text-muted-foreground" />
-              </button>
-              <Link
-                href={`/history/analytics?month=${encodeURIComponent(activeMonth?.key ?? "")}`}
-                className="inline-flex h-10 items-center gap-1.5 rounded-2xl bg-oryno-orange-muted px-3.5 text-sm font-bold text-primary transition hover:bg-primary hover:text-white"
-              >
-                <PieChart className="h-4 w-4" />
-                Analysis
-              </Link>
-            </div>
-
-            <div className="relative mt-4 grid grid-cols-2 gap-3">
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.05 }}
-                className="rounded-[20px] border border-[color-mix(in_srgb,var(--oryno-success)_25%,transparent)] bg-[color-mix(in_srgb,var(--oryno-success)_8%,transparent)] p-3.5"
-              >
-                <div className="flex items-center gap-2 text-[11px] font-bold tracking-[0.12em] text-[var(--oryno-success)] uppercase">
-                  <ArrowDownLeft className="h-3.5 w-3.5" />
-                  In
-                </div>
-                <p className="mt-1.5 truncate text-lg font-bold tabular-nums text-foreground">
-                  {formatMoneyAmount(totals.inflow, currency)}
-                </p>
-              </motion.div>
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 }}
-                className="rounded-[20px] border border-border/70 bg-muted/40 p-3.5"
-              >
-                <div className="flex items-center gap-2 text-[11px] font-bold tracking-[0.12em] text-muted-foreground uppercase">
-                  <ArrowUpRight className="h-3.5 w-3.5" />
-                  Out
-                </div>
-                <p className="mt-1.5 truncate text-lg font-bold tabular-nums text-foreground">
-                  {formatMoneyAmount(totals.outflow, currency)}
-                </p>
-              </motion.div>
-            </div>
-          </MotionSection>
-
-          <MotionSection delay={0.05} className="mt-4 flex flex-wrap gap-2">
+          <MotionSection className="grid grid-cols-2 gap-2.5">
             <FilterPill
               label={categoryLabel}
               active={category !== "all"}
@@ -259,66 +193,77 @@ export default function HistoryPage() {
               active={status !== "all"}
               onClick={() => setSheet("status")}
             />
-            {hasActiveFilters ? (
-              <motion.button
-                type="button"
-                initial={{ opacity: 0, scale: 0.92 }}
-                animate={{ opacity: 1, scale: 1 }}
-                onClick={() => {
-                  setCategory("all");
-                  setStatus("all");
-                }}
-                className="inline-flex h-[42px] items-center rounded-[14px] px-3 text-xs font-bold text-muted-foreground transition hover:text-foreground"
-              >
-                Clear filters
-              </motion.button>
-            ) : null}
           </MotionSection>
 
-          <div className="mt-5 space-y-4 sm:mt-6 sm:space-y-5">
-            <AnimatePresence mode="wait">
-              {groups.length === 0 ? (
-                <HistoryEmpty
-                  filtered={hasActiveFilters || items.length > 0}
-                  onClear={
-                    hasActiveFilters
-                      ? () => {
-                          setCategory("all");
-                          setStatus("all");
-                        }
-                      : undefined
-                  }
-                />
-              ) : (
-                groups.map((group, groupIndex) => (
-                  <MotionSection
-                    key={group.date}
-                    delay={0.04 + groupIndex * 0.03}
-                    className="overflow-hidden rounded-[28px] border border-border/50 bg-background shadow-[var(--shadow-soft)]"
+          <MotionSection
+            delay={0.04}
+            className="mt-4 overflow-hidden rounded-[24px] bg-background shadow-[var(--shadow-soft)] sm:mt-5"
+          >
+            <div className="flex items-start justify-between gap-3 px-4 pt-4 sm:px-5 sm:pt-5">
+              <div className="min-w-0">
+                <button
+                  type="button"
+                  onClick={() => setSheet("month")}
+                  className="inline-flex items-center gap-1 text-base font-bold text-foreground"
+                >
+                  {activeMonth?.label ?? "—"}
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                </button>
+                <p className="mt-1.5 text-sm text-muted-foreground">
+                  <span className="font-medium text-foreground">In</span>{" "}
+                  <span className="font-semibold text-[var(--oryno-success)]">
+                    {formatMoneyAmount(totals.inflow, currency)}
+                  </span>
+                  <span className="mx-2 text-border">·</span>
+                  <span className="font-medium text-foreground">Out</span>{" "}
+                  <span className="font-semibold text-foreground">
+                    {formatMoneyAmount(totals.outflow, currency)}
+                  </span>
+                </p>
+              </div>
+              <Link
+                href={`/history/analytics?month=${encodeURIComponent(activeMonth?.key ?? "")}`}
+                className="inline-flex h-9 shrink-0 items-center rounded-full bg-primary px-4 text-sm font-bold text-white shadow-[var(--shadow-soft)] transition hover:opacity-90"
+              >
+                Analysis
+              </Link>
+            </div>
+
+            <div className="mt-2 px-3 pb-2 sm:px-4 sm:pb-3">
+              <AnimatePresence mode="wait">
+                {monthItems.length === 0 ? (
+                  <div className="px-1 py-2">
+                    <HistoryEmpty
+                      filtered={hasActiveFilters || items.length > 0}
+                      onClear={
+                        hasActiveFilters
+                          ? () => {
+                              setCategory("all");
+                              setStatus("all");
+                            }
+                          : undefined
+                      }
+                    />
+                  </div>
+                ) : (
+                  <motion.div
+                    key={`${activeMonth?.key}-${category}-${status}`}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="divide-y divide-border/50"
                   >
-                    <div className="flex items-center justify-between border-b border-border/50 bg-muted/30 px-4 py-3 sm:px-5">
-                      <p className="text-[11px] font-bold tracking-[0.14em] text-muted-foreground uppercase">
-                        {group.date}
-                      </p>
-                      <span className="rounded-full bg-background px-2.5 py-1 text-[11px] font-semibold text-muted-foreground shadow-[var(--shadow-soft)]">
-                        {group.items.length}{" "}
-                        {group.items.length === 1 ? "item" : "items"}
-                      </span>
-                    </div>
-                    <div className="px-1.5 py-1 sm:px-2">
-                      {group.items.map((tx, index) => (
-                        <TransactionRow
-                          key={tx.id}
-                          transaction={tx}
-                          index={index}
-                        />
-                      ))}
-                    </div>
-                  </MotionSection>
-                ))
-              )}
-            </AnimatePresence>
-          </div>
+                    {monthItems.map((tx, index) => (
+                      <TransactionRow
+                        key={tx.id}
+                        transaction={tx}
+                        index={index}
+                      />
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </MotionSection>
         </>
       )}
 
@@ -421,16 +366,12 @@ function FilterPill({
   onClick: () => void;
 }) {
   return (
-    <motion.button
+    <button
       type="button"
-      whileHover={{ y: -1 }}
-      whileTap={{ scale: 0.98 }}
       onClick={onClick}
       className={cn(
-        "inline-flex min-w-0 flex-1 items-center justify-between gap-2 rounded-[16px] border px-3.5 py-2.5 text-sm font-bold transition sm:flex-none sm:min-w-[160px]",
-        active
-          ? "border-primary/30 bg-oryno-orange-muted text-primary"
-          : "border-border/70 bg-background text-foreground shadow-[var(--shadow-soft)]",
+        "inline-flex w-full items-center justify-between gap-2 rounded-2xl bg-muted px-3.5 py-3 text-sm font-semibold transition",
+        active ? "text-primary ring-1 ring-primary/25" : "text-foreground",
       )}
     >
       <span className="truncate">{label}</span>
@@ -440,7 +381,7 @@ function FilterPill({
           active ? "text-primary" : "text-muted-foreground",
         )}
       />
-    </motion.button>
+    </button>
   );
 }
 
