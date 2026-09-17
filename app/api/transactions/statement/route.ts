@@ -46,6 +46,7 @@ export async function POST(request: Request) {
         id: user.id,
         email: user.email,
         fullName: user.fullName,
+        countryCode: user.countryCode,
       },
       { format, month },
     );

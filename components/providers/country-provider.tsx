@@ -21,6 +21,7 @@ export type DisplayFx = {
   to: string;
   ngnToLocal: number;
   localToNgn: number;
+  usdToLocal?: number;
   provider?: string;
   asOf?: string;
 };

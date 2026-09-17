@@ -25,6 +25,8 @@ export type AppTransaction = {
   title: string;
   subtitle: string;
   amount: string;
+  /** Absolute amount in `currency` (user display currency when FX applied). */
+  amountValue: number;
   type: "credit" | "debit";
   status: TransactionStatus;
   category?: string;
@@ -66,14 +68,69 @@ function presentAmount(
   fx?: NgnLocalQuote | null,
 ) {
   const raw = typeof amount === "number" ? amount : Number(amount);
-  if (fx && fx.to !== "NGN" && storedCurrency === "NGN") {
-    const local = convertNgnToLocal(raw, fx.ngnToLocal);
-    return { value: local, currency: fx.to, formatted: formatMoney(local, fx.to) };
+  const stored = (storedCurrency || "NGN").toUpperCase();
+  const display = (fx?.to || stored).toUpperCase();
+
+  if (!Number.isFinite(raw)) {
+    return { value: 0, currency: display, formatted: formatMoney(0, display) };
   }
+
+  // Already in the user's display currency.
+  if (!fx || stored === display) {
+    return {
+      value: Math.abs(raw),
+      currency: stored,
+      formatted: formatMoney(raw, stored),
+    };
+  }
+
+  // NGN ledger → local display.
+  if (stored === "NGN" && display !== "NGN") {
+    const local = convertNgnToLocal(raw, fx.ngnToLocal);
+    return {
+      value: Math.abs(local),
+      currency: display,
+      formatted: formatMoney(local, display),
+    };
+  }
+
+  // USD wallet → local display.
+  if (stored === "USD" && display !== "USD") {
+    const rate = fx.usdToLocal && fx.usdToLocal > 0 ? fx.usdToLocal : null;
+    if (rate) {
+      const local = Math.round(Math.abs(raw) * rate * 100) / 100;
+      return {
+        value: local,
+        currency: display,
+        formatted: formatMoney(local, display),
+      };
+    }
+  }
+
+  // Local amount shown while display is NGN.
+  if (display === "NGN" && stored !== "NGN" && fx.localToNgn > 0) {
+    if (stored === "USD" && fx.usdToLocal && fx.usdToLocal > 0) {
+      // USD → local mid, then local → NGN via inverse of ngnToLocal path:
+      // usd * usdToLocal gives display local; if display is NGN, usdToLocal is NGN/USD.
+      const ngn = Math.round(Math.abs(raw) * fx.usdToLocal * 100) / 100;
+      return {
+        value: ngn,
+        currency: "NGN",
+        formatted: formatMoney(ngn, "NGN"),
+      };
+    }
+    const ngn = convertNgnToLocal(raw, fx.localToNgn);
+    return {
+      value: Math.abs(ngn),
+      currency: "NGN",
+      formatted: formatMoney(ngn, "NGN"),
+    };
+  }
+
   return {
-    value: raw,
-    currency: storedCurrency,
-    formatted: formatMoney(raw, storedCurrency),
+    value: Math.abs(raw),
+    currency: stored,
+    formatted: formatMoney(raw, stored),
   };
 }
 
@@ -88,6 +145,7 @@ export function toAppTransaction(
     title: row.title,
     subtitle: row.subtitle || row.category.replace(/_/g, " "),
     amount: `${credit ? "+" : "-"}${presented.formatted}`,
+    amountValue: presented.value,
     type: credit ? "credit" : "debit",
     status: mapDbStatus(row.status),
     category: row.category,

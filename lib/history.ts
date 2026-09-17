@@ -195,8 +195,11 @@ export function summarizeCashflow(items: AppTransaction[]) {
   let inflow = 0;
   let outflow = 0;
   for (const item of items) {
-    const amount = Math.abs(parseAmount(item.amount));
-    if (item.type === 'credit') inflow += amount;
+    const amount =
+      typeof item.amountValue === "number" && Number.isFinite(item.amountValue)
+        ? Math.abs(item.amountValue)
+        : Math.abs(parseAmount(item.amount));
+    if (item.type === "credit") inflow += amount;
     else outflow += amount;
   }
   return { inflow, outflow, net: inflow - outflow, count: items.length };
@@ -205,7 +208,7 @@ export function summarizeCashflow(items: AppTransaction[]) {
 export function buildCategoryBreakdown(items: AppTransaction[]): CategoryBreakdown[] {
   const map = new Map<string, CategoryBreakdown>();
   for (const item of items) {
-    const id = (item.category ?? 'other').trim().toLowerCase() || 'other';
+    const id = (item.category ?? "other").trim().toLowerCase() || "other";
     const current = map.get(id) ?? {
       id,
       label: categoryLabel(id),
@@ -214,9 +217,12 @@ export function buildCategoryBreakdown(items: AppTransaction[]): CategoryBreakdo
       outflow: 0,
       total: 0,
     };
-    const amount = Math.abs(parseAmount(item.amount));
+    const amount =
+      typeof item.amountValue === "number" && Number.isFinite(item.amountValue)
+        ? Math.abs(item.amountValue)
+        : Math.abs(parseAmount(item.amount));
     current.count += 1;
-    if (item.type === 'credit') current.inflow += amount;
+    if (item.type === "credit") current.inflow += amount;
     else current.outflow += amount;
     current.total = current.inflow + current.outflow;
     map.set(id, current);
@@ -247,8 +253,11 @@ export function buildDailySeries(items: AppTransaction[], monthKey: string): Day
     if (Number.isNaN(date.getTime())) continue;
     if (monthKeyFromDate(date) !== monthKey) continue;
     const idx = date.getDate() - 1;
-    const amount = Math.abs(parseAmount(item.amount));
-    if (item.type === 'credit') points[idx].inflow += amount;
+    const amount =
+      typeof item.amountValue === "number" && Number.isFinite(item.amountValue)
+        ? Math.abs(item.amountValue)
+        : Math.abs(parseAmount(item.amount));
+    if (item.type === "credit") points[idx].inflow += amount;
     else points[idx].outflow += amount;
   }
 

@@ -15,6 +15,7 @@ export async function getDisplayFx(
       to: currency,
       ngnToLocal: 1,
       localToNgn: 1,
+      usdToLocal: currency === "USD" ? 1 : currency === "NGN" ? 1600 : 1,
       provider: "fallback",
       asOf: new Date().toISOString(),
     };

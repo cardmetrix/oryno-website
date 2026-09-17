@@ -201,6 +201,8 @@ export type NgnLocalQuote = {
   ngnToLocal: number;
   /** Multiply a local amount by this to get NGN. */
   localToNgn: number;
+  /** Multiply a USD amount by this to get the display currency (mid). */
+  usdToLocal?: number;
   provider: string;
   asOf: string;
 };
@@ -211,11 +213,18 @@ export async function quoteNgnToLocal(
 ): Promise<NgnLocalQuote> {
   const to = localCurrency.toUpperCase();
   if (to === "NGN") {
+    let usdToNgn = 1;
+    try {
+      usdToNgn = (await getUsdMidRate("NGN")).midRate;
+    } catch {
+      usdToNgn = 1600;
+    }
     return {
       from: "NGN",
       to: "NGN",
       ngnToLocal: 1,
       localToNgn: 1,
+      usdToLocal: usdToNgn,
       provider: "identity",
       asOf: new Date().toISOString(),
     };
@@ -235,6 +244,7 @@ export async function quoteNgnToLocal(
     to,
     ngnToLocal,
     localToNgn: 1 / ngnToLocal,
+    usdToLocal: local.midRate,
     provider: ngn.provider,
     asOf: new Date().toISOString(),
   };

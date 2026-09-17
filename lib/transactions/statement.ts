@@ -75,6 +75,7 @@ type StatementUser = {
   id: string;
   email: string;
   fullName: string | null;
+  countryCode?: string | null;
 };
 
 export type StatementRequest = {
@@ -105,14 +106,22 @@ function summarize(items: AppTransaction[]) {
   let inflow = 0;
   let outflow = 0;
   for (const item of items) {
-    const n = Math.abs(Number(String(item.amount).replace(/[^\d.-]/g, "")) || 0);
+    const n =
+      typeof item.amountValue === "number" && Number.isFinite(item.amountValue)
+        ? Math.abs(item.amountValue)
+        : Math.abs(Number(String(item.amount).replace(/[^\d.-]/g, "")) || 0);
     if (item.type === "credit") inflow += n;
     else outflow += n;
   }
   return { inflow, outflow, net: inflow - outflow, count: items.length };
 }
 
-async function loadMonthTransactions(userId: string, start: Date, end: Date) {
+async function loadMonthTransactions(
+  userId: string,
+  start: Date,
+  end: Date,
+  countryCode?: string | null,
+) {
   const rows = await db.query.transactions.findMany({
     where: and(
       eq(transactions.userId, userId),
@@ -122,7 +131,9 @@ async function loadMonthTransactions(userId: string, start: Date, end: Date) {
     orderBy: [asc(transactions.createdAt)],
     limit: 2000,
   });
-  return rows.map(toAppTransaction);
+  const { getDisplayFx } = await import("@/lib/display-currency");
+  const fx = await getDisplayFx(countryCode);
+  return rows.map((row) => toAppTransaction(row, fx));
 }
 
 async function buildPdfBuffer(opts: {
@@ -297,7 +308,12 @@ export async function emailWalletStatement(
 
   const format: StatementFormat = input.format === "xlsx" ? "xlsx" : "pdf";
   const period = parseMonth(input.month);
-  const items = await loadMonthTransactions(user.id, period.start, period.end);
+  const items = await loadMonthTransactions(
+    user.id,
+    period.start,
+    period.end,
+    user.countryCode,
+  );
 
   const fileBuffer =
     format === "xlsx"

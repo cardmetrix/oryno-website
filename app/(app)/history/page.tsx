@@ -27,7 +27,7 @@ import {
 } from "@/lib/history";
 import { type AppTransaction } from "@/lib/transactions";
 import { cn } from "@/lib/utils";
-import { useWallet } from "@/hooks/use-wallet";
+import { useCountry } from "@/components/providers/country-provider";
 import { useSettlePendingTransactions } from "@/hooks/use-settle-pending-transactions";
 
 type StatementFormat = "pdf" | "xlsx";
@@ -42,9 +42,13 @@ export default function HistoryPage() {
   const [status, setStatus] = useState("all");
   const [sheet, setSheet] = useState<SheetKind>(null);
   const [downloading, setDownloading] = useState(false);
-  const [currency, setCurrency] = useState("NGN");
-  const { data: wallet } = useWallet();
+  const { country } = useCountry();
   const { settle: settlePending } = useSettlePendingTransactions(true);
+
+  const currency = useMemo(() => {
+    const fromItems = items.find((item) => item.currency)?.currency;
+    return (fromItems || country.currency || "NGN").toUpperCase();
+  }, [items, country.currency]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -64,7 +68,6 @@ export default function HistoryPage() {
       if (!txRes.ok) throw new Error("Failed");
       const json = (await txRes.json()) as { items: AppTransaction[] };
       setItems(json.items ?? []);
-      setCurrency((prev) => json.items?.[0]?.currency ?? prev);
     } catch {
       setError(true);
       setItems([]);
@@ -76,11 +79,6 @@ export default function HistoryPage() {
   useEffect(() => {
     void load();
   }, [load]);
-
-  useEffect(() => {
-    const next = wallet?.totals?.currency ?? wallet?.primary?.currency;
-    if (next) setCurrency(next);
-  }, [wallet]);
 
   const months = useMemo(() => buildHistoryMonths(items), [items]);
 

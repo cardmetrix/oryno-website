@@ -24,7 +24,7 @@ import {
 } from "@/lib/history";
 import type { AppTransaction } from "@/lib/transactions";
 import { cn } from "@/lib/utils";
-import { useWallet } from "@/hooks/use-wallet";
+import { useCountry } from "@/components/providers/country-provider";
 
 export default function HistoryAnalyticsPage() {
   return (
@@ -51,8 +51,12 @@ function HistoryAnalyticsContent() {
   const [loading, setLoading] = useState(true);
   const [monthKey, setMonthKey] = useState(searchParams.get("month") ?? "");
   const [monthOpen, setMonthOpen] = useState(false);
-  const [currency, setCurrency] = useState("NGN");
-  const { data: wallet } = useWallet();
+  const { country } = useCountry();
+
+  const currency = useMemo(() => {
+    const fromItems = items.find((item) => item.currency)?.currency;
+    return (fromItems || country.currency || "NGN").toUpperCase();
+  }, [items, country.currency]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -61,7 +65,6 @@ function HistoryAnalyticsContent() {
       if (!txRes.ok) throw new Error("Failed");
       const json = (await txRes.json()) as { items: AppTransaction[] };
       setItems(json.items ?? []);
-      setCurrency((prev) => json.items?.[0]?.currency ?? prev);
     } catch {
       setItems([]);
     } finally {
@@ -72,11 +75,6 @@ function HistoryAnalyticsContent() {
   useEffect(() => {
     void load();
   }, [load]);
-
-  useEffect(() => {
-    const next = wallet?.totals?.currency ?? wallet?.primary?.currency;
-    if (next) setCurrency(next);
-  }, [wallet]);
 
   const months = useMemo(() => buildHistoryMonths(items), [items]);
   const paramMonth = searchParams.get("month") ?? "";
