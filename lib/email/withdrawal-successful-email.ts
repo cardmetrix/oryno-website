@@ -14,7 +14,7 @@ export function withdrawalSuccessfulEmailContent(input: {
     "Status: Completed ✅",
     `Reference: ${reference}`,
     "",
-    "Thank you for using ORYNO — One App, Endless Possibilities.",
+    "Thank you for using ORYNO — Your Digital World, Simplified.",
   ].join("\n");
 
   const bodyHtml = `
@@ -28,7 +28,7 @@ export function withdrawalSuccessfulEmailContent(input: {
         </td>
       </tr>
     </table>
-    <p style="margin:0;">Thank you for using ORYNO — One App, Endless Possibilities.</p>
+    <p style="margin:0;">Thank you for using ORYNO — Your Digital World, Simplified..</p>
   `;
 
   return {
