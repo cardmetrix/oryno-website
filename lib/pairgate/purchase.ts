@@ -579,15 +579,7 @@ export async function purchasePairgateAirtime(input: {
       orderId: order.id,
     });
 
-    await maybeSaveBeneficiary({
-      save: input.saveBeneficiary,
-      userId: input.userId,
-      phone,
-      networkId: network.id,
-      label: network.name,
-    });
-
-    return {
+    const success = {
       order,
       transactionId: prepared.transaction.id,
       wallet: toWalletSummary(prepared.wallet),
@@ -597,6 +589,16 @@ export async function purchasePairgateAirtime(input: {
       simulated: result.simulated,
       response: result.data,
     };
+
+    void maybeSaveBeneficiary({
+      save: input.saveBeneficiary,
+      userId: input.userId,
+      phone,
+      networkId: network.id,
+      label: network.name,
+    });
+
+    return success;
   } catch (error) {
     const reason = error instanceof Error ? error.message : "Purchase failed";
     await refundFailedDebit({
@@ -710,15 +712,7 @@ export async function purchasePairgateData(input: {
       orderId: order.id,
     });
 
-    await maybeSaveBeneficiary({
-      save: input.saveBeneficiary,
-      userId: input.userId,
-      phone,
-      networkId: network.id,
-      label: network.name,
-    });
-
-    return {
+    const success = {
       order,
       transactionId: prepared.transaction.id,
       wallet: toWalletSummary(prepared.wallet),
@@ -727,6 +721,16 @@ export async function purchasePairgateData(input: {
       simulated: result.simulated,
       response: result.data,
     };
+
+    void maybeSaveBeneficiary({
+      save: input.saveBeneficiary,
+      userId: input.userId,
+      phone,
+      networkId: network.id,
+      label: network.name,
+    });
+
+    return success;
   } catch (error) {
     const reason = error instanceof Error ? error.message : "Purchase failed";
     await refundFailedDebit({

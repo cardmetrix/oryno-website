@@ -1,3 +1,4 @@
+import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { beneficiaries } from "@/lib/db/schema";
 
@@ -12,6 +13,32 @@ export async function upsertBeneficiary(input: {
   if (!phone || phone.length < 8) return null;
 
   const now = new Date();
+  const existing = await db
+    .select()
+    .from(beneficiaries)
+    .where(
+      and(
+        eq(beneficiaries.userId, input.userId),
+        eq(beneficiaries.phone, phone),
+      ),
+    )
+    .limit(1)
+    .then((rows) => rows[0] ?? null);
+
+  if (existing) {
+    const [row] = await db
+      .update(beneficiaries)
+      .set({
+        ...(input.networkId ? { networkId: input.networkId } : {}),
+        ...(input.label?.trim() ? { label: input.label.trim() } : {}),
+        lastUsedAt: now,
+        updatedAt: now,
+      })
+      .where(eq(beneficiaries.id, existing.id))
+      .returning();
+    return row ?? existing;
+  }
+
   const [row] = await db
     .insert(beneficiaries)
     .values({
@@ -21,20 +48,12 @@ export async function upsertBeneficiary(input: {
       label: input.label?.trim() || null,
       lastUsedAt: now,
     })
-    .onConflictDoUpdate({
-      target: [beneficiaries.userId, beneficiaries.phone],
-      set: {
-        ...(input.networkId ? { networkId: input.networkId } : {}),
-        ...(input.label?.trim() ? { label: input.label.trim() } : {}),
-        lastUsedAt: now,
-        updatedAt: now,
-      },
-    })
     .returning();
 
   return row ?? null;
 }
 
+/** Never throws — purchase success must not depend on beneficiary persistence. */
 export async function maybeSaveBeneficiary(input: {
   save?: boolean;
   userId: string;

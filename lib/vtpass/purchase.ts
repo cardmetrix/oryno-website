@@ -619,7 +619,7 @@ export async function purchaseAirtime(input: {
       );
 
       if (outcome === "completed" || outcome === "processing") {
-        await maybeSaveBeneficiary({
+        void maybeSaveBeneficiary({
           save: input.saveBeneficiary,
           userId: input.userId,
           phone,
@@ -795,7 +795,7 @@ export async function purchaseAirtime(input: {
     );
 
     if (outcome === "completed" || outcome === "processing") {
-      await maybeSaveBeneficiary({
+      void maybeSaveBeneficiary({
         save: input.saveBeneficiary,
         userId: input.userId,
         phone,
@@ -955,7 +955,7 @@ export async function purchaseData(input: {
       );
 
       if (outcome === "completed" || outcome === "processing") {
-        await maybeSaveBeneficiary({
+        void maybeSaveBeneficiary({
           save: input.saveBeneficiary,
           userId: input.userId,
           phone,
@@ -1187,7 +1187,7 @@ export async function purchaseData(input: {
     );
 
     if (outcome === "completed" || outcome === "processing") {
-      await maybeSaveBeneficiary({
+      void maybeSaveBeneficiary({
         save: input.saveBeneficiary,
         userId: input.userId,
         phone,
