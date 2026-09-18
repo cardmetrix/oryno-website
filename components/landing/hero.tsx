@@ -44,7 +44,6 @@ export function Hero({ homeSrc, walletSrc }: HeroProps) {
           <motion.p variants={fadeUp} className="eyebrow mb-4 tracking-[0.18em]">
             ORYNO
           </motion.p>
-
           <motion.h1
             variants={fadeUp}
             className="text-[2.6rem] leading-[1.05] font-bold tracking-tight text-foreground sm:text-5xl lg:text-[3.5rem]"
@@ -55,8 +54,6 @@ export function Hero({ homeSrc, walletSrc }: HeroProps) {
             Simplified.
             </span>
           </motion.h1>
-
-
           <motion.p
             variants={fadeUp}
             className="mt-5 max-w-md text-base leading-relaxed text-muted-foreground sm:text-lg"
