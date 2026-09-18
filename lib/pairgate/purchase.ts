@@ -18,6 +18,7 @@ import { resolveCountryCode } from "@/lib/country";
 import { nigeriaServiceLedgerCurrency } from "@/lib/display-currency";
 import { priceLocalAmount } from "@/lib/pricing/service-pricing";
 import { estimateAirtimeCashback } from "@/lib/telecom";
+import { maybeCreditAirtimeCashback } from "@/lib/telecom/cashback";
 import { inferDataPlanCategory } from "@/lib/vtpass/catalog";
 import { normalizePhone } from "@/lib/vtpass/client";
 import { maybeSaveBeneficiary } from "@/lib/beneficiaries";
@@ -529,7 +530,7 @@ export async function purchasePairgateAirtime(input: {
     serviceID: networkSlug,
     faceAmount,
   });
-  const cashback = estimateAirtimeCashback(priced.retail);
+  const cashback = estimateAirtimeCashback(priced.face);
   const market = resolveCountryCode(input.countryCode);
   const network = await ensureTelecomNetwork(market, networkSlug);
   const requestId = generatePairgateReference("ORYAIR");
@@ -593,10 +594,25 @@ export async function purchasePairgateAirtime(input: {
       orderId: order.id,
     });
 
+    const cashbackCredit = await maybeCreditAirtimeCashback({
+      userId: input.userId,
+      walletId: prepared.wallet.id,
+      currency: prepared.currency,
+      amount: cashback,
+      purchaseTransactionId: prepared.transaction.id,
+      phone,
+      networkName: network.name,
+    });
+
     const success = {
       order,
       transactionId: prepared.transaction.id,
-      wallet: toWalletSummary(prepared.wallet),
+      wallet:
+        cashbackCredit &&
+        "walletSummary" in cashbackCredit &&
+        cashbackCredit.walletSummary
+          ? cashbackCredit.walletSummary
+          : toWalletSummary(prepared.wallet),
       requestId: result.referenceCode || prepared.requestId,
       status: "completed" as "completed" | "processing",
       cashback,

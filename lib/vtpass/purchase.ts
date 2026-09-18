@@ -11,6 +11,7 @@ import {
   wallets,
 } from "@/lib/db/schema";
 import { estimateAirtimeCashback } from "@/lib/telecom";
+import { maybeCreditAirtimeCashback } from "@/lib/telecom/cashback";
 import { resolveCountryCode } from "@/lib/country";
 import { getDisplayFx, nigeriaServiceLedgerCurrency } from "@/lib/display-currency";
 import { convertLocalToNgn } from "@/lib/fx/rates";
@@ -546,7 +547,7 @@ export async function purchaseAirtime(input: {
       variationCode: input.variationCode,
       faceAmount,
     });
-    const cashback = estimateAirtimeCashback(priced.retail);
+    const cashback = estimateAirtimeCashback(priced.face);
     const market = resolveCountryCode(input.countryCode);
     const network = await ensureTelecomNetwork(market, input.serviceID);
 
@@ -618,7 +619,24 @@ export async function purchaseAirtime(input: {
         },
       );
 
+      let walletSummary = toWalletSummary(prepared.wallet);
       if (outcome === "completed" || outcome === "processing") {
+        const cashbackCredit = await maybeCreditAirtimeCashback({
+          userId: input.userId,
+          walletId: prepared.wallet.id,
+          currency: prepared.currency,
+          amount: cashback,
+          purchaseTransactionId: prepared.transaction.id,
+          phone,
+          networkName: network.name,
+        });
+        if (
+          cashbackCredit &&
+          "walletSummary" in cashbackCredit &&
+          cashbackCredit.walletSummary
+        ) {
+          walletSummary = cashbackCredit.walletSummary;
+        }
         void maybeSaveBeneficiary({
           save: input.saveBeneficiary,
           userId: input.userId,
@@ -631,7 +649,7 @@ export async function purchaseAirtime(input: {
       return {
         order,
         transactionId: prepared.transaction.id,
-        wallet: toWalletSummary(prepared.wallet),
+        wallet: walletSummary,
         requestId: prepared.requestId,
         status: outcome,
         cashback,
@@ -707,7 +725,7 @@ export async function purchaseAirtime(input: {
     variationCode,
     faceAmount,
   });
-  const cashback = estimateAirtimeCashback(priced.retail);
+  const cashback = estimateAirtimeCashback(priced.face);
   const network = await ensureTelecomNetwork(
     market,
     `foreign-${operatorId ?? input.operatorId ?? "airtime"}`,
@@ -794,7 +812,24 @@ export async function purchaseAirtime(input: {
       },
     );
 
+    let walletSummary = toWalletSummary(prepared.wallet);
     if (outcome === "completed" || outcome === "processing") {
+      const cashbackCredit = await maybeCreditAirtimeCashback({
+        userId: input.userId,
+        walletId: prepared.wallet.id,
+        currency: prepared.currency,
+        amount: cashback,
+        purchaseTransactionId: prepared.transaction.id,
+        phone,
+        networkName: network.name,
+      });
+      if (
+        cashbackCredit &&
+        "walletSummary" in cashbackCredit &&
+        cashbackCredit.walletSummary
+      ) {
+        walletSummary = cashbackCredit.walletSummary;
+      }
       void maybeSaveBeneficiary({
         save: input.saveBeneficiary,
         userId: input.userId,
@@ -807,7 +842,7 @@ export async function purchaseAirtime(input: {
     return {
       order,
       transactionId: prepared.transaction.id,
-      wallet: toWalletSummary(prepared.wallet),
+      wallet: walletSummary,
       requestId: prepared.requestId,
       status: outcome,
       cashback,

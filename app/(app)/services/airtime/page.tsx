@@ -13,6 +13,7 @@ import { PhoneNumberField } from "@/components/app/phone-number-field";
 import type { VtpassServiceOption } from "@/components/app/vtpass-service-picker";
 import { useCountry } from "@/components/providers/country-provider";
 import { useWalletBalance } from "@/hooks/use-wallet-balance";
+import { useInvalidateWallet } from "@/hooks/use-wallet";
 import { airtimePresets, estimateAirtimeCashback } from "@/lib/telecom";
 import { cleanNetworkName } from "@/lib/vtpass/catalog";
 import {
@@ -30,6 +31,7 @@ export default function AirtimePage() {
   const { country, loading: countryLoading, formatServiceMoney, displayFx } =
     useCountry();
   const { canAfford, canAffordNgn, frozen } = useWalletBalance();
+  const invalidateWallet = useInvalidateWallet();
   const countryCode = country?.code || "NG";
   const isNigeria = countryCode === "NG";
   const isInternational = !isNigeria;
@@ -226,6 +228,7 @@ export default function AirtimePage() {
       setReceiptAmount(data.amountFormatted);
       setWalletLabel(data.wallet?.balanceFormatted ?? null);
       setSuccess(true);
+      void invalidateWallet();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Purchase failed");
     } finally {

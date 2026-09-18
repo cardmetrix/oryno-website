@@ -12,6 +12,7 @@ import {
   wallets,
 } from "@/lib/db/schema";
 import { estimateAirtimeCashback } from "@/lib/telecom";
+import { maybeCreditAirtimeCashback } from "@/lib/telecom/cashback";
 import { resolveCountryCode } from "@/lib/country";
 import { nigeriaServiceLedgerCurrency } from "@/lib/display-currency";
 import { maybeSaveBeneficiary } from "@/lib/beneficiaries";
@@ -366,7 +367,7 @@ export async function purchaseSogoAirtime(input: {
     serviceID: networkSlug,
     faceAmount: input.amount,
   });
-  const cashback = estimateAirtimeCashback(priced.retail);
+  const cashback = estimateAirtimeCashback(priced.face);
   const market = resolveCountryCode(input.countryCode);
   const network = await ensureTelecomNetwork(market, networkSlug);
   const idempotencyKey = randomUUID();
@@ -438,7 +439,24 @@ export async function purchaseSogoAirtime(input: {
       },
     );
 
+    let walletSummary = toWalletSummary(prepared.wallet);
     if (outcome === "completed" || outcome === "processing") {
+      const cashbackCredit = await maybeCreditAirtimeCashback({
+        userId: input.userId,
+        walletId: prepared.wallet.id,
+        currency: prepared.currency,
+        amount: cashback,
+        purchaseTransactionId: prepared.transaction.id,
+        phone,
+        networkName: network.name,
+      });
+      if (
+        cashbackCredit &&
+        "walletSummary" in cashbackCredit &&
+        cashbackCredit.walletSummary
+      ) {
+        walletSummary = cashbackCredit.walletSummary;
+      }
       void maybeSaveBeneficiary({
         save: input.saveBeneficiary,
         userId: input.userId,
@@ -451,7 +469,7 @@ export async function purchaseSogoAirtime(input: {
     return {
       order,
       transactionId: prepared.transaction.id,
-      wallet: toWalletSummary(prepared.wallet),
+      wallet: walletSummary,
       requestId: data.reference || prepared.requestId,
       status: outcome,
       cashback,
