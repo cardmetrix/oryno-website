@@ -10,7 +10,7 @@ export type CachedDataPlan = {
   fixedPrice: boolean;
 };
 
-const PREFIX = "oryno:data-plans:v1:";
+const PREFIX = "oryno:data-plans:v2:";
 const TTL_MS = 30 * 60 * 1000;
 
 type Envelope = {

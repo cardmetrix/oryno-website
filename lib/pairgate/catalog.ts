@@ -284,24 +284,17 @@ type DataPlanCache = {
   expiresAt: number;
   serviceName: string;
   variations: PairgateVariation[];
-  /** True once deferred plan types have been merged. */
   complete: boolean;
 };
 const dataPlanCache = new Map<string, DataPlanCache>();
 /** Keep catalogs warm longer — plan prices change infrequently. */
 const DATA_PLAN_CACHE_MS = 30 * 60 * 1000;
-/**
- * Return as soon as the main CG catalog is in — each Pairgate call costs ~2s.
- * SME / GIFTING / lite / awoof fill in via background refresh.
- */
-const FAST_PLAN_TYPES = ["CG"] as const;
-const FALLBACK_PLAN_TYPES = ["SME", "GIFTING"] as const;
-const DEFERRED_PLAN_TYPES = ["SME", "GIFTING", "CG_LITE", "AWOOF"] as const;
+/** All Pairgate plan types — fetch every type before responding so the UI is complete. */
+const ALL_PLAN_TYPES = ["CG", "SME", "GIFTING", "CG_LITE", "AWOOF"] as const;
 const inflightDataPlans = new Map<
   string,
   Promise<{ serviceName: string; variations: PairgateVariation[] }>
 >();
-const inflightDeferred = new Set<string>();
 let catalogWarmStarted = false;
 
 async function fetchDataPlansForType(
@@ -355,52 +348,17 @@ function writeDataPlanCache(
   });
 }
 
-/** Fill remaining plan types without blocking the first response. */
-function scheduleDeferredDataPlans(slug: string, serviceName: string) {
-  if (inflightDeferred.has(slug)) return;
-  inflightDeferred.add(slug);
-  void (async () => {
-    try {
-      const batches = [];
-      for (const planType of DEFERRED_PLAN_TYPES) {
-        batches.push(await fetchDataPlansForType(slug, planType));
-      }
-      const existing = dataPlanCache.get(slug);
-      const merged = mergePlanBatches([
-        existing?.variations ?? [],
-        ...batches,
-      ]);
-      writeDataPlanCache(slug, serviceName, merged, true);
-    } catch (error) {
-      console.error("[pairgate-data-plans-deferred]", slug, error);
-    } finally {
-      inflightDeferred.delete(slug);
-    }
-  })();
-}
-
 async function loadDataVariationsFresh(
   slug: string,
   serviceName: string,
 ): Promise<{ serviceName: string; variations: PairgateVariation[] }> {
-  // One Pairgate round-trip (~2s) for the primary catalog, then return.
+  // Skip /data-plans/categories (extra Pairgate gap). Fetch every plan type.
   const batches: PairgateVariation[][] = [];
-  for (const planType of FAST_PLAN_TYPES) {
+  for (const planType of ALL_PLAN_TYPES) {
     batches.push(await fetchDataPlansForType(slug, planType));
   }
-  let variations = mergePlanBatches(batches);
-
-  // If CG is empty for this network, try one fallback type before responding.
-  if (!variations.length) {
-    for (const planType of FALLBACK_PLAN_TYPES) {
-      batches.push(await fetchDataPlansForType(slug, planType));
-      variations = mergePlanBatches(batches);
-      if (variations.length) break;
-    }
-  }
-
-  writeDataPlanCache(slug, serviceName, variations, false);
-  scheduleDeferredDataPlans(slug, serviceName);
+  const variations = mergePlanBatches(batches);
+  writeDataPlanCache(slug, serviceName, variations, true);
   return { serviceName, variations };
 }
 
@@ -412,16 +370,16 @@ export async function listDataVariations(
     DATA_NETWORKS.find((s) => s.serviceID === slug)?.name || slug.toUpperCase();
 
   const cached = dataPlanCache.get(slug);
-  if (cached && cached.expiresAt > Date.now()) {
-    if (!cached.complete) scheduleDeferredDataPlans(slug, serviceName);
+  // Only serve cache hits that finished loading every plan type.
+  if (cached && cached.complete && cached.expiresAt > Date.now()) {
     return {
       serviceName: cached.serviceName,
       variations: cached.variations,
     };
   }
 
-  // Stale-while-revalidate: serve expired catalog instantly, refresh in background.
-  if (cached?.variations.length) {
+  // Stale-while-revalidate: serve a complete expired catalog instantly.
+  if (cached?.complete && cached.variations.length) {
     if (!inflightDataPlans.has(slug)) {
       const refresh = loadDataVariationsFresh(slug, serviceName).finally(() => {
         inflightDataPlans.delete(slug);
@@ -466,7 +424,11 @@ export function warmDataPlanCatalog(prioritySlug?: string | null) {
     for (const slug of ordered) {
       try {
         const cached = dataPlanCache.get(slug);
-        if (cached && cached.expiresAt > Date.now() && cached.variations.length) {
+        if (
+          cached?.complete &&
+          cached.expiresAt > Date.now() &&
+          cached.variations.length
+        ) {
           continue;
         }
         await listDataVariations(slug);
