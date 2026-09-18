@@ -18,6 +18,7 @@ export type ProfileDto = {
   avatarUrl: string | null;
   countryCode: string | null;
   countryName: string;
+  role: "user" | "admin";
   kycStatus: string;
   kycLevel: number;
   kycLabel: string;
@@ -56,6 +57,7 @@ export function toProfileDto(
     countryName: user.countryCode
       ? getCountryInfo(user.countryCode).name
       : "Not set",
+    role: user.role === "admin" ? "admin" : "user",
     kycStatus: user.kycStatus,
     kycLevel,
     kycLabel:

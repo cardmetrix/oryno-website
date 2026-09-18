@@ -13,6 +13,7 @@ export async function GET(req: Request) {
     const q = (searchParams.get("q") || "").trim();
     const status = (searchParams.get("status") || "").trim();
     const kyc = (searchParams.get("kyc") || "").trim();
+    const role = (searchParams.get("role") || "").trim();
 
     const rows = await db
       .select({
@@ -22,6 +23,7 @@ export async function GET(req: Request) {
         phone: users.phone,
         username: users.username,
         status: users.status,
+        role: users.role,
         kyc: users.kycStatus,
         kycLevel: users.kycLevel,
         countryCode: users.countryCode,
@@ -92,6 +94,8 @@ export async function GET(req: Request) {
         countryCode: u.countryCode,
         status: u.status,
         statusLabel: titleCaseStatus(u.status),
+        role: u.role === "admin" ? "admin" : "user",
+        roleLabel: u.role === "admin" ? "Admin" : "User",
         kyc: u.kyc,
         kycLevel: u.kycLevel,
         kycLabel: `L${u.kycLevel} · ${titleCaseStatus(u.kyc)}`,
@@ -109,6 +113,9 @@ export async function GET(req: Request) {
     }
     if (kyc) {
       mapped = mapped.filter((u) => u.kyc === kyc);
+    }
+    if (role === "user" || role === "admin") {
+      mapped = mapped.filter((u) => u.role === role);
     }
 
     return NextResponse.json({ ok: true, users: mapped });

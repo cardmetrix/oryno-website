@@ -112,6 +112,7 @@ export async function POST(req: Request) {
         phone: user.phone,
         countryCode: country.code,
         status: user.status,
+        role: user.role === "admin" ? "admin" : "user",
         kycStatus: user.kycStatus,
       },
       country,

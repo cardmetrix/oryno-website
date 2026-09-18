@@ -1,6 +1,10 @@
 import { ADMIN_SESSION_COOKIE } from "@/lib/admin/cookie";
+import {
+  ensureStaffAdminForAppUser,
+  markAppUserAsAdminByEmail,
+} from "@/lib/auth/user-role";
 import { db } from "@/lib/db";
-import { adminAuditLogs, admins, adminSessions } from "@/lib/db/schema";
+import { adminAuditLogs, admins, adminSessions, users } from "@/lib/db/schema";
 import { currentUser } from "@clerk/nextjs/server";
 import { createHash, randomBytes, timingSafeEqual } from "crypto";
 import { and, eq, gt, isNull } from "drizzle-orm";
@@ -190,6 +194,15 @@ export async function ensureBootstrapAdmin(input: {
   const self = byEmail.get(email);
   if (!self || !self.active) return null;
 
+  // Keep app users.role in sync for every bootstrap email we touch
+  for (const adminEmail of allowlist) {
+    try {
+      await markAppUserAsAdminByEmail(adminEmail);
+    } catch (error) {
+      console.error("[bootstrap-user-role]", adminEmail, error);
+    }
+  }
+
   if (self.email.toLowerCase() === email) {
     const [touched] = await db
       .update(admins)
@@ -220,13 +233,35 @@ export async function resolveAdminForClerk(): Promise<{
     };
   }
 
-  const admin = await findAdminByEmail(clerk.email);
+  let admin = await findAdminByEmail(clerk.email);
+
+  // App users with role=admin are eligible even before a staff row exists
+  if (!admin || !admin.active) {
+    const appUser = await db.query.users.findFirst({
+      where: eq(users.email, clerk.email),
+      columns: { id: true, role: true, fullName: true, email: true },
+    });
+
+    if (appUser?.role === "admin") {
+      admin = await ensureStaffAdminForAppUser({
+        email: clerk.email,
+        name: clerk.name || appUser.fullName,
+      });
+    }
+  }
 
   if (!admin) {
     return { clerk, admin: null, reason: "not_admin" };
   }
   if (!admin.active) {
     return { clerk, admin: null, reason: "inactive" };
+  }
+
+  // Keep users.role aligned with active staff membership
+  try {
+    await markAppUserAsAdminByEmail(clerk.email);
+  } catch (error) {
+    console.error("[resolve-admin-user-role]", error);
   }
 
   return { clerk, admin };
@@ -237,7 +272,16 @@ export async function canBootstrapAdmin(email: string) {
   const normalized = email.trim().toLowerCase();
   if (!isBootstrapEmail(normalized)) return false;
   const existing = await findAdminByEmail(normalized);
-  return !existing;
+  if (existing?.active) return false;
+
+  const appUser = await db.query.users.findFirst({
+    where: eq(users.email, normalized),
+    columns: { role: true },
+  });
+  // Already an app-level admin — treat as eligible (login will sync staff row)
+  if (appUser?.role === "admin") return false;
+
+  return true;
 }
 
 /** Mobile / non-cookie clients send the raw session token here. */

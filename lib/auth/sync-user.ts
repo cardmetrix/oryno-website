@@ -349,6 +349,7 @@ export async function syncClerkUserToDb(
           phone,
           avatarUrl,
           countryCode,
+          role: "user",
           emailVerifiedAt,
           lastLoginAt: options?.touchLogin ? now : null,
         })
@@ -367,6 +368,7 @@ export async function syncClerkUserToDb(
           phone,
           avatarUrl,
           countryCode,
+          role: "user",
           emailVerifiedAt,
           lastLoginAt: options?.touchLogin ? now : null,
         })

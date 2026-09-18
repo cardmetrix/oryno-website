@@ -32,6 +32,9 @@ export const userStatusEnum = pgEnum("user_status", [
   "deleted",
 ]);
 
+/** App-level role: every account is `user` by default; `admin` unlocks admin console. */
+export const userRoleEnum = pgEnum("user_role", ["user", "admin"]);
+
 export const kycStatusEnum = pgEnum("kyc_status", [
   "unverified",
   "pending",
@@ -279,6 +282,7 @@ export const users = pgTable(
       () => countries.code,
     ),
     status: userStatusEnum("status").notNull().default("active"),
+    role: userRoleEnum("role").notNull().default("user"),
     kycStatus: kycStatusEnum("kyc_status").notNull().default("unverified"),
     /** Highest approved KYC tier: 0 none, 1 ID, 2 BVN, 3 proof of address. */
     kycLevel: integer("kyc_level").notNull().default(0),
@@ -293,6 +297,7 @@ export const users = pgTable(
   (t) => [
     index("users_country_idx").on(t.countryCode),
     index("users_status_idx").on(t.status),
+    index("users_role_idx").on(t.role),
   ],
 );
 

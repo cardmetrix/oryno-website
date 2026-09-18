@@ -39,6 +39,8 @@ type UserRow = {
   country: string;
   status: string;
   statusLabel: string;
+  role: "user" | "admin";
+  roleLabel: string;
   kyc: string;
   kycLabel: string;
   balance: string;
@@ -61,6 +63,8 @@ type UserDetail = {
     countryCode: string | null;
     status: string;
     statusLabel: string;
+    role: "user" | "admin";
+    roleLabel: string;
     kyc: string;
     kycLevel?: number;
     kycLabel: string;
@@ -101,14 +105,16 @@ export default function AdminUsersPage() {
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [kycFilter, setKycFilter] = useState("");
+  const [roleFilter, setRoleFilter] = useState("");
   const url = useMemo(() => {
     const params = new URLSearchParams();
     if (q.trim()) params.set("q", q.trim());
     if (statusFilter) params.set("status", statusFilter);
     if (kycFilter) params.set("kyc", kycFilter);
+    if (roleFilter) params.set("role", roleFilter);
     const qs = params.toString();
     return `/api/admin/users${qs ? `?${qs}` : ""}`;
-  }, [q, statusFilter, kycFilter]);
+  }, [q, statusFilter, kycFilter, roleFilter]);
 
   const { data, loading, error, reload } = useAdminQuery<{ users: UserRow[] }>(
     url,
@@ -153,6 +159,15 @@ export default function AdminUsersPage() {
                 <option value="verified">Verified</option>
                 <option value="rejected">Rejected</option>
               </select>
+              <select
+                value={roleFilter}
+                onChange={(e) => setRoleFilter(e.target.value)}
+                className="h-11 w-full rounded-[14px] border border-border bg-background px-3 text-sm sm:w-auto"
+              >
+                <option value="">All roles</option>
+                <option value="user">User</option>
+                <option value="admin">Admin</option>
+              </select>
             </div>
           </div>
         }
@@ -195,6 +210,11 @@ export default function AdminUsersPage() {
                   key: "status",
                   header: "Status",
                   cell: (row) => <StatusBadge status={row.statusLabel} />,
+                },
+                {
+                  key: "role",
+                  header: "Role",
+                  cell: (row) => <StatusBadge status={row.roleLabel} />,
                 },
                 {
                   key: "balance",
@@ -326,12 +346,39 @@ function UserManageSheet({
             <p className="text-sm text-muted-foreground">{detail.user.email}</p>
             <div className="mt-2 flex flex-wrap gap-2">
               <StatusBadge status={detail.user.statusLabel} />
+              <StatusBadge status={detail.user.roleLabel} />
               <StatusBadge status={detail.user.kycLabel} />
               <span className="text-xs text-muted-foreground">
                 {detail.user.country}
               </span>
             </div>
           </div>
+
+          <section className="space-y-2">
+            <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+              App role
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <ActionBtn
+                disabled={busy || detail.user.role === "user"}
+                onClick={() =>
+                  void patch({ role: "user" }, "Role set to user")
+                }
+                label="Set as user"
+              />
+              <ActionBtn
+                disabled={busy || detail.user.role === "admin"}
+                onClick={() =>
+                  void patch({ role: "admin" }, "Role set to admin")
+                }
+                label="Set as admin"
+                primary
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Admins can unlock the admin console with the shared passcode.
+            </p>
+          </section>
 
           <section className="space-y-2">
             <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">

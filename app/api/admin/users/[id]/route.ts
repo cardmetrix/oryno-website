@@ -1,7 +1,8 @@
 import { desc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { withAdminApi, titleCaseStatus } from "@/lib/admin/api";
-import { writeAdminAudit } from "@/lib/admin/auth";
+import { assertAdminRole, writeAdminAudit } from "@/lib/admin/auth";
+import { isAppUserRole, setAppUserRole } from "@/lib/auth/user-role";
 import { db } from "@/lib/db";
 import {
   countries,
@@ -93,6 +94,8 @@ export async function GET(
         country: country?.name || user.countryCode || "—",
         status: user.status,
         statusLabel: titleCaseStatus(user.status),
+        role: user.role === "admin" ? "admin" : "user",
+        roleLabel: user.role === "admin" ? "Admin" : "User",
         kyc: user.kycStatus,
         kycLevel: user.kycLevel,
         kycLabel: `L${user.kycLevel} · ${titleCaseStatus(user.kycStatus)}`,
@@ -155,6 +158,7 @@ export async function PATCH(
 
     const body = (await req.json().catch(() => ({}))) as {
       status?: string;
+      role?: string;
       kycStatus?: string;
       kycLevel?: number;
       fullName?: string;
@@ -167,6 +171,83 @@ export async function PATCH(
       notify?: boolean;
       note?: string;
     };
+
+    if (body.role != null) {
+      if (!isAppUserRole(body.role)) {
+        return NextResponse.json(
+          { error: "Invalid role. Use user or admin." },
+          { status: 400 },
+        );
+      }
+      if (!assertAdminRole(admin, ["super_admin", "admin"])) {
+        return NextResponse.json(
+          { error: "Only admins can change user roles" },
+          { status: 403 },
+        );
+      }
+      if (body.role === "user" && admin.email.toLowerCase() === user.email.toLowerCase()) {
+        return NextResponse.json(
+          { error: "You cannot remove your own admin role" },
+          { status: 400 },
+        );
+      }
+
+      const roleUpdated = await setAppUserRole({
+        userId: id,
+        role: body.role,
+      });
+
+      if (body.notify !== false) {
+        try {
+          await createNotification({
+            userId: id,
+            title:
+              body.role === "admin"
+                ? "Admin access granted"
+                : "Admin access removed",
+            body:
+              body.role === "admin"
+                ? "Your account can unlock the ORYNO admin console with the admin passcode."
+                : "Your account no longer has admin console access.",
+            type: "system",
+          });
+        } catch (e) {
+          console.error("[admin-user-role-notify]", e);
+        }
+      }
+
+      await writeAdminAudit({
+        adminId: admin.id,
+        action: "user.role.update",
+        entityType: "user",
+        entityId: id,
+        meta: { role: body.role },
+      });
+
+      // Role-only update — return early if nothing else was sent
+      const otherKeys = Object.keys(body).filter(
+        (k) => k !== "role" && k !== "notify" && k !== "note",
+      );
+      if (otherKeys.length === 0) {
+        return NextResponse.json({
+          ok: true,
+          user: roleUpdated
+            ? {
+                id: roleUpdated.id,
+                name: roleUpdated.fullName,
+                email: roleUpdated.email,
+                status: roleUpdated.status,
+                statusLabel: titleCaseStatus(roleUpdated.status),
+                role: roleUpdated.role === "admin" ? "admin" : "user",
+                roleLabel: roleUpdated.role === "admin" ? "Admin" : "User",
+                kyc: roleUpdated.kycStatus,
+                kycLevel: roleUpdated.kycLevel,
+                kycLabel: `L${roleUpdated.kycLevel} · ${titleCaseStatus(roleUpdated.kycStatus)}`,
+              }
+            : null,
+        });
+      }
+    }
 
     const userPatch: Partial<typeof users.$inferInsert> = {
       updatedAt: new Date(),
@@ -337,6 +418,8 @@ export async function PATCH(
             email: updated.email,
             status: updated.status,
             statusLabel: titleCaseStatus(updated.status),
+            role: updated.role === "admin" ? "admin" : "user",
+            roleLabel: updated.role === "admin" ? "Admin" : "User",
             kyc: updated.kycStatus,
             kycLevel: updated.kycLevel,
             kycLabel: `L${updated.kycLevel} · ${titleCaseStatus(updated.kycStatus)}`,
