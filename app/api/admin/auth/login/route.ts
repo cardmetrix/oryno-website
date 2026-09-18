@@ -1,11 +1,9 @@
 import {
-    ADMIN_SESSION_COOKIE,
-    adminCookieOptions,
-    canBootstrapAdmin,
-    createAdminSession,
-    ensureBootstrapAdmin,
-    isValidAdminPasscode,
-    resolveAdminForClerk,
+  ADMIN_SESSION_COOKIE,
+  adminCookieOptions,
+  createAdminSession,
+  isValidAdminPasscode,
+  resolveAdminForClerk,
 } from "@/lib/admin/auth";
 import { notifyAdminLogin } from "@/lib/notify/auth-events";
 import { NextResponse } from "next/server";
@@ -35,14 +33,11 @@ export async function POST(req: Request) {
       );
     }
 
-    const mayBootstrap =
-      !existing && (await canBootstrapAdmin(clerk.email));
-
-    if (!existing && !mayBootstrap) {
+    if (!existing) {
       return NextResponse.json(
         {
           error:
-            "Your account is not an admin. Ask a super admin to add your email to the admins list.",
+            "Your account is not an admin. Ask an admin to set your role to admin.",
         },
         { status: 403 },
       );
@@ -62,39 +57,23 @@ export async function POST(req: Request) {
       );
     }
 
-    let admin = existing;
-    if (!admin && mayBootstrap) {
-      admin = await ensureBootstrapAdmin({
-        email: clerk.email,
-        name: clerk.name,
-      });
-    }
-
-    if (!admin) {
-      return NextResponse.json(
-        { error: "Unable to create admin account" },
-        { status: 500 },
-      );
-    }
-
-    const session = await createAdminSession(admin);
+    const session = await createAdminSession(existing);
 
     try {
-      await notifyAdminLogin(admin);
+      await notifyAdminLogin(existing);
     } catch (notifyError) {
       console.error("[admin-login-notify]", notifyError);
     }
 
     const res = NextResponse.json({
       ok: true,
-      // Returned for mobile / native clients that cannot use HttpOnly cookies.
       sessionToken: session.token,
       expiresAt: session.expiresAt.toISOString(),
       admin: {
-        id: admin.id,
-        name: admin.name,
-        email: admin.email,
-        role: admin.role,
+        id: existing.id,
+        name: existing.name,
+        email: existing.email,
+        role: "admin",
       },
     });
 

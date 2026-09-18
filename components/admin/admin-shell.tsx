@@ -115,7 +115,7 @@ export function AdminShell({
                 </p>
                 <p className="truncate text-xs text-muted-foreground">
                   {admin
-                    ? `${admin.name} · ${admin.role.replace(/_/g, " ")}`
+                    ? `${admin.name} · Admin`
                     : "Country-configurable control center"}
                 </p>
               </div>

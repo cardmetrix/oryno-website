@@ -10,7 +10,6 @@ import { AdminShell } from "@/components/admin/admin-shell";
 type MeState = {
   session: boolean;
   isAdmin: boolean;
-  canBootstrap?: boolean;
   admin?: { name: string; email: string; role: string };
 };
 
@@ -49,7 +48,7 @@ export function AdminGate({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        if (!data.isAdmin && !data.canBootstrap) {
+        if (!data.isAdmin) {
           setDenied(true);
           setReady(true);
           return;

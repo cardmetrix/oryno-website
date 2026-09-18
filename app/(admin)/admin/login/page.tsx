@@ -12,7 +12,6 @@ type MeResponse = {
   ok?: boolean;
   signedIn?: boolean;
   isAdmin?: boolean;
-  canBootstrap?: boolean;
   session?: boolean;
   email?: string;
   reason?: string;
@@ -90,7 +89,6 @@ export default function AdminLoginPage() {
     isSignedIn &&
     me &&
     !me.isAdmin &&
-    !me.canBootstrap &&
     me.reason !== "inactive";
 
   const inactive = me?.reason === "inactive";
@@ -156,7 +154,7 @@ export default function AdminLoginPage() {
               <p className="mt-2 text-sm text-muted-foreground">
                 {inactive
                   ? "This admin account has been deactivated."
-                  : "Your account is not an admin. Ask a super admin to add your email to the admins list."}
+                  : "Your account is not an admin. Ask an admin to set your role to admin."}
               </p>
               {email ? (
                 <p className="mt-2 text-xs font-semibold text-foreground">
@@ -179,14 +177,12 @@ export default function AdminLoginPage() {
                 Secure admin entry
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                {me?.canBootstrap
-                  ? "Your email is on the admin allowlist. Enter the passcode to activate all env-listed admins."
-                  : "Enter the admin passcode to unlock the console."}
+                Enter the admin passcode to unlock the console.
               </p>
               {email ? (
                 <p className="mt-2 text-xs font-semibold text-foreground">
                   {email}
-                  {me?.admin?.role ? ` · ${me.admin.role}` : ""}
+                  {me?.admin?.role ? ` · Admin` : ""}
                 </p>
               ) : null}
             </div>

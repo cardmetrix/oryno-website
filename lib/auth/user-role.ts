@@ -15,8 +15,8 @@ export function isAppUserRole(value: unknown): value is AppUserRole {
 export async function setAppUserRole(input: {
   userId: string;
   role: AppUserRole;
-  /** Staff console role when promoting (default admin). */
-  staffRole?: "super_admin" | "admin" | "support" | "finance" | "viewer";
+  /** Staff console role when promoting (always admin). */
+  staffRole?: "admin";
 }) {
   const user = await db.query.users.findFirst({
     where: eq(users.id, input.userId),

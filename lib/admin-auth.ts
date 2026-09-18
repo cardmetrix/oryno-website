@@ -5,10 +5,7 @@
 export { ADMIN_SESSION_COOKIE } from "@/lib/admin/cookie";
 export {
   assertAdminRole,
-  bootstrapEmails,
-  canBootstrapAdmin,
   createAdminSession,
-  ensureBootstrapAdmin,
   getAdminSession,
   isValidAdminPasscode,
   requireAdminApi,

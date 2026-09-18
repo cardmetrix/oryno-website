@@ -179,7 +179,7 @@ export async function PATCH(
           { status: 400 },
         );
       }
-      if (!assertAdminRole(admin, ["super_admin", "admin"])) {
+      if (!assertAdminRole(admin)) {
         return NextResponse.json(
           { error: "Only admins can change user roles" },
           { status: 403 },

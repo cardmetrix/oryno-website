@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import {
-  canBootstrapAdmin,
   getAdminSession,
   resolveAdminForClerk,
 } from "@/lib/admin/auth";
@@ -19,24 +18,21 @@ async function loadMe() {
   }
 
   if (!admin) {
-    const bootstrap = await canBootstrapAdmin(clerk.email);
     return NextResponse.json(
       {
         ok: false,
         signedIn: true,
         isAdmin: false,
-        canBootstrap: bootstrap,
         session: false,
         email: clerk.email,
         reason: reason === "inactive" ? "inactive" : "not_admin",
       },
-      { status: bootstrap ? 200 : 403 },
+      { status: 403 },
     );
   }
 
   const session = await getAdminSession();
 
-  // Stale cookie (wrong user / expired) — tell clients to clear via logout
   return NextResponse.json({
     ok: Boolean(session),
     signedIn: true,
@@ -46,7 +42,7 @@ async function loadMe() {
       id: admin.id,
       name: admin.name,
       email: admin.email,
-      role: admin.role,
+      role: "admin",
     },
     clerk: {
       email: clerk.email,

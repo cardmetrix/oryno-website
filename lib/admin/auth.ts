@@ -1,8 +1,5 @@
 import { ADMIN_SESSION_COOKIE } from "@/lib/admin/cookie";
-import {
-  ensureStaffAdminForAppUser,
-  markAppUserAsAdminByEmail,
-} from "@/lib/auth/user-role";
+import { ensureStaffAdminForAppUser } from "@/lib/auth/user-role";
 import { db } from "@/lib/db";
 import { adminAuditLogs, admins, adminSessions, users } from "@/lib/db/schema";
 import { currentUser } from "@clerk/nextjs/server";
@@ -12,12 +9,8 @@ import { cookies, headers } from "next/headers";
 
 export { ADMIN_SESSION_COOKIE };
 
-export type AdminRole =
-  | "super_admin"
-  | "admin"
-  | "support"
-  | "finance"
-  | "viewer";
+/** Staff console role — only `admin` is used (no super_admin). */
+export type AdminRole = "admin";
 
 export type AdminRecord = typeof admins.$inferSelect;
 
@@ -28,42 +21,6 @@ export type AdminSessionContext = {
 
 function adminPasscode() {
   return (process.env.ADMIN_PASSCODE || "").trim();
-}
-
-function pushEmails(raw: string, into: string[], seen: Set<string>) {
-  for (const part of raw.split(/[,;\n|]+/)) {
-    const email = part.trim().toLowerCase();
-    if (!email || !email.includes("@") || seen.has(email)) continue;
-    seen.add(email);
-    into.push(email);
-  }
-}
-
-/**
- * All admin emails from env — unlimited count.
- * Reads (in order):
- * - ADMIN_BOOTSTRAP_EMAILS / ADMIN_EMAILS / ADMIN_BOOTSTRAP_EMAIL (comma-separated)
- * - ADMIN_EMAIL_1, ADMIN_EMAIL_2, … ADMIN_EMAIL_100
- */
-export function bootstrapEmails(): string[] {
-  const seen = new Set<string>();
-  const list: string[] = [];
-
-  pushEmails(process.env.ADMIN_BOOTSTRAP_EMAILS || "", list, seen);
-  pushEmails(process.env.ADMIN_EMAILS || "", list, seen);
-  pushEmails(process.env.ADMIN_BOOTSTRAP_EMAIL || "", list, seen);
-
-  for (let i = 1; i <= 100; i++) {
-    const key = `ADMIN_EMAIL_${i}`;
-    const value = process.env[key];
-    if (value) pushEmails(value, list, seen);
-  }
-
-  return list;
-}
-
-function isBootstrapEmail(email: string) {
-  return bootstrapEmails().includes(email.trim().toLowerCase());
 }
 
 function sessionHours() {
@@ -128,97 +85,9 @@ export async function findAdminByEmail(email: string) {
 }
 
 /**
- * Upsert every env-listed admin email into `admins`.
- * First email in the env list → super_admin; the rest → admin.
- * Returns the row for the signing-in email.
+ * Admin access is driven only by `users.role === "admin"`.
+ * No env allowlist / bootstrap emails.
  */
-export async function ensureBootstrapAdmin(input: {
-  email: string;
-  name: string;
-}): Promise<AdminRecord | null> {
-  const email = input.email.trim().toLowerCase();
-  if (!isBootstrapEmail(email)) return null;
-
-  const allowlist = bootstrapEmails();
-  if (!allowlist.length) return null;
-
-  const existingRows = await db.select().from(admins);
-  const byEmail = new Map(
-    existingRows.map((row) => [row.email.toLowerCase(), row]),
-  );
-
-  for (let i = 0; i < allowlist.length; i++) {
-    const adminEmail = allowlist[i];
-    const role = i === 0 ? "super_admin" : "admin";
-    const current = byEmail.get(adminEmail);
-
-    if (current) {
-      // Keep existing role unless still defaulting first env email to super_admin
-      if (
-        i === 0 &&
-        current.role !== "super_admin" &&
-        current.active &&
-        !existingRows.some(
-          (r) => r.role === "super_admin" && r.email.toLowerCase() !== adminEmail,
-        )
-      ) {
-        const [updated] = await db
-          .update(admins)
-          .set({ role: "super_admin", updatedAt: new Date() })
-          .where(eq(admins.id, current.id))
-          .returning();
-        if (updated) byEmail.set(adminEmail, updated);
-      }
-      continue;
-    }
-
-    const displayName =
-      adminEmail === email
-        ? input.name.slice(0, 160)
-        : adminEmail.split("@")[0]?.slice(0, 160) || adminEmail;
-
-    const [created] = await db
-      .insert(admins)
-      .values({
-        name: displayName,
-        email: adminEmail,
-        role,
-        active: true,
-        lastLoginAt: adminEmail === email ? new Date() : null,
-      })
-      .returning();
-
-    if (created) byEmail.set(adminEmail, created);
-  }
-
-  const self = byEmail.get(email);
-  if (!self || !self.active) return null;
-
-  // Keep app users.role in sync for every bootstrap email we touch
-  for (const adminEmail of allowlist) {
-    try {
-      await markAppUserAsAdminByEmail(adminEmail);
-    } catch (error) {
-      console.error("[bootstrap-user-role]", adminEmail, error);
-    }
-  }
-
-  if (self.email.toLowerCase() === email) {
-    const [touched] = await db
-      .update(admins)
-      .set({
-        name: input.name.slice(0, 160) || self.name,
-        lastLoginAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .where(eq(admins.id, self.id))
-      .returning();
-    return touched ?? self;
-  }
-
-  return self;
-}
-
 export async function resolveAdminForClerk(): Promise<{
   clerk: { clerkId: string; email: string; name: string };
   admin: AdminRecord | null;
@@ -233,22 +102,23 @@ export async function resolveAdminForClerk(): Promise<{
     };
   }
 
-  let admin = await findAdminByEmail(clerk.email);
+  const appUser = await db.query.users.findFirst({
+    where: eq(users.email, clerk.email),
+    columns: { id: true, role: true, fullName: true, email: true, status: true },
+  });
 
-  // App users with role=admin are eligible even before a staff row exists
-  if (!admin || !admin.active) {
-    const appUser = await db.query.users.findFirst({
-      where: eq(users.email, clerk.email),
-      columns: { id: true, role: true, fullName: true, email: true },
-    });
-
-    if (appUser?.role === "admin") {
-      admin = await ensureStaffAdminForAppUser({
-        email: clerk.email,
-        name: clerk.name || appUser.fullName,
-      });
-    }
+  if (!appUser || appUser.role !== "admin") {
+    return { clerk, admin: null, reason: "not_admin" };
   }
+
+  if (appUser.status === "suspended" || appUser.status === "deleted") {
+    return { clerk, admin: null, reason: "inactive" };
+  }
+
+  const admin = await ensureStaffAdminForAppUser({
+    email: clerk.email,
+    name: clerk.name || appUser.fullName,
+  });
 
   if (!admin) {
     return { clerk, admin: null, reason: "not_admin" };
@@ -257,31 +127,17 @@ export async function resolveAdminForClerk(): Promise<{
     return { clerk, admin: null, reason: "inactive" };
   }
 
-  // Keep users.role aligned with active staff membership
-  try {
-    await markAppUserAsAdminByEmail(clerk.email);
-  } catch (error) {
-    console.error("[resolve-admin-user-role]", error);
+  // Normalize legacy staff roles (super_admin, etc.) to admin
+  if (admin.role !== "admin") {
+    const [normalized] = await db
+      .update(admins)
+      .set({ role: "admin", updatedAt: new Date() })
+      .where(eq(admins.id, admin.id))
+      .returning();
+    return { clerk, admin: normalized ?? { ...admin, role: "admin" } };
   }
 
   return { clerk, admin };
-}
-
-/** True when this Clerk user is listed for bootstrap and not yet an admin. */
-export async function canBootstrapAdmin(email: string) {
-  const normalized = email.trim().toLowerCase();
-  if (!isBootstrapEmail(normalized)) return false;
-  const existing = await findAdminByEmail(normalized);
-  if (existing?.active) return false;
-
-  const appUser = await db.query.users.findFirst({
-    where: eq(users.email, normalized),
-    columns: { role: true },
-  });
-  // Already an app-level admin — treat as eligible (login will sync staff row)
-  if (appUser?.role === "admin") return false;
-
-  return true;
 }
 
 /** Mobile / non-cookie clients send the raw session token here. */
@@ -313,9 +169,22 @@ export async function getAdminSession(): Promise<AdminSessionContext | null> {
 
   if (!session?.admin || !session.admin.active) return null;
 
-  // Also require the session admin still matches the signed-in Clerk email
   const clerk = await clerkEmail();
   if (!clerk || clerk.email !== session.admin.email.toLowerCase()) {
+    return null;
+  }
+
+  // Session only valid while app role is still admin
+  const appUser = await db.query.users.findFirst({
+    where: eq(users.email, clerk.email),
+    columns: { role: true, status: true },
+  });
+  if (
+    !appUser ||
+    appUser.role !== "admin" ||
+    appUser.status === "suspended" ||
+    appUser.status === "deleted"
+  ) {
     return null;
   }
 
@@ -351,17 +220,9 @@ export async function requireAdminApi(): Promise<
   };
 }
 
-export function assertAdminRole(
-  admin: AdminRecord,
-  allowed: AdminRole[] = [
-    "super_admin",
-    "admin",
-    "support",
-    "finance",
-    "viewer",
-  ],
-) {
-  return allowed.includes(admin.role as AdminRole);
+/** Any authenticated admin can perform admin actions. */
+export function assertAdminRole(_admin: AdminRecord, _allowed?: AdminRole[]) {
+  return true;
 }
 
 async function clientMeta() {
@@ -416,7 +277,11 @@ export async function createAdminSession(admin: AdminRecord) {
 
   await db
     .update(admins)
-    .set({ lastLoginAt: new Date(), updatedAt: new Date() })
+    .set({
+      role: "admin",
+      lastLoginAt: new Date(),
+      updatedAt: new Date(),
+    })
     .where(eq(admins.id, admin.id));
 
   await writeAdminAudit({

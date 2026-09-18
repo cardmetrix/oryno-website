@@ -187,7 +187,7 @@ export const gatewayStatusEnum = pgEnum("gateway_status", [
 export const gatewayModeEnum = pgEnum("gateway_mode", ["live", "test"]);
 
 export const adminRoleEnum = pgEnum("admin_role", [
-  "super_admin",
+  "super_admin", // legacy DB value — app always writes/uses "admin"
   "admin",
   "support",
   "finance",
