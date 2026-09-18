@@ -162,13 +162,18 @@ export function isPairgateHttpOk(
   return ok || status === 200 || Number(json.code) === 200;
 }
 
-export function isPairgateDataSuccess(data: Record<string, unknown>, json: PairgateEnvelope) {
-  return (
-    data.status === true ||
-    data.status === "true" ||
-    json.status === "success" ||
-    Boolean(data.test_mode)
-  );
+export function isPairgateDataSuccess(
+  data: Record<string, unknown>,
+  json: PairgateEnvelope,
+) {
+  if (Boolean(data.test_mode)) return true;
+  if (data.status === true || data.status === "true") return true;
+  if (data.status === false || data.status === "false") return false;
+  // Trust the envelope when Pairgate marks the call successful.
+  if (json.status === "success" || Number(json.code) === 200) {
+    return Boolean(data.reference_code || data.reference || data.message);
+  }
+  return false;
 }
 
 /**

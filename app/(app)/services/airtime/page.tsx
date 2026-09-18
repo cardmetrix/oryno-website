@@ -48,6 +48,7 @@ export default function AirtimePage() {
   const [walletLabel, setWalletLabel] = useState<string | null>(null);
   const [receiptAmount, setReceiptAmount] = useState("");
   const [productTypeId, setProductTypeId] = useState(1);
+  const [retailCharge, setRetailCharge] = useState(0);
 
   const selectedNetwork = networks.find((n) => n.serviceID === networkId);
 
@@ -56,11 +57,14 @@ export default function AirtimePage() {
   const amountNumber = isNigeria
     ? localAmount
     : localAmount * (displayFx?.localToNgn ?? 1);
+  /** Wallet debit amount (includes markup for Nigeria). */
+  const chargeAmount =
+    isNigeria && retailCharge > 0 ? retailCharge : amountNumber;
   const cashback = estimateAirtimeCashback(amountNumber);
 
   const affordable = isNigeria
-    ? canAfford(amountNumber)
-    : canAffordNgn(amountNumber);
+    ? canAfford(chargeAmount)
+    : canAffordNgn(chargeAmount);
   const canSubmit = useMemo(() => {
     const digits = phone.replace(/\D/g, "").length >= 10;
     if (!digits || submitting || !networkId || frozen || !affordable) return false;
@@ -79,6 +83,37 @@ export default function AirtimePage() {
     if (countryLoading) return;
     setAmount(isNigeria ? "500" : defaultIntlAirtimeAmount(countryCode));
   }, [countryLoading, isNigeria, countryCode]);
+
+  useEffect(() => {
+    if (!isNigeria || !networkId || localAmount < minLocal) {
+      setRetailCharge(0);
+      return;
+    }
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const params = new URLSearchParams({
+            serviceID: networkId,
+            amount: String(localAmount),
+          });
+          const res = await fetch(`/api/vtpass/quote?${params}`, {
+            cache: "no-store",
+          });
+          const json = (await res.json()) as { retail?: number };
+          if (!cancelled && res.ok && typeof json.retail === "number") {
+            setRetailCharge(json.retail);
+          }
+        } catch {
+          if (!cancelled) setRetailCharge(0);
+        }
+      })();
+    }, 280);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [isNigeria, networkId, localAmount, minLocal]);
 
   useEffect(() => {
     if (countryLoading) return;
@@ -330,7 +365,16 @@ export default function AirtimePage() {
               <div className="space-y-2 text-sm">
                 <Row label="Network" value={selectedNetwork?.name ?? "—"} />
                 <Row label="Phone" value={phone || "—"} />
-                <Row label="Amount" value={amountLabel} accent />
+                <Row label="Airtime value" value={amountLabel} />
+                {isNigeria && retailCharge > 0 && retailCharge !== localAmount ? (
+                  <Row
+                    label="You pay"
+                    value={money(retailCharge)}
+                    accent
+                  />
+                ) : (
+                  <Row label="Amount" value={amountLabel} accent />
+                )}
                 <div className="flex items-center justify-between border-t border-border/70 pt-3">
                   <span className="inline-flex items-center gap-2 font-semibold">
                     <Wallet className="h-4 w-4 text-primary" />
@@ -350,9 +394,13 @@ export default function AirtimePage() {
                 ? "Processing…"
                 : frozen
                   ? "Wallet unavailable"
-                  : !affordable && amountNumber > 0
+                  : !affordable && chargeAmount > 0
                     ? "Insufficient balance"
-                    : `Buy airtime · ${amountLabel}`}
+                    : `Buy airtime · ${
+                        isNigeria && retailCharge > 0
+                          ? money(retailCharge)
+                          : amountLabel
+                      }`}
             </motion.button>
           </form>
         )}

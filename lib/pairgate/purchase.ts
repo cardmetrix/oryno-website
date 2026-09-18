@@ -397,18 +397,32 @@ async function submitAirtime(input: {
   recipient: string;
   reference: string;
 }) {
+  // Pairgate expects 11-digit 0XXXXXXXXXX (or 234…).
+  let recipient = input.recipient.replace(/\D/g, "");
+  if (recipient.startsWith("234") && recipient.length >= 13) {
+    recipient = `0${recipient.slice(3)}`;
+  } else if (recipient.length === 10 && /^[789]/.test(recipient)) {
+    recipient = `0${recipient}`;
+  }
+
+  const reference = input.reference.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 100);
+  const safeRef =
+    reference.length >= 8
+      ? reference
+      : `${reference}${Date.now().toString(36)}`.slice(0, 100);
+
   const path = pairgateApiPath("/airtime/purchase", "/test/airtime/purchase");
   const { ok, status, json } = await pairgateFetch(path, {
     method: "POST",
     body: JSON.stringify({
-      provider_id: input.providerId,
+      provider_id: input.providerId.toLowerCase(),
       amount: Math.round(input.amount),
-      recipient: input.recipient,
-      reference: input.reference.slice(0, 100),
+      recipient,
+      reference: safeRef,
     }),
   });
   return mapPurchaseResponse(
-    { ok, status, json, clientRef: input.reference },
+    { ok, status, json, clientRef: safeRef },
     "Airtime purchase failed",
   );
 }

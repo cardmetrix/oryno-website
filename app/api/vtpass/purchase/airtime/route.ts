@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
 import { createNotification } from "@/lib/notifications-service";
-import { isNigeriaMarket, purchasePairgateAirtime, requirePairgateForNigeria } from "@/lib/pairgate";
+import {
+  isNigeriaMarket,
+  normalizePairgateNetwork,
+  purchasePairgateAirtime,
+  requirePairgateForNigeria,
+} from "@/lib/pairgate";
+import { priceLocalAmount } from "@/lib/pricing/service-pricing";
 import { formatMoney } from "@/lib/transactions";
 import { purchaseAirtime } from "@/lib/vtpass";
 import { sogoHttpStatus } from "@/lib/sogo/errors";
@@ -71,9 +77,27 @@ export async function POST(req: Request) {
       requirePairgateForNigeria(user.countryCode);
     }
 
+    // Lock against the retail wallet charge (markup), not the face amount.
+    let lockAmount = amount;
+    if (usePairgate && body.serviceID) {
+      try {
+        const slug = normalizePairgateNetwork(body.serviceID);
+        const priced = await priceLocalAmount({
+          provider: "vtpass",
+          serviceKey: `${slug}:open`,
+          amount,
+        });
+        if (Number.isFinite(priced.local) && priced.local > 0) {
+          lockAmount = priced.local;
+        }
+      } catch {
+        // Fall back to face amount for the lock.
+      }
+    }
+
     const result = await withSpendLock(
       user.id,
-      amount,
+      lockAmount,
       user.countryCode,
       () =>
         usePairgate

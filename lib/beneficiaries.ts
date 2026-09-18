@@ -1,6 +1,40 @@
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { beneficiaries } from "@/lib/db/schema";
+
+export type BeneficiaryDto = {
+  id: string;
+  phone: string;
+  label: string | null;
+  networkId: string | null;
+  lastUsedAt: string | null;
+};
+
+export async function listBeneficiaries(
+  userId: string,
+  limit = 30,
+): Promise<BeneficiaryDto[]> {
+  const rows = await db
+    .select({
+      id: beneficiaries.id,
+      phone: beneficiaries.phone,
+      label: beneficiaries.label,
+      networkId: beneficiaries.networkId,
+      lastUsedAt: beneficiaries.lastUsedAt,
+    })
+    .from(beneficiaries)
+    .where(eq(beneficiaries.userId, userId))
+    .orderBy(desc(beneficiaries.lastUsedAt), desc(beneficiaries.updatedAt))
+    .limit(Math.min(Math.max(limit, 1), 50));
+
+  return rows.map((row) => ({
+    id: row.id,
+    phone: row.phone,
+    label: row.label,
+    networkId: row.networkId,
+    lastUsedAt: row.lastUsedAt ? row.lastUsedAt.toISOString() : null,
+  }));
+}
 
 /** Persist or refresh a phone beneficiary after a successful telecom purchase. */
 export async function upsertBeneficiary(input: {
