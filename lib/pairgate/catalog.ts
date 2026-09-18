@@ -284,19 +284,25 @@ type DataPlanCache = {
   expiresAt: number;
   serviceName: string;
   variations: PairgateVariation[];
-  /** True once deferred plan types (CG_LITE / AWOOF) have been merged. */
+  /** True once deferred plan types have been merged. */
   complete: boolean;
 };
 const dataPlanCache = new Map<string, DataPlanCache>();
-const DATA_PLAN_CACHE_MS = 10 * 60 * 1000;
-/** Prefer these first so the UI can respond before slower promo/lite catalogs. */
-const PRIORITY_PLAN_TYPES = ["CG", "SME", "GIFTING"] as const;
-const DEFERRED_PLAN_TYPES = ["CG_LITE", "AWOOF"] as const;
+/** Keep catalogs warm longer — plan prices change infrequently. */
+const DATA_PLAN_CACHE_MS = 30 * 60 * 1000;
+/**
+ * Return as soon as the main CG catalog is in — each Pairgate call costs ~2s.
+ * SME / GIFTING / lite / awoof fill in via background refresh.
+ */
+const FAST_PLAN_TYPES = ["CG"] as const;
+const FALLBACK_PLAN_TYPES = ["SME", "GIFTING"] as const;
+const DEFERRED_PLAN_TYPES = ["SME", "GIFTING", "CG_LITE", "AWOOF"] as const;
 const inflightDataPlans = new Map<
   string,
   Promise<{ serviceName: string; variations: PairgateVariation[] }>
 >();
 const inflightDeferred = new Set<string>();
+let catalogWarmStarted = false;
 
 async function fetchDataPlansForType(
   slug: string,
@@ -377,12 +383,22 @@ async function loadDataVariationsFresh(
   slug: string,
   serviceName: string,
 ): Promise<{ serviceName: string; variations: PairgateVariation[] }> {
-  // Skip /data-plans/categories (extra ~2s Pairgate gap). Static types match their docs.
+  // One Pairgate round-trip (~2s) for the primary catalog, then return.
   const batches: PairgateVariation[][] = [];
-  for (const planType of PRIORITY_PLAN_TYPES) {
+  for (const planType of FAST_PLAN_TYPES) {
     batches.push(await fetchDataPlansForType(slug, planType));
   }
-  const variations = mergePlanBatches(batches);
+  let variations = mergePlanBatches(batches);
+
+  // If CG is empty for this network, try one fallback type before responding.
+  if (!variations.length) {
+    for (const planType of FALLBACK_PLAN_TYPES) {
+      batches.push(await fetchDataPlansForType(slug, planType));
+      variations = mergePlanBatches(batches);
+      if (variations.length) break;
+    }
+  }
+
   writeDataPlanCache(slug, serviceName, variations, false);
   scheduleDeferredDataPlans(slug, serviceName);
   return { serviceName, variations };
@@ -426,6 +442,39 @@ export async function listDataVariations(
   });
   inflightDataPlans.set(slug, load);
   return load;
+}
+
+/**
+ * Warm MTN/Airtel/Glo/9mobile catalogs in the background (non-blocking).
+ * Call when the data services list is requested so the first plan view is a cache hit.
+ */
+export function warmDataPlanCatalog(prioritySlug?: string | null) {
+  if (catalogWarmStarted && !prioritySlug) return;
+  catalogWarmStarted = true;
+
+  const networks = DATA_NETWORKS.map((n) => n.serviceID);
+  const ordered = prioritySlug
+    ? [
+        normalizePairgateNetwork(prioritySlug),
+        ...networks.filter(
+          (id) => id !== normalizePairgateNetwork(prioritySlug),
+        ),
+      ]
+    : networks;
+
+  void (async () => {
+    for (const slug of ordered) {
+      try {
+        const cached = dataPlanCache.get(slug);
+        if (cached && cached.expiresAt > Date.now() && cached.variations.length) {
+          continue;
+        }
+        await listDataVariations(slug);
+      } catch (error) {
+        console.error("[pairgate-data-warm]", slug, error);
+      }
+    }
+  })();
 }
 
 export async function listCableVariations(

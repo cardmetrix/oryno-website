@@ -18,6 +18,7 @@ export {
   listCableVariations,
   listDataServices,
   listDataVariations,
+  warmDataPlanCatalog,
   listElectricityServices,
   listElectricityVariations,
   listTvServices,

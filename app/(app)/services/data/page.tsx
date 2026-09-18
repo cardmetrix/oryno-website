@@ -26,6 +26,10 @@ import {
   intlDataVariationLabel,
   usesFlexibleIntlData,
 } from "@/lib/vtpass/intl-data";
+import {
+  readDataPlansCache,
+  writeDataPlansCache,
+} from "@/lib/telecom/data-plans-cache";
 import { cn } from "@/lib/utils";
 import { formatCountryMoney } from "@/lib/country";
 import {
@@ -157,6 +161,7 @@ export default function DataPage() {
       setNetworkId("");
       setVariations([]);
       setVariationCode("");
+      // Keep session plan cache across remounts — only clear in-memory map.
       plansCacheRef.current.clear();
 
       try {
@@ -230,13 +235,18 @@ export default function DataPage() {
       const cacheKey = isNigeria
         ? `ng:${networkId}`
         : `intl:${networkId}:${productTypeId}`;
-      const cached = plansCacheRef.current.get(cacheKey);
-      if (cached?.length) {
-        setVariations(cached);
+
+      const memory = plansCacheRef.current.get(cacheKey);
+      const session = memory?.length
+        ? memory
+        : readDataPlansCache(cacheKey);
+      if (session?.length) {
+        plansCacheRef.current.set(cacheKey, session);
+        setVariations(session);
         setVariationCode((prev) =>
-          cached.some((v) => v.variationCode === prev)
+          session.some((v) => v.variationCode === prev)
             ? prev
-            : cached[0]?.variationCode || "",
+            : session[0]?.variationCode || "",
         );
         setLoadingPlans(false);
       } else {
@@ -255,6 +265,7 @@ export default function DataPage() {
         if (cancelled) return;
         const next: Variation[] = data.variations ?? [];
         plansCacheRef.current.set(cacheKey, next);
+        writeDataPlansCache(cacheKey, next);
         setVariations(next);
         if (next[0]?.variationCode) {
           setVariationCode((prev) =>
@@ -264,7 +275,7 @@ export default function DataPage() {
           );
         }
       } catch (e) {
-        if (!cancelled && !cached?.length) {
+        if (!cancelled && !session?.length) {
           setError(e instanceof Error ? e.message : "Failed to load plans");
         }
       } finally {
@@ -276,6 +287,47 @@ export default function DataPage() {
       cancelled = true;
     };
   }, [isFlexibleIntl, isNigeria, networkId, productTypeId]);
+
+  // Prefetch sibling network catalogs after the active one is ready (NG).
+  useEffect(() => {
+    if (!isNigeria || networks.length < 2 || !networkId || loadingPlans) return;
+    if (!variations.length) return;
+
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        for (const net of networks) {
+          if (cancelled) return;
+          if (net.serviceID === networkId) continue;
+          const key = `ng:${net.serviceID}`;
+          if (
+            plansCacheRef.current.get(key)?.length ||
+            readDataPlansCache(key)?.length
+          ) {
+            continue;
+          }
+          try {
+            const res = await fetch(
+              `/api/vtpass/variations?serviceID=${encodeURIComponent(net.serviceID)}&identifier=data`,
+            );
+            const data = await res.json();
+            if (!res.ok || cancelled) continue;
+            const next: Variation[] = data.variations ?? [];
+            if (!next.length) continue;
+            plansCacheRef.current.set(key, next);
+            writeDataPlansCache(key, next);
+          } catch {
+            // non-blocking
+          }
+        }
+      })();
+    }, 1500);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [isNigeria, networks, networkId, loadingPlans, variations.length]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();

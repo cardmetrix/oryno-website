@@ -15,6 +15,7 @@ import {
   normalizePairgateNetwork,
   normalizePairgateTv,
   requirePairgateForNigeria,
+  warmDataPlanCatalog,
 } from "@/lib/pairgate";
 import {
   fallbackVariationsFor,
@@ -200,6 +201,8 @@ export async function GET(req: Request) {
       // Data plans (airtime has no variations)
       if (isDataNetwork || /-data$/i.test(serviceID)) {
         const live = await listDataVariations(serviceID);
+        // Prefetch sibling networks so switching MTN→Airtel is instant.
+        warmDataPlanCatalog(networkSlug);
         const price = await createLocalPricer("vtpass");
         const priced = live.variations.map((v) => {
           const base = Number(v.charged_amount) || 0;
@@ -218,16 +221,25 @@ export async function GET(req: Request) {
             chargedAmount: v.charged_amount,
           };
         });
-        return NextResponse.json({
-          ok: true,
-          demo: isPairgateSandbox(),
-          provider: "pairgate",
-          countryCode: "NG",
-          currency: "NGN",
-          serviceID,
-          serviceName: live.serviceName,
-          variations: priced,
-        });
+        return NextResponse.json(
+          {
+            ok: true,
+            demo: isPairgateSandbox(),
+            provider: "pairgate",
+            countryCode: "NG",
+            currency: "NGN",
+            serviceID,
+            serviceName: live.serviceName,
+            variations: priced,
+          },
+          {
+            headers: {
+              // Browser/client can reuse plans while server SWR refreshes Pairgate.
+              "Cache-Control":
+                "private, max-age=120, stale-while-revalidate=1800",
+            },
+          },
+        );
       }
 
       // Never fall through to VTpass for Nigeria

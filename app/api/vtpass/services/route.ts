@@ -13,6 +13,7 @@ import {
   listTvServices,
   requirePairgateForNigeria,
   isPairgateSandbox,
+  warmDataPlanCatalog,
 } from "@/lib/pairgate";
 import {
   cleanNetworkName,
@@ -82,27 +83,43 @@ export async function GET(req: Request) {
             : identifier === "tv-subscription"
               ? listTvServices()
               : listElectricityServices();
-      return NextResponse.json({
-        ok: true,
-        demo: isPairgateSandbox(),
-        provider: "pairgate",
-        countryCode: "NG",
-        currency: "NGN",
-        identifier,
-        services: services.map((s) => ({
-          serviceID: s.serviceID,
-          name: s.name,
-          image: s.image,
-          minAmount: s.minAmount,
-          maxAmount: s.maxAmount,
-          customerLabel:
-            identifier === "tv-subscription"
-              ? "Smartcard / IUC"
-              : identifier === "electricity-bill"
-                ? "Meter number"
-                : undefined,
-        })),
-      });
+
+      // Warm Pairgate data catalogs while the user picks a network.
+      if (identifier === "data") {
+        warmDataPlanCatalog(services[0]?.serviceID);
+      }
+
+      return NextResponse.json(
+        {
+          ok: true,
+          demo: isPairgateSandbox(),
+          provider: "pairgate",
+          countryCode: "NG",
+          currency: "NGN",
+          identifier,
+          services: services.map((s) => ({
+            serviceID: s.serviceID,
+            name: s.name,
+            image: s.image,
+            minAmount: s.minAmount,
+            maxAmount: s.maxAmount,
+            customerLabel:
+              identifier === "tv-subscription"
+                ? "Smartcard / IUC"
+                : identifier === "electricity-bill"
+                  ? "Meter number"
+                  : undefined,
+          })),
+        },
+        {
+          headers: {
+            "Cache-Control":
+              identifier === "data" || identifier === "airtime"
+                ? "private, max-age=300, stale-while-revalidate=1800"
+                : "private, max-age=120, stale-while-revalidate=600",
+          },
+        },
+      );
     }
 
     if (
