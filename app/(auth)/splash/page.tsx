@@ -34,7 +34,7 @@ export default function SplashPage() {
             ORYNO
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            One App. Endless Possibilities.
+            Your Digital World, Simplified.
           </p>
         </div>
         <motion.div

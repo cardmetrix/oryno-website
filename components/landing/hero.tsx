@@ -49,10 +49,10 @@ export function Hero({ homeSrc, walletSrc }: HeroProps) {
             variants={fadeUp}
             className="text-[2.6rem] leading-[1.05] font-bold tracking-tight text-foreground sm:text-5xl lg:text-[3.5rem]"
           >
-            One App.
+           Your Digital World, 
             <br />
             <span className="bg-gradient-to-r from-oryno-orange to-oryno-orange-soft bg-clip-text text-transparent">
-              Endless Possibilities.
+            Simplified.
             </span>
           </motion.h1>
 

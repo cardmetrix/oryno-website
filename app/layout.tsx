@@ -18,7 +18,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ORYNO — One App. Endless Possibilities.",
+  title: "ORYNO — Your Digital World, Simplified.",
   description:
     "ORYNO is a premium digital services platform for airtime, data, bill payments, virtual numbers, social boosting, and wallet payouts across Africa.",
   keywords: [
@@ -40,7 +40,7 @@ export const metadata: Metadata = {
     shortcut: "/favicon.png?v=2",
   },
   openGraph: {
-    title: "ORYNO — One App. Endless Possibilities.",
+    title: "ORYNO — Your Digital World, Simplified.",
     description:
       "The premium digital services app for airtime, data, bills, virtual numbers, and more.",
     type: "website",

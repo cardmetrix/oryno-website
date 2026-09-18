@@ -43,7 +43,7 @@ export function SiteFooter() {
               </span>
             </a>
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-muted-foreground">
-              One App. Endless Possibilities. A premium digital services
+              Your Digital World, Simplified. A premium digital services
               platform built for clarity, speed, and trust.
             </p>
           </div>

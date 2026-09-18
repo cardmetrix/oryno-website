@@ -26,7 +26,7 @@ export function AuthSplitLayout({
   children,
   title,
   subtitle,
-  panelTitle = "One App. Endless Possibilities.",
+  panelTitle = "Your Digital World, Simplified.",
   panelSubtitle = "Airtime, data, bills, wallet payouts — all in one premium experience.",
   top,
   className,

@@ -121,7 +121,7 @@ export default function AboutPage() {
     <AppShell hideNav>
       <PageHeader
         title="About ORYNO"
-        subtitle="One App. Endless Possibilities."
+        subtitle="Your Digital World, Simplified."
         backHref="/settings"
       />
 
@@ -156,7 +156,7 @@ export default function AboutPage() {
 
           <p className="mt-4 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1.5 text-sm font-semibold text-white ring-1 ring-white/20 backdrop-blur-sm">
             <Sparkles className="h-4 w-4" strokeWidth={1.75} />
-            Slogan: One App. Endless Possibilities.
+            Slogan: Your Digital World, Simplified.
           </p>
           <p className="mt-3 text-xs font-medium tracking-wide text-white/70">
             App {APP_VERSION_LABEL}

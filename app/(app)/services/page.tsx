@@ -46,7 +46,7 @@ export default function ServicesPage() {
     <AppShell>
       <PageHeader
         title="All Services"
-        subtitle="One app. Endless possibilities."
+        subtitle="Your Digital World, Simplified."
         backHref="/dashboard"
       />
 
