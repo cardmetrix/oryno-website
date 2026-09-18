@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 
 const THRESHOLD = 72;
 const MAX_PULL = 120;
+const INDICATOR_SLOT = 56;
 
 type PullToRefreshProps = {
   children: ReactNode;
@@ -36,7 +37,7 @@ function getScrollTop() {
 
 /**
  * Mobile pull-to-refresh with the ORYNO branded spinner.
- * Only arms when the page is scrolled to the top; ignores mostly-horizontal swipes.
+ * Indicator sits in a slot above page content (never overlays it).
  */
 export function PullToRefresh({
   children,
@@ -172,55 +173,36 @@ export function PullToRefresh({
 
   const progress = Math.min(1, pull / THRESHOLD);
   const show = refreshing || pull > 4;
-  const indicatorOffset = Math.min(pull, MAX_PULL);
+  const slotHeight = refreshing
+    ? INDICATOR_SLOT
+    : show
+      ? Math.min(Math.max(pull * 0.85, 0), INDICATOR_SLOT + 16)
+      : 0;
 
   return (
     <div ref={rootRef} className={cn("relative", className)}>
+      {/* Loader slot above page content — expands on pull, never overlays content */}
       <div
-        className="pointer-events-none absolute inset-x-0 top-0 z-40 flex justify-center md:hidden"
+        className="pointer-events-none flex items-center justify-center overflow-hidden md:hidden"
         style={{
-          height: show ? Math.max(indicatorOffset, refreshing ? 56 : 0) : 0,
+          height: slotHeight,
           opacity: show ? 1 : 0,
           transition:
             refreshing || pull === 0
-              ? "height 0.2s ease, opacity 0.2s ease"
+              ? "height 0.22s ease, opacity 0.2s ease"
               : undefined,
         }}
         aria-live="polite"
         aria-busy={refreshing}
       >
-        <div
-          className="flex items-end justify-center pb-1"
-          style={{
-            transform: `translateY(${Math.max(0, indicatorOffset - 48)}px)`,
-            transition:
-              refreshing || pull === 0 ? "transform 0.2s ease" : undefined,
-          }}
-        >
-          <OrynoRefreshIcon
-            progress={progress}
-            refreshing={refreshing}
-            size={44}
-          />
-        </div>
+        <OrynoRefreshIcon
+          progress={progress}
+          refreshing={refreshing}
+          size={40}
+        />
       </div>
 
-      <div
-        style={{
-          transform:
-            show && !refreshing
-              ? `translateY(${indicatorOffset * 0.35}px)`
-              : refreshing
-                ? "translateY(18px)"
-                : "translateY(0)",
-          transition:
-            refreshing || pull === 0
-              ? "transform 0.25s cubic-bezier(0.22, 1, 0.36, 1)"
-              : undefined,
-        }}
-      >
-        {children}
-      </div>
+      {children}
     </div>
   );
 }

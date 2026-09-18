@@ -508,21 +508,20 @@ export function parseDataPlanMeta(name: string): DataPlanMeta {
     ? `${sizeMatch[1]}${sizeMatch[2].toUpperCase()}`
     : name.split(/[·\-–—|(]/)[0]?.trim() || name;
 
-  const dayMatch = name.match(/(\d+)\s*-?\s*days?\b/i);
+  // Prefer Weekly / Monthly / Daily over raw "7 days" / "30 days".
+  let validity = category;
   const hourMatch = name.match(/(\d+)\s*-?\s*hours?\b/i);
-  let validity = "";
-  if (dayMatch) {
-    const n = Number(dayMatch[1]);
-    validity = `${n} day${n === 1 ? "" : "s"}`;
-  } else if (hourMatch) {
+  if (categoryRaw === "daily" && hourMatch) {
     const n = Number(hourMatch[1]);
-    validity = `${n} hour${n === 1 ? "" : "s"}`;
-  } else if (/\bdaily\b/i.test(name)) {
-    validity = "1 day";
-  } else if (/\bweekly\b/i.test(name)) {
-    validity = "7 days";
-  } else if (/\bmonthly\b/i.test(name)) {
-    validity = "30 days";
+    if (n > 0 && n < 24) {
+      validity = `${n} hour${n === 1 ? "" : "s"}`;
+    }
+  } else if (categoryRaw === "daily") {
+    const dayMatch = name.match(/(\d+)\s*-?\s*days?\b/i);
+    if (dayMatch) {
+      const n = Number(dayMatch[1]);
+      if (n > 1 && n <= 3) validity = `${n} days`;
+    }
   }
 
   const tags: string[] = [];

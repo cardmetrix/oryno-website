@@ -106,11 +106,11 @@ export function DataPlanGrid({
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-2 sm:gap-3">
           {Array.from({ length: 6 }).map((_, i) => (
             <div
               key={i}
-              className="h-[118px] animate-pulse rounded-2xl bg-muted"
+              className="h-[110px] animate-pulse rounded-2xl bg-muted sm:h-[118px]"
             />
           ))}
         </div>
@@ -119,7 +119,7 @@ export function DataPlanGrid({
           No plans for this type
         </p>
       ) : (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-2 sm:gap-3">
           {filtered.map((plan, index) => {
             const meta = parseDataPlanMeta(plan.name);
             const selected = value === plan.id;
@@ -133,22 +133,22 @@ export function DataPlanGrid({
                 whileTap={{ scale: 0.98 }}
                 onClick={() => onChange(plan.id)}
                 className={cn(
-                  "flex flex-col items-start rounded-2xl bg-muted px-3.5 py-3.5 text-left transition",
+                  "flex flex-col items-start rounded-2xl bg-muted px-2.5 py-3 text-left transition sm:px-3.5 sm:py-3.5",
                   selected
                     ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
                     : "hover:bg-muted/80",
                 )}
               >
-                <span className="rounded-full bg-oryno-orange-muted px-2.5 py-0.5 text-[11px] font-semibold text-primary">
+                <span className="rounded-full bg-oryno-orange-muted px-2 py-0.5 text-[10px] font-semibold text-primary sm:px-2.5 sm:text-[11px]">
                   {meta.badge}
                 </span>
-                <p className="mt-2.5 text-lg font-extrabold tracking-tight text-foreground">
+                <p className="mt-2 text-base font-extrabold tracking-tight text-foreground sm:mt-2.5 sm:text-lg">
                   {meta.size}
                 </p>
-                <p className="mt-1 text-[15px] font-bold text-primary">
+                <p className="mt-1 text-sm font-bold text-primary sm:text-[15px]">
                   {formatMoney(plan.amount)}
                 </p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
+                <p className="mt-0.5 text-[11px] text-muted-foreground sm:text-xs">
                   {meta.validity}
                 </p>
               </motion.button>
