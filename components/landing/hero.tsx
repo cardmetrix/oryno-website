@@ -54,6 +54,7 @@ export function Hero({ homeSrc, walletSrc }: HeroProps) {
             Simplified.
             </span>
           </motion.h1>
+          
           <motion.p
             variants={fadeUp}
             className="mt-5 max-w-md text-base leading-relaxed text-muted-foreground sm:text-lg"
