@@ -15,6 +15,7 @@ import { resolveCountryCode } from "@/lib/country";
 import { getDisplayFx, nigeriaServiceLedgerCurrency } from "@/lib/display-currency";
 import { convertLocalToNgn } from "@/lib/fx/rates";
 import { priceLocalAmount } from "@/lib/pricing/service-pricing";
+import { maybeSaveBeneficiary } from "@/lib/beneficiaries";
 import {
   ensurePrimaryWallet,
   toWalletSummary,
@@ -617,6 +618,16 @@ export async function purchaseAirtime(input: {
         },
       );
 
+      if (outcome === "completed" || outcome === "processing") {
+        await maybeSaveBeneficiary({
+          save: input.saveBeneficiary,
+          userId: input.userId,
+          phone,
+          networkId: network.id,
+          label: network.name,
+        });
+      }
+
       return {
         order,
         transactionId: prepared.transaction.id,
@@ -783,6 +794,16 @@ export async function purchaseAirtime(input: {
       },
     );
 
+    if (outcome === "completed" || outcome === "processing") {
+      await maybeSaveBeneficiary({
+        save: input.saveBeneficiary,
+        userId: input.userId,
+        phone,
+        networkId: network.id,
+        label: network.name,
+      });
+    }
+
     return {
       order,
       transactionId: prepared.transaction.id,
@@ -828,6 +849,7 @@ export async function purchaseData(input: {
   productTypeId?: string | number;
   /** When true, `amount` is local currency for flexible VTpass data top-up. */
   flexibleLocalAmount?: boolean;
+  saveBeneficiary?: boolean;
 }) {
   if (input.mode !== "international") {
     if (!input.variationCode) throw new Error("Select a data plan");
@@ -931,6 +953,16 @@ export async function purchaseData(input: {
           orderId: order.id,
         },
       );
+
+      if (outcome === "completed" || outcome === "processing") {
+        await maybeSaveBeneficiary({
+          save: input.saveBeneficiary,
+          userId: input.userId,
+          phone,
+          networkId: network.id,
+          label: network.name,
+        });
+      }
 
       return {
         order,
@@ -1153,6 +1185,16 @@ export async function purchaseData(input: {
         orderId: order.id,
       },
     );
+
+    if (outcome === "completed" || outcome === "processing") {
+      await maybeSaveBeneficiary({
+        save: input.saveBeneficiary,
+        userId: input.userId,
+        phone,
+        networkId: network.id,
+        label: network.name,
+      });
+    }
 
     return {
       order,

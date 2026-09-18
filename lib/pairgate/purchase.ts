@@ -20,6 +20,7 @@ import { priceLocalAmount } from "@/lib/pricing/service-pricing";
 import { estimateAirtimeCashback } from "@/lib/telecom";
 import { inferDataPlanCategory } from "@/lib/vtpass/catalog";
 import { normalizePhone } from "@/lib/vtpass/client";
+import { maybeSaveBeneficiary } from "@/lib/beneficiaries";
 import {
   ensurePrimaryWallet,
   toWalletSummary,
@@ -578,6 +579,14 @@ export async function purchasePairgateAirtime(input: {
       orderId: order.id,
     });
 
+    await maybeSaveBeneficiary({
+      save: input.saveBeneficiary,
+      userId: input.userId,
+      phone,
+      networkId: network.id,
+      label: network.name,
+    });
+
     return {
       order,
       transactionId: prepared.transaction.id,
@@ -616,6 +625,7 @@ export async function purchasePairgateData(input: {
   variationCode: string;
   variationName: string;
   amount: number;
+  saveBeneficiary?: boolean;
 }) {
   const phone = normalizePhone(input.phone, input.countryCode || "NG");
   if (phone.length < 10) throw new Error("Enter a valid phone number");
@@ -698,6 +708,14 @@ export async function purchasePairgateData(input: {
       pairgate: result.data,
       simulated: result.simulated,
       orderId: order.id,
+    });
+
+    await maybeSaveBeneficiary({
+      save: input.saveBeneficiary,
+      userId: input.userId,
+      phone,
+      networkId: network.id,
+      label: network.name,
     });
 
     return {

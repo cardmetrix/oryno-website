@@ -56,6 +56,7 @@ export default function DataPage() {
   const [loadingNetworks, setLoadingNetworks] = useState(true);
   const [networkId, setNetworkId] = useState("");
   const [phone, setPhone] = useState("");
+  const [saveBeneficiary, setSaveBeneficiary] = useState(true);
   const [amount, setAmount] = useState(defaultIntlDataAmount(countryCode));
   const [variations, setVariations] = useState<Variation[]>([]);
   const [loadingPlans, setLoadingPlans] = useState(false);
@@ -298,6 +299,7 @@ export default function DataPage() {
                 variationCode: selected!.variationCode,
                 variationName: selected!.name,
                 amount: selected!.amount,
+                saveBeneficiary,
               }
             : isFlexibleIntl
               ? {
@@ -308,6 +310,7 @@ export default function DataPage() {
                   countryIso: countryCode,
                   productTypeId,
                   flexibleLocalAmount: true,
+                  saveBeneficiary,
                 }
               : {
                   mode: "international",
@@ -318,6 +321,7 @@ export default function DataPage() {
                   operatorId: networkId,
                   countryIso: countryCode,
                   productTypeId,
+                  saveBeneficiary,
                 },
         ),
       });
@@ -385,12 +389,21 @@ export default function DataPage() {
               />
             </MotionSection>
 
-            <MotionSection delay={0.04}>
+            <MotionSection delay={0.04} className="space-y-3">
               <PhoneNumberField
                 value={phone}
                 onChange={setPhone}
                 placeholder={isNigeria ? "0803 000 0000" : "Recipient number"}
               />
+              <label className="flex items-center gap-2 px-1 text-sm text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={saveBeneficiary}
+                  onChange={(e) => setSaveBeneficiary(e.target.checked)}
+                  className="rounded border-border"
+                />
+                Save as beneficiary
+              </label>
             </MotionSection>
 
             {isFlexibleIntl ? (

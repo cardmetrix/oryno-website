@@ -14,6 +14,7 @@ import {
 import { estimateAirtimeCashback } from "@/lib/telecom";
 import { resolveCountryCode } from "@/lib/country";
 import { nigeriaServiceLedgerCurrency } from "@/lib/display-currency";
+import { maybeSaveBeneficiary } from "@/lib/beneficiaries";
 import {
   ensurePrimaryWallet,
   toWalletSummary,
@@ -436,6 +437,16 @@ export async function purchaseSogoAirtime(input: {
         orderId: order.id,
       },
     );
+
+    if (outcome === "completed" || outcome === "processing") {
+      await maybeSaveBeneficiary({
+        save: input.saveBeneficiary,
+        userId: input.userId,
+        phone,
+        networkId: network.id,
+        label: network.name,
+      });
+    }
 
     return {
       order,

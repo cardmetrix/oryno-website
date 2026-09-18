@@ -31,6 +31,7 @@ export async function POST(req: Request) {
       countryIso?: string;
       productTypeId?: string | number;
       flexibleLocalAmount?: boolean;
+      saveBeneficiary?: boolean;
     };
 
     const mode = body.mode ?? "local";
@@ -90,6 +91,7 @@ export async function POST(req: Request) {
               variationCode: body.variationCode!,
               variationName: body.variationName || body.variationCode!,
               amount: Number(body.amount),
+              saveBeneficiary: body.saveBeneficiary,
             })
           : purchaseData({
               userId: user.id,
@@ -105,6 +107,7 @@ export async function POST(req: Request) {
               countryIso: body.countryIso,
               productTypeId: body.productTypeId,
               flexibleLocalAmount: flexibleIntl,
+              saveBeneficiary: body.saveBeneficiary,
             }),
     );
 
