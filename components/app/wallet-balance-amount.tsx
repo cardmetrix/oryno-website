@@ -50,7 +50,7 @@ export function WalletBalanceAmount({
     currency?.toUpperCase() === "USD" ? "en-US" : info.locale;
 
   return (
-    <span className={cn("inline-flex items-baseline ", className)}>
+    <span className={cn("inline-flex items-baseline gap-1", className)}>
       <span className={cn("shrink-0", symbolClassName)}>{symbol}</span>
       <span className={amountClassName}>
         {formatAmountDigits(balance, locale)}
