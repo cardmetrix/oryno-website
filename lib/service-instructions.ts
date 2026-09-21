@@ -77,7 +77,7 @@ export const SERVICE_INSTRUCTIONS: Record<
       "Select the app you need to verify (WhatsApp, Telegram, Google, Instagram, etc.).",
       "Pick the country for the phone number. Your phone’s location or VPN must match that country, or verification usually fails.",
       "Before you tap Get number: turn on a VPN set to the same country as the number you are buying, open the target app, and keep the VPN on until the SMS code arrives.",
-      "Pay to reserve the number, copy it into the app’s signup/verify screen, then stay on this page — the code appears here automatically when 5sim receives the SMS.",
+      "Pay to reserve the number, copy it into the app’s signup/verify screen, then stay on this page — the code appears here automatically when Provider receives the SMS.",
       "If no SMS arrives within about an hour, the purchase is refunded to your USD wallet. Do not reuse a number after the session ends.",
     ],
   },
