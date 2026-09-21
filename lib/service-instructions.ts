@@ -70,13 +70,15 @@ export const SERVICE_INSTRUCTIONS: Record<
     ],
   },
   "virtual-numbers": {
-    subtitle: "Follow these steps to get an SMS verification number",
+    subtitle:
+      "Match your location to the number’s country — or WhatsApp/Telegram may refuse the code",
     steps: [
-      "Fund your wallet — numbers are charged at purchase.",
-      "Select the service you need the number for (Telegram, WhatsApp, etc.).",
-      "Pick a country with stock available (flags show each market).",
-      "Pay from your wallet to reserve the number, then copy it into the app.",
-      "Stay on the page — the SMS code appears here when it arrives.",
+      "Fund your USD wallet first — virtual numbers are charged in USD at purchase.",
+      "Select the app you need to verify (WhatsApp, Telegram, Google, Instagram, etc.).",
+      "Pick the country for the phone number. Your phone’s location or VPN must match that country. A USA number with a Nigeria IP (or the reverse) usually fails verification.",
+      "Before you tap Get number: turn on a VPN set to the same country as the number you are buying, open the target app, and keep the VPN on until the SMS code arrives.",
+      "Pay to reserve the number, copy it into the app’s signup/verify screen, then stay on this page — the code appears here automatically when 5sim receives the SMS.",
+      "If no SMS arrives within about an hour, the purchase is refunded to your USD wallet. Do not reuse a number after the session ends.",
     ],
   },
   "gift-cards": {

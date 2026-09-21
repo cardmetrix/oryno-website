@@ -83,7 +83,7 @@ export async function POST(req: Request) {
           iso: body.iso,
           service: body.service!.trim(),
           serviceName: body.serviceName || body.service!,
-          operator: "any",
+          operator: body.operator?.trim() || "any",
           priceUsd: chargeUsd,
           costUsd: Number.isFinite(costUsd) && costUsd > 0 ? costUsd : undefined,
           priceLocal: Number(body.priceLocal) || 0,

@@ -267,6 +267,50 @@ export async function getFivesimCountries(): Promise<FivesimCountry[]> {
 
 type OperatorStock = { cost: number; count: number; rate?: number };
 
+type OperatorCandidate = {
+  operator: string;
+  cost: number;
+  count: number;
+  rate: number;
+};
+
+/**
+ * WhatsApp has multiple 5sim operator lanes. Cheap ~$0.85 options often never
+ * deliver SMS; the ~$1.90 lane is the one that works — prefer it when in stock.
+ */
+const WHATSAPP_PREFERRED_COST = 1.9;
+const WHATSAPP_PREFERRED_MIN = 1.5;
+const WHATSAPP_PREFERRED_MAX = 2.5;
+
+function pickBestOperator(
+  product: string,
+  candidates: OperatorCandidate[],
+): OperatorCandidate | null {
+  if (!candidates.length) return null;
+
+  if (product === "whatsapp") {
+    const preferred = [...candidates]
+      .filter(
+        (c) =>
+          c.cost >= WHATSAPP_PREFERRED_MIN && c.cost <= WHATSAPP_PREFERRED_MAX,
+      )
+      .sort(
+        (a, b) =>
+          Math.abs(a.cost - WHATSAPP_PREFERRED_COST) -
+          Math.abs(b.cost - WHATSAPP_PREFERRED_COST),
+      );
+    if (preferred[0]) return preferred[0];
+
+    // Prefer solid mid/high lanes over known-weak sub-$1.20 virtuals.
+    const solid = [...candidates]
+      .filter((c) => c.cost >= 1.2)
+      .sort((a, b) => a.cost - b.cost);
+    if (solid[0]) return solid[0];
+  }
+
+  return [...candidates].sort((a, b) => a.cost - b.cost)[0] ?? null;
+}
+
 /**
  * Guest prices by product:
  * { product: { country: { operator: { cost, count, rate } } } }
@@ -288,8 +332,7 @@ export async function getFivesimPricesByProduct(product: string) {
 
   for (const [countrySlug, operators] of Object.entries(byCountry)) {
     if (!operators || typeof operators !== "object") continue;
-    let best: { operator: string; cost: number; count: number; rate: number } | null =
-      null;
+    const candidates: OperatorCandidate[] = [];
     let totalCount = 0;
     for (const [operator, stock] of Object.entries(operators)) {
       const cost = Number(stock?.cost) || 0;
@@ -297,10 +340,9 @@ export async function getFivesimPricesByProduct(product: string) {
       const rate = Number(stock?.rate) || 0;
       totalCount += count;
       if (count <= 0 || cost <= 0) continue;
-      if (!best || cost < best.cost) {
-        best = { operator, cost, count, rate };
-      }
+      candidates.push({ operator, cost, count, rate });
     }
+    const best = pickBestOperator(product, candidates);
     if (!best) continue;
     offers.push({
       countrySlug,
@@ -322,12 +364,18 @@ export async function buyFivesimActivation(input: {
 }) {
   const country = input.country.trim().toLowerCase();
   const product = input.product.trim().toLowerCase();
-  // Docs: maxPrice only applies when operator is "any".
-  const operator = "any";
+  const operator =
+    (input.operator || "any").trim().toLowerCase() || "any";
   if (!country || !product) throw new Error("Country and product are required");
 
+  // Docs: maxPrice only applies when operator is "any".
   const qs = new URLSearchParams();
-  if (input.maxPrice && Number.isFinite(input.maxPrice) && input.maxPrice > 0) {
+  if (
+    operator === "any" &&
+    input.maxPrice &&
+    Number.isFinite(input.maxPrice) &&
+    input.maxPrice > 0
+  ) {
     qs.set("maxPrice", String(input.maxPrice));
   }
   const q = qs.toString() ? `?${qs}` : "";

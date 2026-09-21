@@ -262,8 +262,12 @@ export async function purchaseFivesimNumber(input: {
     const bought = await buyFivesimActivation({
       country: countrySlug,
       product,
-      operator: input.operator || "any",
-      maxPrice: wholesaleUsd * 1.35,
+      // Always buy the priced operator lane (critical for WhatsApp ~$1.90).
+      operator: input.operator?.trim() || "any",
+      maxPrice:
+        !input.operator || input.operator === "any"
+          ? wholesaleUsd * 1.35
+          : undefined,
     });
 
     console.log(LOG_PREFIX, "purchase LIVE", {
