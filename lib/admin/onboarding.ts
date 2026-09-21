@@ -29,7 +29,7 @@ export const DEFAULT_ONBOARDING_SLIDES = [
     key: "data",
     title: "Airtime & data",
     subtitle:
-      "Top up MTN, Airtel, Glo, T2 and buy data bundles in seconds.",
+      "Top up MTN, Airtel, Glo, 9mobile and buy data bundles in seconds.",
     imagePath: "/onboarding/data.png",
     accent: "#FF6A00",
     sortOrder: 2,

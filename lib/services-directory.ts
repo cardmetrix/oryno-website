@@ -50,9 +50,9 @@ export const servicesDirectory: ServiceDirectoryItem[] = [
     label: "Airtime",
     shortDescription: "Top up any network instantly",
     longDescription:
-      "Buy local airtime in Nigeria (MTN, Airtel, Glo, T2) or international top-ups for your country.",
+      "Buy local airtime in Nigeria (MTN, Airtel, Glo, 9mobile) or international top-ups for your country.",
     category: "Telecom",
-    tags: ["MTN", "Airtel", "Glo", "T2", "International"],
+    tags: ["MTN", "Airtel", "Glo", "9mobile", "International"],
     eta: "Instant",
     accent: "#FF6A00",
     popular: true,
@@ -65,7 +65,7 @@ export const servicesDirectory: ServiceDirectoryItem[] = [
     label: "Data Bundles",
     shortDescription: "Daily, weekly & monthly plans",
     longDescription:
-      "Live plans for MTN, Airtel, Glo, T2, Smile, Spectranet and SME — or international data for your country.",
+      "Live plans for MTN, Airtel, Glo, 9mobile, Smile, Spectranet and SME — or international data for your country.",
     category: "Telecom",
     tags: ["MTN", "Airtel", "Glo", "Smile", "SME"],
     eta: "Instant",

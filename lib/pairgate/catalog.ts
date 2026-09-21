@@ -52,9 +52,8 @@ const AIRTIME_NETWORKS: PairgateService[] = [
     maxAmount: 50000,
   },
   {
-    // Pairgate API slug remains `9mobile`; T2 is the consumer-facing brand.
-    serviceID: "t2",
-    name: "T2",
+    serviceID: "9mobile",
+    name: "9mobile",
     image: `${IMG}/9mobile-Airtime.jpg`,
     minAmount: 50,
     maxAmount: 50000,
@@ -65,7 +64,7 @@ const DATA_NETWORKS: PairgateService[] = [
   { serviceID: "mtn", name: "MTN Data", image: `${IMG}/MTN-Data.jpg` },
   { serviceID: "airtel", name: "Airtel Data", image: `${IMG}/Airtel-Data.jpg` },
   { serviceID: "glo", name: "Glo Data", image: `${IMG}/GLO-Data.jpg` },
-  { serviceID: "t2", name: "T2 Data", image: `${IMG}/9mobile-Data.jpg` },
+  { serviceID: "9mobile", name: "9mobile Data", image: `${IMG}/9mobile-Data.jpg` },
 ];
 
 const TV_PROVIDERS: PairgateService[] = [
@@ -158,7 +157,7 @@ const NETWORK_SLUG: Record<string, string> = {
   glo: "glo",
   "glo-data": "glo",
   "glo-sme-data": "glo",
-  // UI / legacy IDs → Pairgate data/airtime slug (`9mobile` in their API).
+  // Legacy / alternate IDs → Pairgate provider slug (`9mobile`).
   etisalat: "9mobile",
   "etisalat-data": "9mobile",
   "9mobile": "9mobile",
@@ -399,7 +398,7 @@ function displayNetworkServiceName(slug: string) {
   const match = DATA_NETWORKS.find(
     (s) => normalizePairgateNetwork(s.serviceID) === slug,
   );
-  return match?.name || (slug === "9mobile" ? "T2 Data" : slug.toUpperCase());
+  return match?.name || (slug === "9mobile" ? "9mobile Data" : slug.toUpperCase());
 }
 
 async function loadDataVariationsFresh(
@@ -420,7 +419,7 @@ async function loadDataVariationsFresh(
   }
   const variations = mergePlanBatches(batches);
   // Only mark complete when every request succeeded — otherwise a 429 empty
-  // response would stick for 30 minutes and show "no plans" for T2/9mobile.
+  // response would stick for 30 minutes and show "no plans" for 9mobile.
   writeDataPlanCache(slug, serviceName, variations, allOk);
   return { serviceName, variations };
 }
@@ -465,7 +464,7 @@ export async function listDataVariations(
 }
 
 /**
- * Warm MTN/Airtel/Glo/T2 catalogs in the background (non-blocking).
+ * Warm MTN/Airtel/Glo/9mobile catalogs in the background (non-blocking).
  * Call when the data services list is requested so the first plan view is a cache hit.
  */
 export function warmDataPlanCatalog(prioritySlug?: string | null) {
