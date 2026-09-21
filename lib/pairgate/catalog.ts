@@ -52,8 +52,9 @@ const AIRTIME_NETWORKS: PairgateService[] = [
     maxAmount: 50000,
   },
   {
-    serviceID: "9mobile",
-    name: "9mobile",
+    // Pairgate API slug remains `9mobile`; T2 is the consumer-facing brand.
+    serviceID: "t2",
+    name: "T2",
     image: `${IMG}/9mobile-Airtime.jpg`,
     minAmount: 50,
     maxAmount: 50000,
@@ -64,7 +65,7 @@ const DATA_NETWORKS: PairgateService[] = [
   { serviceID: "mtn", name: "MTN Data", image: `${IMG}/MTN-Data.jpg` },
   { serviceID: "airtel", name: "Airtel Data", image: `${IMG}/Airtel-Data.jpg` },
   { serviceID: "glo", name: "Glo Data", image: `${IMG}/GLO-Data.jpg` },
-  { serviceID: "9mobile", name: "9mobile Data", image: `${IMG}/9mobile-Data.jpg` },
+  { serviceID: "t2", name: "T2 Data", image: `${IMG}/9mobile-Data.jpg` },
 ];
 
 const TV_PROVIDERS: PairgateService[] = [
@@ -157,9 +158,13 @@ const NETWORK_SLUG: Record<string, string> = {
   glo: "glo",
   "glo-data": "glo",
   "glo-sme-data": "glo",
+  // UI / legacy IDs → Pairgate data/airtime slug (`9mobile` in their API).
   etisalat: "9mobile",
   "etisalat-data": "9mobile",
   "9mobile": "9mobile",
+  t2: "9mobile",
+  t2mobile: "9mobile",
+  "t2-data": "9mobile",
 };
 
 const TV_SLUG: Record<string, string> = {
@@ -300,19 +305,61 @@ let catalogWarmStarted = false;
 async function fetchDataPlansForType(
   slug: string,
   planType: string,
-): Promise<PairgateVariation[]> {
+): Promise<{ plans: PairgateVariation[]; ok: boolean }> {
   // Always use live catalog paths — /test/data-plans returns empty arrays
   const path = `/data-plans?provider_id=${encodeURIComponent(slug)}&plan_type=${encodeURIComponent(planType)}`;
   try {
     const { ok, status, json } = await pairgateCatalogGet(path);
-    if (!isPairgateHttpOk(ok, status, json) || !json.data) return [];
-    return plansFromGroupedData(
-      json.data as Record<string, unknown>,
-      planType,
-    );
+    if (status === 429) {
+      console.error("[pairgate-data-plans] rate-limited", slug, planType);
+      return { plans: [], ok: false };
+    }
+    if (!isPairgateHttpOk(ok, status, json) || !json.data) {
+      return { plans: [], ok: false };
+    }
+    return {
+      plans: plansFromGroupedData(
+        json.data as Record<string, unknown>,
+        planType,
+      ),
+      ok: true,
+    };
   } catch (error) {
     console.error("[pairgate-data-plans]", slug, planType, error);
-    return [];
+    return { plans: [], ok: false };
+  }
+}
+
+/** Plan types Pairgate lists for this provider (avoids empty CG/AWOOF calls that burn rate limit). */
+async function planTypesForProvider(slug: string): Promise<string[] | null> {
+  try {
+    const { ok, status, json } = await pairgateCatalogGet(
+      "/data-plans/categories",
+    );
+    if (!isPairgateHttpOk(ok, status, json) || !Array.isArray(json.data)) {
+      return null;
+    }
+    const aliases = new Set(
+      slug === "9mobile"
+        ? ["9mobile", "t2", "t2mobile"]
+        : [slug],
+    );
+    const types = new Set<string>();
+    for (const row of json.data as unknown[]) {
+      if (!row || typeof row !== "object") continue;
+      const rec = row as Record<string, unknown>;
+      const nameSlug = String(rec.provider_name || "")
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, "");
+      if (!aliases.has(nameSlug)) continue;
+      const planType = String(rec.plan_type || "").trim().toUpperCase();
+      if (planType) types.add(planType);
+    }
+    return types.size ? [...types] : null;
+  } catch (error) {
+    console.error("[pairgate-data-categories]", slug, error);
+    return null;
   }
 }
 
@@ -348,17 +395,33 @@ function writeDataPlanCache(
   });
 }
 
+function displayNetworkServiceName(slug: string) {
+  const match = DATA_NETWORKS.find(
+    (s) => normalizePairgateNetwork(s.serviceID) === slug,
+  );
+  return match?.name || (slug === "9mobile" ? "T2 Data" : slug.toUpperCase());
+}
+
 async function loadDataVariationsFresh(
   slug: string,
   serviceName: string,
 ): Promise<{ serviceName: string; variations: PairgateVariation[] }> {
-  // Skip /data-plans/categories (extra Pairgate gap). Fetch every plan type.
+  const fromCategories = await planTypesForProvider(slug);
+  const planTypes = fromCategories?.length
+    ? fromCategories
+    : [...ALL_PLAN_TYPES];
+
   const batches: PairgateVariation[][] = [];
-  for (const planType of ALL_PLAN_TYPES) {
-    batches.push(await fetchDataPlansForType(slug, planType));
+  let allOk = true;
+  for (const planType of planTypes) {
+    const result = await fetchDataPlansForType(slug, planType);
+    if (!result.ok) allOk = false;
+    batches.push(result.plans);
   }
   const variations = mergePlanBatches(batches);
-  writeDataPlanCache(slug, serviceName, variations, true);
+  // Only mark complete when every request succeeded — otherwise a 429 empty
+  // response would stick for 30 minutes and show "no plans" for T2/9mobile.
+  writeDataPlanCache(slug, serviceName, variations, allOk);
   return { serviceName, variations };
 }
 
@@ -366,8 +429,7 @@ export async function listDataVariations(
   providerSlug: string,
 ): Promise<{ serviceName: string; variations: PairgateVariation[] }> {
   const slug = normalizePairgateNetwork(providerSlug);
-  const serviceName =
-    DATA_NETWORKS.find((s) => s.serviceID === slug)?.name || slug.toUpperCase();
+  const serviceName = displayNetworkServiceName(slug);
 
   const cached = dataPlanCache.get(slug);
   // Only serve cache hits that finished loading every plan type.
@@ -378,8 +440,8 @@ export async function listDataVariations(
     };
   }
 
-  // Stale-while-revalidate: serve a complete expired catalog instantly.
-  if (cached?.complete && cached.variations.length) {
+  // Stale-while-revalidate: serve any non-empty catalog instantly while refreshing.
+  if (cached?.variations.length) {
     if (!inflightDataPlans.has(slug)) {
       const refresh = loadDataVariationsFresh(slug, serviceName).finally(() => {
         inflightDataPlans.delete(slug);
@@ -403,7 +465,7 @@ export async function listDataVariations(
 }
 
 /**
- * Warm MTN/Airtel/Glo/9mobile catalogs in the background (non-blocking).
+ * Warm MTN/Airtel/Glo/T2 catalogs in the background (non-blocking).
  * Call when the data services list is requested so the first plan view is a cache hit.
  */
 export function warmDataPlanCatalog(prioritySlug?: string | null) {
@@ -411,11 +473,14 @@ export function warmDataPlanCatalog(prioritySlug?: string | null) {
   catalogWarmStarted = true;
 
   const networks = DATA_NETWORKS.map((n) => n.serviceID);
-  const ordered = prioritySlug
+  const priority = prioritySlug
+    ? normalizePairgateNetwork(prioritySlug)
+    : null;
+  const ordered = priority
     ? [
-        normalizePairgateNetwork(prioritySlug),
+        priority,
         ...networks.filter(
-          (id) => id !== normalizePairgateNetwork(prioritySlug),
+          (id) => normalizePairgateNetwork(id) !== priority,
         ),
       ]
     : networks;

@@ -46,6 +46,8 @@ const KNOWN_BRAND_DOMAINS: Record<string, string> = {
   airtel: "airtel.com",
   glo: "gloworld.com",
   "9mobile": "9mobile.com.ng",
+  t2: "9mobile.com.ng",
+  t2mobile: "9mobile.com.ng",
   smile: "smile.com.ng",
   spectranet: "spectranet.com.ng",
 };

@@ -139,12 +139,17 @@ const NETWORK_COLORS: Record<
     soft: "rgba(80, 184, 72, 0.14)",
   },
   etisalat: {
-    name: "9mobile",
+    name: "T2",
     color: "#006F2D",
     soft: "rgba(0, 111, 45, 0.14)",
   },
   "9mobile": {
-    name: "9mobile",
+    name: "T2",
+    color: "#006F2D",
+    soft: "rgba(0, 111, 45, 0.14)",
+  },
+  t2: {
+    name: "T2",
     color: "#006F2D",
     soft: "rgba(0, 111, 45, 0.14)",
   },

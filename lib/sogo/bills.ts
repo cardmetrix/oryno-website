@@ -62,6 +62,7 @@ const LEGACY_NETWORK: Record<string, string> = {
   etisalat: "t2mobile",
   "etisalat-data": "t2mobile",
   "9mobile": "t2mobile",
+  t2: "t2mobile",
   t2mobile: "t2mobile",
   smile: "smile",
   "smile-direct": "smile",
@@ -98,7 +99,7 @@ const FALLBACK_AIRTIME: SogoBillProvider[] = [
   { slug: "mtn", name: "MTN" },
   { slug: "airtel", name: "Airtel" },
   { slug: "glo", name: "Glo" },
-  { slug: "t2mobile", name: "9mobile" },
+  { slug: "t2mobile", name: "T2" },
 ];
 
 const FALLBACK_DATA: SogoBillProvider[] = [
@@ -144,9 +145,9 @@ const FALLBACK_DATA_PLANS: Record<string, SogoBillPlan[]> = {
     { variationCode: "glo-50gb-monthly", name: "Glo 50GB — 30 days", amount: 10000, fixedPrice: true },
   ],
   t2mobile: [
-    { variationCode: "9mobile-1gb-daily", name: "9mobile 1GB — 1 day", amount: 400, fixedPrice: true },
-    { variationCode: "9mobile-4.5gb-weekly", name: "9mobile 4.5GB — 7 days", amount: 2000, fixedPrice: true },
-    { variationCode: "9mobile-30gb-monthly", name: "9mobile 30GB — 30 days", amount: 9500, fixedPrice: true },
+    { variationCode: "t2-1gb-daily", name: "T2 1GB — 1 day", amount: 400, fixedPrice: true },
+    { variationCode: "t2-4.5gb-weekly", name: "T2 4.5GB — 7 days", amount: 2000, fixedPrice: true },
+    { variationCode: "t2-30gb-monthly", name: "T2 30GB — 30 days", amount: 9500, fixedPrice: true },
   ],
   smile: [
     { variationCode: "smile-1gb", name: "Smile 1GB Flexi", amount: 1000, fixedPrice: true },
@@ -209,8 +210,8 @@ export function toSogoPhone(phone: string) {
 
 export function displayNetworkName(slug: string, fallback?: string) {
   const key = slug.toLowerCase();
-  if (key === "t2mobile" || key === "9mobile" || key === "etisalat") {
-    return "9mobile";
+  if (key === "t2mobile" || key === "t2" || key === "9mobile" || key === "etisalat") {
+    return "T2";
   }
   if (fallback) return fallback;
   return slug.toUpperCase();

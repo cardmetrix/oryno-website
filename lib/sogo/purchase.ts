@@ -49,7 +49,17 @@ const NETWORK_COLORS: Record<
   airtel: { name: "Airtel", color: "#ED1C24", soft: "rgba(237, 28, 36, 0.14)" },
   glo: { name: "Glo", color: "#50B848", soft: "rgba(80, 184, 72, 0.14)" },
   t2mobile: {
-    name: "9mobile",
+    name: "T2",
+    color: "#006F2D",
+    soft: "rgba(0, 111, 45, 0.14)",
+  },
+  t2: {
+    name: "T2",
+    color: "#006F2D",
+    soft: "rgba(0, 111, 45, 0.14)",
+  },
+  "9mobile": {
+    name: "T2",
     color: "#006F2D",
     soft: "rgba(0, 111, 45, 0.14)",
   },

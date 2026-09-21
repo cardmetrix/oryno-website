@@ -1,4 +1,4 @@
-export type NetworkId = "mtn" | "airtel" | "glo" | "9mobile";
+export type NetworkId = "mtn" | "airtel" | "glo" | "9mobile" | "t2";
 
 export type Network = {
   id: NetworkId;
@@ -27,8 +27,8 @@ export const networks: Network[] = [
     soft: "rgba(80, 184, 72, 0.14)",
   },
   {
-    id: "9mobile",
-    name: "9mobile",
+    id: "t2",
+    name: "T2",
     color: "#006F2D",
     soft: "rgba(0, 111, 45, 0.14)",
   },
@@ -143,27 +143,27 @@ export const dataPlans: DataPlan[] = [
     category: "Monthly",
   },
   {
-    id: "9m-d1",
-    network: "9mobile",
-    name: "9mobile Daily",
+    id: "t2-d1",
+    network: "t2",
+    name: "T2 Daily",
     size: "1GB",
     validity: "1 day",
     price: 400,
     category: "Daily",
   },
   {
-    id: "9m-w1",
-    network: "9mobile",
-    name: "9mobile Weekly",
+    id: "t2-w1",
+    network: "t2",
+    name: "T2 Weekly",
     size: "4.5GB",
     validity: "7 days",
     price: 2000,
     category: "Weekly",
   },
   {
-    id: "9m-m1",
-    network: "9mobile",
-    name: "9mobile Monthly",
+    id: "t2-m1",
+    network: "t2",
+    name: "T2 Monthly",
     size: "30GB",
     validity: "30 days",
     price: 9500,
