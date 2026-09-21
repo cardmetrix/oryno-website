@@ -503,15 +503,6 @@ export default function VirtualNumbersPage() {
                 </p>
               ) : null}
 
-              <p className="mt-3 rounded-[14px] border border-amber-500/25 bg-amber-500/10 px-3.5 py-3 text-xs leading-relaxed text-foreground">
-                <span className="font-semibold text-amber-700 dark:text-amber-400">
-                  Location must match.
-                </span>{" "}
-                Use a VPN set to the same country as the number you buy (e.g. USA
-                number → USA VPN). If your IP country does not match the number,
-                WhatsApp and similar apps often block the SMS code.
-              </p>
-
               <SearchPickerSheet
                 open={countryOpen}
                 onOpenChange={setCountryOpen}
