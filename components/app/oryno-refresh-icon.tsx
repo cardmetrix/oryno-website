@@ -39,19 +39,15 @@ export function OrynoRefreshIcon({
       className={cn(
         "relative flex items-center justify-center",
         active ? "opacity-100" : "opacity-0",
+        active &&
+          "drop-shadow-[0_6px_14px_rgba(255,106,0,0.28)] dark:drop-shadow-[0_8px_20px_rgba(255,106,0,0.45)]",
         className,
       )}
-      style={{
-        width: size,
-        height: size,
-        filter: active
-          ? "drop-shadow(0 6px 14px rgba(255, 106, 0, 0.28))"
-          : undefined,
-      }}
+      style={{ width: size, height: size }}
       aria-hidden={!active}
     >
       <span
-        className="absolute inset-[-6px] rounded-full bg-primary/10"
+        className="absolute inset-[-6px] rounded-full bg-primary/10 dark:bg-primary/25"
         style={{ opacity: refreshing ? 1 : 0.35 + p * 0.65 }}
       />
 
@@ -68,7 +64,7 @@ export function OrynoRefreshIcon({
           fill="none"
           stroke="currentColor"
           strokeWidth={stroke}
-          className="text-primary/20"
+          className="text-primary/20 dark:text-primary/35"
         />
       </svg>
 
@@ -106,7 +102,9 @@ export function OrynoRefreshIcon({
 
       <span
         className={cn(
-          "relative z-10 overflow-hidden rounded-full bg-background shadow-[0_2px_8px_rgba(0,0,0,0.08)] ring-1 ring-black/5",
+          "relative z-10 overflow-hidden rounded-full bg-background",
+          "shadow-[0_2px_8px_rgba(0,0,0,0.08)] ring-1 ring-black/5",
+          "dark:bg-muted dark:shadow-[0_4px_16px_rgba(0,0,0,0.55)] dark:ring-white/12",
           refreshing &&
             "animate-[oryno-refresh-pulse_1.1s_ease-in-out_infinite]",
         )}
