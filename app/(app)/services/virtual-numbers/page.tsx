@@ -573,8 +573,6 @@ export default function VirtualNumbersPage() {
               </SearchPickerSheet>
             </MotionSection>
 
-            <ServiceInstructions service="virtual-numbers" delay={0.06} />
-
             <MotionSection
               delay={0.08}
               className="rounded-2xl border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:rounded-[28px] sm:p-6"
@@ -601,6 +599,8 @@ export default function VirtualNumbersPage() {
                 </div>
               </div>
             </MotionSection>
+
+            <ServiceInstructions service="virtual-numbers" delay={0.1} />
 
             <div className="hidden pt-2 sm:block">
               <motion.button
