@@ -81,6 +81,7 @@ function toTransferLookup(row: TransferData | null | undefined): TransferLookup 
 export async function lookupFlutterwaveTransfer(
   reference: string,
   transferId?: string | number | null,
+  options?: { idOnly?: boolean },
 ) {
   if (!hasFlutterwaveKeys()) return null;
 
@@ -94,9 +95,11 @@ export async function lookupFlutterwaveTransfer(
     } catch (error) {
       console.error("[flutterwave-transfer-lookup-id]", transferId, error);
     }
+    // Prefer a single Fixie hop per poll when we already have the transfer id.
+    if (options?.idOnly) return null;
   }
 
-  if (!reference.trim()) return null;
+  if (!reference.trim() || options?.idOnly) return null;
 
   try {
     const res = await flutterwaveFetch<TransferData | TransferData[]>(
@@ -121,12 +124,16 @@ export async function confirmFlutterwaveTransfer(input: {
   attempts?: number;
   delayMs?: number;
 }) {
-  const attempts = input.attempts ?? 8;
-  const delayMs = input.delayMs ?? 1500;
+  // Keep polls low — each lookup burns a Fixie request on the free/low tiers.
+  const attempts = input.attempts ?? 4;
+  const delayMs = input.delayMs ?? 2000;
+  const idOnly = Boolean(input.transferId != null && String(input.transferId).trim());
   let last: TransferLookup | null = null;
 
   for (let i = 0; i < attempts; i += 1) {
-    last = await lookupFlutterwaveTransfer(input.reference, input.transferId);
+    last = await lookupFlutterwaveTransfer(input.reference, input.transferId, {
+      idOnly,
+    });
     if (last?.status === "success" || last?.status === "failed" || last?.status === "reversed") {
       return last;
     }

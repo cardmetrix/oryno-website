@@ -33,11 +33,29 @@ export function humanizeFlutterwaveSetupError(
 export const WITHDRAWAL_UNAVAILABLE_MESSAGE =
   "Withdrawal unavailable right now. Please try again shortly. Your money was returned to your ORYNO wallet.";
 
+export const FIXIE_QUOTA_MESSAGE =
+  "Withdrawals are paused because the Fixie proxy monthly request limit was reached. Upgrade the Fixie plan (or wait until the quota resets), then try again. Your money was returned to your ORYNO wallet.";
+
+export function isFixieQuotaError(message?: string | null) {
+  if (!message) return false;
+  const value = message.toLowerCase();
+  return (
+    value.includes("monthly request quota exceeded") ||
+    value.includes("quota exceeded") ||
+    value.includes("request volume limit") ||
+    (value.includes("407") && value.includes("proxy"))
+  );
+}
+
 export function humanizeFlutterwaveTransferError(message?: string | null) {
   const detail = (message || "").trim();
+  if (isFixieQuotaError(detail)) {
+    return FIXIE_QUOTA_MESSAGE;
+  }
   if (
     isFlutterwaveIpWhitelistError(message) ||
     /FLUTTERWAVE_HTTPS_PROXY is missing/i.test(detail) ||
+    /FIXIE_URL is missing/i.test(detail) ||
     /proxy request failed/i.test(detail)
   ) {
     return WITHDRAWAL_UNAVAILABLE_MESSAGE;
@@ -46,6 +64,9 @@ export function humanizeFlutterwaveTransferError(message?: string | null) {
 }
 
 export function humanizeWalletRefundReason(message?: string | null) {
+  if (isFixieQuotaError(message)) {
+    return "Withdrawals paused (Fixie monthly request limit reached). Your money was returned to your ORYNO wallet — not to your bank account.";
+  }
   if (isFlutterwaveIpWhitelistError(message)) {
     return "Withdrawal unavailable. Your money was returned to your ORYNO wallet — not to your bank account.";
   }

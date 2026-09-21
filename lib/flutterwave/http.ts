@@ -125,10 +125,24 @@ export async function flutterwaveHttp(
     });
   } catch (error) {
     const host = flutterwaveProxyHost();
+    const detail = error instanceof Error ? error.message : String(error);
+    const cause =
+      error instanceof Error && error.cause instanceof Error
+        ? error.cause.message
+        : "";
+    const combined = `${detail} ${cause}`.trim();
+    // Fixie returns HTTP 407 with "Monthly request quota exceeded" when the plan is exhausted.
+    if (
+      /407/.test(combined) ||
+      /proxy authentication required/i.test(combined) ||
+      /quota exceeded/i.test(combined)
+    ) {
+      throw new Error(
+        `Flutterwave proxy request failed${host ? ` via ${host}` : ""}: Monthly request quota exceeded (HTTP 407). Upgrade Fixie or wait until the quota resets.`,
+      );
+    }
     throw new Error(
-      `Flutterwave proxy request failed${host ? ` via ${host}` : ""}: ${
-        error instanceof Error ? error.message : String(error)
-      }`,
+      `Flutterwave proxy request failed${host ? ` via ${host}` : ""}: ${detail}`,
     );
   }
 }

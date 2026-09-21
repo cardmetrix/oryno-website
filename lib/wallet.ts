@@ -604,10 +604,15 @@ export async function withdrawWallet(input: {
   } catch (error) {
     const raw =
       error instanceof Error ? error.message : "Withdrawal transfer failed";
+    const { hasFlutterwaveProxy, flutterwaveProxyHost } = await import(
+      "@/lib/flutterwave/http"
+    );
     console.error("[withdraw-flutterwave]", {
       reference,
       userId: input.userId,
-      proxyHost: process.env.FLUTTERWAVE_HTTPS_PROXY ? "configured" : "missing",
+      proxy: hasFlutterwaveProxy()
+        ? flutterwaveProxyHost() || "configured"
+        : "missing",
       error: raw,
     });
 
