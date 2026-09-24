@@ -164,6 +164,15 @@ function ServiceCard({
   item: ServiceDirectoryItem;
   index: number;
 }) {
+  const badge =
+    item.id === "social" ||
+    item.id === "virtual-numbers" ||
+    item.id === "invoices"
+      ? item.stats
+      : item.soon
+        ? "Soon"
+        : null;
+
   return (
     <ServiceActionCard
       href={item.href}
@@ -171,6 +180,7 @@ function ServiceCard({
       icon={item.icon}
       index={index}
       accent={item.accent}
+      badge={badge}
     />
   );
 }

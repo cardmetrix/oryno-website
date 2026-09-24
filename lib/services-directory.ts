@@ -43,7 +43,6 @@ export type ServiceDirectoryItem = {
 const {
   currencySymbol,
   billProviders,
-  virtualNumbers,
 } = activeCountryConfig;
 
 export const servicesDirectory: ServiceDirectoryItem[] = [
@@ -133,12 +132,12 @@ export const servicesDirectory: ServiceDirectoryItem[] = [
     longDescription:
       "Grow Instagram, TikTok, YouTube and more - live packages, wallet checkout, and order tracking.",
     category: "Lifestyle",
-    tags: ["Instagram", "TikTok", "YouTube"],
+    tags: ["Instagram", "TikTok", "YouTube", "Most popular"],
     eta: "Starts soon after order",
     accent: "#FF6A00",
     popular: true,
     icon: TrendingUp,
-    stats: "Live catalog",
+    stats: "Most popular",
   },
   {
     id: "virtual-numbers",
@@ -148,11 +147,11 @@ export const servicesDirectory: ServiceDirectoryItem[] = [
     longDescription:
       "Get SMS verification numbers worldwide for WhatsApp, Telegram, and more - pay from your ORYNO wallet.",
     category: "Lifestyle",
-    tags: ["Buy", "Rent", "SMS"],
+    tags: ["Buy", "Rent", "SMS", "Hot"],
     eta: "Ready in minutes",
     accent: "#FF6A00",
     icon: Phone,
-    stats: `${virtualNumbers.length}+ offers`,
+    stats: "Hot",
   },
   {
     id: "gift-cards-live",
@@ -213,7 +212,7 @@ export const servicesDirectory: ServiceDirectoryItem[] = [
     accent: "#FF6A00",
     popular: true,
     icon: FileText,
-    stats: "Powered by ORYNO",
+    stats: "Free",
   },
   {
     id: "payment-links",
