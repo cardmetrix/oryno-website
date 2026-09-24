@@ -319,6 +319,33 @@ body {
   background: var(--usd-card-btn-alt-hover);
 }
 
+/* International gifting hero surface */
+.gifting-card-surface {
+  position: relative;
+  overflow: hidden;
+  color: #ffffff;
+  background-color: #1a0f0a;
+  background-image: url("/brand/international-gifting-bg.png");
+  background-size: cover;
+  background-position: right center;
+  background-repeat: no-repeat;
+  box-shadow: var(--shadow-soft);
+}
+
+.gifting-card-surface::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.5) 0%,
+    rgba(0, 0, 0, 0.22) 40%,
+    rgba(0, 0, 0, 0.06) 70%,
+    transparent 100%
+  );
+}
+
 /* Instant theme swap: suppress staggered color transitions, keep the switch thumb. */
 html.disable-theme-transitions,
 html.disable-theme-transitions * {
