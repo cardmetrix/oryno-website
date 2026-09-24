@@ -4,18 +4,17 @@ import Link from "next/link";
 import { useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeftRight, Eye, EyeOff, Plus } from "lucide-react";
-import { WalletCardSkeleton } from "@/components/app/wallet-skeleton";
 import { WalletBalanceAmount } from "@/components/app/wallet-balance-amount";
 import { useCountry } from "@/components/providers/country-provider";
 import { useWallet } from "@/hooks/use-wallet";
 import { cn } from "@/lib/utils";
 
-/** Gap between mobile swipe slides (matches Tailwind gap-1.5). */
-const MOBILE_GAP_PX = 6;
+/** Gap between swipe slides (matches Tailwind gap-1.5). */
+const SLIDE_GAP_PX = 6;
 
 type Props = { className?: string };
 
-/** Dashboard wallets: swipe one-at-a-time on mobile; both side-by-side from md. */
+/** Dashboard wallets: one full-width card at a time (same width as AdCarousel). */
 export function DashboardWalletCarousel({ className }: Props) {
   const { country } = useCountry();
   const { data, isLoading } = useWallet();
@@ -24,7 +23,11 @@ export function DashboardWalletCarousel({ className }: Props) {
   const pagerRef = useRef<HTMLDivElement>(null);
 
   if (isLoading && !data) {
-    return <WalletCardSkeleton className={className} />;
+    return (
+      <div className={cn(className)}>
+        <div className="h-[148px] w-full animate-pulse rounded-[20px] bg-muted sm:h-[156px] md:rounded-[22px]" />
+      </div>
+    );
   }
 
   const localCurrency = data?.primary.currency ?? country.currency;
@@ -32,13 +35,12 @@ export function DashboardWalletCarousel({ className }: Props) {
   const usdFormatted = data?.usd?.balanceFormatted ?? "$0.00";
 
   function slideStride(el: HTMLDivElement) {
-    return el.clientWidth + MOBILE_GAP_PX;
+    return el.clientWidth + SLIDE_GAP_PX;
   }
 
   function onScroll() {
     const el = pagerRef.current;
     if (!el) return;
-    if (window.matchMedia("(min-width: 768px)").matches) return;
     const idx = Math.round(el.scrollLeft / Math.max(slideStride(el), 1));
     setView(idx >= 1 ? "usd" : "local");
   }
@@ -46,10 +48,6 @@ export function DashboardWalletCarousel({ className }: Props) {
   function scrollTo(target: "local" | "usd") {
     const el = pagerRef.current;
     if (!el) return;
-    if (window.matchMedia("(min-width: 768px)").matches) {
-      setView(target);
-      return;
-    }
     el.scrollTo({
       left: target === "usd" ? slideStride(el) : 0,
       behavior: "smooth",
@@ -58,7 +56,7 @@ export function DashboardWalletCarousel({ className }: Props) {
   }
 
   const footer = (
-    <div className="flex items-center justify-between md:hidden">
+    <div className="flex items-center justify-between">
       <div className="flex items-center gap-1">
         <button
           type="button"
@@ -104,26 +102,24 @@ export function DashboardWalletCarousel({ className }: Props) {
   const usdConvertBtn =
     "usd-card-btn-alt inline-flex h-8 w-full items-center justify-center gap-1 rounded-full text-[11px] font-bold transition";
 
+  const slideClass =
+    "box-border w-full min-w-full max-w-full shrink-0 basis-full snap-start snap-always";
+  const cardRadius = "overflow-hidden rounded-[20px] md:rounded-[22px]";
+
   return (
-    <div className={cn(className)}>
+    <div className={cn("w-full", className)}>
       <div
         ref={pagerRef}
         onScroll={onScroll}
         className={cn(
           "flex w-full snap-x snap-mandatory gap-1.5 overflow-x-auto overscroll-x-contain",
           "[-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-          "md:grid md:grid-cols-2 md:items-stretch md:gap-1.5 md:overflow-visible md:snap-none px-2",
         )}
         style={{ WebkitOverflowScrolling: "touch" }}
       >
         {/* Local */}
-        <div
-          className={cn(
-            "box-border w-full min-w-full max-w-full shrink-0 basis-full snap-start snap-always",
-            "md:min-w-0 md:max-w-none md:basis-auto md:snap-none",
-          )}
-        >
-          <div className="local-wallet-surface isolate overflow-hidden rounded-[14px]">
+        <div className={slideClass}>
+          <div className={cn("local-wallet-surface isolate", cardRadius)}>
             <motion.div
               aria-hidden
               animate={{ x: ["-35%", "135%"] }}
@@ -204,13 +200,13 @@ export function DashboardWalletCarousel({ className }: Props) {
         </div>
 
         {/* USD */}
-        <div
-          className={cn(
-            "box-border w-full min-w-full max-w-full shrink-0 basis-full snap-start snap-always",
-            "md:min-w-0 md:max-w-none md:basis-auto md:snap-none",
-          )}
-        >
-          <div className="usd-card-surface isolate overflow-hidden rounded-[14px] ring-1 ring-[color:var(--usd-card-ring)]">
+        <div className={slideClass}>
+          <div
+            className={cn(
+              "usd-card-surface isolate ring-1 ring-[color:var(--usd-card-ring)]",
+              cardRadius,
+            )}
+          >
             <motion.div
               aria-hidden
               animate={{ x: ["-35%", "135%"] }}

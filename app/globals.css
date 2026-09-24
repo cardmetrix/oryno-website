@@ -273,7 +273,6 @@ body {
   background-size: cover;
   background-position: right center;
   background-repeat: no-repeat;
-  box-shadow: var(--usd-card-shadow);
 }
 
 .usd-card-surface::before {
@@ -301,7 +300,6 @@ body {
   background-size: cover;
   background-position: right center;
   background-repeat: no-repeat;
-  box-shadow: var(--usd-card-shadow);
 }
 
 .virtual-card-surface::before {
@@ -328,7 +326,6 @@ body {
   background-size: cover;
   background-position: right center;
   background-repeat: no-repeat;
-  box-shadow: var(--shadow-soft);
 }
 
 .local-wallet-surface::before {
