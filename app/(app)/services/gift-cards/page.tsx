@@ -730,7 +730,7 @@ function GiftCardsPageContent() {
   return (
     <AppShell hideNav>
       <PageHeader
-        title="Gift Cards"
+        title="Buy Gift Cards"
         subtitle="Buy digital gift cards with your USD balance"
         backHref="/services/gift-cards/live"
       />
@@ -738,7 +738,7 @@ function GiftCardsPageContent() {
       <ErrorAlertModal
         error={error}
         onClose={() => setError(null)}
-        page="Gift Cards"
+        page="Buy Gift Cards"
       />
 
       <MotionSection className="mb-4">

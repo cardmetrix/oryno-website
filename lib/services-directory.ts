@@ -170,7 +170,7 @@ export const servicesDirectory: ServiceDirectoryItem[] = [
   {
     id: "gift-cards",
     href: "/services/gift-cards",
-    label: "Gift Cards",
+    label: "Buy Gift Cards",
     shortDescription: "Buy gift cards with USD",
     longDescription:
       "Purchase digital gift cards worldwide. Paid from your USD balance.",
