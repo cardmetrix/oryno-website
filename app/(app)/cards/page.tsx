@@ -354,40 +354,8 @@ function CardsPageContent() {
                         className="mt-1.5 text-sm leading-relaxed"
                         style={{ color: "var(--usd-card-muted)" }}
                       >
-                        A Visa card linked to your ORYNO USD wallet ? built for
-                        online payments worldwide. Join the waitlist and we will
-                        notify you the moment it launches.
+                      A secure virtual card designed for seamless online payments, including subscriptions and digital services such as Spotify, Netflix, Apple Music, and more.
                       </p>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2 font-mono text-[11px] opacity-80 sm:text-xs">
-                      <div>
-                        <p
-                          className="text-[9px] tracking-wide uppercase"
-                          style={{ color: "var(--usd-card-soft)" }}
-                        >
-                          Number
-                        </p>
-                        <p>**** **** **** ****</p>
-                      </div>
-                      <div>
-                        <p
-                          className="text-[9px] tracking-wide uppercase"
-                          style={{ color: "var(--usd-card-soft)" }}
-                        >
-                          Exp
-                        </p>
-                        <p>**/**</p>
-                      </div>
-                      <div>
-                        <p
-                          className="text-[9px] tracking-wide uppercase"
-                          style={{ color: "var(--usd-card-soft)" }}
-                        >
-                          CVV
-                        </p>
-                        <p>***</p>
-                      </div>
                     </div>
 
                     {waitlistJoined ? (
