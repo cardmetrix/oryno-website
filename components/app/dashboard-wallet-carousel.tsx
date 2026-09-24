@@ -10,9 +10,8 @@ import { useCountry } from "@/components/providers/country-provider";
 import { useWallet } from "@/hooks/use-wallet";
 import { cn } from "@/lib/utils";
 
-
-/** Gap between mobile swipe slides (matches Tailwind gap-3). */
-const MOBILE_GAP_PX = 12;
+/** Gap between mobile swipe slides (matches Tailwind gap-1.5). */
+const MOBILE_GAP_PX = 6;
 
 type Props = { className?: string };
 
@@ -31,6 +30,7 @@ export function DashboardWalletCarousel({ className }: Props) {
   const localCurrency = data?.primary.currency ?? country.currency;
   const localBalance = data?.primary.balance ?? "0";
   const usdFormatted = data?.usd?.balanceFormatted ?? "$0.00";
+
   function slideStride(el: HTMLDivElement) {
     return el.clientWidth + MOBILE_GAP_PX;
   }
@@ -58,15 +58,15 @@ export function DashboardWalletCarousel({ className }: Props) {
   }
 
   const footer = (
-    <div className="flex items-center justify-between pt-0.5 md:hidden">
-      <div className="flex items-center gap-1.5">
+    <div className="flex items-center justify-between md:hidden">
+      <div className="flex items-center gap-1">
         <button
           type="button"
           aria-label="Local wallet"
           onClick={() => scrollTo("local")}
           className={cn(
-            "h-1.5 rounded-full transition-all",
-            view === "local" ? "w-5 bg-white" : "w-1.5 bg-white/35",
+            "h-1 rounded-full transition-all",
+            view === "local" ? "w-4 bg-white" : "w-1 bg-white/35",
           )}
         />
         <button
@@ -74,8 +74,8 @@ export function DashboardWalletCarousel({ className }: Props) {
           aria-label="USD wallet"
           onClick={() => scrollTo("usd")}
           className={cn(
-            "h-1.5 rounded-full transition-all",
-            view === "usd" ? "w-5 bg-white" : "w-1.5 bg-white/35",
+            "h-1 rounded-full transition-all",
+            view === "usd" ? "w-4 bg-white" : "w-1 bg-white/35",
           )}
         />
       </div>
@@ -87,7 +87,7 @@ export function DashboardWalletCarousel({ className }: Props) {
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -4 }}
           onClick={() => scrollTo(view === "local" ? "usd" : "local")}
-          className="text-[11px] font-semibold text-white/75"
+          className="text-[10px] font-semibold text-white/75"
         >
           {view === "local" ? "Swipe for USD ›" : "‹ Local wallet"}
         </motion.button>
@@ -96,13 +96,13 @@ export function DashboardWalletCarousel({ className }: Props) {
   );
 
   const localFundBtn =
-    "inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-full bg-white/20 text-[13px] font-bold text-white ring-1 ring-white/30 backdrop-blur-sm transition hover:bg-white/28";
+    "inline-flex h-8 w-full items-center justify-center gap-1 rounded-full bg-white/20 text-[11px] font-bold text-white ring-1 ring-white/30 backdrop-blur-sm transition hover:bg-white/28";
   const localConvertBtn =
-    "inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-full bg-black/20 text-[13px] font-bold text-white ring-1 ring-white/25 backdrop-blur-md transition hover:bg-black/30";
+    "inline-flex h-8 w-full items-center justify-center gap-1 rounded-full bg-black/20 text-[11px] font-bold text-white ring-1 ring-white/25 backdrop-blur-md transition hover:bg-black/30";
   const usdFundBtn =
-    "usd-card-btn inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-full text-[13px] font-bold transition";
+    "usd-card-btn inline-flex h-8 w-full items-center justify-center gap-1 rounded-full text-[11px] font-bold transition";
   const usdConvertBtn =
-    "usd-card-btn-alt inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-full text-[13px] font-bold transition";
+    "usd-card-btn-alt inline-flex h-8 w-full items-center justify-center gap-1 rounded-full text-[11px] font-bold transition";
 
   return (
     <div className={cn(className)}>
@@ -110,9 +110,9 @@ export function DashboardWalletCarousel({ className }: Props) {
         ref={pagerRef}
         onScroll={onScroll}
         className={cn(
-          "flex w-full snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain",
+          "flex w-full snap-x snap-mandatory gap-1.5 overflow-x-auto overscroll-x-contain",
           "[-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-          "md:grid md:grid-cols-2 md:items-stretch md:gap-2.5 md:overflow-visible md:snap-none",
+          "md:grid md:grid-cols-2 md:items-stretch md:gap-1.5 md:overflow-visible md:snap-none",
         )}
         style={{ WebkitOverflowScrolling: "touch" }}
       >
@@ -123,7 +123,7 @@ export function DashboardWalletCarousel({ className }: Props) {
             "md:min-w-0 md:max-w-none md:basis-auto md:snap-none",
           )}
         >
-          <div className="relative isolate overflow-hidden rounded-[18px]">
+          <div className="relative isolate overflow-hidden rounded-[14px]">
             <div className="absolute inset-0 bg-gradient-to-br from-[#ff8124] via-oryno-orange to-[#e85d00]" />
             <div className="absolute inset-0 bg-[linear-gradient(210deg,rgba(255,255,255,0.16)_0%,transparent_42%,rgba(180,60,0,0.18)_100%)]" />
             <motion.div
@@ -138,72 +138,69 @@ export function DashboardWalletCarousel({ className }: Props) {
               className="pointer-events-none absolute inset-y-0 w-1/3 skew-x-[-18deg] bg-gradient-to-r from-transparent via-white/18 to-transparent"
             />
 
-            <div className="relative flex flex-col gap-2 p-3.5 text-white sm:gap-2.5 sm:p-4">
-              <div className="flex items-start justify-between gap-2">
-                <p className="text-[10px] font-bold tracking-[0.2em] text-white/90 uppercase">
-                  ORYNO
-                </p>
-              
-              </div>
-
-              <p className="text-sm font-semibold tracking-wide sm:text-[15px]">
-                {localCurrency} Wallet
-              </p>
-
-              <div className="flex items-end justify-between gap-2">
+            <div className="relative flex flex-col gap-1.5 p-2.5 text-white sm:p-3">
+              <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="text-[9px] font-medium tracking-[0.14em] text-white/70 uppercase">
-                    Available balance
+                  <p className="text-[9px] font-bold tracking-[0.18em] text-white/90 uppercase">
+                    ORYNO
                   </p>
-                  <AnimatePresence mode="wait">
-                    <motion.div
-                      key={hidden ? "h" : localBalance}
-                      initial={{ opacity: 0, y: 4 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -3 }}
-                      className="mt-0.5 truncate text-xl font-bold tracking-tight sm:text-2xl"
-                    >
-                      <WalletBalanceAmount
-                        balance={localBalance}
-                        currency={localCurrency}
-                        countryCode={country.code}
-                        hidden={hidden}
-                      />
-                    </motion.div>
-                  </AnimatePresence>
+                  <p className="text-[13px] font-semibold tracking-wide">
+                    {localCurrency} Wallet
+                  </p>
                 </div>
                 <motion.button
                   type="button"
                   whileTap={{ scale: 0.92 }}
                   onClick={() => setHidden((v) => !v)}
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/25"
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/25"
                   aria-label={hidden ? "Show balance" : "Hide balance"}
                 >
                   {hidden ? (
-                    <EyeOff className="h-3.5 w-3.5" />
+                    <EyeOff className="h-3 w-3" />
                   ) : (
-                    <Eye className="h-3.5 w-3.5" />
+                    <Eye className="h-3 w-3" />
                   )}
                 </motion.button>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="min-w-0">
+                <p className="text-[8px] font-medium tracking-[0.12em] text-white/70 uppercase">
+                  Available balance
+                </p>
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={hidden ? "h" : localBalance}
+                    initial={{ opacity: 0, y: 3 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -2 }}
+                    className="truncate text-lg font-bold tracking-tight sm:text-xl"
+                  >
+                    <WalletBalanceAmount
+                      balance={localBalance}
+                      currency={localCurrency}
+                      countryCode={country.code}
+                      hidden={hidden}
+                    />
+                  </motion.div>
+                </AnimatePresence>
+              </div>
+
+              <div className="grid grid-cols-2 gap-1.5">
                 <motion.div whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }}>
                   <Link href="/fund" className={localFundBtn}>
-                    <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
-                    Fund Wallet
+                    <Plus className="h-3 w-3" strokeWidth={2.5} />
+                    Fund
                   </Link>
                 </motion.div>
                 <motion.div whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }}>
                   <Link href="/convert" className={localConvertBtn}>
-                    <ArrowLeftRight className="h-3.5 w-3.5" strokeWidth={2.25} />
-                    Convert to USD
+                    <ArrowLeftRight className="h-3 w-3" strokeWidth={2.25} />
+                    Convert
                   </Link>
                 </motion.div>
               </div>
 
               {footer}
-
             </div>
           </div>
         </div>
@@ -215,7 +212,7 @@ export function DashboardWalletCarousel({ className }: Props) {
             "md:min-w-0 md:max-w-none md:basis-auto md:snap-none",
           )}
         >
-          <div className="usd-card-surface isolate overflow-hidden rounded-[18px] ring-1 ring-[color:var(--usd-card-ring)]">
+          <div className="usd-card-surface isolate overflow-hidden rounded-[14px] ring-1 ring-[color:var(--usd-card-ring)]">
             <motion.div
               aria-hidden
               animate={{ x: ["-35%", "135%"] }}
@@ -228,71 +225,64 @@ export function DashboardWalletCarousel({ className }: Props) {
               className="pointer-events-none absolute inset-y-0 z-[1] w-1/3 skew-x-[-18deg] bg-gradient-to-r from-transparent via-[color:var(--usd-card-sheen)] to-transparent"
             />
 
-            <div className="relative z-[2] flex flex-col gap-2 p-3.5 sm:gap-2.5 sm:p-4">
-              <div className="flex items-start justify-between gap-2">
-                <p className="text-[10px] font-bold tracking-[0.2em] uppercase opacity-90">
-                  ORYNO
-                </p>
-              
-              </div>
-
-              <p className="text-sm font-semibold tracking-wide sm:text-[15px]">
-                USD Wallet 
-              </p>
-
-              <div className="flex items-end justify-between gap-2">
+            <div className="relative z-[2] flex flex-col gap-1.5 p-2.5 sm:p-3">
+              <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
-                  <p
-                    className="text-[9px] font-medium tracking-[0.14em] uppercase"
-                    style={{ color: "var(--usd-card-soft)" }}
-                  >
-                    Available balance
+                  <p className="text-[9px] font-bold tracking-[0.18em] uppercase opacity-90">
+                    ORYNO
                   </p>
-                  <AnimatePresence mode="wait">
-                    <motion.p
-                      key={hidden ? "h" : usdFormatted}
-                      initial={{ opacity: 0, y: 4 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -3 }}
-                      className="mt-0.5 truncate text-xl font-bold tracking-tight sm:text-2xl"
-                    >
-                      {hidden ? "••••••••" : usdFormatted}
-                    </motion.p>
-                  </AnimatePresence>
+                  <p className="text-[13px] font-semibold tracking-wide">
+                    USD Wallet
+                  </p>
                 </div>
                 <motion.button
                   type="button"
                   whileTap={{ scale: 0.92 }}
                   onClick={() => setHidden((v) => !v)}
-                  className="usd-card-chip flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+                  className="usd-card-chip flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
                   aria-label={hidden ? "Show balance" : "Hide balance"}
                 >
                   {hidden ? (
-                    <EyeOff className="h-3.5 w-3.5" />
+                    <EyeOff className="h-3 w-3" />
                   ) : (
-                    <Eye className="h-3.5 w-3.5" />
+                    <Eye className="h-3 w-3" />
                   )}
                 </motion.button>
               </div>
 
-              <p
-                className="text-[11px] leading-snug"
-                style={{ color: "var(--usd-card-muted)" }}
-              >
-                Use your USD balance for gift cards, international virtual
-                numbers and more.
-              </p>
+              <div className="min-w-0">
+                <p
+                  className="text-[8px] font-medium tracking-[0.12em] uppercase"
+                  style={{ color: "var(--usd-card-soft)" }}
+                >
+                  Available balance
+                </p>
+                <AnimatePresence mode="wait">
+                  <motion.p
+                    key={hidden ? "h" : usdFormatted}
+                    initial={{ opacity: 0, y: 3 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -2 }}
+                    className="truncate text-lg font-bold tracking-tight sm:text-xl"
+                  >
+                    {hidden ? "••••••••" : usdFormatted}
+                  </motion.p>
+                </AnimatePresence>
+              </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-1.5">
                 <motion.div whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }}>
                   <Link href="/cards" className={usdFundBtn}>
-                    <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
-                    Fund Wallet
+                    <Plus className="h-3 w-3" strokeWidth={2.5} />
+                    Fund
                   </Link>
                 </motion.div>
                 <motion.div whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }}>
-                  <Link href="/convert?direction=to_local" className={usdConvertBtn}>
-                    <ArrowLeftRight className="h-3.5 w-3.5" strokeWidth={2.25} />
+                  <Link
+                    href="/convert?direction=to_local"
+                    className={usdConvertBtn}
+                  >
+                    <ArrowLeftRight className="h-3 w-3" strokeWidth={2.25} />
                     Convert
                   </Link>
                 </motion.div>
