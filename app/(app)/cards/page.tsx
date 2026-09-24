@@ -324,7 +324,7 @@ function CardsPageContent() {
           {!selected ? (
             <>
               <MotionSection className="mb-4">
-                <div className="usd-card-surface isolate overflow-hidden rounded-[22px] ring-1 ring-[color:var(--usd-card-ring)]">
+                <div className="virtual-card-surface isolate overflow-hidden rounded-[22px] ring-1 ring-[color:var(--usd-card-ring)]">
                   <motion.div
                     aria-hidden
                     animate={{ x: ["-40%", "140%"] }}
@@ -451,7 +451,7 @@ function CardsPageContent() {
 
           {selected ? (
             <MotionSection delay={0.04} className="mb-4">
-              <div className="usd-card-surface isolate overflow-hidden rounded-[22px] ring-1 ring-[color:var(--usd-card-ring)]">
+              <div className="virtual-card-surface isolate overflow-hidden rounded-[22px] ring-1 ring-[color:var(--usd-card-ring)]">
                 <motion.div
                   aria-hidden
                   animate={{ x: ["-40%", "140%"] }}

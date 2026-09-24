@@ -263,13 +263,13 @@ body {
   line-height: 1.5;
 }
 
-/* USD wallet / virtual card surface — branded card art */
+/* USD wallet surface — dashboard / wallet (dollar art) */
 .usd-card-surface {
   position: relative;
   overflow: hidden;
   color: var(--usd-card-fg);
   background-color: #0a0a0c;
-  background-image: url("/brand/usd-virtual-card-bg.png");
+  background-image: url("/brand/usd-wallet-card-bg.png");
   background-size: cover;
   background-position: right center;
   background-repeat: no-repeat;
@@ -282,6 +282,33 @@ body {
   position: absolute;
   inset: 0;
   /* Soft left scrim so overlay text stays readable over the art */
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.55) 0%,
+    rgba(0, 0, 0, 0.28) 42%,
+    rgba(0, 0, 0, 0.08) 72%,
+    transparent 100%
+  );
+}
+
+/* Virtual card surface — Cards page (Visa card art) */
+.virtual-card-surface {
+  position: relative;
+  overflow: hidden;
+  color: var(--usd-card-fg);
+  background-color: #0a0a0c;
+  background-image: url("/brand/usd-virtual-card-bg.png");
+  background-size: cover;
+  background-position: right center;
+  background-repeat: no-repeat;
+  box-shadow: var(--usd-card-shadow);
+}
+
+.virtual-card-surface::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
   background: linear-gradient(
     90deg,
     rgba(0, 0, 0, 0.55) 0%,
