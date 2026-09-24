@@ -330,7 +330,7 @@ function CardsPageContent() {
                       ) : (
                         <CreditCard className="h-4 w-4" />
                       )}
-                      Purchase card · {data.issueFeeFormatted}
+                      Purchase card - {data.issueFeeFormatted}
                     </button>
                   )}
                 </div>
@@ -360,7 +360,7 @@ function CardsPageContent() {
                         className="text-[11px] font-bold tracking-[0.2em] uppercase"
                         style={{ color: "var(--usd-card-soft)" }}
                       >
-                        ORYNO · {data.issuer.toUpperCase()}
+                        ORYNO - {data.issuer.toUpperCase()}
                       </p>
                       <p className="mt-1 text-sm font-semibold opacity-95">
                         {selected.label ?? "USD Virtual Card"}
@@ -538,7 +538,7 @@ function CardsPageContent() {
                     ) : (
                       <Plus className="h-4 w-4" strokeWidth={2.5} />
                     )}
-                    Purchase another · {data.issueFeeFormatted}
+                    Purchase another - {data.issueFeeFormatted}
                   </button>
                   <p className="mt-2 text-center text-[11px] text-muted-foreground">
                     Pay with Flutterwave. Max {data.maxActiveCards} active
