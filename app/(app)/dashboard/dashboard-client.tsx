@@ -13,10 +13,10 @@ import {
 import { AdCarousel } from "@/components/app/ad-carousel";
 import { AppShell } from "@/components/app/app-shell";
 import { DashboardHeader } from "@/components/app/dashboard-header";
+import { DashboardWalletCarousel } from "@/components/app/dashboard-wallet-carousel";
 import { HistoryEmpty } from "@/components/app/history-states";
 import { MotionSection } from "@/components/app/motion-section";
 import { TransactionRow } from "@/components/app/transaction-row";
-import { WalletCard } from "@/components/app/wallet-card";
 import { ServiceActionCard } from "@/components/app/service-action-card";
 import { GiftCardIcon } from "@/components/icons/gift-card-icon";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -45,7 +45,7 @@ export function DashboardClient() {
 
       <div className="grid items-stretch gap-4 sm:gap-5 lg:grid-cols-1 lg:gap-6 lg:has-[.ad-carousel]:grid-cols-[1.35fr_0.85fr]">
         <MotionSection className="min-w-0">
-          <WalletCard />
+          <DashboardWalletCarousel />
         </MotionSection>
 
         <AdCarousel />

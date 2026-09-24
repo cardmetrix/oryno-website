@@ -66,6 +66,7 @@ const isAppRoute = createRouteMatcher([
   "/dashboard(.*)",
   "/wallet(.*)",
   "/fund(.*)",
+  "/convert(.*)",
   "/withdraw(.*)",
   "/history(.*)",
   "/notifications(.*)",

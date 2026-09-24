@@ -1,10 +1,17 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { Check, Copy, Loader2, RefreshCw, ShieldCheck } from "lucide-react";
+import {
+  Check,
+  Copy,
+  CreditCard,
+  Loader2,
+  RefreshCw,
+  ShieldCheck,
+} from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
@@ -37,6 +44,53 @@ type IdentityRequired = {
   hasPendingKyc: boolean;
 };
 
+type FundOptions = {
+  method?: "dva" | "checkout";
+  checkoutAvailable?: boolean;
+  dvaAvailable?: boolean;
+  countryCode?: string;
+  currency?: string;
+  presets?: string[];
+  paymentOptions?: string;
+  account?: DepositAccount | null;
+  identityRequired?: IdentityRequired | null;
+  error?: string;
+  setupHint?: string | null;
+  demoMode?: boolean;
+};
+
+const PAYMENT_OPTION_LABELS: Record<string, string> = {
+  card: "Card",
+  banktransfer: "Bank transfer",
+  ussd: "USSD",
+  account: "Account",
+  mobilemoneyghana: "Mobile money",
+  mpesa: "M-Pesa",
+  mobilemoneyeastafrica: "Mobile money",
+};
+
+function formatPaymentOptions(raw?: string | null) {
+  if (!raw) return "Card";
+  return raw
+    .split(",")
+    .map((p) => PAYMENT_OPTION_LABELS[p.trim()] ?? p.trim())
+    .filter(Boolean)
+    .join(" · ");
+}
+
+function formatMoney(amount: number, currency: string) {
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  } catch {
+    return `${currency} ${amount.toFixed(2)}`;
+  }
+}
+
 export default function FundPage() {
   return (
     <Suspense
@@ -44,8 +98,8 @@ export default function FundPage() {
         <AppShell hideNav>
           <PageHeader
             title="Fund Wallet"
-            subtitle="Transfer to your dedicated account"
-            backHref="/wallet"
+            subtitle="Add money to your local wallet"
+            backHref="/dashboard"
           />
         </AppShell>
       }
@@ -57,10 +111,26 @@ export default function FundPage() {
 
 function FundPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [wallet, setWallet] = useState<WalletSummary | null>(null);
   const [deposit, setDeposit] = useState<DepositAccount | null>(null);
   const [identityRequired, setIdentityRequired] =
     useState<IdentityRequired | null>(null);
+  const [checkoutAvailable, setCheckoutAvailable] = useState(false);
+  const [currency, setCurrency] = useState("NGN");
+  const [countryCode, setCountryCode] = useState("NG");
+  const [presets, setPresets] = useState<string[]>([
+    "1000",
+    "2000",
+    "5000",
+    "10000",
+  ]);
+  const [paymentOptions, setPaymentOptions] = useState("card");
+  const [amount, setAmount] = useState("");
+  const [confirming, setConfirming] = useState(false);
+  const [paying, setPaying] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [preferCheckout, setPreferCheckout] = useState(false);
   const [loading, setLoading] = useState(true);
   const [checking, setChecking] = useState(false);
   const [submittingIdentity, setSubmittingIdentity] = useState(false);
@@ -71,6 +141,7 @@ function FundPageContent() {
   const [idNumber, setIdNumber] = useState("");
   const lastBalanceRef = useRef<string | null>(null);
   const redirectedRef = useRef(false);
+  const verifiedRef = useRef(false);
   const { data: walletPayload, refetch: refetchWallet } = useWallet({
     refetchInterval: 8000,
   });
@@ -112,7 +183,22 @@ function FundPageContent() {
 
     lastBalanceRef.current = next.balance;
     setWallet(next);
+    setCurrency(next.currency);
   }, [walletPayload, goToLatestFundReceipt]);
+
+  const applyOptions = useCallback((json: FundOptions) => {
+    setDeposit(json.account ?? null);
+    setIdentityRequired(json.identityRequired ?? null);
+    setSetupHint(json.setupHint ?? null);
+    setCheckoutAvailable(Boolean(json.checkoutAvailable));
+    if (json.currency) setCurrency(json.currency);
+    if (json.countryCode) setCountryCode(json.countryCode);
+    if (json.presets?.length) {
+      setPresets(json.presets);
+      setAmount((prev) => prev || json.presets![0]);
+    }
+    if (json.paymentOptions) setPaymentOptions(json.paymentOptions);
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -123,36 +209,90 @@ function FundPageContent() {
         cache: "no-store",
       });
 
-      const json = (await depositRes.json().catch(() => ({}))) as {
-        account?: DepositAccount | null;
-        identityRequired?: IdentityRequired | null;
-        error?: string;
-        setupHint?: string | null;
-      };
+      const json = (await depositRes.json().catch(() => ({}))) as FundOptions;
 
-      if (depositRes.ok) {
-        setDeposit(json.account ?? null);
-        setIdentityRequired(json.identityRequired ?? null);
-        setSetupHint(json.setupHint ?? null);
-        if (!json.account && !json.identityRequired) {
-          setError(json.error || "Could not load your dedicated account. Try refresh.");
-        }
-      } else {
-        setDeposit(json.account ?? null);
-        setIdentityRequired(json.identityRequired ?? null);
-        setSetupHint(json.setupHint ?? null);
-        setError(json.error || "Could not load your dedicated account");
+      applyOptions(json);
+
+      const hasPath =
+        Boolean(json.account) ||
+        Boolean(json.identityRequired) ||
+        Boolean(json.checkoutAvailable);
+
+      if (!depositRes.ok && !hasPath) {
+        setError(json.error || "Could not load funding options");
+      } else if (!hasPath && json.error) {
+        setError(json.error);
       }
     } catch {
-      setError("Could not load your dedicated account");
+      setError("Could not load funding options");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [applyOptions]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Flutterwave checkout return: /fund?local_fund=1&tx_ref=...
+  useEffect(() => {
+    const localFund = searchParams.get("local_fund");
+    const reference =
+      searchParams.get("tx_ref") ||
+      searchParams.get("reference") ||
+      searchParams.get("trxref");
+    const transactionId =
+      searchParams.get("transaction_id") || searchParams.get("transactionId");
+    if (!localFund || (!reference && !transactionId) || verifiedRef.current) {
+      return;
+    }
+    verifiedRef.current = true;
+
+    let cancelled = false;
+    (async () => {
+      setVerifying(true);
+      setError(null);
+      try {
+        const res = await fetch("/api/wallet/fund/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reference, transactionId }),
+        });
+        const json = (await res.json()) as {
+          error?: string;
+          transactionId?: string;
+          amountFormatted?: string;
+        };
+        if (!res.ok) throw new Error(json.error || "Could not verify payment");
+        if (cancelled) return;
+        toast.success("Wallet funded", {
+          description: json.amountFormatted,
+        });
+        await refetchWallet();
+        redirectedRef.current = true;
+        router.replace(
+          json.transactionId
+            ? `/history/${json.transactionId}`
+            : "/dashboard",
+        );
+      } catch (err) {
+        if (cancelled) return;
+        setError(
+          err instanceof Error ? err.message : "Payment verification failed",
+        );
+        toast.error(
+          err instanceof Error ? err.message : "Payment verification failed",
+        );
+        router.replace("/fund");
+      } finally {
+        if (!cancelled) setVerifying(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams, refetchWallet, router]);
 
   async function copyText(value: string, kind: "number" | "name") {
     try {
@@ -190,7 +330,8 @@ function FundPageContent() {
           toast.success(json.message || "Deposit received");
         } else {
           toast.message(json.message || "No new deposit yet", {
-            description: "If you just transferred, wait a few minutes and try again.",
+            description:
+              "If you just transferred, wait a few minutes and try again.",
           });
         }
       } else if (json.error) {
@@ -220,21 +361,16 @@ function FundPageContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ idType, idNumber: digits }),
       });
-      const json = (await res.json().catch(() => ({}))) as {
-        account?: DepositAccount | null;
-        identityRequired?: IdentityRequired | null;
-        error?: string;
-      };
+      const json = (await res.json().catch(() => ({}))) as FundOptions;
+
+      applyOptions(json);
 
       if (json.account) {
-        setDeposit(json.account);
-        setIdentityRequired(null);
         setIdNumber("");
         toast.success("Your fund account is ready");
         return;
       }
 
-      setIdentityRequired(json.identityRequired ?? null);
       setError(json.error || "Could not create your fund account. Try again.");
     } catch {
       setError("Could not save your details. Try again.");
@@ -243,13 +379,90 @@ function FundPageContent() {
     }
   }
 
+  const amountNum = Number(amount);
+  const amountValid = Number.isFinite(amountNum) && amountNum > 0;
+  const currentBalance = Number(wallet?.balance ?? 0);
+  const resultingBalance = amountValid ? currentBalance + amountNum : null;
+
+  const depositDetails = useMemo(() => {
+    if (!amountValid) return null;
+    return {
+      amount: amountNum,
+      currency,
+      methodLabel: formatPaymentOptions(paymentOptions),
+      feeLabel: "Provider fees may apply at checkout",
+      credited: amountNum,
+      creditedFormatted: formatMoney(amountNum, currency),
+      payFormatted: formatMoney(amountNum, currency),
+      resultingFormatted:
+        resultingBalance != null
+          ? formatMoney(resultingBalance, currency)
+          : null,
+      countryCode,
+    };
+  }, [
+    amountValid,
+    amountNum,
+    currency,
+    paymentOptions,
+    resultingBalance,
+    countryCode,
+  ]);
+
+  async function onPayWithCard() {
+    if (!depositDetails) return;
+    setPaying(true);
+    setError(null);
+    try {
+      const callbackUrl = `${window.location.origin}/fund?local_fund=1`;
+      const res = await fetch("/api/wallet/fund/initialize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: depositDetails.amount,
+          callbackUrl,
+        }),
+      });
+      const json = (await res.json()) as {
+        error?: string;
+        authorizationUrl?: string;
+      };
+      if (!res.ok) throw new Error(json.error || "Could not start payment");
+      if (!json.authorizationUrl) {
+        throw new Error("Payment page unavailable. Try again.");
+      }
+      window.location.href = json.authorizationUrl;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not start payment");
+      setConfirming(false);
+      setPaying(false);
+    }
+  }
+
+  const showCheckout =
+    checkoutAvailable &&
+    (preferCheckout || (!deposit && !identityRequired));
+  const showIdentity = Boolean(identityRequired) && !preferCheckout;
+  const showDva = Boolean(deposit) && !preferCheckout && !identityRequired;
+
   return (
     <AppShell hideNav>
       <PageHeader
         title="Fund Wallet"
-        subtitle="Transfer to your dedicated account"
-        backHref="/wallet"
+        subtitle={
+          showCheckout
+            ? "Deposit by card or mobile money"
+            : "Transfer to your dedicated account"
+        }
+        backHref="/dashboard"
       />
+
+      {verifying ? (
+        <MotionSection className="mb-4 flex items-center gap-3 rounded-[18px] border border-border bg-muted/40 px-4 py-4 text-sm">
+          <Loader2 className="h-4 w-4 animate-spin text-primary" />
+          <span>Confirming your payment…</span>
+        </MotionSection>
+      ) : null}
 
       {loading ? (
         <div className="space-y-4">
@@ -278,7 +491,162 @@ function FundPageContent() {
             </MotionSection>
           ) : null}
 
-          {identityRequired ? (
+          {showCheckout ? (
+            <MotionSection
+              delay={0.04}
+              className="rounded-[22px] border border-border bg-background p-5 shadow-[var(--shadow-soft)]"
+            >
+              <div className="mb-4 flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <CreditCard className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-semibold text-foreground">
+                    Deposit by card
+                  </h2>
+                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                    Your country doesn&apos;t offer a dedicated account number.
+                    Pay with card or mobile money — your {currency} wallet is
+                    credited instantly after payment.
+                  </p>
+                </div>
+              </div>
+
+              <label className="block space-y-1.5">
+                <span className="text-sm font-medium">
+                  Amount ({currency})
+                </span>
+                <input
+                  inputMode="decimal"
+                  value={amount}
+                  onChange={(e) => {
+                    setAmount(e.target.value.replace(/[^\d.]/g, ""));
+                    setConfirming(false);
+                  }}
+                  placeholder="0.00"
+                  className="h-12 w-full rounded-xl border border-border bg-background px-3 text-base font-semibold outline-none focus:border-primary"
+                />
+              </label>
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                {presets.map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => {
+                      setAmount(p);
+                      setConfirming(false);
+                    }}
+                    className={cn(
+                      "rounded-full px-3 py-1.5 text-xs font-semibold ring-1 transition",
+                      amount === p
+                        ? "bg-primary text-primary-foreground ring-primary"
+                        : "bg-muted/50 text-muted-foreground ring-border",
+                    )}
+                  >
+                    {formatMoney(Number(p), currency)}
+                  </button>
+                ))}
+              </div>
+
+              {depositDetails ? (
+                <div className="mt-5 space-y-2.5 rounded-2xl border border-border bg-muted/30 p-4 text-sm">
+                  <p className="text-[11px] font-bold tracking-[0.14em] text-muted-foreground uppercase">
+                    Deposit details
+                  </p>
+                  <DetailPlain
+                    label="You pay"
+                    value={depositDetails.payFormatted}
+                    emphasize
+                  />
+                  <DetailPlain label="Currency" value={depositDetails.currency} />
+                  <DetailPlain
+                    label="Payment methods"
+                    value={depositDetails.methodLabel}
+                  />
+                  <DetailPlain label="ORYNO fee" value="Free" />
+                  <DetailPlain
+                    label="Provider fee"
+                    value={depositDetails.feeLabel}
+                  />
+                  <DetailPlain
+                    label="Credited to wallet"
+                    value={depositDetails.creditedFormatted}
+                    emphasize
+                  />
+                  {depositDetails.resultingFormatted ? (
+                    <DetailPlain
+                      label="Balance after deposit"
+                      value={depositDetails.resultingFormatted}
+                    />
+                  ) : null}
+                  <p className="pt-1 text-xs leading-relaxed text-muted-foreground">
+                    You’ll complete payment securely on Flutterwave. Funds land
+                    in your local ({currency}) wallet 1:1 after confirmation.
+                  </p>
+                </div>
+              ) : null}
+
+              {error ? (
+                <p className="mt-3 text-sm font-medium text-destructive">
+                  {error}
+                </p>
+              ) : null}
+
+              {!confirming ? (
+                <button
+                  type="button"
+                  disabled={!depositDetails}
+                  onClick={() => setConfirming(true)}
+                  className="btn-primary mt-5 inline-flex h-12 w-full items-center justify-center gap-2 text-base disabled:opacity-50"
+                >
+                  <CreditCard className="h-4 w-4" />
+                  Review deposit
+                </button>
+              ) : (
+                <div className="mt-5 space-y-3">
+                  <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-100">
+                    Confirm the deposit details above. You’ll be redirected to
+                    pay with your card or mobile money.
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setConfirming(false)}
+                      className="h-12 rounded-xl border border-border text-sm font-semibold"
+                    >
+                      Back
+                    </button>
+                    <button
+                      type="button"
+                      disabled={paying}
+                      onClick={() => void onPayWithCard()}
+                      className="btn-primary inline-flex h-12 items-center justify-center gap-2 text-sm disabled:opacity-50"
+                    >
+                      {paying ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <CreditCard className="h-4 w-4" />
+                      )}
+                      Pay now
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {preferCheckout && (deposit || identityRequired) ? (
+                <button
+                  type="button"
+                  onClick={() => setPreferCheckout(false)}
+                  className="mt-4 w-full text-center text-sm font-semibold text-primary"
+                >
+                  Use bank account instead
+                </button>
+              ) : null}
+            </MotionSection>
+          ) : null}
+
+          {showIdentity ? (
             <MotionSection
               delay={0.04}
               className="rounded-[22px] border border-border bg-background p-5 shadow-[var(--shadow-soft)]"
@@ -292,14 +660,14 @@ function FundPageContent() {
                     Verify to get your account number
                   </h2>
                   <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                    {identityRequired.message}
+                    {identityRequired!.message}
                   </p>
                 </div>
               </div>
 
               <form onSubmit={(event) => void onSubmitIdentity(event)}>
                 <div className="mb-4 flex gap-2">
-                  {identityRequired.idTypes.map((type) => (
+                  {identityRequired!.idTypes.map((type) => (
                     <button
                       key={type}
                       type="button"
@@ -320,7 +688,11 @@ function FundPageContent() {
                 </div>
 
                 <AuthField
-                  label={idType === "BVN" ? "Bank Verification Number" : "National ID Number"}
+                  label={
+                    idType === "BVN"
+                      ? "Bank Verification Number"
+                      : "National ID Number"
+                  }
                 >
                   <input
                     type="text"
@@ -338,8 +710,8 @@ function FundPageContent() {
                 </AuthField>
 
                 <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                  We use your {idType} only to create your personal fund account.
-                  It must match your name on ORYNO.
+                  We use your {idType} only to create your personal fund
+                  account. It must match your name on ORYNO.
                 </p>
 
                 <button
@@ -358,17 +730,32 @@ function FundPageContent() {
                 </button>
               </form>
 
-              <p className="mt-4 text-center text-xs text-muted-foreground">
-                Already started verification?{" "}
-                <Link
-                  href="/settings/kyc"
-                  className="font-semibold text-primary underline-offset-2 hover:underline"
+              {checkoutAvailable ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPreferCheckout(true);
+                    setConfirming(false);
+                  }}
+                  className="mt-4 w-full text-center text-sm font-semibold text-primary"
                 >
-                  View KYC status
-                </Link>
-              </p>
+                  Or deposit by card instead
+                </button>
+              ) : (
+                <p className="mt-4 text-center text-xs text-muted-foreground">
+                  Already started verification?{" "}
+                  <Link
+                    href="/settings"
+                    className="font-semibold text-primary underline-offset-2 hover:underline"
+                  >
+                    View settings
+                  </Link>
+                </p>
+              )}
             </MotionSection>
-          ) : (
+          ) : null}
+
+          {showDva ? (
             <MotionSection
               delay={0.04}
               className="rounded-[22px] border border-border bg-background p-5 shadow-[var(--shadow-soft)]"
@@ -409,6 +796,7 @@ function FundPageContent() {
                     }
                     copied={copied === "number"}
                   />
+                  <DetailRow label="Currency" value={deposit.currency} />
                   <p className="text-xs leading-relaxed text-muted-foreground">
                     {deposit.instructions}
                   </p>
@@ -418,10 +806,23 @@ function FundPageContent() {
                   Deposit account unavailable. Try refresh.
                 </p>
               )}
-            </MotionSection>
-          )}
 
-          {deposit ? (
+              {checkoutAvailable ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPreferCheckout(true);
+                    setConfirming(false);
+                  }}
+                  className="mt-4 w-full text-center text-sm font-semibold text-primary"
+                >
+                  Prefer card deposit?
+                </button>
+              ) : null}
+            </MotionSection>
+          ) : null}
+
+          {deposit && !preferCheckout ? (
             <MotionSection delay={0.12} className="mt-5 md:max-w-sm">
               <button
                 type="button"
@@ -441,7 +842,7 @@ function FundPageContent() {
             </MotionSection>
           ) : null}
 
-          {error ? (
+          {!showCheckout && !showDva && !showIdentity && error ? (
             <p className="mt-4 text-sm font-medium text-destructive">{error}</p>
           ) : null}
           {setupHint ? (
@@ -452,6 +853,30 @@ function FundPageContent() {
         </motion.div>
       )}
     </AppShell>
+  );
+}
+
+function DetailPlain({
+  label,
+  value,
+  emphasize,
+}: {
+  label: string;
+  value: string;
+  emphasize?: boolean;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <span className="text-muted-foreground">{label}</span>
+      <span
+        className={cn(
+          "text-right font-semibold",
+          emphasize && "text-oryno-orange",
+        )}
+      >
+        {value}
+      </span>
+    </div>
   );
 }
 

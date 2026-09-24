@@ -18,7 +18,13 @@ export async function GET() {
     }
 
     const options = await getWalletFundOptions(user);
-    if (!options.account && options.error) {
+    const hasPath =
+      Boolean(options.account) ||
+      Boolean(options.identityRequired) ||
+      Boolean(options.checkoutAvailable);
+
+    // Checkout-only countries (no dedicated account) must not 500.
+    if (!hasPath && options.error) {
       return NextResponse.json(
         { error: options.error, ...options },
         { status: 500 },

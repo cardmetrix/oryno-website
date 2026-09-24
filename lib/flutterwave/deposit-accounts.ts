@@ -27,6 +27,7 @@ import { convertLocalToNgn } from "@/lib/fx/rates";
 import { ensurePrimaryWallet, toWalletSummary } from "@/lib/wallet";
 import {
   countryFromCurrency,
+  flutterwavePaymentOptions,
   flutterwaveSupportsVirtualAccount,
   fundPresetsForCountry,
   paystackDepositAccountFallback,
@@ -565,10 +566,15 @@ export async function getWalletFundOptions(user: typeof users.$inferSelect) {
     }
   }
 
+  // Card / mobile-money checkout when no dedicated account number is available.
+  const checkoutAvailable =
+    hasFlutterwaveKeys() &&
+    (!account || !flutterwaveSupportsVirtualAccount(countryCode));
+
   return {
-    method: "dva" as WalletFundMethod,
-    checkoutAvailable: false,
-    dvaAvailable: true,
+    method: account ? ("dva" as WalletFundMethod) : ("checkout" as WalletFundMethod),
+    checkoutAvailable,
+    dvaAvailable: Boolean(account) || flutterwaveSupportsVirtualAccount(countryCode),
     countryCode,
     currency,
     presets,
@@ -578,6 +584,7 @@ export async function getWalletFundOptions(user: typeof users.$inferSelect) {
     setupHint,
     serverEgressIp,
     demoMode,
+    paymentOptions: flutterwavePaymentOptions(countryCode),
   };
 }
 
