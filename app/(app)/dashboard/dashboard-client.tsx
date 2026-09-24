@@ -43,7 +43,7 @@ export function DashboardClient() {
     <AppShell>
       <DashboardHeader />
 
-      <div className="grid items-stretch gap-4 sm:gap-5 lg:grid-cols-1 lg:gap-6 lg:has-[.ad-carousel]:grid-cols-[1.35fr_0.85fr]">
+      <div className="space-y-4 sm:space-y-5">
         <MotionSection className="min-w-0">
           <DashboardWalletCarousel />
         </MotionSection>
