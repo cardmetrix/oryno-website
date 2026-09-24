@@ -6,7 +6,10 @@ import {
   ORYNO_INVOICE_COMPANY,
 } from "@/lib/invoices/constants";
 import { summarizeInvoice } from "@/lib/invoices";
-import type { invoiceItems as invoiceItemsTable, invoices as invoicesTable } from "@/lib/db/schema";
+import type {
+  invoiceItems as invoiceItemsTable,
+  invoices as invoicesTable,
+} from "@/lib/db/schema";
 
 function invoiceFontPath() {
   const candidates = [
@@ -40,6 +43,37 @@ function fmtDate(iso: string | null | undefined) {
   });
 }
 
+function clip(text: string, max: number) {
+  const t = text.trim();
+  if (t.length <= max) return t;
+  return `${t.slice(0, Math.max(0, max - 1)).trimEnd()}…`;
+}
+
+/** Absolute text that does not advance PDFKit's flow cursor / create pages. */
+function at(
+  doc: PDFKit.PDFDocument,
+  text: string,
+  x: number,
+  y: number,
+  opts: {
+    size?: number;
+    color?: string;
+    width?: number;
+    align?: "left" | "center" | "right";
+  } = {},
+) {
+  const { size = 9, color = "#111827", width, align } = opts;
+  doc.save();
+  doc.fillColor(color).fontSize(size);
+  doc.text(text, x, y, {
+    width,
+    align,
+    lineBreak: false,
+    continued: false,
+  });
+  doc.restore();
+}
+
 export async function buildInvoicePdf(input: {
   invoice: typeof invoicesTable.$inferSelect;
   items: (typeof invoiceItemsTable.$inferSelect)[];
@@ -50,7 +84,8 @@ export async function buildInvoicePdf(input: {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({
       size: "A4",
-      margin: 48,
+      margin: 0,
+      autoFirstPage: true,
       info: {
         Title: `Invoice ${input.invoice.number}`,
         Author: ORYNO_INVOICE_COMPANY.name,
@@ -67,194 +102,274 @@ export async function buildInvoicePdf(input: {
       // default font
     }
 
+    // Force a single sheet — never let PDFKit paginate this layout.
+    doc.addPage = (() => doc) as typeof doc.addPage;
+
     const orange = "#FF6A00";
     const muted = "#6B7280";
     const ink = "#111827";
-    const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+    const left = 40;
+    const right = doc.page.width - 40;
+    const pageWidth = right - left;
+    let y = 40;
 
     // Header
-    doc.fillColor(orange).fontSize(22).text("INVOICE", { continued: false });
-    doc
-      .fillColor(ink)
-      .fontSize(11)
-      .text(`# ${input.invoice.number}`, { align: "left" });
-    doc.moveDown(0.3);
-    doc
-      .fillColor(muted)
-      .fontSize(9)
-      .text(`Status: ${input.invoice.status.toUpperCase()}`);
+    at(doc, "INVOICE", left, y, { size: 20, color: orange });
+    at(doc, `# ${input.invoice.number}`, left + 118, y + 6, {
+      size: 11,
+      color: ink,
+    });
+    at(doc, input.invoice.status.toUpperCase(), right - 90, y + 6, {
+      size: 9,
+      color: muted,
+      width: 90,
+      align: "right",
+    });
+    y += 30;
 
-    doc.moveDown(1);
-
-    // Meta row
-    const metaY = doc.y;
-    doc.fillColor(muted).fontSize(8).text("Date", 48, metaY);
-    doc.fillColor(ink).fontSize(10).text(fmtDate(summary.issuedAt), 48, metaY + 12);
-    doc.fillColor(muted).fontSize(8).text("Payment Terms", 180, metaY);
-    doc
-      .fillColor(ink)
-      .fontSize(10)
-      .text(input.invoice.paymentTerms || "-", 180, metaY + 12);
-    doc.fillColor(muted).fontSize(8).text("Due Date", 320, metaY);
-    doc.fillColor(ink).fontSize(10).text(fmtDate(summary.dueAt), 320, metaY + 12);
-    if (input.invoice.poNumber) {
-      doc.fillColor(muted).fontSize(8).text("PO Number", 440, metaY);
-      doc
-        .fillColor(ink)
-        .fontSize(10)
-        .text(input.invoice.poNumber, 440, metaY + 12);
+    // Meta
+    const metas = [
+      { label: "Date", value: fmtDate(summary.issuedAt), x: left },
+      {
+        label: "Payment Terms",
+        value: clip(input.invoice.paymentTerms || "-", 22),
+        x: left + 130,
+      },
+      { label: "Due Date", value: fmtDate(summary.dueAt), x: left + 280 },
+      {
+        label: "PO Number",
+        value: clip(input.invoice.poNumber || "-", 18),
+        x: left + 400,
+      },
+    ];
+    for (const m of metas) {
+      at(doc, m.label, m.x, y, { size: 7, color: muted });
+      at(doc, m.value, m.x, y + 11, { size: 9, color: ink, width: 120 });
     }
-    doc.y = metaY + 40;
+    y += 34;
 
-    // From / Bill To / Ship To
-    const colW = pageWidth / 3 - 8;
-    const blockY = doc.y;
-    function party(
-      x: number,
-      label: string,
-      name: string | null | undefined,
-      lines: (string | null | undefined)[],
-    ) {
-      doc.fillColor(muted).fontSize(8).text(label, x, blockY);
-      doc
-        .fillColor(ink)
-        .fontSize(10)
-        .text(name || "-", x, blockY + 12, { width: colW });
-      let y = blockY + 26;
-      for (const line of lines.filter(Boolean)) {
-        doc
-          .fillColor(muted)
-          .fontSize(8)
-          .text(String(line), x, y, { width: colW });
-        y += 11;
+    // Parties
+    const colW = (pageWidth - 16) / 3;
+    const parties = [
+      {
+        label: "From",
+        name: input.invoice.fromName || "-",
+        lines: [
+          input.invoice.fromEmail,
+          input.invoice.fromPhone,
+          input.invoice.fromAddress,
+        ],
+        x: left,
+      },
+      {
+        label: "Bill To",
+        name: input.invoice.customerName || "-",
+        lines: [
+          input.invoice.customerEmail,
+          input.invoice.customerPhone,
+          input.invoice.customerAddress,
+        ],
+        x: left + colW + 8,
+      },
+      {
+        label: "Ship To",
+        name: input.invoice.shipToName || "-",
+        lines: [input.invoice.shipToAddress],
+        x: left + (colW + 8) * 2,
+      },
+    ];
+
+    for (const party of parties) {
+      let py = y;
+      at(doc, party.label, party.x, py, { size: 7, color: muted });
+      py += 11;
+      at(doc, clip(party.name, 42), party.x, py, {
+        size: 9,
+        color: ink,
+        width: colW,
+      });
+      py += 13;
+      for (const line of party.lines.filter(Boolean).slice(0, 3)) {
+        at(doc, clip(String(line), 48), party.x, py, {
+          size: 8,
+          color: muted,
+          width: colW,
+        });
+        py += 11;
       }
     }
+    y += 58;
 
-    party(48, "Who is this from?", input.invoice.fromName, [
-      input.invoice.fromEmail,
-      input.invoice.fromPhone,
-      input.invoice.fromAddress,
-    ]);
-    party(48 + colW + 12, "Bill To", input.invoice.customerName, [
-      input.invoice.customerEmail,
-      input.invoice.customerPhone,
-      input.invoice.customerAddress,
-    ]);
-    party(48 + (colW + 12) * 2, "Ship To", input.invoice.shipToName, [
-      input.invoice.shipToAddress,
-    ]);
-
-    doc.y = blockY + 78;
     doc
-      .moveTo(48, doc.y)
-      .lineTo(48 + pageWidth, doc.y)
+      .moveTo(left, y)
+      .lineTo(right, y)
       .strokeColor("#E5E7EB")
+      .lineWidth(1)
       .stroke();
-    doc.moveDown(1);
+    y += 10;
 
     // Table header
-    const tableTop = doc.y;
-    doc.fillColor(muted).fontSize(8);
-    doc.text("Item", 48, tableTop, { width: 220 });
-    doc.text("Qty", 280, tableTop, { width: 40, align: "right" });
-    doc.text("Rate", 330, tableTop, { width: 80, align: "right" });
-    doc.text("Amount", 420, tableTop, { width: 100, align: "right" });
-    doc.y = tableTop + 14;
-    doc
-      .moveTo(48, doc.y)
-      .lineTo(48 + pageWidth, doc.y)
-      .strokeColor("#E5E7EB")
-      .stroke();
-    doc.moveDown(0.5);
+    at(doc, "Item", left, y, { size: 7, color: muted });
+    at(doc, "Qty", left + 260, y, {
+      size: 7,
+      color: muted,
+      width: 36,
+      align: "right",
+    });
+    at(doc, "Rate", left + 310, y, {
+      size: 7,
+      color: muted,
+      width: 90,
+      align: "right",
+    });
+    at(doc, "Amount", left + 410, y, {
+      size: 7,
+      color: muted,
+      width: pageWidth - 410,
+      align: "right",
+    });
+    y += 12;
+    doc.moveTo(left, y).lineTo(right, y).strokeColor("#E5E7EB").stroke();
+    y += 8;
 
-    for (const item of input.items) {
-      const y = doc.y;
-      doc.fillColor(ink).fontSize(9);
-      doc.text(item.description, 48, y, { width: 220 });
-      doc.text(String(Number(item.quantity)), 280, y, {
-        width: 40,
+    const maxItemRows = 12;
+    const rows = input.items.slice(0, maxItemRows);
+    for (const item of rows) {
+      at(doc, clip(item.description, 55), left, y, {
+        size: 9,
+        color: ink,
+        width: 250,
+      });
+      at(doc, String(Number(item.quantity)), left + 260, y, {
+        size: 9,
+        color: ink,
+        width: 36,
         align: "right",
       });
-      doc.text(money(Number(item.unitPrice), summary.currency), 330, y, {
-        width: 80,
+      at(
+        doc,
+        money(Number(item.unitPrice), summary.currency),
+        left + 310,
+        y,
+        { size: 9, color: ink, width: 90, align: "right" },
+      );
+      at(doc, money(Number(item.amount), summary.currency), left + 410, y, {
+        size: 9,
+        color: ink,
+        width: pageWidth - 410,
         align: "right",
       });
-      doc.text(money(Number(item.amount), summary.currency), 420, y, {
-        width: 100,
-        align: "right",
-      });
-      doc.moveDown(0.8);
+      y += 16;
+    }
+    if (input.items.length > maxItemRows) {
+      at(
+        doc,
+        `+ ${input.items.length - maxItemRows} more item(s)`,
+        left,
+        y,
+        { size: 8, color: muted },
+      );
+      y += 14;
     }
 
-    doc.moveDown(0.5);
-    doc
-      .moveTo(48, doc.y)
-      .lineTo(48 + pageWidth, doc.y)
-      .strokeColor("#E5E7EB")
-      .stroke();
-    doc.moveDown(0.8);
+    doc.moveTo(left, y).lineTo(right, y).strokeColor("#E5E7EB").stroke();
+    y += 12;
 
-    // Totals
-    const totalsX = 340;
-    function totalRow(label: string, value: string, bold = false) {
-      const y = doc.y;
-      doc
-        .fillColor(bold ? ink : muted)
-        .fontSize(bold ? 11 : 9)
-        .text(label, totalsX, y, { width: 80 });
-      doc
-        .fillColor(ink)
-        .fontSize(bold ? 11 : 9)
-        .text(value, 420, y, { width: 100, align: "right" });
-      doc.moveDown(0.55);
+    const totals: Array<{ label: string; value: string; bold?: boolean }> = [
+      { label: "Subtotal", value: summary.subtotalFormatted },
+    ];
+    if (summary.discount > 0) {
+      totals.push({
+        label: "Discount",
+        value: `-${summary.discountFormatted}`,
+      });
     }
-
-    totalRow("Subtotal", summary.subtotalFormatted);
-    if (summary.discount > 0) totalRow("Discount", `-${summary.discountFormatted}`);
     if (summary.taxRate > 0 || summary.tax > 0) {
-      totalRow(`Tax (${summary.taxRate}%)`, summary.taxFormatted);
+      totals.push({
+        label: `Tax (${summary.taxRate}%)`,
+        value: summary.taxFormatted,
+      });
     }
-    if (summary.shipping > 0) totalRow("Shipping", summary.shippingFormatted);
-    totalRow("Total", summary.totalFormatted, true);
+    if (summary.shipping > 0) {
+      totals.push({ label: "Shipping", value: summary.shippingFormatted });
+    }
+    totals.push({
+      label: "Total",
+      value: summary.totalFormatted,
+      bold: true,
+    });
     if (summary.amountPaid > 0) {
-      totalRow("Amount Paid", summary.amountPaidFormatted);
+      totals.push({
+        label: "Amount Paid",
+        value: summary.amountPaidFormatted,
+      });
     }
-    totalRow("Balance Due", summary.balanceDueFormatted, true);
+    totals.push({
+      label: "Balance Due",
+      value: summary.balanceDueFormatted,
+      bold: true,
+    });
 
-    // Notes / terms
+    for (const row of totals) {
+      at(doc, row.label, left + 310, y, {
+        size: row.bold ? 10 : 9,
+        color: row.bold ? ink : muted,
+        width: 90,
+      });
+      at(doc, row.value, left + 410, y, {
+        size: row.bold ? 10 : 9,
+        color: ink,
+        width: pageWidth - 410,
+        align: "right",
+      });
+      y += row.bold ? 15 : 13;
+    }
+
     if (input.invoice.notes) {
-      doc.moveDown(1);
-      doc.fillColor(muted).fontSize(8).text("Notes");
-      doc.fillColor(ink).fontSize(9).text(input.invoice.notes, {
+      y += 8;
+      at(doc, "Notes", left, y, { size: 7, color: muted });
+      y += 11;
+      at(doc, clip(input.invoice.notes, 180), left, y, {
+        size: 8,
+        color: ink,
         width: pageWidth,
       });
+      y += 14;
     }
     if (input.invoice.terms) {
-      doc.moveDown(0.8);
-      doc.fillColor(muted).fontSize(8).text("Terms");
-      doc.fillColor(ink).fontSize(9).text(input.invoice.terms, {
+      y += 4;
+      at(doc, "Terms", left, y, { size: 7, color: muted });
+      y += 11;
+      at(doc, clip(input.invoice.terms, 180), left, y, {
+        size: 8,
+        color: ink,
         width: pageWidth,
       });
     }
 
-    // Footer with ORYNO company details
-    const footerTop = doc.page.height - 72;
+    // Footer on the same single page
+    const footerTop = doc.page.height - 50;
     doc
-      .moveTo(48, footerTop)
-      .lineTo(48 + pageWidth, footerTop)
+      .moveTo(left, footerTop)
+      .lineTo(right, footerTop)
       .strokeColor("#E5E7EB")
       .stroke();
-    doc.fillColor(orange).fontSize(10).text(ORYNO_INVOICE_COMPANY.name, 48, footerTop + 10);
-    doc
-      .fillColor(muted)
-      .fontSize(8)
-      .text(ORYNO_INVOICE_COMPANY.tagline, 48, footerTop + 24);
-    doc.text(
-      `${ORYNO_INVOICE_COMPANY.website}  ·  ${ORYNO_INVOICE_COMPANY.email}`,
-      48,
-      footerTop + 36,
+    at(doc, ORYNO_INVOICE_COMPANY.name, left, footerTop + 8, {
+      size: 9,
+      color: orange,
+    });
+    at(
+      doc,
+      `${ORYNO_INVOICE_COMPANY.tagline}  ·  ${ORYNO_INVOICE_COMPANY.website}  ·  ${ORYNO_INVOICE_COMPANY.email}`,
+      left,
+      footerTop + 22,
+      { size: 7, color: muted, width: pageWidth },
     );
-    doc.text(INVOICE_FOOTER, 48, footerTop + 48, { width: pageWidth });
+    at(doc, INVOICE_FOOTER, left, footerTop + 34, {
+      size: 7,
+      color: muted,
+      width: pageWidth,
+    });
 
     doc.end();
   });
