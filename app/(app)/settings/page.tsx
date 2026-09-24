@@ -26,7 +26,6 @@ import { Switch } from "@/components/ui/switch";
 import { announceLogout } from "@/lib/auth/client-logout";
 import { AUTH_LINKS } from "@/lib/auth-links";
 import type { ProfileDto } from "@/lib/profile";
-import { cn } from "@/lib/utils";
 
 type SettingsPayload = {
   profile: ProfileDto;
@@ -134,31 +133,16 @@ export default function SettingsPage() {
         backHref="/profile"
       />
 
-      <MotionSection className="mb-5 overflow-hidden rounded-[28px] border border-border bg-gradient-to-br from-[#ff8124] via-oryno-orange to-[#e85d00] p-5 text-white shadow-[0_16px_40px_rgba(255,106,0,0.28)]">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-semibold tracking-[0.16em] text-white/75 uppercase">
-              Account
-            </p>
-            <p className="mt-1 text-lg font-bold tracking-tight">
-              {data.profile.fullName}
-            </p>
-            <p className="mt-0.5 text-sm text-white/80">{data.profile.email}</p>
-          </div>
-          <span
-            className={cn(
-              "rounded-full px-2.5 py-1 text-[11px] font-bold",
-              data.profile.kycStatus === "verified"
-                ? "bg-white/20 text-white"
-                : "bg-black/20 text-[#ffd29a]",
-            )}
-          >
-            {data.profile.kycLabel}
-          </span>
+      <MotionSection className="settings-hero-surface mb-5 isolate overflow-hidden rounded-[28px] p-5">
+        <div className="relative z-[1]">
+          <p className="text-xs font-semibold tracking-[0.16em] text-white/75 uppercase">
+            Account
+          </p>
+          <p className="mt-1 text-lg font-bold tracking-tight">
+            {data.profile.fullName}
+          </p>
+          <p className="mt-0.5 text-sm text-white/80">{data.profile.email}</p>
         </div>
-        <p className="mt-3 text-xs text-white/75">
-          Daily limit · {data.profile.dailyLimitLabel}
-        </p>
       </MotionSection>
 
       <MotionSection delay={0.04}>

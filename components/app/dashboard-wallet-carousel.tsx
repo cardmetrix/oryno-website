@@ -112,7 +112,7 @@ export function DashboardWalletCarousel({ className }: Props) {
         className={cn(
           "flex w-full snap-x snap-mandatory gap-1.5 overflow-x-auto overscroll-x-contain",
           "[-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-          "md:grid md:grid-cols-2 md:items-stretch md:gap-1.5 md:overflow-visible md:snap-none",
+          "md:grid md:grid-cols-2 md:items-stretch md:gap-1.5 md:overflow-visible md:snap-none px-2",
         )}
         style={{ WebkitOverflowScrolling: "touch" }}
       >
