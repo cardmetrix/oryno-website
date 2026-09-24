@@ -7,9 +7,9 @@ import {
   Check,
   Gift,
   Globe2,
-  Heart,
   Loader2,
-  Send,
+  MessageCircleHeart,
+  Truck,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/app-shell";
@@ -25,18 +25,23 @@ type WaitlistStatus = {
 const DETAILS = [
   {
     icon: Globe2,
-    title: "Cross-border gifts",
-    body: "Send digital gifts and cards to friends and family in other countries from your ORYNO wallet.",
+    title: "Gifts Across Borders",
+    body: "Send thoughtful gifts to friends and family in other countries, right from your ORYNO account.",
   },
   {
-    icon: Send,
-    title: "Instant delivery",
-    body: "Recipients get codes and gift links by email or in-app - no shipping delays.",
+    icon: Gift,
+    title: "Thoughtfully Curated Gifts",
+    body: "Choose from flowers, cakes, personalized frames, wristwatches, fashion accessories, and other special gifts for every occasion.",
   },
   {
-    icon: Heart,
-    title: "Curated brands",
-    body: "Amazon, Apple, streaming, gaming and lifestyle brands popular worldwide.",
+    icon: MessageCircleHeart,
+    title: "Personal Written Notes",
+    body: "Add a heartfelt message to your gift and let your loved ones know you're thinking of them, no matter the distance.",
+  },
+  {
+    icon: Truck,
+    title: "Convenient Gift Delivery",
+    body: "We make it easy to celebrate birthdays, anniversaries, milestones, and special moments with loved ones abroad.",
   },
 ];
 
