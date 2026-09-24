@@ -408,18 +408,29 @@ export const serviceCategories: Array<ServiceCategory | "All"> = [
   "Coming soon",
 ];
 
+/** Quick-filter chips next to the services search bar. */
+export const SERVICE_QUICK_TAGS = [
+  "Most popular",
+  "Hot",
+  "Free",
+] as const;
+
+export type ServiceQuickTag = (typeof SERVICE_QUICK_TAGS)[number];
+
 export function filterServices(
   items: ServiceDirectoryItem[],
-  opts: { query?: string; category?: string },
+  opts: { query?: string; category?: string; tag?: string | null },
 ) {
   const q = (opts.query ?? "").trim().toLowerCase();
   const category = opts.category ?? "All";
+  const tag = (opts.tag ?? "").trim().toLowerCase();
 
   return items.filter((item) => {
     const matchesCategory =
       category === "All" ||
       (category === "Popular" && item.popular) ||
-      (category === "Coming soon" && (item.soon || item.category === "Coming soon")) ||
+      (category === "Coming soon" &&
+        (item.soon || item.category === "Coming soon")) ||
       item.category === category;
 
     const haystack = [
@@ -427,12 +438,18 @@ export function filterServices(
       item.shortDescription,
       item.longDescription,
       item.category,
+      item.stats ?? "",
       ...item.tags,
     ]
       .join(" ")
       .toLowerCase();
 
     const matchesQuery = !q || haystack.includes(q);
-    return matchesCategory && matchesQuery;
+    const matchesTag =
+      !tag ||
+      (item.stats ?? "").toLowerCase() === tag ||
+      item.tags.some((t) => t.toLowerCase() === tag);
+
+    return matchesCategory && matchesQuery && matchesTag;
   });
 }

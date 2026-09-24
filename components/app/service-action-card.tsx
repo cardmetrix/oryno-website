@@ -15,8 +15,6 @@ type ServiceActionCardProps = {
   accent?: string;
   /** Compact tiles for dashboard Quick Actions */
   size?: "default" | "sm";
-  /** Optional pill tag shown above the label (services catalog) */
-  badge?: string | null;
 };
 
 export function ServiceActionCard({
@@ -26,7 +24,6 @@ export function ServiceActionCard({
   index = 0,
   accent = "#FF6A00",
   size = "default",
-  badge,
 }: ServiceActionCardProps) {
   const compact = size === "sm";
 
@@ -47,16 +44,10 @@ export function ServiceActionCard({
         href={href}
         className={
           compact
-            ? "group relative flex h-full flex-col items-center justify-center gap-1.5 px-0.5 py-1 text-center"
-            : "group relative flex h-full flex-col items-center justify-center gap-2.5 px-1 py-2 text-center sm:gap-3 sm:py-3"
+            ? "group flex h-full flex-col items-center justify-center gap-1.5 px-0.5 py-1 text-center"
+            : "group flex h-full flex-col items-center justify-center gap-2.5 px-1 py-2 text-center sm:gap-3 sm:py-3"
         }
       >
-        {badge && !compact ? (
-          <span className="absolute top-0 right-0 z-[1] max-w-[90%] truncate rounded-full bg-oryno-orange-muted px-1.5 py-0.5 text-[8px] font-bold tracking-wide text-primary uppercase ring-1 ring-primary/15 sm:text-[9px]">
-            {badge}
-          </span>
-        ) : null}
-
         <motion.span
           className={
             compact
