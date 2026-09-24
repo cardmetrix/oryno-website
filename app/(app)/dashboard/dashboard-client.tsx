@@ -67,7 +67,7 @@ export function DashboardClient() {
               </Link>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 sm:grid-cols-3 sm:gap-2.5">
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-3 sm:gap-2">
               {quickActions.map((action, index) => (
                 <ServiceActionCard
                   key={action.label}
@@ -83,7 +83,7 @@ export function DashboardClient() {
         </div>
       </MotionSection>
 
-      <MotionSection className="mt-6 rounded-[28px] border border-border/80 bg-background/90 p-5 shadow-[var(--shadow-soft)] backdrop-blur-sm sm:p-6">
+      <MotionSection className="mt-2 rounded-[28px] border border-border/80 bg-background/90 p-5 shadow-[var(--shadow-soft)] backdrop-blur-sm sm:p-6">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-base font-semibold text-foreground">
             Recent Transactions

@@ -304,11 +304,6 @@ function CardsPageContent() {
       title: "Secure by design",
       body: "Freeze anytime. Reveal PAN and CVV only with your transaction PIN.",
     },
-    {
-      icon: CreditCard,
-      title: `Issued with ${data?.issuer ?? "Maplerad"}`,
-      body: `Launch fee from ${data?.issueFeeFormatted ?? "$1.50"}. Fund from your USD wallet after issue.`,
-    },
   ];
 
   return (
