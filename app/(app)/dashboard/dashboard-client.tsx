@@ -43,7 +43,7 @@ export function DashboardClient() {
     <AppShell>
       <DashboardHeader />
 
-      <div className="space-y-2.5 md:space-y-3">
+      <div className="space-y-1">
         <MotionSection className="min-w-0">
           <DashboardWalletCarousel />
         </MotionSection>
