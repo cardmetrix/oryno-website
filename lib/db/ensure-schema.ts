@@ -235,6 +235,21 @@ export async function ensureWalletSchema() {
         ON "usd_virtual_card_waitlist" USING btree ("email")
       `);
       await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS "gift_card_waitlist" (
+          "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+          "user_id" uuid REFERENCES "users"("id") ON DELETE cascade,
+          "email" varchar(255) NOT NULL,
+          "country_code" varchar(2) REFERENCES "countries"("code"),
+          "notified_at" timestamp with time zone,
+          "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+          "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+        )
+      `);
+      await db.execute(sql`
+        CREATE UNIQUE INDEX IF NOT EXISTS "gift_card_waitlist_email_uidx"
+        ON "gift_card_waitlist" USING btree ("email")
+      `);
+      await db.execute(sql`
         CREATE TABLE IF NOT EXISTS "landing_assets" (
           "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
           "slot" varchar(64) NOT NULL,

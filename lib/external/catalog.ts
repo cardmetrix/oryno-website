@@ -46,7 +46,10 @@ export const EXTERNAL_API_CATALOG = {
       "POST /support/error-report",
       "GET|POST /support/tickets",
     ],
-    waitlist: ["GET|POST /waitlist/usd-card"],
+    waitlist: [
+      "GET|POST|DELETE /waitlist/usd-card",
+      "GET|POST|DELETE /waitlist/international-gifting",
+    ],
     services: [
       "GET /services",
       "POST /services/airtime/purchase",

@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   Activity,
   FileText,
+  Gift,
   Phone,
   Smartphone,
   Trophy,
@@ -181,6 +182,22 @@ export const servicesDirectory: ServiceDirectoryItem[] = [
     soon: false,
     icon: GiftCardIcon,
     stats: "50+ brands",
+  },
+  {
+    id: "international-gifting",
+    href: "/services/international-gifting",
+    label: "International Gifting",
+    shortDescription: "Send gifts worldwide — coming soon",
+    longDescription:
+      "Send digital gifts and gift cards to friends and family across countries. Join the waitlist to get notified at launch.",
+    category: "Coming soon",
+    tags: ["Gifting", "International", "Waitlist", "USD"],
+    eta: "Coming soon",
+    accent: "#FF6A00",
+    soon: true,
+    popular: true,
+    icon: Gift,
+    stats: "Waitlist open",
   },
   {
     id: "invoices",
@@ -387,6 +404,7 @@ export function filterServices(
     const matchesCategory =
       category === "All" ||
       (category === "Popular" && item.popular) ||
+      (category === "Coming soon" && (item.soon || item.category === "Coming soon")) ||
       item.category === category;
 
     const haystack = [

@@ -36,6 +36,11 @@ export const adminNav: AdminNavItem[] = [
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/support", label: "Support", icon: Headphones },
   { href: "/admin/waitlist", label: "USD Card Waitlist", icon: CreditCard },
+  {
+    href: "/admin/waitlist/international-gifting",
+    label: "Gifting Waitlist",
+    icon: Gift,
+  },
   { href: "/admin/virtual-cards", label: "Virtual Cards", icon: CreditCard },
   { href: "/admin/transaction-pins", label: "Transaction PINs", icon: KeyRound },
   { href: "/admin/wallets", label: "Wallets", icon: Wallet },
@@ -61,5 +66,8 @@ export const adminNav: AdminNavItem[] = [
 
 export function isAdminNavActive(pathname: string, href: string) {
   if (href === "/admin") return pathname === "/admin";
-  return pathname === href || pathname.startsWith(`${href}/`);
+  if (pathname === href) return true;
+  // Keep /admin/waitlist from matching nested waitlist pages
+  if (href === "/admin/waitlist") return false;
+  return pathname.startsWith(`${href}/`);
 }
