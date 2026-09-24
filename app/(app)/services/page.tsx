@@ -151,7 +151,7 @@ export default function ServicesPage() {
           <AdCarousel
             placement="services_carousel"
             reserveSpaceWhileLoading={false}
-            className="mt-5 sm:mt-6 lg:min-h-0 lg:h-[148px]"
+            className="mt-4 sm:mt-5"
           />
     </AppShell>
   );

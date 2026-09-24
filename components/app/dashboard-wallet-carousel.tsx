@@ -129,7 +129,7 @@ export function DashboardWalletCarousel({ className }: Props) {
             "md:min-w-0 md:max-w-none md:basis-auto md:snap-none",
           )}
         >
-          <div className="relative isolate overflow-hidden rounded-[18px] shadow-[0_8px_22px_rgba(255,106,0,0.16)]">
+          <div className="relative isolate overflow-hidden rounded-[18px]">
             <div className="absolute inset-0 bg-gradient-to-br from-[#ff8124] via-oryno-orange to-[#e85d00]" />
             <div className="absolute inset-0 bg-[linear-gradient(210deg,rgba(255,255,255,0.16)_0%,transparent_42%,rgba(180,60,0,0.18)_100%)]" />
             <motion.div
@@ -215,6 +215,7 @@ export function DashboardWalletCarousel({ className }: Props) {
               </div>
 
               {footer}
+
             </div>
           </div>
         </div>
@@ -226,7 +227,7 @@ export function DashboardWalletCarousel({ className }: Props) {
             "md:min-w-0 md:max-w-none md:basis-auto md:snap-none",
           )}
         >
-          <div className="relative isolate overflow-hidden rounded-[18px] bg-[#1C1C1E] shadow-[0_8px_22px_rgba(0,0,0,0.18)] ring-1 ring-white/10">
+          <div className="relative isolate overflow-hidden rounded-[18px] bg-[#1C1C1E] ring-1 ring-white/10">
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_85%_10%,rgba(255,106,0,0.18),transparent_45%)]" />
 
             <div className="relative flex flex-col gap-2 p-3.5 text-white sm:gap-2.5 sm:p-4">

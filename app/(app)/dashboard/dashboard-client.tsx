@@ -43,12 +43,12 @@ export function DashboardClient() {
     <AppShell>
       <DashboardHeader />
 
-      <div className="space-y-3 md:space-y-3.5">
+      <div className="space-y-2.5 md:space-y-3">
         <MotionSection className="min-w-0">
           <DashboardWalletCarousel />
         </MotionSection>
 
-        <AdCarousel className="!h-[112px] sm:!h-[124px] md:!h-[132px] md:!rounded-[22px] lg:!h-[132px] lg:!min-h-0" />
+        <AdCarousel />
       </div>
 
       <MotionSection className="mt-6">
