@@ -10,12 +10,6 @@ import { useCountry } from "@/components/providers/country-provider";
 import { useWallet } from "@/hooks/use-wallet";
 import { cn } from "@/lib/utils";
 
-const LOCAL_HINT: Record<string, string> = {
-  NG: "Use your NGN balance for airtime, data, bills, betting and other Nigerian services.",
-  GH: "Use your GHS balance for airtime, data, bills, betting and other Ghanaian services.",
-  KE: "Use your KES balance for airtime, data, bills, betting and other Kenyan services.",
-  ZA: "Use your ZAR balance for airtime, data, bills and other South African services.",
-};
 
 /** Gap between mobile swipe slides (matches Tailwind gap-3). */
 const MOBILE_GAP_PX = 12;
@@ -37,10 +31,6 @@ export function DashboardWalletCarousel({ className }: Props) {
   const localCurrency = data?.primary.currency ?? country.currency;
   const localBalance = data?.primary.balance ?? "0";
   const usdFormatted = data?.usd?.balanceFormatted ?? "$0.00";
-  const hint =
-    LOCAL_HINT[country.code] ??
-    `Use your ${localCurrency} balance for local services in ${country.name}.`;
-
   function slideStride(el: HTMLDivElement) {
     return el.clientWidth + MOBILE_GAP_PX;
   }
@@ -195,11 +185,7 @@ export function DashboardWalletCarousel({ className }: Props) {
                 </motion.button>
               </div>
 
-              <p className="text-[11px] leading-snug text-white/80 sm:text-xs">
-                {hint}
-              </p>
-
-              <div className="grid grid-cols-2 gap-2 pt-0.5">
+              <div className="grid grid-cols-2 gap-2">
                 <motion.div whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }}>
                   <Link href="/fund" className={fundBtn}>
                     <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
@@ -268,12 +254,7 @@ export function DashboardWalletCarousel({ className }: Props) {
                 </motion.button>
               </div>
 
-              <p className="text-[11px] leading-snug text-white/70 sm:text-xs">
-                Use your USD balance for gift cards, international virtual
-                numbers and more.
-              </p>
-
-              <div className="grid grid-cols-2 gap-2 pt-0.5">
+              <div className="grid grid-cols-2 gap-2">
                 <motion.div whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }}>
                   <Link href="/cards" className={fundBtn}>
                     <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
