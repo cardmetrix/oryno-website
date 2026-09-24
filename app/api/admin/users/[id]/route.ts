@@ -289,6 +289,7 @@ export async function PATCH(
             body: "Your ORYNO account is active again.",
             type: "system",
           });
+        }
       } catch (e) {
         console.error("[admin-user-notify]", e);
       }

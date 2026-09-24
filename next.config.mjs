@@ -23,9 +23,6 @@ const nextConfig = {
   experimental: {
     optimizePackageImports: ['framer-motion', 'lucide-react'],
   },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
   typescript: {
     ignoreBuildErrors: true,
   },
