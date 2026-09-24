@@ -127,7 +127,9 @@ export function DashboardWalletCarousel({ className }: Props) {
       >
         {/* Local */}
         <div className={slideClass}>
-          <div className={cn("local-wallet-surface isolate", cardRadius)}>
+          <div className={cn("relative isolate", cardRadius)}>
+            <div className="absolute inset-0 bg-gradient-to-br from-[#ff8124] via-oryno-orange to-[#e85d00]" />
+            <div className="absolute inset-0 bg-[linear-gradient(210deg,rgba(255,255,255,0.16)_0%,transparent_42%,rgba(180,60,0,0.18)_100%)]" />
             <motion.div
               aria-hidden
               animate={{ x: ["-35%", "135%"] }}
