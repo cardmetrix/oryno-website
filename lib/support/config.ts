@@ -32,11 +32,11 @@ export const SUPPORT_FAQS = [
   },
   {
     q: "How do withdrawals work?",
-    a: "Open Wallet → Withdraw, enter the amount, choose a payout bank, then confirm with your transaction PIN. We debit your wallet and send the transfer. Typical timing is a few minutes.",
+    a: "Bank withdrawals have been removed. Move money between your local and USD wallets with Convert, or spend USD online with a virtual card from Cards.",
   },
   {
     q: "When will USD virtual cards launch?",
-    a: `USD virtual cards (issued with ${USD_CARD_ISSUER}) are coming soon for online payments worldwide. Join the waitlist from your USD wallet — we’ll email and push you as soon as cards go live in your country. Gift cards are already live under Services → Gift Cards.`,
+    a: `USD virtual cards (issued with ${USD_CARD_ISSUER}) are available under Cards. Issue a card, fund your USD wallet, then pay online worldwide. Reveal card details with your transaction PIN.`,
   },
   {
     q: "How do I verify my account (KYC)?",

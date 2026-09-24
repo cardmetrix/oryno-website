@@ -503,3 +503,50 @@ export async function ensureInvoiceSchema() {
   await invoiceReady;
 }
 
+let virtualCardsReady: Promise<void> | null = null;
+
+export async function ensureVirtualCardsSchema() {
+  if (!virtualCardsReady) {
+    virtualCardsReady = (async () => {
+      await db.execute(sql`
+        DO $$ BEGIN
+          CREATE TYPE "public"."usd_virtual_card_status" AS ENUM('active', 'frozen', 'terminated');
+        EXCEPTION WHEN duplicate_object THEN null;
+        END $$;
+      `);
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS "usd_virtual_cards" (
+          "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+          "user_id" uuid NOT NULL REFERENCES "users"("id") ON DELETE cascade,
+          "wallet_id" uuid NOT NULL REFERENCES "wallets"("id") ON DELETE cascade,
+          "brand" varchar(20) DEFAULT 'visa' NOT NULL,
+          "label" varchar(80) DEFAULT 'ORYNO USD' NOT NULL,
+          "last4" varchar(4) NOT NULL,
+          "exp_month" integer NOT NULL,
+          "exp_year" integer NOT NULL,
+          "pan_cipher" text NOT NULL,
+          "cvv_cipher" text NOT NULL,
+          "status" "public"."usd_virtual_card_status" DEFAULT 'active' NOT NULL,
+          "provider" varchar(40) DEFAULT 'oryno' NOT NULL,
+          "external_ref" varchar(120),
+          "metadata" jsonb,
+          "created_at" timestamptz DEFAULT now() NOT NULL,
+          "updated_at" timestamptz DEFAULT now() NOT NULL
+        )
+      `);
+      await db.execute(sql`
+        CREATE INDEX IF NOT EXISTS "usd_virtual_cards_user_idx"
+        ON "usd_virtual_cards" USING btree ("user_id")
+      `);
+      await db.execute(sql`
+        CREATE INDEX IF NOT EXISTS "usd_virtual_cards_status_idx"
+        ON "usd_virtual_cards" USING btree ("status")
+      `);
+    })().catch((error) => {
+      virtualCardsReady = null;
+      throw error;
+    });
+  }
+  await virtualCardsReady;
+}
+

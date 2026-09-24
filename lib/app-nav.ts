@@ -20,7 +20,7 @@ import { GiftCardIcon } from "@/components/icons/gift-card-icon";
 
 export const primaryNav = [
   { href: "/dashboard", label: "Home", icon: Home },
-  { href: "/wallet", label: "Wallet", icon: Wallet },
+  { href: "/wallet", label: "Cards", icon: Wallet },
   { href: "/convert", label: "Convert", icon: ArrowLeftRight },
   { href: "/history", label: "History", icon: History },
   { href: "/profile", label: "Profile", icon: User },

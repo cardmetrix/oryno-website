@@ -59,7 +59,12 @@ export async function ensureUsdWallet(userId: string): Promise<WalletRow> {
   return again;
 }
 
-type UsdDebitCategory = "virtual_number" | "social" | "gift_card" | "other";
+type UsdDebitCategory =
+  | "virtual_number"
+  | "social"
+  | "gift_card"
+  | "fee"
+  | "other";
 
 /**
  * Debit the user's USD card/wallet for USD-priced services (numbers, boosting).

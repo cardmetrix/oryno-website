@@ -977,6 +977,44 @@ export const usdVirtualCardWaitlist = pgTable(
   (t) => [uniqueIndex("usd_virtual_card_waitlist_email_uidx").on(t.email)],
 );
 
+export const usdVirtualCardStatusEnum = pgEnum("usd_virtual_card_status", [
+  "active",
+  "frozen",
+  "terminated",
+]);
+
+/** Issued USD virtual debit cards (spend from USD wallet). */
+export const usdVirtualCards = pgTable(
+  "usd_virtual_cards",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    walletId: uuid("wallet_id")
+      .notNull()
+      .references(() => wallets.id, { onDelete: "cascade" }),
+    brand: varchar("brand", { length: 20 }).notNull().default("visa"),
+    label: varchar("label", { length: 80 }).notNull().default("ORYNO USD"),
+    last4: varchar("last4", { length: 4 }).notNull(),
+    expMonth: integer("exp_month").notNull(),
+    expYear: integer("exp_year").notNull(),
+    /** AES-GCM ciphertext of full PAN */
+    panCipher: text("pan_cipher").notNull(),
+    /** AES-GCM ciphertext of CVV */
+    cvvCipher: text("cvv_cipher").notNull(),
+    status: usdVirtualCardStatusEnum("status").notNull().default("active"),
+    provider: varchar("provider", { length: 40 }).notNull().default("oryno"),
+    externalRef: varchar("external_ref", { length: 120 }),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+    ...timestamps,
+  },
+  (t) => [
+    index("usd_virtual_cards_user_idx").on(t.userId),
+    index("usd_virtual_cards_status_idx").on(t.status),
+  ],
+);
+
 // ─── 9. Referrals ────────────────────────────────────────────────────────────
 
 export const referralCodes = pgTable(
@@ -1469,11 +1507,23 @@ export const usersRelations = relations(users, ({ one, many }) => ({
     references: [userDepositAccounts.userId],
   }),
   transactions: many(transactions),
+  usdVirtualCards: many(usdVirtualCards),
   notifications: many(notifications),
   pushTokens: many(userPushTokens),
   referralCode: one(referralCodes, {
     fields: [users.id],
     references: [referralCodes.userId],
+  }),
+}));
+
+export const usdVirtualCardsRelations = relations(usdVirtualCards, ({ one }) => ({
+  user: one(users, {
+    fields: [usdVirtualCards.userId],
+    references: [users.id],
+  }),
+  wallet: one(wallets, {
+    fields: [usdVirtualCards.walletId],
+    references: [wallets.id],
   }),
 }));
 

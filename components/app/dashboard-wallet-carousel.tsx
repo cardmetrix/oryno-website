@@ -275,9 +275,9 @@ export function DashboardWalletCarousel({ className }: Props) {
 
               <div className="grid grid-cols-2 gap-2 pt-0.5">
                 <motion.div whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }}>
-                  <Link href="/wallet?view=usd&panel=fund" className={fundBtn}>
+                  <Link href="/wallet" className={fundBtn}>
                     <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
-                    Fund Wallet
+                    Cards
                   </Link>
                 </motion.div>
                 <motion.div whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }}>

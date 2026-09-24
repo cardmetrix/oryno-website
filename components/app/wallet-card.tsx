@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowUpRight, Eye, EyeOff, Plus } from "lucide-react";
+import { ArrowLeftRight, Eye, EyeOff, Plus } from "lucide-react";
 import { WalletCardSkeleton } from "@/components/app/wallet-skeleton";
 import { WalletBalanceAmount } from "@/components/app/wallet-balance-amount";
 import { BRAND_LOGO_SRC } from "@/components/brand-logo";
@@ -143,7 +143,7 @@ export function WalletCard({
 
         <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }}>
           <Link
-            href="/withdraw"
+            href="/wallet"
             className="group relative flex h-[52px] w-full items-center justify-center gap-2.5 overflow-hidden rounded-[18px] bg-[#1a120c] px-3 text-sm font-bold text-white shadow-[0_14px_32px_rgba(0,0,0,0.28)] ring-1 ring-white/10"
           >
             <span
@@ -151,9 +151,9 @@ export function WalletCard({
               className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(255,106,0,0.28),transparent_55%)] opacity-80"
             />
             <span className="relative flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white ring-1 ring-white/15 transition-transform duration-300 group-hover:scale-110">
-              <ArrowUpRight className="h-4 w-4 text-white" strokeWidth={2.25} />
+              <ArrowLeftRight className="h-4 w-4 text-white" strokeWidth={2.25} />
             </span>
-            <span className="relative tracking-wide text-white">Withdraw</span>
+            <span className="relative tracking-wide text-white">Cards</span>
           </Link>
         </motion.div>
       </div>
