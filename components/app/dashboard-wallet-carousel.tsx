@@ -14,7 +14,7 @@ const SLIDE_GAP_PX = 6;
 
 type Props = { className?: string };
 
-/** Dashboard wallets: one full-width card at a time (same width as AdCarousel). */
+/** Dashboard wallets: swipe one-at-a-time on mobile; both side-by-side from md. */
 export function DashboardWalletCarousel({ className }: Props) {
   const { country } = useCountry();
   const { data, isLoading } = useWallet();
@@ -41,6 +41,7 @@ export function DashboardWalletCarousel({ className }: Props) {
   function onScroll() {
     const el = pagerRef.current;
     if (!el) return;
+    if (window.matchMedia("(min-width: 768px)").matches) return;
     const idx = Math.round(el.scrollLeft / Math.max(slideStride(el), 1));
     setView(idx >= 1 ? "usd" : "local");
   }
@@ -48,6 +49,10 @@ export function DashboardWalletCarousel({ className }: Props) {
   function scrollTo(target: "local" | "usd") {
     const el = pagerRef.current;
     if (!el) return;
+    if (window.matchMedia("(min-width: 768px)").matches) {
+      setView(target);
+      return;
+    }
     el.scrollTo({
       left: target === "usd" ? slideStride(el) : 0,
       behavior: "smooth",
@@ -56,7 +61,7 @@ export function DashboardWalletCarousel({ className }: Props) {
   }
 
   const footer = (
-    <div className="flex items-center justify-between">
+    <div className="flex items-center justify-between md:hidden">
       <div className="flex items-center gap-1">
         <button
           type="button"
@@ -102,8 +107,10 @@ export function DashboardWalletCarousel({ className }: Props) {
   const usdConvertBtn =
     "usd-card-btn-alt inline-flex h-8 w-full items-center justify-center gap-1 rounded-full text-[11px] font-bold transition";
 
-  const slideClass =
-    "box-border w-full min-w-full max-w-full shrink-0 basis-full snap-start snap-always";
+  const slideClass = cn(
+    "box-border w-full min-w-full max-w-full shrink-0 basis-full snap-start snap-always",
+    "md:min-w-0 md:max-w-none md:basis-auto md:snap-none",
+  );
   const cardRadius = "overflow-hidden rounded-[20px] md:rounded-[22px]";
 
   return (
@@ -114,6 +121,7 @@ export function DashboardWalletCarousel({ className }: Props) {
         className={cn(
           "flex w-full snap-x snap-mandatory gap-1.5 overflow-x-auto overscroll-x-contain",
           "[-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+          "md:grid md:grid-cols-2 md:items-stretch md:gap-1.5 md:overflow-visible md:snap-none",
         )}
         style={{ WebkitOverflowScrolling: "touch" }}
       >
@@ -167,7 +175,7 @@ export function DashboardWalletCarousel({ className }: Props) {
                     initial={{ opacity: 0, y: 3 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -2 }}
-                    className="truncate text-lg font-bold tracking-tight sm:text-xl"
+                    className="truncate text-lg font-extrabold tracking-tight sm:text-xl"
                   >
                     <WalletBalanceAmount
                       balance={localBalance}
@@ -257,7 +265,7 @@ export function DashboardWalletCarousel({ className }: Props) {
                     initial={{ opacity: 0, y: 3 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -2 }}
-                    className="truncate text-lg font-bold tracking-tight sm:text-xl"
+                    className="truncate text-lg font-extrabold tracking-tight sm:text-xl"
                   >
                     {hidden ? "••••••••" : usdFormatted}
                   </motion.p>
