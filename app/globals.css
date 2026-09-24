@@ -263,17 +263,16 @@ body {
   line-height: 1.5;
 }
 
-/* Theme-adaptive USD wallet / virtual card surface */
+/* USD wallet / virtual card surface — branded card art */
 .usd-card-surface {
   position: relative;
   overflow: hidden;
   color: var(--usd-card-fg);
-  background: linear-gradient(
-    145deg,
-    var(--usd-card-from) 0%,
-    var(--usd-card-via) 48%,
-    var(--usd-card-to) 100%
-  );
+  background-color: #0a0a0c;
+  background-image: url("/brand/usd-virtual-card-bg.png");
+  background-size: cover;
+  background-position: right center;
+  background-repeat: no-repeat;
   box-shadow: var(--usd-card-shadow);
 }
 
@@ -282,14 +281,14 @@ body {
   pointer-events: none;
   position: absolute;
   inset: 0;
-  background:
-    radial-gradient(circle at 88% 8%, var(--usd-card-glow), transparent 44%),
-    linear-gradient(
-      210deg,
-      color-mix(in srgb, var(--usd-card-fg) 10%, transparent) 0%,
-      transparent 42%,
-      color-mix(in srgb, #000 18%, transparent) 100%
-    );
+  /* Soft left scrim so overlay text stays readable over the art */
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.55) 0%,
+    rgba(0, 0, 0, 0.28) 42%,
+    rgba(0, 0, 0, 0.08) 72%,
+    transparent 100%
+  );
 }
 
 .usd-card-chip {
