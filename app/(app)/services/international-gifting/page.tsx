@@ -155,8 +155,7 @@ export default function InternationalGiftingPage() {
                       International Gifting
                     </p>
                     <p className="mt-1.5 text-sm leading-relaxed text-white/85">
-                      Send digital gifts and gift cards across borders. Join the
-                      waitlist and we will notify you the moment it launches.
+                    Send thoughtful gifts to your loved ones abroad — from beautiful flowers and delicious cakes 🍰 to personalized frames, elegant wristwatches ⌚️, accessories, and more. Add a heartfelt written note to make every gift truly personal.
                     </p>
                   </div>
                 </div>
