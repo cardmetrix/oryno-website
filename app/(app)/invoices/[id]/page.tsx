@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
-import { INVOICE_FOOTER } from "@/lib/invoices";
+import { INVOICE_FOOTER } from "@/lib/invoices/constants";
 
 type Packed = {
   invoice: {

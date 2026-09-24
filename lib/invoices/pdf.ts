@@ -4,8 +4,8 @@ import PDFDocument from "pdfkit";
 import {
   INVOICE_FOOTER,
   ORYNO_INVOICE_COMPANY,
-  summarizeInvoice,
-} from "@/lib/invoices";
+} from "@/lib/invoices/constants";
+import { summarizeInvoice } from "@/lib/invoices";
 import type { invoiceItems as invoiceItemsTable, invoices as invoicesTable } from "@/lib/db/schema";
 
 function invoiceFontPath() {
