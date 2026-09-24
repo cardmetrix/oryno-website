@@ -354,52 +354,11 @@ function CardsPageContent() {
                         className="mt-1.5 text-sm leading-relaxed"
                         style={{ color: "var(--usd-card-muted)" }}
                       >
-                      A secure virtual card designed for seamless online payments, including subscriptions and digital services such as Spotify, Netflix, Apple Music, and more.
+                        A secure virtual card designed for seamless online
+                        payments, including subscriptions and digital services
+                        such as Spotify, Netflix, Apple Music, and more.
                       </p>
                     </div>
-
-                    {waitlistJoined ? (
-                      <div className="rounded-2xl bg-white/10 px-4 py-3 ring-1 ring-white/15">
-                        <div className="flex items-center gap-2">
-                          <Check className="h-4 w-4 shrink-0" />
-                          <p className="text-sm font-semibold">
-                            You are on the waitlist
-                          </p>
-                        </div>
-                        <p
-                          className="mt-1 text-xs leading-relaxed"
-                          style={{ color: "var(--usd-card-muted)" }}
-                        >
-                          {data.waitlist?.joinedAt
-                            ? `Joined ${new Date(data.waitlist.joinedAt).toLocaleDateString("en-NG", { dateStyle: "medium" })}. `
-                            : ""}
-                          We will email and push you when {data.issuer} cards go
-                          live.
-                        </p>
-                        <button
-                          type="button"
-                          disabled={joining}
-                          onClick={() => void onLeaveWaitlist()}
-                          className="mt-3 text-[11px] font-semibold underline-offset-2 opacity-80 hover:underline disabled:opacity-50"
-                        >
-                          Leave waitlist
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        disabled={joining}
-                        onClick={() => void onJoinWaitlist()}
-                        className="usd-card-btn inline-flex h-12 items-center justify-center gap-2 rounded-full text-sm font-bold disabled:opacity-50"
-                      >
-                        {joining ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Bell className="h-4 w-4" />
-                        )}
-                        Join waitlist
-                      </button>
-                    )}
                   </div>
                 </div>
               </MotionSection>
@@ -422,6 +381,70 @@ function CardsPageContent() {
                     </div>
                   </div>
                 ))}
+              </MotionSection>
+
+              <MotionSection
+                delay={0.1}
+                className="mb-4 rounded-[22px] border border-border bg-background p-4 shadow-[var(--shadow-soft)]"
+              >
+                {waitlistJoined ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+                        <Check className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold">
+                          You are on the waitlist
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {data.waitlist?.joinedAt
+                            ? `Joined ${new Date(data.waitlist.joinedAt).toLocaleDateString("en-NG", { dateStyle: "medium" })}`
+                            : "You will be notified at launch"}
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-xs leading-relaxed text-muted-foreground">
+                      We will email and push you when {data.issuer} cards go
+                      live.
+                    </p>
+                    <button
+                      type="button"
+                      disabled={joining}
+                      onClick={() => void onLeaveWaitlist()}
+                      className="inline-flex h-11 w-full items-center justify-center rounded-full border border-border text-sm font-semibold text-muted-foreground transition hover:bg-muted disabled:opacity-50"
+                    >
+                      {joining ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        "Leave waitlist"
+                      )}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-sm font-semibold">Join the waitlist</p>
+                      <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                        Get notified the moment {data.issuer} USD virtual cards
+                        launch.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={joining}
+                      onClick={() => void onJoinWaitlist()}
+                      className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-primary text-sm font-bold text-primary-foreground disabled:opacity-50"
+                    >
+                      {joining ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Bell className="h-4 w-4" />
+                      )}
+                      Join waitlist
+                    </button>
+                  </div>
+                )}
               </MotionSection>
             </>
           ) : null}
