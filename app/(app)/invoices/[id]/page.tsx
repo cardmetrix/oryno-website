@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
+import { Skeleton } from "@/components/ui/skeleton";
 import { INVOICE_FOOTER } from "@/lib/invoices/constants";
 
 type Packed = {
@@ -153,7 +154,46 @@ export default function InvoiceDetailPage() {
     return (
       <AppShell>
         <PageHeader title="Invoice" useHistoryBack />
-        <p className="text-sm text-muted-foreground">Loading...</p>
+        <div className="space-y-4">
+          <div className="overflow-hidden rounded-[22px] border border-border bg-background p-4 shadow-[var(--shadow-soft)] sm:p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-2">
+                <Skeleton className="h-7 w-36 rounded-lg" />
+                <Skeleton className="h-4 w-28 rounded-full" />
+              </div>
+              <Skeleton className="h-7 w-16 rounded-full" />
+            </div>
+            <div className="mt-5 grid gap-3 sm:grid-cols-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="space-y-2">
+                  <Skeleton className="h-3 w-16 rounded-full" />
+                  <Skeleton className="h-4 w-24 rounded-full" />
+                </div>
+              ))}
+            </div>
+            <div className="mt-5 grid gap-4 sm:grid-cols-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="space-y-2">
+                  <Skeleton className="h-3 w-14 rounded-full" />
+                  <Skeleton className="h-4 w-32 rounded-full" />
+                  <Skeleton className="h-3 w-40 rounded-full" />
+                  <Skeleton className="h-3 w-28 rounded-full" />
+                </div>
+              ))}
+            </div>
+            <div className="mt-6 space-y-3">
+              <Skeleton className="h-4 w-full rounded-lg" />
+              <Skeleton className="h-4 w-full rounded-lg" />
+              <Skeleton className="h-4 w-5/6 rounded-lg" />
+            </div>
+            <div className="mt-6 ml-auto w-full max-w-xs space-y-2">
+              <Skeleton className="h-4 w-full rounded-full" />
+              <Skeleton className="h-4 w-full rounded-full" />
+              <Skeleton className="h-5 w-full rounded-full" />
+            </div>
+          </div>
+          <Skeleton className="h-11 w-full rounded-full" />
+        </div>
       </AppShell>
     );
   }

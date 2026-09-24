@@ -6,6 +6,7 @@ import { FileText, Plus } from "lucide-react";
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type InvoiceRow = {
   id: string;
@@ -55,7 +56,23 @@ export default function InvoicesPage() {
       />
       <MotionSection>
         {loading ? (
-          <p className="text-sm text-muted-foreground">Loading invoices...</p>
+          <div className="space-y-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div
+                key={i}
+                className="flex items-center justify-between rounded-2xl border border-border bg-card px-4 py-3"
+              >
+                <div className="min-w-0 flex-1 space-y-2">
+                  <Skeleton className="h-4 w-32 rounded-full" />
+                  <Skeleton className="h-3 w-40 rounded-full" />
+                </div>
+                <div className="space-y-2 text-right">
+                  <Skeleton className="ml-auto h-4 w-20 rounded-full" />
+                  <Skeleton className="ml-auto h-3 w-14 rounded-full" />
+                </div>
+              </div>
+            ))}
+          </div>
         ) : error ? (
           <p className="text-sm text-destructive">{error}</p>
         ) : rows.length === 0 ? (

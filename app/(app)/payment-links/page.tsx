@@ -6,6 +6,7 @@ import { Link2, Plus } from "lucide-react";
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
 import { PageHeader } from "@/components/app/page-header";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type LinkRow = {
   id: string;
@@ -58,7 +59,20 @@ export default function PaymentLinksPage() {
       />
       <MotionSection>
         {loading ? (
-          <p className="text-sm text-muted-foreground">Loading links...</p>
+          <div className="space-y-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div
+                key={i}
+                className="flex items-center justify-between rounded-2xl border border-border bg-background px-4 py-3 shadow-[var(--shadow-soft)]"
+              >
+                <div className="min-w-0 flex-1 space-y-2">
+                  <Skeleton className="h-4 w-36 rounded-full" />
+                  <Skeleton className="h-3 w-24 rounded-full" />
+                </div>
+                <Skeleton className="h-5 w-20 rounded-full" />
+              </div>
+            ))}
+          </div>
         ) : error ? (
           <p className="text-sm text-destructive">{error}</p>
         ) : rows.length === 0 ? (
