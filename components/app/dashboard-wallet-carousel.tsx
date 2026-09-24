@@ -123,9 +123,7 @@ export function DashboardWalletCarousel({ className }: Props) {
             "md:min-w-0 md:max-w-none md:basis-auto md:snap-none",
           )}
         >
-          <div className="relative isolate overflow-hidden rounded-[14px]">
-            <div className="absolute inset-0 bg-gradient-to-br from-[#ff8124] via-oryno-orange to-[#e85d00]" />
-            <div className="absolute inset-0 bg-[linear-gradient(210deg,rgba(255,255,255,0.16)_0%,transparent_42%,rgba(180,60,0,0.18)_100%)]" />
+          <div className="local-wallet-surface isolate overflow-hidden rounded-[14px]">
             <motion.div
               aria-hidden
               animate={{ x: ["-35%", "135%"] }}
@@ -135,10 +133,10 @@ export function DashboardWalletCarousel({ className }: Props) {
                 ease: "easeInOut",
                 repeatDelay: 2.2,
               }}
-              className="pointer-events-none absolute inset-y-0 w-1/3 skew-x-[-18deg] bg-gradient-to-r from-transparent via-white/18 to-transparent"
+              className="pointer-events-none absolute inset-y-0 z-[1] w-1/3 skew-x-[-18deg] bg-gradient-to-r from-transparent via-white/18 to-transparent"
             />
 
-            <div className="relative flex flex-col gap-1.5 p-2.5 text-white sm:p-3">
+            <div className="relative z-[2] flex flex-col gap-1.5 p-2.5 text-white sm:p-3">
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
                   <p className="text-[9px] font-bold tracking-[0.18em] text-white/90 uppercase">

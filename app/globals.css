@@ -318,6 +318,33 @@ body {
   );
 }
 
+/* Local wallet surface — dashboard (orange wallet art) */
+.local-wallet-surface {
+  position: relative;
+  overflow: hidden;
+  color: #ffffff;
+  background-color: #e85d00;
+  background-image: url("/brand/local-wallet-card-bg.png");
+  background-size: cover;
+  background-position: right center;
+  background-repeat: no-repeat;
+  box-shadow: var(--shadow-soft);
+}
+
+.local-wallet-surface::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(180, 60, 0, 0.45) 0%,
+    rgba(180, 60, 0, 0.18) 40%,
+    rgba(0, 0, 0, 0.05) 70%,
+    transparent 100%
+  );
+}
+
 .usd-card-chip {
   background: var(--usd-card-chip);
   color: color-mix(in srgb, var(--usd-card-fg) 95%, transparent);
