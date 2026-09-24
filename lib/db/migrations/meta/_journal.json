@@ -169,6 +169,13 @@
       "when": 1790251758910,
       "tag": "0023_cheerful_storm",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1790261912660,
+      "tag": "0024_spotty_cardiac",
+      "breakpoints": true
     }
   ]
 }

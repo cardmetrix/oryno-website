@@ -20,8 +20,12 @@ function createClient() {
     throw new Error("DATABASE_URL is not set");
   }
 
-  // Vercel/serverless: keep pool tiny so we don't exhaust Neon connections.
-  const max = process.env.NODE_ENV === "production" ? 1 : 5;
+  // Vercel/serverless: keep pool tiny so we don't exhaust Neon/Supabase poolers.
+  // Supabase session pooler (~15 clients) — stay at 1 locally too when using pooler host.
+  const usingPooler = /pooler\.supabase\.com/i.test(url);
+  const max =
+    Number(process.env.DB_POOL_MAX) ||
+    (process.env.NODE_ENV === "production" ? 1 : usingPooler ? 1 : 3);
   const disableSsl = /sslmode=disable/i.test(url);
 
   return postgres(url, {
