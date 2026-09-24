@@ -101,7 +101,11 @@ async function resolveAndSync(options?: {
             .returning();
           if (updated) {
             rememberUser(clerkUser.id, updated);
-            await ensurePrimaryWallet(updated.id, "NGN").catch(() => undefined);
+            const { currencyForCountry } = await import("@/lib/country");
+            await ensurePrimaryWallet(
+              updated.id,
+              currencyForCountry(updated.countryCode),
+            ).catch(() => undefined);
             return { user: updated, debug };
           }
         }

@@ -38,6 +38,7 @@ export const DEFAULT_COUNTRY_SERVICES = [
   "virtual_numbers",
   "social",
   "gift_cards",
+  "invoices",
 ];
 
 /** Common markets admins may add quickly */

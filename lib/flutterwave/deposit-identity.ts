@@ -80,11 +80,11 @@ export async function getUserDepositIdentity(
 }
 
 export function nigerianDepositIdentityRequired(
-  countryCode?: string | null,
+  _countryCode?: string | null,
 ) {
-  if (resolveCountryCode(countryCode) !== "NG") return false;
-  if (isFlutterwaveDemoMode()) return false;
-  return true;
+  // Phase 1: KYC / BVN-NIN is not required to fund.
+  void _countryCode;
+  return false;
 }
 
 export async function buildDepositIdentityRequired(

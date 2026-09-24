@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   Activity,
+  FileText,
   Phone,
   Smartphone,
   Trophy,
@@ -155,12 +156,12 @@ export const servicesDirectory: ServiceDirectoryItem[] = [
     id: "gift-cards-live",
     href: "/services/gift-cards/live",
     label: "Gift Card Live",
-    shortDescription: "Live buy & sell rates",
+    shortDescription: "Browse cards to buy with USD",
     longDescription:
-      "Browse live gift card rates, then tap a brand to open the sell or buy form.",
+      "Browse live gift card products, then tap a brand to buy with your USD balance.",
     category: "Lifestyle",
-    tags: ["Live", "Rates", "Trade"],
-    eta: "Live rates",
+    tags: ["Live", "Buy", "USD"],
+    eta: "Live catalog",
     accent: "#FF6A00",
     popular: true,
     icon: Activity,
@@ -170,16 +171,31 @@ export const servicesDirectory: ServiceDirectoryItem[] = [
     id: "gift-cards",
     href: "/services/gift-cards",
     label: "Gift Cards",
-    shortDescription: "Buy & sell gift cards",
+    shortDescription: "Buy gift cards with USD",
     longDescription:
-      "Sell cards for wallet credit via live rates, or buy digital codes with your wallet.",
+      "Purchase digital gift cards worldwide. Paid from your USD balance.",
     category: "Lifestyle",
     tags: ["Amazon", "Apple", "Steam"],
-    eta: "Form trade",
+    eta: "Instant codes",
     accent: "#FF6A00",
     soon: false,
     icon: GiftCardIcon,
     stats: "50+ brands",
+  },
+  {
+    id: "invoices",
+    href: "/invoices",
+    label: "Invoices",
+    shortDescription: "Free invoice generator",
+    longDescription:
+      "Create professional invoices and share Flutterwave payment links. Free forever.",
+    category: "Lifestyle",
+    tags: ["Free", "Payment link"],
+    eta: "Instant",
+    accent: "#FF6A00",
+    popular: true,
+    icon: FileText,
+    stats: "Powered by ORYNO",
   },
 ];
 
@@ -343,7 +359,8 @@ export function getServicesDirectory(countryCode?: string | null) {
     if (item.id === "gift-cards") {
       return {
         ...item,
-        longDescription: `Sell cards for ${country.currency} wallet credit via live rates, or buy digital codes with your wallet.`,
+        shortDescription: "Buy digital gift cards with USD",
+        longDescription: `Purchase digital gift cards worldwide. Paid from your USD balance.`,
       };
     }
     return item;

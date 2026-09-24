@@ -70,6 +70,26 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: true, purpose: "usd_fund", ...result });
       }
 
+      if (purpose === "invoice_payment") {
+        const slug =
+          typeof meta?.paymentLinkSlug === "string"
+            ? meta.paymentLinkSlug
+            : null;
+        if (slug) {
+          const { markPaymentLinkPaid } = await import("@/lib/invoices");
+          const result = await markPaymentLinkPaid({
+            slug,
+            reference,
+            raw: data as Record<string, unknown>,
+          });
+          return NextResponse.json({
+            ok: true,
+            purpose: "invoice_payment",
+            ...result,
+          });
+        }
+      }
+
       const userId = await findUserIdForDepositCharge(lookupPayload);
       if (!userId) {
         console.error("[flutterwave-webhook] unmatched customer", {

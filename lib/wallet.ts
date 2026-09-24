@@ -18,7 +18,6 @@ import {
 } from "@/lib/country";
 import {
   convertLocalToNgn,
-  convertNgnToLocal,
   type NgnLocalQuote,
 } from "@/lib/fx/rates";
 import { getDisplayFx } from "@/lib/display-currency";
@@ -70,16 +69,15 @@ export function formatCardDisplay(cardNumber: string, hidden = false) {
 
 export function toWalletSummary(
   wallet: WalletRow,
-  fx?: NgnLocalQuote | null,
+  _fx?: NgnLocalQuote | null,
 ): WalletSummary {
+  // Phase 1: balances are stored in true wallet currency (local + USD).
+  // Do not FX-convert NGN → local for display.
+  void _fx;
   const cardNumber =
     wallet.cardNumber || generateWalletCardNumber(wallet.userId, wallet.currency);
-  const convert =
-    fx && fx.to !== "NGN" && wallet.currency === "NGN";
-  const balanceValue = convert
-    ? convertNgnToLocal(Number(wallet.balance), fx.ngnToLocal)
-    : Number(wallet.balance);
-  const currency = convert ? fx.to : wallet.currency;
+  const balanceValue = Number(wallet.balance);
+  const currency = wallet.currency;
   return {
     id: wallet.id,
     currency,

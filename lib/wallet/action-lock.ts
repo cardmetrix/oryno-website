@@ -2,7 +2,6 @@ import { and, eq, gte, inArray } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { transactions } from "@/lib/db/schema";
-import { assertDailyTransactionLimit } from "@/lib/wallet/daily-limit";
 
 const LOCK_CLASS = 87421;
 const IN_FLIGHT_MS = 90_000;
@@ -94,25 +93,21 @@ export async function withSpendLock<T>(
   });
 }
 
-/** One wallet debit/payout at a time per user. Second request gets 409. */
+/** One wallet debit/payout at a time per user. Second request gets 409.
+ * Phase 1: KYC daily limits are not enforced.
+ */
 export async function withUserActionLock<T>(
   userId: string,
   fn: () => Promise<T>,
   options?: { amountNgn?: number; countryCode?: string | null },
 ): Promise<T> {
+  void options;
   const key = advisoryKey(userId);
   const locked = await tryLock(key);
   if (!locked) {
     throw new ActionInProgressError();
   }
   try {
-    if (options?.amountNgn != null) {
-      await assertDailyTransactionLimit({
-        userId,
-        amountNgn: options.amountNgn,
-        countryCode: options.countryCode,
-      });
-    }
     await assertNoRecentInFlight(userId);
     return await fn();
   } finally {

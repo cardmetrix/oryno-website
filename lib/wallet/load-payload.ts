@@ -1,12 +1,12 @@
-import { getCountryInfo } from "@/lib/country";
+import { currencyForCountry, getCountryInfo } from "@/lib/country";
 import { ensureWalletSchema } from "@/lib/db/ensure-schema";
 import { getDisplayFx } from "@/lib/display-currency";
 import { quoteLocalUsd } from "@/lib/fx/customer-quote";
+import { convertLocalToNgn } from "@/lib/fx/rates";
 import { formatMoney } from "@/lib/transactions";
 import type { SyncedUser } from "@/lib/auth/sync-user";
 import type { WalletPayload } from "@/lib/wallet-types";
 import {
-  ensurePrimaryWallet,
   listBankAccounts,
   listUserWallets,
   recentWalletTransactions,
@@ -14,6 +14,7 @@ import {
   toWalletSummary,
   type WalletRow,
 } from "@/lib/wallet";
+import { ensureLocalPrimaryWallet } from "@/lib/wallet/migrate-local-primary";
 import { ensureUsdWallet } from "@/lib/wallet-usd";
 import { getWithdrawMinimum } from "@/lib/wallet/withdraw-limits";
 import { getWithdrawFeeDisplay } from "@/lib/company/charges";
@@ -22,22 +23,25 @@ export async function loadWalletPayload(user: SyncedUser): Promise<WalletPayload
   await ensureWalletSchema();
 
   const displayFx = await getDisplayFx(user.countryCode);
-  const currency = displayFx.to;
+  const currency = currencyForCountry(user.countryCode);
 
   const [withdrawMinimum, withdrawFee, primaryResult, usdRow, bankRows] = await Promise.all([
     getWithdrawMinimum(user.countryCode, displayFx),
     getWithdrawFeeDisplay(user.countryCode).catch(() => ({
       ngn: 50,
       local: 50,
-      currency: "NGN",
-      formatted: "₦50.00",
+      currency,
+      formatted: formatMoney(50, currency),
       formattedNgn: "₦50.00",
     })),
-    ensurePrimaryWallet(user.id, "NGN").catch(async (walletError) => {
+    ensureLocalPrimaryWallet({
+      userId: user.id,
+      countryCode: user.countryCode,
+    }).catch(async (walletError) => {
       console.error("[wallet-get-primary]", walletError);
       const fallbackWallets = await listUserWallets(user.id).catch(() => []);
       const found =
-        fallbackWallets.find((w) => w.currency === "NGN") ??
+        fallbackWallets.find((w) => w.currency === currency) ??
         fallbackWallets.find((w) => w.isPrimary) ??
         fallbackWallets[0];
       if (!found) throw walletError;
@@ -70,15 +74,21 @@ export async function loadWalletPayload(user: SyncedUser): Promise<WalletPayload
     }),
   ]);
 
-  const walletsSummary = walletRows.map((w) => toWalletSummary(w, displayFx));
+  const walletsSummary = walletRows.map((w) => toWalletSummary(w));
   const primarySummary =
     walletsSummary.find((w) => w.id === primary.id) ??
-    toWalletSummary(primary, displayFx);
+    toWalletSummary(primary);
   const usdSummary =
     (usdRow && walletsSummary.find((w) => w.id === usdRow.id)) ||
     (usdRow ? toWalletSummary(usdRow) : null) ||
     walletsSummary.find((w) => w.currency === "USD") ||
     null;
+
+  const primaryBalance = Number(primary.balance);
+  const ledgerNgn =
+    primary.currency === "NGN"
+      ? primaryBalance
+      : convertLocalToNgn(primaryBalance, displayFx.localToNgn);
 
   return {
     primary: primarySummary,
@@ -96,7 +106,7 @@ export async function loadWalletPayload(user: SyncedUser): Promise<WalletPayload
     withdrawFee,
     fx,
     displayFx,
-    ledgerNgn: Number(primary.balance).toFixed(2),
+    ledgerNgn: ledgerNgn.toFixed(2),
     totals: {
       balance: primarySummary.balance,
       balanceFormatted: primarySummary.balanceFormatted,

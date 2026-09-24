@@ -2,10 +2,10 @@ import { randomUUID } from "crypto";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { billPayments, billProviders, transactions, wallets } from "@/lib/db/schema";
-import { getDisplayFx, nigeriaServiceLedgerCurrency } from "@/lib/display-currency";
-import { convertLocalToNgn } from "@/lib/fx/rates";
+import { localServiceLedgerCurrency } from "@/lib/display-currency";
 import { refundFailedDebit } from "@/lib/wallet/ledger";
 import { ensurePrimaryWallet, toWalletSummary } from "@/lib/wallet";
+import { priceLocalAmount } from "@/lib/pricing/service-pricing";
 import { findHubtelBillService } from "./catalog";
 import { isHubtelDemoMode, payHubtelBill, verifyHubtelCustomer } from "./client";
 import { hubtelErrorToEnglish } from "./errors";
@@ -52,7 +52,7 @@ async function ensureGhanaBillProvider(input: {
   return again;
 }
 
-async function debitNgn(input: {
+async function debitLocal(input: {
   userId: string;
   amount: number;
   title: string;
@@ -62,7 +62,7 @@ async function debitNgn(input: {
   if (!Number.isFinite(input.amount) || input.amount <= 0) {
     throw Object.assign(new Error("Enter a valid amount"), { status: 400 });
   }
-  const currency = nigeriaServiceLedgerCurrency();
+  const currency = localServiceLedgerCurrency("GH");
   const wallet = await ensurePrimaryWallet(input.userId, currency);
   if (wallet.status === "frozen" || wallet.status === "closed") {
     throw Object.assign(new Error("Wallet is not available for payments"), {
@@ -113,6 +113,9 @@ async function debitNgn(input: {
         metadata: {
           provider: "hubtel",
           requestId,
+          balanceAffected: currency,
+          originalCurrency: currency,
+          originalAmount: input.amount,
           ...(input.metadata ?? {}),
         },
       })
@@ -188,12 +191,10 @@ export async function purchaseHubtelBill(input: {
     );
   }
 
-  const fx = await getDisplayFx("GH");
-  const ledgerNgn = convertLocalToNgn(ghsAmount, fx.localToNgn);
   const priced = await priceLocalAmount({
     provider: "vtpass",
     serviceKey: `hubtel:${service.serviceID}:${input.variationCode}`,
-    amount: ledgerNgn,
+    amount: ghsAmount,
   });
 
   const provider = await ensureGhanaBillProvider({
@@ -206,7 +207,7 @@ export async function purchaseHubtelBill(input: {
     32,
   );
 
-  const prepared = await debitNgn({
+  const prepared = await debitLocal({
     userId: input.userId,
     amount: priced.local,
     title: input.serviceName || service.name,
@@ -216,7 +217,6 @@ export async function purchaseHubtelBill(input: {
       variationCode: input.variationCode,
       billCategory: service.category,
       faceGhs: ghsAmount,
-      ledgerNgn,
       customerName: verified.customerName,
       idempotencyKey,
     },
@@ -289,7 +289,7 @@ export async function purchaseHubtelBill(input: {
     return {
       payment,
       transactionId: prepared.transaction.id,
-      wallet: toWalletSummary(wallet, fx),
+      wallet: toWalletSummary(wallet),
       requestId: paid.reference,
       status,
       simulated: paid.demo,

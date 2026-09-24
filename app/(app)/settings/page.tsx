@@ -7,7 +7,7 @@ import { motion } from "framer-motion";
 import {
   Bell,
   ChevronRight,
-  Gauge,
+  FileText,
   HelpCircle,
   History,
   Languages,
@@ -197,20 +197,9 @@ export default function SettingsPage() {
             label="Security & PIN"
             hint={data.security.hasPin ? "PIN set" : "Set PIN"}
           />
-          <Row
-            href="/settings/levels"
-            icon={Gauge}
-            label="Account Levels"
-            hint={`${data.profile.dailyLimitLabel} daily`}
-          />
-          <Row
-            href="/settings/kyc"
-            icon={ShieldCheck}
-            label="KYC Verification"
-            hint={data.profile.kycLabel}
-          />
           <Row href="/wallet" icon={Wallet} label="Wallet & Banks" />
           <Row href="/history" icon={History} label="Transaction History" />
+          <Row href="/invoices" icon={FileText} label="Invoices" hint="Free" />
         </Section>
       </MotionSection>
 

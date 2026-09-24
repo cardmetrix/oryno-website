@@ -378,14 +378,9 @@ export async function creditWalletFromDeposit(input: {
   const paidLocal = input.amountKobo / 100;
   const paidCurrency = (input.currency || "NGN").toUpperCase();
   const paidCountry = countryFromCurrency(paidCurrency);
-  let ledgerNgn = paidLocal;
-  if (paidCurrency !== "NGN") {
-    const { getDisplayFx } = await import("@/lib/display-currency");
-    const fx = await getDisplayFx(paidCountry);
-    ledgerNgn = convertLocalToNgn(paidLocal, fx.localToNgn);
-  }
-  const amount = ledgerNgn.toFixed(2);
-  const currency = "NGN";
+  // Phase 1: credit the paid local currency 1:1 into the matching wallet.
+  const amount = paidLocal.toFixed(2);
+  const currency = paidCurrency;
 
   const already = await db.query.walletFundings.findFirst({
     where: inArray(walletFundings.externalRef, lookupRefs),
@@ -394,12 +389,19 @@ export async function creditWalletFromDeposit(input: {
     return { duplicated: true as const, fundingId: already.id };
   }
 
-  const wallet = await ensurePrimaryWallet(input.userId, "NGN");
+  const wallet = await ensurePrimaryWallet(input.userId, currency);
   const provider =
     input.channel?.includes("paystack") ||
     String(input.raw?.provider || "").includes("paystack")
       ? "paystack"
       : "flutterwave";
+
+  const { getDisplayFx } = await import("@/lib/display-currency");
+  const fx = await getDisplayFx(paidCountry);
+  const ledgerNgnEquivalent =
+    currency === "NGN"
+      ? paidLocal
+      : convertLocalToNgn(paidLocal, fx.localToNgn);
 
   const result = await db.transaction(async (tx) => {
     const current = await tx.query.wallets.findFirst({
@@ -429,6 +431,13 @@ export async function creditWalletFromDeposit(input: {
           paidAt: input.paidAt,
           paidLocal,
           paidCurrency,
+          countryCode: paidCountry,
+          originalCurrency: paidCurrency,
+          originalAmount: paidLocal,
+          usdEquivalent: null,
+          exchangeRate: currency === "NGN" ? 1 : fx.localToNgn,
+          ledgerNgnEquivalent,
+          balanceAffected: currency,
           depositRefs: lookupRefs,
         },
       })
@@ -456,6 +465,7 @@ export async function creditWalletFromDeposit(input: {
           channel: input.channel ?? "virtual_account",
           paidLocal,
           paidCurrency,
+          ledgerNgnEquivalent,
           depositRefs: lookupRefs,
           raw: input.raw ?? null,
         },
@@ -473,8 +483,6 @@ export async function creditWalletFromDeposit(input: {
   scheduleReferralCheck(input.userId);
 
   const amountFormatted = formatCountryMoney(paidLocal, paidCountry);
-  const { getDisplayFx } = await import("@/lib/display-currency");
-  const fx = await getDisplayFx(paidCountry);
 
   try {
     void notifyWalletFunded({
@@ -495,7 +503,7 @@ export async function creditWalletFromDeposit(input: {
     duplicated: false as const,
     fundingId: result.funding.id,
     transactionId: result.transaction.id,
-    wallet: toWalletSummary(result.wallet, fx),
+    wallet: toWalletSummary(result.wallet),
     amountFormatted,
     reference: input.reference,
   };

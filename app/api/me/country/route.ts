@@ -38,7 +38,7 @@ export async function GET() {
         .where(eq(users.id, user.id));
     }
     const displayFx = await getDisplayFx(country.code);
-    const wallet = await ensurePrimaryWallet(user.id, "NGN");
+    const wallet = await ensurePrimaryWallet(user.id, country.currency);
 
     return NextResponse.json({
       country,
@@ -92,7 +92,7 @@ export async function PATCH(req: Request) {
       .returning();
 
     const displayFx = await getDisplayFx(country.code);
-    const wallet = await ensurePrimaryWallet(user.id, "NGN");
+    const wallet = await ensurePrimaryWallet(user.id, country.currency);
 
     try {
       const clerkUser = await currentUser();

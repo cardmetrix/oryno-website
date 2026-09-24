@@ -27,11 +27,15 @@ export default function AdminGiftCardsPage() {
   const { data, loading, error, reload } =
     useAdminQuery<GiftCardsResponse>("/api/admin/gift-cards");
 
+  const buyOrders = (data?.orders || []).filter(
+    (o) => o.type.toLowerCase() === "buy",
+  );
+
   return (
     <>
       <AdminPageHeader
         title="Gift Cards"
-        subtitle="Sogo sell + Reloadly buy · live orders and brand rates"
+        subtitle="Buy-only · Reloadly orders and brand rates"
       />
 
       {loading ? <AdminLoadingBlock variant="split" /> : null}
@@ -39,7 +43,7 @@ export default function AdminGiftCardsPage() {
 
       {data ? (
         <div className="grid gap-5 xl:grid-cols-2">
-          <AdminCard title="Exchange rates" delay={0.05}>
+          <AdminCard title="Buy rates" delay={0.05}>
             {data.rates.length === 0 ? (
               <AdminEmptyBlock message="No gift card brands/rates in the database yet." />
             ) : (
@@ -57,7 +61,6 @@ export default function AdminGiftCardsPage() {
                     ),
                   },
                   { key: "buy", header: "Buy", cell: (row) => row.buy },
-                  { key: "sell", header: "Sell", cell: (row) => row.sell },
                   {
                     key: "status",
                     header: "Status",
@@ -68,12 +71,12 @@ export default function AdminGiftCardsPage() {
             )}
           </AdminCard>
 
-          <AdminCard title="Orders" delay={0.1}>
-            {data.orders.length === 0 ? (
-              <AdminEmptyBlock message="No gift card orders yet." />
+          <AdminCard title="Buy orders" delay={0.1}>
+            {buyOrders.length === 0 ? (
+              <AdminEmptyBlock message="No gift card buy orders yet." />
             ) : (
               <AdminTable
-                rows={data.orders}
+                rows={buyOrders}
                 rowKey={(row) => row.id}
                 columns={[
                   {

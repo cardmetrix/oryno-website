@@ -59,7 +59,8 @@ const FALLBACK_BUY_COUNTRIES = [
 export default function GiftCardsLivePage() {
   const router = useRouter();
   const { formatServiceMoney } = useCountry();
-  const [mode, setMode] = useState<Mode>("sell");
+  const [mode] = useState<Mode>("buy");
+  const setMode = (_: Mode) => {};
 
   const [sellBrands, setSellBrands] = useState<SellBrand[]>([]);
   const [rateMap, setRateMap] = useState<Record<string, number | null>>({});
@@ -217,7 +218,7 @@ export default function GiftCardsLivePage() {
 
       <MotionSection className="mb-4">
         <div className="grid grid-cols-2 gap-2 rounded-2xl border border-border bg-background p-1.5 shadow-[var(--shadow-soft)]">
-          {(["sell", "buy"] as const).map((tab) => (
+          {(["buy"] as const).map((tab) => (
             <button
               key={tab}
               type="button"

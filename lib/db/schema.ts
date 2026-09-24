@@ -1567,3 +1567,83 @@ export const supportTicketsRelations = relations(
     messages: many(supportMessages),
   }),
 );
+
+
+export const invoiceStatusEnum = pgEnum("invoice_status", [
+  "draft",
+  "sent",
+  "paid",
+  "cancelled",
+  "overdue",
+]);
+
+export const invoices = pgTable(
+  "invoices",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    number: varchar("number", { length: 40 }).notNull(),
+    customerName: varchar("customer_name", { length: 160 }).notNull(),
+    customerEmail: varchar("customer_email", { length: 255 }),
+    customerPhone: varchar("customer_phone", { length: 40 }),
+    currency: varchar("currency", { length: 3 }).notNull(),
+    subtotal: numeric("subtotal", { precision: 18, scale: 2 }).notNull(),
+    tax: numeric("tax", { precision: 18, scale: 2 }).notNull().default("0"),
+    total: numeric("total", { precision: 18, scale: 2 }).notNull(),
+    notes: text("notes"),
+    status: invoiceStatusEnum("status").notNull().default("draft"),
+    dueAt: timestamp("due_at", { withTimezone: true }),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex("invoices_user_number_uidx").on(t.userId, t.number),
+    index("invoices_user_created_idx").on(t.userId, t.createdAt),
+    index("invoices_status_idx").on(t.status),
+  ],
+);
+
+export const invoiceItems = pgTable(
+  "invoice_items",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    invoiceId: uuid("invoice_id")
+      .notNull()
+      .references(() => invoices.id, { onDelete: "cascade" }),
+    description: varchar("description", { length: 255 }).notNull(),
+    quantity: numeric("quantity", { precision: 12, scale: 2 }).notNull().default("1"),
+    unitPrice: numeric("unit_price", { precision: 18, scale: 2 }).notNull(),
+    amount: numeric("amount", { precision: 18, scale: 2 }).notNull(),
+    ...timestamps,
+  },
+  (t) => [index("invoice_items_invoice_idx").on(t.invoiceId)],
+);
+
+export const paymentLinks = pgTable(
+  "payment_links",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    invoiceId: uuid("invoice_id").references(() => invoices.id, {
+      onDelete: "set null",
+    }),
+    slug: varchar("slug", { length: 48 }).notNull(),
+    title: varchar("title", { length: 160 }).notNull(),
+    amount: numeric("amount", { precision: 18, scale: 2 }).notNull(),
+    currency: varchar("currency", { length: 3 }).notNull(),
+    status: varchar("status", { length: 24 }).notNull().default("active"),
+    flutterwaveRef: varchar("flutterwave_ref", { length: 120 }),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex("payment_links_slug_uidx").on(t.slug),
+    index("payment_links_user_idx").on(t.userId),
+  ],
+);

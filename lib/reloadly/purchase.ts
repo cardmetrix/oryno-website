@@ -5,12 +5,10 @@ import {
   giftCardBrands,
   giftCardOrders,
   transactions,
-  wallets,
 } from "@/lib/db/schema";
-import { nigeriaServiceLedgerCurrency, getDisplayFx } from "@/lib/display-currency";
-import { convertNgnToLocal, roundMoney } from "@/lib/fx/rates";
-import { quoteLocalUsd } from "@/lib/fx/customer-quote";
-import { ensurePrimaryWallet, toWalletSummary } from "@/lib/wallet";
+import { roundMoney } from "@/lib/fx/rates";
+import { formatMoney } from "@/lib/transactions";
+import { debitUsdWallet, ensureUsdWallet } from "@/lib/wallet-usd";
 import { refundFailedDebit } from "@/lib/wallet/ledger";
 import { categoryForSlug } from "@/lib/sogo/catalog";
 import {
@@ -60,73 +58,6 @@ async function ensureBrand(name: string, slugHint?: string) {
   return again;
 }
 
-async function debitWallet(input: {
-  userId: string;
-  countryCode?: string | null;
-  amount: number;
-  title: string;
-  subtitle: string;
-  metadata?: Record<string, unknown>;
-}) {
-  if (!Number.isFinite(input.amount) || input.amount <= 0) {
-    throw new Error("Enter a valid amount");
-  }
-
-  const currency = nigeriaServiceLedgerCurrency();
-  const wallet = await ensurePrimaryWallet(input.userId, currency);
-
-  if (wallet.status === "frozen" || wallet.status === "closed") {
-    throw new Error("Wallet is not available for payments");
-  }
-
-  const amountStr = input.amount.toFixed(2);
-
-  return db.transaction(async (tx) => {
-    const current = await tx.query.wallets.findFirst({
-      where: eq(wallets.id, wallet.id),
-    });
-    if (!current) throw new Error("Wallet not found");
-    if (Number(current.balance) < input.amount) {
-      throw new Error("Insufficient wallet balance");
-    }
-
-    const next = (Number(current.balance) - input.amount).toFixed(2);
-    const [updated] = await tx
-      .update(wallets)
-      .set({ balance: next, updatedAt: new Date() })
-      .where(eq(wallets.id, current.id))
-      .returning();
-
-    const [txRow] = await tx
-      .insert(transactions)
-      .values({
-        userId: input.userId,
-        walletId: current.id,
-        type: "debit",
-        category: "gift_card",
-        title: input.title,
-        subtitle: input.subtitle,
-        amount: amountStr,
-        currency,
-        status: "processing",
-        balanceAfter: next,
-        metadata: {
-          provider: "reloadly",
-          side: "buy",
-          ...(input.metadata ?? {}),
-        },
-      })
-      .returning();
-
-    return {
-      wallet: updated ?? { ...current, balance: next },
-      transaction: txRow,
-      amount: input.amount,
-      currency,
-    };
-  });
-}
-
 async function refundDebit(input: {
   walletId: string;
   transactionId: string;
@@ -157,12 +88,11 @@ export async function quoteGiftCardBuy(input: {
   unitPrice: number;
   countryCode?: string | null;
 }) {
+  void input.countryCode;
   const mappedUsd = lookupSenderUsd(
     input.product.senderPriceMap,
     input.unitPrice,
   );
-  // Prefer Reloadly's sender (USD) map. Do not treat recipient face value as USD
-  // when the map is missing — that breaks NGN/GBP/EUR cards.
   let usdFace: number;
   if (mappedUsd != null) {
     usdFace = mappedUsd;
@@ -171,7 +101,6 @@ export async function quoteGiftCardBuy(input: {
   ) {
     usdFace = input.unitPrice;
   } else {
-    // Conservative FX estimate for ledger quoting when Reloadly omits the map.
     const { getUsdMidRate } = await import("@/lib/fx/rates");
     try {
       const mid = await getUsdMidRate(
@@ -184,27 +113,33 @@ export async function quoteGiftCardBuy(input: {
     }
   }
 
-  // Ledger is always NGN; display converts to the account country.
-  const quote = await quoteLocalUsd(nigeriaServiceLedgerCurrency());
-  const { priceUsdToLocal } = await import("@/lib/pricing/service-pricing");
-  const priced = await priceUsdToLocal({
-    provider: "reloadly",
-    serviceKey: String(input.product.productId),
-    usd: usdFace,
-    buyRate: quote.buyRate,
-    source: "gift_card_buy",
+  const { getProviderMarkup } = await import("@/lib/pricing/service-pricing");
+  const { applySilentCharge, getCompanyCharges } = await import(
+    "@/lib/company/charges"
+  );
+  const markup = await getProviderMarkup("reloadly");
+  const charges = await getCompanyCharges();
+  const listed = roundMoney(usdFace * markup);
+  const withCharge = applySilentCharge({
+    base: listed,
+    charge: charges.services.gift_card_buy ?? {
+      mode: "flat",
+      value: 0,
+      enabled: false,
+    },
   });
-  const displayFx = await getDisplayFx(input.countryCode);
+  const usdCharge = Math.max(0.01, roundMoney(withCharge.total));
 
   return {
     usdFace,
-    local: convertNgnToLocal(priced.local, displayFx.ngnToLocal),
-    currency: displayFx.to,
-    ledgerNgn: priced.local,
-    rate: quote.buyRate,
-    midRate: quote.midRate,
-    markup: priced.markup,
-    companyCharge: priced.companyCharge,
+    usdCharge,
+    local: usdCharge,
+    currency: "USD" as const,
+    ledgerNgn: usdCharge,
+    rate: 1,
+    midRate: 1,
+    markup,
+    companyCharge: withCharge.chargeAmount,
     demo: isReloadlyDemoMode(),
   };
 }
@@ -217,7 +152,6 @@ export async function buyGiftCard(input: {
   productId: number;
   unitPrice: number;
   quantity?: number;
-  /** Product catalog country (Reloadly ISO), not the user's wallet country. */
   productCountryCode?: string | null;
 }) {
   if (isReloadlyDemoMode()) {
@@ -238,8 +172,7 @@ export async function buyGiftCard(input: {
   if (!product) {
     const hint = (input.productCountryCode || "US").toUpperCase();
     const catalog = await fetchReloadlyProducts({ countryCode: hint });
-    product =
-      catalog.find((p) => p.productId === input.productId) ?? null;
+    product = catalog.find((p) => p.productId === input.productId) ?? null;
   }
   if (!product) throw new Error("Gift card product not found");
 
@@ -258,19 +191,13 @@ export async function buyGiftCard(input: {
       (d) => Math.abs(Number(d) - amount) < 0.001,
     );
     if (!matches) {
-      throw new Error("That amount isn’t available for this card");
+      throw new Error("That amount isn't available for this card");
     }
   } else {
-    if (
-      product.minAmount != null &&
-      input.unitPrice < product.minAmount
-    ) {
+    if (product.minAmount != null && input.unitPrice < product.minAmount) {
       throw new Error(`Minimum amount is ${product.minAmount}`);
     }
-    if (
-      product.maxAmount != null &&
-      input.unitPrice > product.maxAmount
-    ) {
+    if (product.maxAmount != null && input.unitPrice > product.maxAmount) {
       throw new Error(`Maximum amount is ${product.maxAmount}`);
     }
   }
@@ -282,8 +209,6 @@ export async function buyGiftCard(input: {
   });
 
   const quantity = Math.max(1, Math.floor(input.quantity || 1));
-  // Only use mapped sender USD for the preflight balance check.
-  // Falling back to face value wrongly treats NGN/GBP amounts as USD.
   const mappedSenderUsd = lookupSenderUsd(product.senderPriceMap, input.unitPrice);
   const minProviderBalance =
     mappedSenderUsd != null
@@ -294,19 +219,30 @@ export async function buyGiftCard(input: {
   const brand = await ensureBrand(product.brandName, product.brandName);
   const customIdentifier = `oryno-${randomUUID()}`;
   const reference = localReference();
+  const usdTotal = roundMoney(price.usdCharge * quantity);
 
-  const debit = await debitWallet({
+  await ensureUsdWallet(input.userId);
+  const debit = await debitUsdWallet({
     userId: input.userId,
-    countryCode: input.countryCode,
-    amount: price.ledgerNgn,
+    amount: usdTotal,
+    category: "gift_card",
     title: `Bought ${product.brandName} gift card`,
     subtitle: `${product.recipientCurrency} ${input.unitPrice} · ${product.name}`,
     metadata: {
+      provider: "reloadly",
+      side: "buy",
       productId: product.productId,
       unitPrice: input.unitPrice,
+      usdFace: price.usdFace,
+      usdCharge: price.usdCharge,
+      quantity,
       productCountryCode: orderCountryCode,
       customIdentifier,
       orderReference: reference,
+      countryCode: input.countryCode,
+      balanceAffected: "USD",
+      originalCurrency: "USD",
+      originalAmount: usdTotal,
     },
   });
 
@@ -317,9 +253,9 @@ export async function buyGiftCard(input: {
       userId: input.userId,
       brandId: brand.id,
       side: "buy",
-      amountUsd: input.unitPrice.toFixed(2),
-      localAmount: price.ledgerNgn.toFixed(2),
-      currency: debit.currency,
+      amountUsd: price.usdFace.toFixed(2),
+      localAmount: usdTotal.toFixed(2),
+      currency: "USD",
       cardImageUrl: product.image,
       cardCodeEncrypted: null,
       status: "processing",
@@ -374,66 +310,26 @@ export async function buyGiftCard(input: {
       .update(transactions)
       .set({
         status: "completed",
-        externalRef: String(providerOrder.transactionId),
-        updatedAt: new Date(),
+        relatedOrderId: order.id,
+        externalRef: String(providerOrder.transactionId || reference),
         metadata: {
-          provider: "reloadly",
-          side: "buy",
-          orderId: order.id,
-          orderReference: reference,
-          productId: product.productId,
-          unitPrice: input.unitPrice,
-          customIdentifier,
-          reloadlyTransactionId: providerOrder.transactionId,
-          reloadlyStatus: providerOrder.status,
-          recipientEmail: email,
-          cards: codePayload,
-          demo: simulated,
+          ...((debit.transaction.metadata as Record<string, unknown>) || {}),
+          providerOrderId: providerOrder.transactionId,
+          cardsDelivered: codePayload.length,
         },
+        updatedAt: new Date(),
       })
       .where(eq(transactions.id, debit.transaction.id));
-
-    const { scheduleReferralCheck } = await import("@/lib/referrals/service");
-    scheduleReferralCheck(input.userId);
-
-    try {
-      const { ngnValueOfUsd, recognizeNgnServiceProfit } = await import(
-        "@/lib/company/recognize"
-      );
-      const providerNgn = await ngnValueOfUsd(price.usdFace);
-      await recognizeNgnServiceProfit({
-        source: "gift_card_buy",
-        transactionId: debit.transaction.id,
-        userId: input.userId,
-        grossIn: debit.amount,
-        grossOut: providerNgn,
-        chargeAmount: price.companyCharge,
-        markupAmount: Math.max(0, debit.amount - providerNgn - price.companyCharge),
-        fxSpreadAmount: Math.max(
-          0,
-          roundMoney(price.usdFace * price.rate) -
-            roundMoney(price.usdFace * price.midRate),
-        ),
-        description: `Bought ${product.brandName} gift card`,
-        metadata: {
-          productId: product.productId,
-          usdFace: price.usdFace,
-          buyRate: price.rate,
-          midRate: price.midRate,
-        },
-      });
-    } catch (revenueError) {
-      console.error("[reloadly-revenue]", revenueError);
-    }
 
     return {
       order,
       transactionId: debit.transaction.id,
       reference,
       providerTransactionId: providerOrder.transactionId,
-      amount: debit.amount,
-      currency: debit.currency,
-      wallet: toWalletSummary(debit.wallet, await getDisplayFx(input.countryCode)),
+      amount: usdTotal,
+      currency: "USD" as const,
+      amountFormatted: formatMoney(usdTotal, "USD"),
+      wallet: debit.wallet,
       cards: codePayload,
       product,
       simulated,
@@ -445,7 +341,7 @@ export async function buyGiftCard(input: {
     await refundDebit({
       walletId: debit.wallet.id,
       transactionId: debit.transaction.id,
-      amount: debit.amount,
+      amount: usdTotal,
       reason,
     });
     await db

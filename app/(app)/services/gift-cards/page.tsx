@@ -239,9 +239,8 @@ function GiftCardsPageContent() {
   const modeParam = searchParams.get("mode");
   const countryParam = searchParams.get("country");
 
-  const [mode, setMode] = useState<Mode>(() =>
-    modeParam === "buy" ? "buy" : "sell",
-  );
+  const [mode] = useState<Mode>("buy");
+  const setMode = (_: Mode) => {};
   const [error, setError] = useState<string | null>(null);
 
   // ── Sell state ──────────────────────────────────────────────
@@ -748,7 +747,7 @@ function GiftCardsPageContent() {
 
       <MotionSection className="mb-4">
         <div className="grid grid-cols-2 gap-2 rounded-2xl border border-border bg-background p-1.5 shadow-[var(--shadow-soft)]">
-          {(["sell", "buy"] as const).map((tab) => (
+          {(["buy"] as const).map((tab) => (
             <button
               key={tab}
               type="button"

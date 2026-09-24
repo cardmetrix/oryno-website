@@ -22,7 +22,12 @@ export async function getDisplayFx(
   }
 }
 
-/** Nigeria-priced services always settle on the NGN wallet. */
+/** @deprecated Prefer localServiceLedgerCurrency(countryCode) — Phase 1 uses true local wallets. */
 export function nigeriaServiceLedgerCurrency() {
   return "NGN" as const;
+}
+
+/** Local services settle on the user's country currency wallet. */
+export function localServiceLedgerCurrency(countryCode?: string | null) {
+  return currencyForCountry(countryCode);
 }

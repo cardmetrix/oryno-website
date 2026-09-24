@@ -23,15 +23,17 @@ export async function POST() {
       );
     }
 
-    const wallet = await ensurePrimaryWallet(user.id, "NGN");
-    const { getDisplayFx } = await import("@/lib/display-currency");
-    const fx = await getDisplayFx(user.countryCode);
+    const { currencyForCountry } = await import("@/lib/country");
+    const wallet = await ensurePrimaryWallet(
+      user.id,
+      currencyForCountry(user.countryCode),
+    );
 
     return NextResponse.json({
       ok: true,
       credited: result.credited,
       checked: result.checked,
-      wallet: toWalletSummary(wallet, fx),
+      wallet: toWalletSummary(wallet),
       message:
         result.credited > 0
           ? `${result.credited} deposit${result.credited === 1 ? "" : "s"} credited to your wallet.`

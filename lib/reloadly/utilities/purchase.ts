@@ -2,10 +2,10 @@ import { randomUUID } from "crypto";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { billPayments, billProviders, transactions, wallets } from "@/lib/db/schema";
-import { getDisplayFx, nigeriaServiceLedgerCurrency } from "@/lib/display-currency";
-import { convertLocalToNgn } from "@/lib/fx/rates";
+import { localServiceLedgerCurrency } from "@/lib/display-currency";
 import { refundFailedDebit } from "@/lib/wallet/ledger";
 import { ensurePrimaryWallet, toWalletSummary } from "@/lib/wallet";
+import { priceLocalAmount } from "@/lib/pricing/service-pricing";
 import { findKenyaBillService } from "./catalog";
 import { isKenyaBillsDemoMode, payKenyaBill, verifyKenyaBillCustomer } from "./client";
 import { kenyaBillErrorToEnglish } from "./errors";
@@ -46,7 +46,7 @@ async function ensureKenyaBillProvider(input: {
   return again;
 }
 
-async function debitNgn(input: {
+async function debitLocal(input: {
   userId: string;
   amount: number;
   title: string;
@@ -56,7 +56,7 @@ async function debitNgn(input: {
   if (!Number.isFinite(input.amount) || input.amount <= 0) {
     throw Object.assign(new Error("Enter a valid amount"), { status: 400 });
   }
-  const currency = nigeriaServiceLedgerCurrency();
+  const currency = localServiceLedgerCurrency("KE");
   const wallet = await ensurePrimaryWallet(input.userId, currency);
   if (wallet.status === "frozen" || wallet.status === "closed") {
     throw Object.assign(new Error("Wallet is not available for payments"), {
@@ -176,12 +176,10 @@ export async function purchaseKenyaBill(input: {
     );
   }
 
-  const fx = await getDisplayFx("KE");
-  const ledgerNgn = convertLocalToNgn(kesAmount, fx.localToNgn);
   const priced = await priceLocalAmount({
     provider: "reloadly",
     serviceKey: `kenya-bill:${service.serviceID}:${input.variationCode}`,
-    amount: ledgerNgn,
+    amount: kesAmount,
   });
 
   const provider = await ensureKenyaBillProvider({
@@ -192,7 +190,7 @@ export async function purchaseKenyaBill(input: {
   const idempotencyKey =
     `KEB${Date.now()}${randomUUID().replace(/-/g, "").slice(0, 8)}`.slice(0, 32);
 
-  const prepared = await debitNgn({
+  const prepared = await debitLocal({
     userId: input.userId,
     amount: priced.local,
     title: input.serviceName || service.name,
@@ -202,7 +200,7 @@ export async function purchaseKenyaBill(input: {
       variationCode: input.variationCode,
       billCategory: service.category,
       faceKes: kesAmount,
-      ledgerNgn,
+      
       customerName: verified.customerName,
       idempotencyKey,
     },
@@ -275,7 +273,7 @@ export async function purchaseKenyaBill(input: {
     return {
       payment,
       transactionId: prepared.transaction.id,
-      wallet: toWalletSummary(wallet, fx),
+      wallet: toWalletSummary(wallet),
       requestId: paid.reference,
       status,
       simulated: paid.demo || isKenyaBillsDemoMode(),

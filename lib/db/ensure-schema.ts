@@ -429,3 +429,77 @@ export async function ensureWalletSchema() {
   }
   await ready;
 }
+
+
+let invoiceReady: Promise<void> | null = null;
+
+export async function ensureInvoiceSchema() {
+  if (!invoiceReady) {
+    invoiceReady = (async () => {
+      await db.execute(sql`
+        DO $$ BEGIN
+          CREATE TYPE "invoice_status" AS ENUM ('draft', 'sent', 'paid', 'cancelled', 'overdue');
+        EXCEPTION WHEN duplicate_object THEN null; END $$;
+      `);
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS "invoices" (
+          "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+          "user_id" uuid NOT NULL REFERENCES "users"("id") ON DELETE cascade,
+          "number" varchar(40) NOT NULL,
+          "customer_name" varchar(160) NOT NULL,
+          "customer_email" varchar(255),
+          "customer_phone" varchar(40),
+          "currency" varchar(3) NOT NULL,
+          "subtotal" numeric(18, 2) NOT NULL,
+          "tax" numeric(18, 2) DEFAULT '0' NOT NULL,
+          "total" numeric(18, 2) NOT NULL,
+          "notes" text,
+          "status" "invoice_status" DEFAULT 'draft' NOT NULL,
+          "due_at" timestamptz,
+          "paid_at" timestamptz,
+          "metadata" jsonb,
+          "created_at" timestamptz DEFAULT now() NOT NULL,
+          "updated_at" timestamptz DEFAULT now() NOT NULL
+        )
+      `);
+      await db.execute(sql`
+        CREATE UNIQUE INDEX IF NOT EXISTS "invoices_user_number_uidx"
+        ON "invoices" ("user_id", "number")
+      `);
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS "invoice_items" (
+          "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+          "invoice_id" uuid NOT NULL REFERENCES "invoices"("id") ON DELETE cascade,
+          "description" varchar(255) NOT NULL,
+          "quantity" numeric(12, 2) DEFAULT '1' NOT NULL,
+          "unit_price" numeric(18, 2) NOT NULL,
+          "amount" numeric(18, 2) NOT NULL,
+          "created_at" timestamptz DEFAULT now() NOT NULL,
+          "updated_at" timestamptz DEFAULT now() NOT NULL
+        )
+      `);
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS "payment_links" (
+          "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+          "user_id" uuid NOT NULL REFERENCES "users"("id") ON DELETE cascade,
+          "invoice_id" uuid REFERENCES "invoices"("id") ON DELETE set null,
+          "slug" varchar(48) NOT NULL UNIQUE,
+          "title" varchar(160) NOT NULL,
+          "amount" numeric(18, 2) NOT NULL,
+          "currency" varchar(3) NOT NULL,
+          "status" varchar(24) DEFAULT 'active' NOT NULL,
+          "flutterwave_ref" varchar(120),
+          "paid_at" timestamptz,
+          "metadata" jsonb,
+          "created_at" timestamptz DEFAULT now() NOT NULL,
+          "updated_at" timestamptz DEFAULT now() NOT NULL
+        )
+      `);
+    })().catch((error) => {
+      invoiceReady = null;
+      throw error;
+    });
+  }
+  await invoiceReady;
+}
+
