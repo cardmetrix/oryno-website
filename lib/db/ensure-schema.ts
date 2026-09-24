@@ -515,6 +515,18 @@ export async function ensureVirtualCardsSchema() {
         END $$;
       `);
       await db.execute(sql`
+        DO $$ BEGIN
+          CREATE TYPE "public"."usd_virtual_card_order_status" AS ENUM(
+            'pending_payment',
+            'paid_pending_review',
+            'approved',
+            'rejected',
+            'issued'
+          );
+        EXCEPTION WHEN duplicate_object THEN null;
+        END $$;
+      `);
+      await db.execute(sql`
         CREATE TABLE IF NOT EXISTS "usd_virtual_cards" (
           "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
           "user_id" uuid NOT NULL REFERENCES "users"("id") ON DELETE cascade,
@@ -541,6 +553,37 @@ export async function ensureVirtualCardsSchema() {
       await db.execute(sql`
         CREATE INDEX IF NOT EXISTS "usd_virtual_cards_status_idx"
         ON "usd_virtual_cards" USING btree ("status")
+      `);
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS "usd_virtual_card_orders" (
+          "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+          "user_id" uuid NOT NULL REFERENCES "users"("id") ON DELETE cascade,
+          "fee_usd" numeric(18, 2) NOT NULL,
+          "local_amount" numeric(18, 2) NOT NULL,
+          "local_currency" varchar(3) NOT NULL,
+          "status" "public"."usd_virtual_card_order_status" DEFAULT 'pending_payment' NOT NULL,
+          "payment_ref" varchar(120),
+          "card_id" uuid REFERENCES "usd_virtual_cards"("id") ON DELETE set null,
+          "reviewed_by" varchar(80),
+          "review_note" text,
+          "paid_at" timestamptz,
+          "reviewed_at" timestamptz,
+          "metadata" jsonb,
+          "created_at" timestamptz DEFAULT now() NOT NULL,
+          "updated_at" timestamptz DEFAULT now() NOT NULL
+        )
+      `);
+      await db.execute(sql`
+        CREATE INDEX IF NOT EXISTS "usd_virtual_card_orders_user_idx"
+        ON "usd_virtual_card_orders" USING btree ("user_id")
+      `);
+      await db.execute(sql`
+        CREATE INDEX IF NOT EXISTS "usd_virtual_card_orders_status_idx"
+        ON "usd_virtual_card_orders" USING btree ("status")
+      `);
+      await db.execute(sql`
+        CREATE UNIQUE INDEX IF NOT EXISTS "usd_virtual_card_orders_payment_ref_uidx"
+        ON "usd_virtual_card_orders" USING btree ("payment_ref")
       `);
     })().catch((error) => {
       virtualCardsReady = null;

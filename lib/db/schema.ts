@@ -983,6 +983,17 @@ export const usdVirtualCardStatusEnum = pgEnum("usd_virtual_card_status", [
   "terminated",
 ]);
 
+export const usdVirtualCardOrderStatusEnum = pgEnum(
+  "usd_virtual_card_order_status",
+  [
+    "pending_payment",
+    "paid_pending_review",
+    "approved",
+    "rejected",
+    "issued",
+  ],
+);
+
 /** Issued USD virtual debit cards (spend from USD wallet). */
 export const usdVirtualCards = pgTable(
   "usd_virtual_cards",
@@ -1012,6 +1023,38 @@ export const usdVirtualCards = pgTable(
   (t) => [
     index("usd_virtual_cards_user_idx").on(t.userId),
     index("usd_virtual_cards_status_idx").on(t.status),
+  ],
+);
+
+/** Flutterwave-paid requests to purchase a USD virtual card (admin reviews before issue). */
+export const usdVirtualCardOrders = pgTable(
+  "usd_virtual_card_orders",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    feeUsd: numeric("fee_usd", { precision: 18, scale: 2 }).notNull(),
+    localAmount: numeric("local_amount", { precision: 18, scale: 2 }).notNull(),
+    localCurrency: varchar("local_currency", { length: 3 }).notNull(),
+    status: usdVirtualCardOrderStatusEnum("status")
+      .notNull()
+      .default("pending_payment"),
+    paymentRef: varchar("payment_ref", { length: 120 }),
+    cardId: uuid("card_id").references(() => usdVirtualCards.id, {
+      onDelete: "set null",
+    }),
+    reviewedBy: varchar("reviewed_by", { length: 80 }),
+    reviewNote: text("review_note"),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+    ...timestamps,
+  },
+  (t) => [
+    index("usd_virtual_card_orders_user_idx").on(t.userId),
+    index("usd_virtual_card_orders_status_idx").on(t.status),
+    uniqueIndex("usd_virtual_card_orders_payment_ref_uidx").on(t.paymentRef),
   ],
 );
 
@@ -1508,6 +1551,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   }),
   transactions: many(transactions),
   usdVirtualCards: many(usdVirtualCards),
+  usdVirtualCardOrders: many(usdVirtualCardOrders),
   notifications: many(notifications),
   pushTokens: many(userPushTokens),
   referralCode: one(referralCodes, {
@@ -1526,6 +1570,20 @@ export const usdVirtualCardsRelations = relations(usdVirtualCards, ({ one }) => 
     references: [wallets.id],
   }),
 }));
+
+export const usdVirtualCardOrdersRelations = relations(
+  usdVirtualCardOrders,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [usdVirtualCardOrders.userId],
+      references: [users.id],
+    }),
+    card: one(usdVirtualCards, {
+      fields: [usdVirtualCardOrders.cardId],
+      references: [usdVirtualCards.id],
+    }),
+  }),
+);
 
 export const userPushTokensRelations = relations(userPushTokens, ({ one }) => ({
   user: one(users, {

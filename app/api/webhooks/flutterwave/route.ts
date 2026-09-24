@@ -70,6 +70,25 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: true, purpose: "usd_fund", ...result });
       }
 
+      if (purpose === "virtual_card_purchase") {
+        const { markVirtualCardOrderPaid } = await import("@/lib/virtual-cards");
+        const { ensureVirtualCardsSchema } = await import(
+          "@/lib/db/ensure-schema"
+        );
+        await ensureVirtualCardsSchema();
+        const userId =
+          typeof meta?.oryno_user_id === "string" ? meta.oryno_user_id : null;
+        const result = await markVirtualCardOrderPaid({
+          reference: lookupPayload.tx_ref || reference,
+          userId,
+        });
+        return NextResponse.json({
+          ok: true,
+          purpose: "virtual_card_purchase",
+          ...result,
+        });
+      }
+
       if (purpose === "invoice_payment") {
         const slug =
           typeof meta?.paymentLinkSlug === "string"

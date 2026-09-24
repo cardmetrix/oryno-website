@@ -36,6 +36,7 @@ export const adminNav: AdminNavItem[] = [
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/support", label: "Support", icon: Headphones },
   { href: "/admin/waitlist", label: "USD Card Waitlist", icon: CreditCard },
+  { href: "/admin/virtual-cards", label: "Virtual Cards", icon: CreditCard },
   { href: "/admin/transaction-pins", label: "Transaction PINs", icon: KeyRound },
   { href: "/admin/wallets", label: "Wallets", icon: Wallet },
   { href: "/admin/gift-cards", label: "Gift Cards", icon: Gift },
