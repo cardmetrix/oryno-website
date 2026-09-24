@@ -79,7 +79,7 @@ const services = [
   },
   {
     icon: GiftCardIcon,
-    title: "Gift Cards",
+    title: "Buy Gift Cards",
     description: "Buy and sell gift cards with live rates into your wallet.",
   },
   {

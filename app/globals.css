@@ -101,6 +101,25 @@
     #ff7a1a 45%,
     var(--oryno-orange-soft) 100%
   );
+
+  /* USD wallet / virtual card surface (theme-adaptive) */
+  --usd-card-from: #3a3a40;
+  --usd-card-via: #242428;
+  --usd-card-to: #16161a;
+  --usd-card-fg: #ffffff;
+  --usd-card-muted: rgba(255, 255, 255, 0.68);
+  --usd-card-soft: rgba(255, 255, 255, 0.5);
+  --usd-card-chip: rgba(255, 255, 255, 0.14);
+  --usd-card-chip-ring: rgba(255, 255, 255, 0.22);
+  --usd-card-btn: rgba(255, 255, 255, 0.18);
+  --usd-card-btn-hover: rgba(255, 255, 255, 0.26);
+  --usd-card-btn-alt: rgba(0, 0, 0, 0.28);
+  --usd-card-btn-alt-hover: rgba(0, 0, 0, 0.36);
+  --usd-card-ring: rgba(255, 255, 255, 0.12);
+  --usd-card-glow: color-mix(in srgb, var(--oryno-orange) 28%, transparent);
+  --usd-card-sheen: rgba(255, 255, 255, 0.14);
+  --usd-card-shadow: 0 18px 42px rgba(28, 28, 30, 0.22);
+
   color-scheme: light;
 }
 
@@ -153,6 +172,24 @@
     color-mix(in srgb, var(--background) 94%, transparent) 0%,
     color-mix(in srgb, var(--muted) 90%, transparent) 100%
   );
+
+  --usd-card-from: #2e2e34;
+  --usd-card-via: #1c1c1e;
+  --usd-card-to: #0c0c0e;
+  --usd-card-fg: #fafafa;
+  --usd-card-muted: rgba(255, 255, 255, 0.7);
+  --usd-card-soft: rgba(255, 255, 255, 0.52);
+  --usd-card-chip: rgba(255, 255, 255, 0.1);
+  --usd-card-chip-ring: rgba(255, 255, 255, 0.16);
+  --usd-card-btn: rgba(255, 255, 255, 0.14);
+  --usd-card-btn-hover: rgba(255, 255, 255, 0.22);
+  --usd-card-btn-alt: rgba(255, 255, 255, 0.08);
+  --usd-card-btn-alt-hover: rgba(255, 255, 255, 0.14);
+  --usd-card-ring: rgba(255, 255, 255, 0.1);
+  --usd-card-glow: color-mix(in srgb, var(--oryno-orange) 22%, transparent);
+  --usd-card-sheen: rgba(255, 255, 255, 0.1);
+  --usd-card-shadow: 0 20px 48px rgba(0, 0, 0, 0.45);
+
   color-scheme: dark;
 }
 
@@ -224,6 +261,63 @@ body {
   font-family: var(--font-geist-sans), ui-sans-serif, sans-serif;
   font-feature-settings: "ss01" on, "cv11" on;
   line-height: 1.5;
+}
+
+/* Theme-adaptive USD wallet / virtual card surface */
+.usd-card-surface {
+  position: relative;
+  overflow: hidden;
+  color: var(--usd-card-fg);
+  background: linear-gradient(
+    145deg,
+    var(--usd-card-from) 0%,
+    var(--usd-card-via) 48%,
+    var(--usd-card-to) 100%
+  );
+  box-shadow: var(--usd-card-shadow);
+}
+
+.usd-card-surface::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 88% 8%, var(--usd-card-glow), transparent 44%),
+    linear-gradient(
+      210deg,
+      color-mix(in srgb, var(--usd-card-fg) 10%, transparent) 0%,
+      transparent 42%,
+      color-mix(in srgb, #000 18%, transparent) 100%
+    );
+}
+
+.usd-card-chip {
+  background: var(--usd-card-chip);
+  color: color-mix(in srgb, var(--usd-card-fg) 95%, transparent);
+  box-shadow: inset 0 0 0 1px var(--usd-card-chip-ring);
+}
+
+.usd-card-btn {
+  background: var(--usd-card-btn);
+  color: var(--usd-card-fg);
+  box-shadow: inset 0 0 0 1px var(--usd-card-chip-ring);
+  backdrop-filter: blur(8px);
+}
+
+.usd-card-btn:hover {
+  background: var(--usd-card-btn-hover);
+}
+
+.usd-card-btn-alt {
+  background: var(--usd-card-btn-alt);
+  color: var(--usd-card-fg);
+  box-shadow: inset 0 0 0 1px var(--usd-card-chip-ring);
+  backdrop-filter: blur(8px);
+}
+
+.usd-card-btn-alt:hover {
+  background: var(--usd-card-btn-alt-hover);
 }
 
 /* Instant theme swap: suppress staggered color transitions, keep the switch thumb. */

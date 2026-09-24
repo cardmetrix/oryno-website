@@ -95,10 +95,14 @@ export function DashboardWalletCarousel({ className }: Props) {
     </div>
   );
 
-  const fundBtn =
+  const localFundBtn =
     "inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-full bg-white/20 text-[13px] font-bold text-white ring-1 ring-white/30 backdrop-blur-sm transition hover:bg-white/28";
-  const convertBtn =
+  const localConvertBtn =
     "inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-full bg-black/20 text-[13px] font-bold text-white ring-1 ring-white/25 backdrop-blur-md transition hover:bg-black/30";
+  const usdFundBtn =
+    "usd-card-btn inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-full text-[13px] font-bold transition";
+  const usdConvertBtn =
+    "usd-card-btn-alt inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-full text-[13px] font-bold transition";
 
   return (
     <div className={cn(className)}>
@@ -187,13 +191,13 @@ export function DashboardWalletCarousel({ className }: Props) {
 
               <div className="grid grid-cols-2 gap-2">
                 <motion.div whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }}>
-                  <Link href="/fund" className={fundBtn}>
+                  <Link href="/fund" className={localFundBtn}>
                     <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
                     Fund Wallet
                   </Link>
                 </motion.div>
                 <motion.div whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }}>
-                  <Link href="/convert" className={convertBtn}>
+                  <Link href="/convert" className={localConvertBtn}>
                     <ArrowLeftRight className="h-3.5 w-3.5" strokeWidth={2.25} />
                     Convert to USD
                   </Link>
@@ -213,15 +217,25 @@ export function DashboardWalletCarousel({ className }: Props) {
             "md:min-w-0 md:max-w-none md:basis-auto md:snap-none",
           )}
         >
-          <div className="relative isolate overflow-hidden rounded-[18px] bg-[#1C1C1E] ring-1 ring-white/10">
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_85%_10%,rgba(255,106,0,0.18),transparent_45%)]" />
+          <div className="usd-card-surface isolate overflow-hidden rounded-[18px] ring-1 ring-[color:var(--usd-card-ring)]">
+            <motion.div
+              aria-hidden
+              animate={{ x: ["-35%", "135%"] }}
+              transition={{
+                duration: 5.2,
+                repeat: Infinity,
+                ease: "easeInOut",
+                repeatDelay: 2.4,
+              }}
+              className="pointer-events-none absolute inset-y-0 z-[1] w-1/3 skew-x-[-18deg] bg-gradient-to-r from-transparent via-[color:var(--usd-card-sheen)] to-transparent"
+            />
 
-            <div className="relative flex flex-col gap-2 p-3.5 text-white sm:gap-2.5 sm:p-4">
+            <div className="relative z-[2] flex flex-col gap-2 p-3.5 sm:gap-2.5 sm:p-4">
               <div className="flex items-start justify-between gap-2">
-                <p className="text-[10px] font-bold tracking-[0.2em] text-white/90 uppercase">
+                <p className="text-[10px] font-bold tracking-[0.2em] uppercase opacity-90">
                   ORYNO
                 </p>
-                <span className="rounded-full bg-white/10 px-2 py-0.5 text-[9px] font-bold tracking-wide text-white/90 ring-1 ring-white/15">
+                <span className="usd-card-chip rounded-full px-2 py-0.5 text-[9px] font-bold tracking-wide">
                   USD WALLET
                 </span>
               </div>
@@ -232,18 +246,29 @@ export function DashboardWalletCarousel({ className }: Props) {
 
               <div className="flex items-end justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="text-[9px] font-medium tracking-[0.14em] text-white/65 uppercase">
+                  <p
+                    className="text-[9px] font-medium tracking-[0.14em] uppercase"
+                    style={{ color: "var(--usd-card-soft)" }}
+                  >
                     Available balance
                   </p>
-                  <p className="mt-0.5 truncate text-xl font-bold tracking-tight sm:text-2xl">
-                    {hidden ? "••••••••" : usdFormatted}
-                  </p>
+                  <AnimatePresence mode="wait">
+                    <motion.p
+                      key={hidden ? "h" : usdFormatted}
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -3 }}
+                      className="mt-0.5 truncate text-xl font-bold tracking-tight sm:text-2xl"
+                    >
+                      {hidden ? "••••••••" : usdFormatted}
+                    </motion.p>
+                  </AnimatePresence>
                 </div>
                 <motion.button
                   type="button"
                   whileTap={{ scale: 0.92 }}
                   onClick={() => setHidden((v) => !v)}
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 ring-1 ring-white/20"
+                  className="usd-card-chip flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
                   aria-label={hidden ? "Show balance" : "Hide balance"}
                 >
                   {hidden ? (
@@ -254,15 +279,23 @@ export function DashboardWalletCarousel({ className }: Props) {
                 </motion.button>
               </div>
 
+              <p
+                className="text-[11px] leading-snug"
+                style={{ color: "var(--usd-card-muted)" }}
+              >
+                Use your USD balance for gift cards, international virtual
+                numbers and more.
+              </p>
+
               <div className="grid grid-cols-2 gap-2">
                 <motion.div whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }}>
-                  <Link href="/cards" className={fundBtn}>
+                  <Link href="/cards" className={usdFundBtn}>
                     <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
-                    Cards
+                    Fund Wallet
                   </Link>
                 </motion.div>
                 <motion.div whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }}>
-                  <Link href="/convert?direction=to_local" className={convertBtn}>
+                  <Link href="/convert?direction=to_local" className={usdConvertBtn}>
                     <ArrowLeftRight className="h-3.5 w-3.5" strokeWidth={2.25} />
                     Convert
                   </Link>

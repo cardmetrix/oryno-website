@@ -14,7 +14,7 @@ export const SUPPORT_TOPICS = [
   "Airtime / Data",
   "TV Bills",
   "Electricity",
-  "Gift Cards",
+  "Buy Gift Cards",
   "Virtual Numbers",
   "USD Virtual Card",
   "Account & Security",

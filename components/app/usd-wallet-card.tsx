@@ -42,7 +42,7 @@ type ActionsProps = {
 
 const USD_PRESETS = ["5", "10", "20", "50", "100"];
 
-/** Dark USD balance card with Fund / Convert toggles (matches mobile). */
+/** Theme-adaptive USD balance card with Fund / Convert toggles. */
 export function UsdWalletCard({
   usd,
   hidden,
@@ -56,11 +56,10 @@ export function UsdWalletCard({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       className={cn(
-        "relative flex h-full min-h-full flex-col overflow-hidden rounded-[28px] border border-white/10 bg-[#1C1C1E]",
+        "usd-card-surface flex h-full min-h-full flex-col rounded-[28px] ring-1 ring-[color:var(--usd-card-ring)]",
         className,
       )}
     >
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_85%_10%,rgba(255,106,0,0.22),transparent_45%),radial-gradient(circle_at_10%_90%,rgba(255,255,255,0.06),transparent_40%)]" />
       <motion.div
         aria-hidden="true"
         animate={{ x: ["-35%", "135%"] }}
@@ -70,14 +69,25 @@ export function UsdWalletCard({
           ease: "easeInOut",
           repeatDelay: 2.4,
         }}
-        className="pointer-events-none absolute inset-y-0 w-1/3 skew-x-[-18deg] bg-gradient-to-r from-transparent via-white/10 to-transparent"
+        className="pointer-events-none absolute inset-y-0 z-[1] w-1/3 skew-x-[-18deg] bg-gradient-to-r from-transparent via-[color:var(--usd-card-sheen)] to-transparent"
       />
 
-      <div className="relative flex flex-1 flex-col px-5 py-5 text-white sm:px-6 sm:py-6">
+      <div className="relative z-[2] flex flex-1 flex-col px-5 py-5 sm:px-6 sm:py-6">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="inline-flex items-center gap-1.5 text-[11px] font-bold tracking-[0.16em] text-white/65 uppercase">
-              USD Wallet
+            <div className="flex items-center gap-2">
+              <p className="text-[11px] font-bold tracking-[0.16em] uppercase opacity-90">
+                ORYNO
+              </p>
+            </div>
+            <p className="mt-2 text-sm font-semibold tracking-wide">
+              USD Wallet 🌐
+            </p>
+            <p
+              className="mt-2 text-[10px] font-medium tracking-[0.14em] uppercase"
+              style={{ color: "var(--usd-card-soft)" }}
+            >
+              Available balance
             </p>
             <AnimatePresence mode="wait">
               <motion.p
@@ -85,20 +95,25 @@ export function UsdWalletCard({
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }}
-                className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl"
+                className="mt-0.5 text-3xl font-bold tracking-tight sm:text-4xl"
               >
                 {hidden ? "••••••••" : (usd?.balanceFormatted ?? "$0.00")}
               </motion.p>
             </AnimatePresence>
           </div>
-          <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-bold text-white/90 ring-1 ring-white/15">
+          <span className="usd-card-chip inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold">
             <ShieldCheck className="h-3.5 w-3.5 text-oryno-orange" />
             Protected
           </span>
         </div>
 
-        <p className="mt-1.5 text-sm text-white/70">
-        USD Wallet
+        <p
+          className="mt-2 text-sm leading-snug"
+          style={{ color: "var(--usd-card-muted)" }}
+        >
+          {holderName
+            ? `Cardholder · ${holderName}`
+            : "Use your USD balance for gift cards, international virtual numbers and more."}
         </p>
 
         <div className="relative mt-5 grid grid-cols-2 gap-2.5 md:mt-auto md:pt-5">
@@ -108,21 +123,24 @@ export function UsdWalletCard({
             className={cn(
               "flex h-[50px] items-center justify-center gap-2 rounded-[16px] text-sm font-bold transition",
               panel === "fund"
-                ? "bg-oryno-orange text-black"
-                : "bg-white text-black",
+                ? "bg-oryno-orange text-black shadow-[var(--shadow-orange)]"
+                : "usd-card-btn",
             )}
           >
-            <Plus className="h-4 w-4 text-black" strokeWidth={2.5} />
+            <Plus
+              className={cn("h-4 w-4", panel === "fund" ? "text-black" : "")}
+              strokeWidth={2.5}
+            />
             Fund
           </button>
           <button
             type="button"
             onClick={() => onPanelChange("convert")}
             className={cn(
-              "flex h-[50px] items-center justify-center gap-2 rounded-[16px] text-sm font-bold ring-1 transition",
+              "flex h-[50px] items-center justify-center gap-2 rounded-[16px] text-sm font-bold transition",
               panel === "convert"
-                ? "bg-oryno-orange text-black ring-transparent"
-                : "bg-white/10 text-white ring-white/15",
+                ? "bg-oryno-orange text-black shadow-[var(--shadow-orange)]"
+                : "usd-card-btn-alt",
             )}
           >
             <ArrowLeftRight className="h-4 w-4" strokeWidth={2.25} />

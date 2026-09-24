@@ -3,8 +3,9 @@
 import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
+  ArrowLeftRight,
   Copy,
   CreditCard,
   Eye,
@@ -89,6 +90,7 @@ function CardsPageContent() {
   const [issuing, setIssuing] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hidden, setHidden] = useState(true);
+  const [balanceHidden, setBalanceHidden] = useState(false);
   const [revealed, setRevealed] = useState<Revealed | null>(null);
   const [pinOpen, setPinOpen] = useState(false);
   const [pinLoading, setPinLoading] = useState(false);
@@ -324,29 +326,8 @@ function CardsPageContent() {
         </div>
       ) : (
         <>
-          <MotionSection className="mb-4 rounded-[18px] border border-border bg-muted/40 px-4 py-3">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
-                  USD wallet · spendable
-                </p>
-                <p className="text-xl font-bold text-foreground">
-                  {data.usd.balanceFormatted}
-                </p>
-              </div>
-              <Link
-                href="/convert"
-                className="text-xs font-semibold text-primary"
-              >
-                Convert local → USD
-              </Link>
-            </div>
-          </MotionSection>
-
-          {/* Virtual card */}
-          <MotionSection delay={0.04} className="mb-4">
-            <div className="relative overflow-hidden rounded-[22px] bg-[#1C1C1E] p-5 text-white shadow-none ring-1 ring-white/10 sm:p-6">
-              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_90%_10%,rgba(255,106,0,0.28),transparent_42%),radial-gradient(circle_at_10%_90%,rgba(255,255,255,0.06),transparent_40%)]" />
+          <MotionSection className="mb-4">
+            <div className="usd-card-surface isolate overflow-hidden rounded-[22px] ring-1 ring-[color:var(--usd-card-ring)]">
               <motion.div
                 aria-hidden
                 animate={{ x: ["-40%", "140%"] }}
@@ -356,16 +337,116 @@ function CardsPageContent() {
                   ease: "easeInOut",
                   repeatDelay: 2,
                 }}
-                className="pointer-events-none absolute inset-y-0 w-1/3 skew-x-[-18deg] bg-gradient-to-r from-transparent via-white/12 to-transparent"
+                className="pointer-events-none absolute inset-y-0 z-[1] w-1/3 skew-x-[-18deg] bg-gradient-to-r from-transparent via-[color:var(--usd-card-sheen)] to-transparent"
               />
 
-              <div className="relative space-y-5">
+              <div className="relative z-[2] flex flex-col gap-3 p-4 sm:p-5">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-[10px] font-bold tracking-[0.2em] uppercase opacity-90">
+                    ORYNO
+                  </p>
+                  <span className="usd-card-chip rounded-full px-2.5 py-0.5 text-[9px] font-bold tracking-wide">
+                    USD WALLET
+                  </span>
+                </div>
+
+                <p className="text-sm font-semibold tracking-wide sm:text-[15px]">
+                  USD Wallet 🌐
+                </p>
+
+                <div className="flex items-end justify-between gap-3">
+                  <div className="min-w-0">
+                    <p
+                      className="text-[10px] font-medium tracking-[0.14em] uppercase"
+                      style={{ color: "var(--usd-card-soft)" }}
+                    >
+                      Available balance
+                    </p>
+                    <AnimatePresence mode="wait">
+                      <motion.p
+                        key={balanceHidden ? "h" : data.usd.balanceFormatted}
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -4 }}
+                        className="mt-0.5 truncate text-2xl font-bold tracking-tight sm:text-3xl"
+                      >
+                        {balanceHidden ? "••••••••" : data.usd.balanceFormatted}
+                      </motion.p>
+                    </AnimatePresence>
+                  </div>
+                  <motion.button
+                    type="button"
+                    whileTap={{ scale: 0.92 }}
+                    onClick={() => setBalanceHidden((v) => !v)}
+                    className="usd-card-chip flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+                    aria-label={balanceHidden ? "Show balance" : "Hide balance"}
+                  >
+                    {balanceHidden ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </motion.button>
+                </div>
+
+                <p
+                  className="text-[12px] leading-snug"
+                  style={{ color: "var(--usd-card-muted)" }}
+                >
+                  Use your USD balance for gift cards, international virtual
+                  numbers and more.
+                </p>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    className="usd-card-btn inline-flex h-10 items-center justify-center gap-1.5 rounded-full text-[13px] font-bold"
+                    onClick={() =>
+                      document
+                        .getElementById("fund-usd")
+                        ?.scrollIntoView({ behavior: "smooth", block: "start" })
+                    }
+                  >
+                    <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
+                    Fund Wallet
+                  </button>
+                  <Link
+                    href="/convert"
+                    className="usd-card-btn-alt inline-flex h-10 items-center justify-center gap-1.5 rounded-full text-[13px] font-bold"
+                  >
+                    <ArrowLeftRight className="h-3.5 w-3.5" strokeWidth={2.25} />
+                    Convert
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </MotionSection>
+
+          {/* Virtual card */}
+          <MotionSection delay={0.04} className="mb-4">
+            <div className="usd-card-surface isolate overflow-hidden rounded-[22px] ring-1 ring-[color:var(--usd-card-ring)]">
+              <motion.div
+                aria-hidden
+                animate={{ x: ["-40%", "140%"] }}
+                transition={{
+                  duration: 5.5,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                  repeatDelay: 2,
+                }}
+                className="pointer-events-none absolute inset-y-0 z-[1] w-1/3 skew-x-[-18deg] bg-gradient-to-r from-transparent via-[color:var(--usd-card-sheen)] to-transparent"
+              />
+
+              <div className="relative z-[2] space-y-5 p-5 sm:p-6">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-[11px] font-bold tracking-[0.2em] text-white/70 uppercase">
+                    <p
+                      className="text-[11px] font-bold tracking-[0.2em] uppercase"
+                      style={{ color: "var(--usd-card-soft)" }}
+                    >
                       ORYNO · {data.issuer.toUpperCase()}
                     </p>
-                    <p className="mt-1 text-sm font-semibold text-white/90">
+                    <p className="mt-1 text-sm font-semibold opacity-95">
                       {selected?.label ?? "USD Virtual Card"}
                     </p>
                   </div>
@@ -378,13 +459,13 @@ function CardsPageContent() {
                             ? "bg-emerald-500/20 text-emerald-200"
                             : selected.status === "frozen"
                               ? "bg-sky-500/20 text-sky-200"
-                              : "bg-white/10 text-white/70",
+                              : "usd-card-chip",
                         )}
                       >
                         {selected.status}
                       </span>
                     ) : null}
-                    <span className="rounded-md bg-white/10 px-2 py-1 text-[10px] font-bold tracking-wide text-white/90 ring-1 ring-white/15">
+                    <span className="usd-card-chip rounded-md px-2 py-1 text-[10px] font-bold tracking-wide">
                       VISA
                     </span>
                   </div>
@@ -410,7 +491,7 @@ function CardsPageContent() {
                       }
                     }}
                     disabled={!selected}
-                    className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 ring-1 ring-white/20 disabled:opacity-40"
+                    className="usd-card-chip flex h-9 w-9 items-center justify-center rounded-full disabled:opacity-40"
                     aria-label={hidden ? "Reveal card" : "Hide card"}
                   >
                     {hidden ? (
@@ -423,21 +504,30 @@ function CardsPageContent() {
 
                 <div className="flex items-end justify-between gap-4">
                   <div>
-                    <p className="text-[10px] tracking-wide text-white/50 uppercase">
+                    <p
+                      className="text-[10px] tracking-wide uppercase"
+                      style={{ color: "var(--usd-card-soft)" }}
+                    >
                       Cardholder
                     </p>
-                    <p className="text-sm font-semibold uppercase tracking-wide">
+                    <p className="text-sm font-semibold tracking-wide uppercase">
                       {holder}
                     </p>
                   </div>
                   <div>
-                    <p className="text-[10px] tracking-wide text-white/50 uppercase">
+                    <p
+                      className="text-[10px] tracking-wide uppercase"
+                      style={{ color: "var(--usd-card-soft)" }}
+                    >
                       Exp
                     </p>
                     <p className="font-mono text-sm font-semibold">{displayExp}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] tracking-wide text-white/50 uppercase">
+                    <p
+                      className="text-[10px] tracking-wide uppercase"
+                      style={{ color: "var(--usd-card-soft)" }}
+                    >
                       CVV
                     </p>
                     <p className="font-mono text-sm font-semibold">{displayCvv}</p>
@@ -543,6 +633,7 @@ function CardsPageContent() {
           </MotionSection>
 
           {/* Fund USD */}
+          <div id="fund-usd" className="scroll-mt-24">
           <MotionSection
             delay={0.12}
             className="rounded-[22px] border border-border bg-background p-4 shadow-[var(--shadow-soft)]"
@@ -593,6 +684,7 @@ function CardsPageContent() {
               Pay with card / mobile money
             </button>
           </MotionSection>
+          </div>
         </>
       )}
 
