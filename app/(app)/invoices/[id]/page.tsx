@@ -348,6 +348,19 @@ export default function InvoiceDetailPage() {
       <MotionSection delay={0.06} className="mt-4 space-y-3">
         <button
           type="button"
+          disabled={downloading}
+          onClick={() => void downloadPdf()}
+          className="btn-secondary inline-flex h-11 w-full items-center justify-center gap-2 text-sm disabled:opacity-50"
+        >
+          {downloading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Download className="h-4 w-4" />
+          )}
+          Download PDF
+        </button>
+        <button
+          type="button"
           disabled={linking}
           onClick={() => void createLink()}
           className="btn-primary inline-flex h-11 w-full items-center justify-center gap-2 text-sm disabled:opacity-50"

@@ -2,7 +2,7 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2 } from "lucide-react";
+import { Download, Loader2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
@@ -98,7 +98,7 @@ export default function NewInvoicePage() {
     };
   }, [items, taxRate, discount, shipping, amountPaid]);
 
-  async function onSubmit(e: FormEvent, asDraft: boolean) {
+  async function onSubmit(e: FormEvent, mode: "send" | "pdf") {
     e.preventDefault();
     setSaving(true);
     try {
@@ -106,7 +106,7 @@ export default function NewInvoicePage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          status: asDraft ? "draft" : "sent",
+          status: "sent",
           currency,
           fromName,
           fromEmail,
@@ -137,7 +137,25 @@ export default function NewInvoicePage() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Failed");
-      toast.success(asDraft ? "Draft saved" : "Invoice created");
+
+      if (mode === "pdf" && json.invoice?.id) {
+        const pdfRes = await fetch(`/api/invoices/${json.invoice.id}/pdf`);
+        if (!pdfRes.ok) {
+          const err = await pdfRes.json().catch(() => ({}));
+          throw new Error(err.error || "PDF failed");
+        }
+        const blob = await pdfRes.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `invoice-${json.invoice.number || json.invoice.id}.pdf`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success("Invoice created and PDF downloaded");
+      } else {
+        toast.success("Invoice created");
+      }
+
       router.push(`/invoices/${json.invoice.id}`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed");
@@ -156,7 +174,7 @@ export default function NewInvoicePage() {
 
       <MotionSection>
         <form
-          onSubmit={(e) => void onSubmit(e, false)}
+          onSubmit={(e) => void onSubmit(e, "send")}
           className="overflow-hidden rounded-[22px] border border-border bg-background shadow-[var(--shadow-soft)]"
         >
           <div className="flex items-center justify-between border-b border-border bg-muted/30 px-4 py-3 sm:px-5">
@@ -477,10 +495,15 @@ export default function NewInvoicePage() {
             <button
               type="button"
               disabled={saving}
-              onClick={(e) => void onSubmit(e as unknown as FormEvent, true)}
-              className="btn-secondary h-11 px-5 text-sm disabled:opacity-50"
+              onClick={(e) => void onSubmit(e as unknown as FormEvent, "pdf")}
+              className="btn-secondary inline-flex h-11 items-center gap-2 px-5 text-sm disabled:opacity-50"
             >
-              Save draft
+              {saving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              Download PDF
             </button>
           </div>
         </form>
