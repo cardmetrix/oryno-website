@@ -25,7 +25,7 @@ import { useSettlePendingTransactions } from "@/hooks/use-settle-pending-transac
 import type { AppTransaction } from "@/lib/transactions";
 
 const quickActions = [
-  { href: "/services/gift-cards", label: "Gift Cards", icon: GiftCardIcon },
+  { href: "/services/gift-cards", label: "Buy Gift Cards", icon: GiftCardIcon },
   { href: "/services/social", label: "Boosting", icon: TrendingUp },
   { href: "/services/virtual-numbers", label: "Numbers", icon: Phone },
   { href: "/services/airtime", label: "Airtime", icon: Smartphone },
