@@ -10,10 +10,9 @@ import type { NotificationType } from "@/lib/notification-types";
 const CTA_BY_TYPE: Partial<
   Record<NotificationType | string, { label: string; href: string }>
 > = {
-  fund: { label: "View wallet", href: "/wallet" },
-  withdraw: { label: "View wallet", href: "/wallet" },
-  transfer: { label: "View wallet", href: "/wallet" },
-  kyc: { label: "Open KYC", href: "/settings/kyc" },
+  fund: { label: "View cards", href: "/cards" },
+  withdraw: { label: "View cards", href: "/cards" },
+  transfer: { label: "View cards", href: "/cards" },
   security: { label: "Review security", href: "/settings/security" },
   service: { label: "Open services", href: "/services" },
   success: { label: "Open ORYNO", href: "/dashboard" },

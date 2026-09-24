@@ -101,13 +101,13 @@ export async function buildDepositIdentityRequired(
     kycStatus === "pending" || latest?.status === "pending";
 
   let message =
-    "Enter your BVN or NIN to generate your dedicated bank account number. You can also add BVN in Settings → KYC.";
+    "Enter your BVN or NIN to generate your dedicated bank account number.";
   if (hasPendingKyc) {
     message =
-      "We need your BVN or NIN on file to create your fund account. Add it below or complete verification in Settings → KYC.";
+      "We need your BVN or NIN on file to create your fund account. Add it below.";
   } else if (kycLevel === 0) {
     message =
-      "Verify with BVN or NIN in Settings → KYC, or enter it below to get your dedicated fund account.";
+      "Enter your BVN or NIN below to get your dedicated fund account.";
   }
 
   return {

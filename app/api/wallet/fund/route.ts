@@ -59,7 +59,7 @@ export async function POST(req: Request) {
         reference: result.funding.externalRef ?? result.transaction.id,
         transactionId: result.transaction.id,
         fundingId: result.funding.id,
-        href: "/wallet",
+        href: "/cards",
       });
     } catch (notifyError) {
       console.error("[wallet-fund-notify]", notifyError);

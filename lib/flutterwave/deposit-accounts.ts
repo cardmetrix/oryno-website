@@ -492,7 +492,7 @@ export async function creditWalletFromDeposit(input: {
       reference,
       transactionId: result.transaction.id,
       fundingId: result.funding.id,
-      href: "/wallet",
+      href: "/cards",
     }).catch((notifyError) => {
       console.error("[flutterwave-deposit-notify]", notifyError);
     });
@@ -645,7 +645,7 @@ export async function reverseDeposit(input: {
           : "A deposit was reversed and deducted from your wallet.",
         type: "fund",
         metadata: {
-          href: "/wallet",
+          href: "/cards",
           fundingId: funding.id,
           transactionId: funding.transactionId,
         },

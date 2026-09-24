@@ -50,7 +50,7 @@ export async function joinUsdCardWaitlist(input: {
       title: "You’re on the USD card waitlist",
       body: `Hi ${input.fullName.split(" ")[0] || "there"}, we’ll notify you the moment ${USD_CARD_ISSUER} USD virtual cards launch in your country.`,
       type: "promo",
-      metadata: { href: "/wallet", kind: "usd_card_waitlist" },
+      metadata: { href: "/cards", kind: "usd_card_waitlist" },
       email: false,
       push: true,
     });

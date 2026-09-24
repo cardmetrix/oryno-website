@@ -122,6 +122,26 @@ const nextConfig = {
   async redirects() {
     return [
       {
+        source: "/settings/kyc",
+        destination: "/settings",
+        permanent: true,
+      },
+      {
+        source: "/settings/kyc/:path*",
+        destination: "/settings",
+        permanent: true,
+      },
+      {
+        source: "/wallet",
+        destination: "/cards",
+        permanent: true,
+      },
+      {
+        source: "/wallet/:path*",
+        destination: "/cards/:path*",
+        permanent: true,
+      },
+      {
         source: "/services/emails",
         destination: "/services",
         permanent: true,

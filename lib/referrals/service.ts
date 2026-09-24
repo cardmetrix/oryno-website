@@ -345,7 +345,7 @@ export async function maybeCompleteReferral(referredUserId: string) {
         body: `You received ${formatAmt(referredBonus.amountStr, referredBonus.currency)} for completing ${REFERRAL_MIN_TRANSACTIONS} transactions after joining with a referral.`,
         type: "referral",
         metadata: {
-          href: "/wallet",
+          href: "/cards",
           kind: "referral_bonus",
           role: "referred",
           amount: referredBonus.amountStr,

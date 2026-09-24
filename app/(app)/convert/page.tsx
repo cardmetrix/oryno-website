@@ -139,7 +139,7 @@ function ConvertPageContent() {
       if (json.creditTransactionId) {
         router.replace(`/history/${json.creditTransactionId}`);
       } else {
-        router.replace("/wallet");
+        router.replace("/cards");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Conversion failed");

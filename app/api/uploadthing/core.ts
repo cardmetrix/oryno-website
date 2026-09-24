@@ -34,22 +34,6 @@ export const ourFileRouter = {
       return { url, clerkId: metadata.clerkId };
     }),
 
-  kycDocument: f({
-    image: {
-      maxFileSize: "8MB",
-      maxFileCount: 1,
-    },
-  })
-    .middleware(async () => {
-      const { userId } = await auth();
-      if (!userId) throw new UploadThingError("Unauthorized");
-      return { clerkId: userId };
-    })
-    .onUploadComplete(async ({ metadata, file }) => {
-      const url = file.ufsUrl || file.url;
-      return { url, clerkId: metadata.clerkId };
-    }),
-
   adImage: f({
     image: {
       maxFileSize: "8MB",

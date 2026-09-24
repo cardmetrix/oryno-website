@@ -114,10 +114,10 @@ export default function ProfilePage() {
       avatarUrl,
       countryCode: null,
       countryName: "Loading…",
+      role: "user",
       kycStatus: "unverified",
       kycLevel: 0,
       kycLabel: "Checking…",
-      accountLevelName: "Unverified",
       status: "active",
       dailyLimitLabel: "—",
       emailVerified: Boolean(
@@ -646,24 +646,6 @@ export default function ProfilePage() {
           )}
         </AnimatePresence>
 
-        <div className="border-t border-border bg-gradient-to-r from-oryno-orange-muted/80 to-transparent px-4 py-3.5 sm:px-5">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-xs font-semibold text-primary">
-                Account Limit Status
-              </p>
-              <p className="mt-0.5 text-sm font-semibold text-foreground">
-                {enriching ? "Updating limits…" : `${display.dailyLimitLabel} daily`}
-              </p>
-            </div>
-            <Link
-              href="/settings/levels"
-              className="shrink-0 text-xs font-semibold text-primary"
-            >
-              View Levels
-            </Link>
-          </div>
-        </div>
       </MotionSection>
 
       <MotionSection delay={0.1} className="mt-5 space-y-3">

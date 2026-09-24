@@ -7,7 +7,6 @@ import { motion } from "framer-motion";
 import {
   Bell,
   ChevronRight,
-  FileText,
   HelpCircle,
   Languages,
   LockKeyhole,
@@ -178,7 +177,6 @@ export default function SettingsPage() {
             label="Security & PIN"
             hint={data.security.hasPin ? "PIN set" : "Set PIN"}
           />
-          <Row href="/invoices" icon={FileText} label="Invoices" hint="Free" />
         </Section>
       </MotionSection>
 

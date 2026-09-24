@@ -1,6 +1,5 @@
 import {
   Banknote,
-  BadgeCheck,
   BarChart3,
   Bell,
   CreditCard,

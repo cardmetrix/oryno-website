@@ -16,7 +16,7 @@ export async function notifyWalletFunded(input: {
     body: `${input.amountFormatted} received. Ref ${reference}`,
     type: "fund",
     metadata: {
-      href: input.href || "/wallet",
+      href: input.href || "/cards",
       amountFormatted: input.amountFormatted,
       reference,
       transactionId: input.transactionId,

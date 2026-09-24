@@ -41,7 +41,7 @@ export const EXTERNAL_API_CATALOG = {
     notifications: ["GET|PATCH|DELETE /notifications"],
     devices: ["POST|DELETE /devices"],
     ads: ["GET /ads"],
-    profile: ["GET|PATCH /profile", "GET|PATCH /me/country", "GET|PATCH /settings", "GET|POST /settings/kyc"],
+    profile: ["GET|PATCH /profile", "GET|PATCH /me/country", "GET|PATCH /settings"],
     support: [
       "POST /support/error-report",
       "GET|POST /support/tickets",

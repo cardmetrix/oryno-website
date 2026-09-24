@@ -40,6 +40,6 @@ export const SUPPORT_FAQS = [
   },
   {
     q: "How do I verify my account (KYC)?",
-    a: "Open Settings → KYC Verification and follow the steps. Some features may require KYC depending on your country and transaction limits.",
+    a: "Identity verification is managed by ORYNO support when required for your country or transaction limits.",
   },
 ] as const;

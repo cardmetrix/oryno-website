@@ -272,7 +272,7 @@ export function UsdWalletActionsPanel({
     setBusy(true);
     setError(null);
     try {
-      const callbackUrl = `${window.location.origin}/wallet?usd_fund=1`;
+      const callbackUrl = `${window.location.origin}/cards?usd_fund=1`;
       const res = await fetch("/api/wallet/usd/fund", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

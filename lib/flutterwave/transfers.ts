@@ -356,7 +356,7 @@ export async function settlePayoutTransfer(input: {
         body: `${amountFormatted} has been sent to your bank.`,
         type: "withdraw",
         metadata: {
-          href: "/wallet",
+          href: "/cards",
           withdrawalId: withdrawal.id,
           amountFormatted,
           reference,
@@ -431,7 +431,7 @@ export async function settlePayoutTransfer(input: {
           : reason + " The amount was returned to your wallet.",
       type: "withdraw",
       metadata: {
-        href: "/wallet",
+        href: "/cards",
         withdrawalId: withdrawal.id,
         reference: input.reference,
       },

@@ -63,7 +63,7 @@ export function AuthButtons({
       <div className={shell}>
         <motion.div whileHover={{ y: -1 }} whileTap={{ scale: 0.98 }} className={item}>
           <Link
-            href="/wallet"
+            href="/cards"
             onClick={onNavigate}
             className={cn(
               "btn-secondary inline-flex items-center justify-center gap-2",

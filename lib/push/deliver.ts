@@ -13,10 +13,9 @@ const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
 const CTA_BY_TYPE: Partial<
   Record<NotificationType | string, { href: string }>
 > = {
-  fund: { href: "/wallet" },
-  withdraw: { href: "/wallet" },
-  transfer: { href: "/wallet" },
-  kyc: { href: "/settings/kyc" },
+  fund: { href: "/cards" },
+  withdraw: { href: "/cards" },
+  transfer: { href: "/cards" },
   security: { href: "/settings/security" },
   service: { href: "/services" },
   success: { href: "/dashboard" },

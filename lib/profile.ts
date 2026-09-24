@@ -4,7 +4,6 @@ import {
   formatLevelLimit,
   KYC_LABELS,
   normalizeKycLevel,
-  resolveUserLevel,
 } from "@/lib/account-levels";
 import { getCountryInfo } from "@/lib/country";
 
@@ -22,7 +21,6 @@ export type ProfileDto = {
   kycStatus: string;
   kycLevel: number;
   kycLabel: string;
-  accountLevelName: string;
   status: string;
   dailyLimitLabel: string;
   emailVerified: boolean;
@@ -43,7 +41,6 @@ export function toProfileDto(
   const kycLevel = normalizeKycLevel(
     (user as SyncedUser & { kycLevel?: number }).kycLevel,
   );
-  const level = resolveUserLevel(kycLevel);
 
   return {
     id: user.id,
@@ -60,11 +57,7 @@ export function toProfileDto(
     role: user.role === "admin" ? "admin" : "user",
     kycStatus: user.kycStatus,
     kycLevel,
-    kycLabel:
-      kycLevel > 0
-        ? `Level ${kycLevel} · ${KYC_LABELS[user.kycStatus] ?? user.kycStatus}`
-        : (KYC_LABELS[user.kycStatus] ?? user.kycStatus),
-    accountLevelName: kycLevel > 0 ? level.name : "Unverified",
+    kycLabel: KYC_LABELS[user.kycStatus] ?? user.kycStatus,
     status: user.status,
     dailyLimitLabel: formatLevelLimit(
       dailyLimitForLevel(kycLevel),

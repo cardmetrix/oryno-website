@@ -6,7 +6,6 @@ import { isAppUserRole, setAppUserRole } from "@/lib/auth/user-role";
 import { db } from "@/lib/db";
 import {
   countries,
-  kycSubmissions,
   transactions,
   users,
   wallets,
@@ -17,19 +16,10 @@ import { formatMoney } from "@/lib/transactions";
 export const runtime = "nodejs";
 
 type UserStatus = "active" | "suspended" | "deleted";
-type KycStatus = "unverified" | "pending" | "verified" | "rejected";
 type WalletStatus = "healthy" | "frozen" | "closed";
 
 function isUserStatus(v: string): v is UserStatus {
   return v === "active" || v === "suspended" || v === "deleted";
-}
-function isKycStatus(v: string): v is KycStatus {
-  return (
-    v === "unverified" ||
-    v === "pending" ||
-    v === "verified" ||
-    v === "rejected"
-  );
 }
 function isWalletStatus(v: string): v is WalletStatus {
   return v === "healthy" || v === "frozen" || v === "closed";
@@ -60,10 +50,6 @@ export async function GET(
       .from(wallets)
       .where(eq(wallets.userId, id));
 
-    const latestKyc = await db.query.kycSubmissions.findFirst({
-      where: eq(kycSubmissions.userId, id),
-      orderBy: [desc(kycSubmissions.createdAt)],
-    });
 
     const recentTx = await db
       .select({
@@ -96,9 +82,6 @@ export async function GET(
         statusLabel: titleCaseStatus(user.status),
         role: user.role === "admin" ? "admin" : "user",
         roleLabel: user.role === "admin" ? "Admin" : "User",
-        kyc: user.kycStatus,
-        kycLevel: user.kycLevel,
-        kycLabel: `L${user.kycLevel} · ${titleCaseStatus(user.kycStatus)}`,
         lastLoginAt: user.lastLoginAt?.toISOString?.() ?? null,
         createdAt: user.createdAt?.toISOString?.() ?? null,
         emailVerifiedAt: user.emailVerifiedAt?.toISOString?.() ?? null,
@@ -112,22 +95,6 @@ export async function GET(
         statusLabel: titleCaseStatus(w.status),
         isPrimary: w.isPrimary,
       })),
-      kycSubmission: latestKyc
-        ? {
-            id: latestKyc.id,
-            status: latestKyc.status,
-            statusLabel: titleCaseStatus(latestKyc.status),
-            targetLevel: latestKyc.targetLevel,
-            idType: latestKyc.idType,
-            idNumber: latestKyc.idNumber,
-            idFrontUrl: latestKyc.idFrontUrl,
-            idBackUrl: latestKyc.idBackUrl,
-            selfieUrl: latestKyc.selfieUrl,
-            rejectionReason: latestKyc.rejectionReason,
-            reviewedAt: latestKyc.reviewedAt?.toISOString?.() ?? null,
-            createdAt: latestKyc.createdAt?.toISOString?.() ?? null,
-          }
-        : null,
       transactions: recentTx.map((t) => ({
         id: t.id,
         title: t.title,
@@ -159,8 +126,6 @@ export async function PATCH(
     const body = (await req.json().catch(() => ({}))) as {
       status?: string;
       role?: string;
-      kycStatus?: string;
-      kycLevel?: number;
       fullName?: string;
       phone?: string | null;
       countryCode?: string | null;
@@ -240,9 +205,6 @@ export async function PATCH(
                 statusLabel: titleCaseStatus(roleUpdated.status),
                 role: roleUpdated.role === "admin" ? "admin" : "user",
                 roleLabel: roleUpdated.role === "admin" ? "Admin" : "User",
-                kyc: roleUpdated.kycStatus,
-                kycLevel: roleUpdated.kycLevel,
-                kycLabel: `L${roleUpdated.kycLevel} · ${titleCaseStatus(roleUpdated.kycStatus)}`,
               }
             : null,
         });
@@ -263,35 +225,7 @@ export async function PATCH(
       userPatch.status = body.status;
     }
 
-    if (body.kycStatus != null) {
-      if (!isKycStatus(body.kycStatus)) {
-        return NextResponse.json(
-          { error: "Invalid KYC status" },
-          { status: 400 },
-        );
-      }
-      userPatch.kycStatus = body.kycStatus;
-      if (body.kycStatus === "verified" && body.kycLevel == null) {
-        userPatch.kycLevel = Math.max(user.kycLevel || 0, 1);
-      }
-      if (body.kycStatus === "unverified" || body.kycStatus === "rejected") {
-        if (body.kycLevel == null) userPatch.kycLevel = 0;
-      }
-    }
 
-    if (body.kycLevel != null) {
-      const level = Number(body.kycLevel);
-      if (![0, 1, 2, 3].includes(level)) {
-        return NextResponse.json(
-          { error: "kycLevel must be 0, 1, 2, or 3" },
-          { status: 400 },
-        );
-      }
-      userPatch.kycLevel = level;
-      if (level > 0 && body.kycStatus == null) {
-        userPatch.kycStatus = "verified";
-      }
-    }
 
     if (typeof body.fullName === "string" && body.fullName.trim()) {
       userPatch.fullName = body.fullName.trim().slice(0, 160);
@@ -336,28 +270,6 @@ export async function PATCH(
         .where(eq(wallets.id, body.walletId));
     }
 
-    // Keep latest KYC submission in sync when admin sets KYC on user
-    if (body.kycStatus === "verified" || body.kycStatus === "rejected") {
-      const latest = await db.query.kycSubmissions.findFirst({
-        where: eq(kycSubmissions.userId, id),
-        orderBy: [desc(kycSubmissions.createdAt)],
-      });
-      if (latest) {
-        await db
-          .update(kycSubmissions)
-          .set({
-            status: body.kycStatus,
-            rejectionReason:
-              body.kycStatus === "rejected"
-                ? body.note?.trim() || latest.rejectionReason || "Rejected by admin"
-                : null,
-            reviewedByAdminId: admin.id,
-            reviewedAt: new Date(),
-            updatedAt: new Date(),
-          })
-          .where(eq(kycSubmissions.id, latest.id));
-      }
-    }
 
     if (body.notify !== false) {
       try {
@@ -377,25 +289,6 @@ export async function PATCH(
             body: "Your ORYNO account is active again.",
             type: "system",
           });
-        } else if (body.kycStatus === "verified") {
-          await createNotification({
-            userId: id,
-            title: "KYC verified",
-            body: "Your identity verification was approved.",
-            type: "kyc",
-            metadata: { href: "/settings/kyc", kycStatus: "verified" },
-          });
-        } else if (body.kycStatus === "rejected") {
-          await createNotification({
-            userId: id,
-            title: "KYC rejected",
-            body:
-              body.note?.trim() ||
-              "Your identity verification was rejected. Please resubmit.",
-            type: "kyc",
-            metadata: { href: "/settings/kyc", kycStatus: "rejected" },
-          });
-        }
       } catch (e) {
         console.error("[admin-user-notify]", e);
       }
@@ -420,9 +313,6 @@ export async function PATCH(
             statusLabel: titleCaseStatus(updated.status),
             role: updated.role === "admin" ? "admin" : "user",
             roleLabel: updated.role === "admin" ? "Admin" : "User",
-            kyc: updated.kycStatus,
-            kycLevel: updated.kycLevel,
-            kycLabel: `L${updated.kycLevel} · ${titleCaseStatus(updated.kycStatus)}`,
           }
         : null,
     });

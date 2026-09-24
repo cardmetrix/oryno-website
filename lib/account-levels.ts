@@ -237,7 +237,7 @@ export function levelCta(input: {
   kycStatus: string;
 }): {
   label: string;
-  href: "/settings/kyc" | "/profile";
+  href: "/settings" | "/profile";
   disabled: boolean;
   variant: "primary" | "secondary";
 } {
@@ -255,7 +255,7 @@ export function levelCta(input: {
   if (status === "pending") {
     return {
       label: "View KYC status",
-      href: "/settings/kyc",
+      href: "/settings",
       disabled: false,
       variant: "primary",
     };
@@ -268,7 +268,7 @@ export function levelCta(input: {
         : next
           ? `Upgrade to Level ${next}`
           : "Get verified",
-    href: "/settings/kyc",
+    href: "/settings",
     disabled: false,
     variant: "primary",
   };

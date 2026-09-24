@@ -78,7 +78,7 @@ async function reverseTimedOutWithdrawal(withdrawal: StuckWithdrawal) {
         body: `${amountFormatted} was not sent to your bank in time and is back in your ORYNO wallet.`,
         type: "withdraw",
         metadata: {
-          href: "/wallet",
+          href: "/cards",
           withdrawalId: withdrawal.id,
           reference: withdrawal.providerRef,
           timedOut: true,

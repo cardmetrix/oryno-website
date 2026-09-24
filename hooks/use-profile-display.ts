@@ -47,10 +47,10 @@ function bootstrapFromClerkUser(
     avatarUrl,
     countryCode: null,
     countryName: "Loading…",
+    role: "user",
     kycStatus: "unverified",
     kycLevel: 0,
     kycLabel: "Checking…",
-    accountLevelName: "Unverified",
     status: "active",
     dailyLimitLabel: "—",
     emailVerified: Boolean(

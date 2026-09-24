@@ -12,7 +12,6 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const q = (searchParams.get("q") || "").trim();
     const status = (searchParams.get("status") || "").trim();
-    const kyc = (searchParams.get("kyc") || "").trim();
     const role = (searchParams.get("role") || "").trim();
 
     const rows = await db
@@ -24,8 +23,6 @@ export async function GET(req: Request) {
         username: users.username,
         status: users.status,
         role: users.role,
-        kyc: users.kycStatus,
-        kycLevel: users.kycLevel,
         countryCode: users.countryCode,
         countryName: countries.name,
         lastLoginAt: users.lastLoginAt,
@@ -96,9 +93,6 @@ export async function GET(req: Request) {
         statusLabel: titleCaseStatus(u.status),
         role: u.role === "admin" ? "admin" : "user",
         roleLabel: u.role === "admin" ? "Admin" : "User",
-        kyc: u.kyc,
-        kycLevel: u.kycLevel,
-        kycLabel: `L${u.kycLevel} · ${titleCaseStatus(u.kyc)}`,
         balance: primary
           ? primary.balanceFormatted
           : formatMoney(0, "NGN"),
@@ -110,9 +104,6 @@ export async function GET(req: Request) {
 
     if (status) {
       mapped = mapped.filter((u) => u.status === status);
-    }
-    if (kyc) {
-      mapped = mapped.filter((u) => u.kyc === kyc);
     }
     if (role === "user" || role === "admin") {
       mapped = mapped.filter((u) => u.role === role);

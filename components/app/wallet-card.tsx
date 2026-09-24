@@ -143,7 +143,7 @@ export function WalletCard({
 
         <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }}>
           <Link
-            href="/wallet"
+            href="/cards"
             className="group relative flex h-[52px] w-full items-center justify-center gap-2.5 overflow-hidden rounded-[18px] bg-[#1a120c] px-3 text-sm font-bold text-white shadow-[0_14px_32px_rgba(0,0,0,0.28)] ring-1 ring-white/10"
           >
             <span

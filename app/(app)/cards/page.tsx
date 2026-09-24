@@ -118,7 +118,7 @@ function CardsPageContent() {
     void load();
   }, [load]);
 
-  // USD fund callback: /wallet?usd_fund=1&tx_ref=...
+  // USD fund callback: /cards?usd_fund=1&tx_ref=...
   useEffect(() => {
     const usdFund = searchParams.get("usd_fund");
     const reference =
@@ -148,13 +148,13 @@ function CardsPageContent() {
         });
         await load();
         await refetchWallet();
-        router.replace("/wallet");
+        router.replace("/cards");
       } catch (err) {
         if (cancelled) return;
         toast.error(
           err instanceof Error ? err.message : "USD payment verification failed",
         );
-        router.replace("/wallet");
+        router.replace("/cards");
       }
     })();
 
@@ -267,7 +267,7 @@ function CardsPageContent() {
     }
     setFunding(true);
     try {
-      const callbackUrl = `${window.location.origin}/wallet?usd_fund=1`;
+      const callbackUrl = `${window.location.origin}/cards?usd_fund=1`;
       const res = await fetch("/api/wallet/usd/fund", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

@@ -64,7 +64,7 @@ const isAuthScreen = createRouteMatcher([
 
 const isAppRoute = createRouteMatcher([
   "/dashboard(.*)",
-  "/wallet(.*)",
+  "/cards(.*)",
   "/fund(.*)",
   "/convert(.*)",
   "/withdraw(.*)",

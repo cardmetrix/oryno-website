@@ -41,8 +41,6 @@ type UserRow = {
   statusLabel: string;
   role: "user" | "admin";
   roleLabel: string;
-  kyc: string;
-  kycLabel: string;
   balance: string;
   balances: Array<{
     balanceFormatted: string;
@@ -65,9 +63,6 @@ type UserDetail = {
     statusLabel: string;
     role: "user" | "admin";
     roleLabel: string;
-    kyc: string;
-    kycLevel?: number;
-    kycLabel: string;
     lastLoginAt: string | null;
     createdAt: string | null;
   };
@@ -79,18 +74,6 @@ type UserDetail = {
     statusLabel: string;
     isPrimary: boolean;
   }>;
-  kycSubmission: {
-    id: string;
-    status: string;
-    targetLevel?: number;
-    statusLabel: string;
-    idType: string | null;
-    idNumber: string | null;
-    idFrontUrl: string | null;
-    idBackUrl: string | null;
-    selfieUrl: string | null;
-    rejectionReason: string | null;
-  } | null;
   transactions: Array<{
     id: string;
     title: string;
@@ -104,17 +87,15 @@ type UserDetail = {
 export default function AdminUsersPage() {
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const [kycFilter, setKycFilter] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
   const url = useMemo(() => {
     const params = new URLSearchParams();
     if (q.trim()) params.set("q", q.trim());
     if (statusFilter) params.set("status", statusFilter);
-    if (kycFilter) params.set("kyc", kycFilter);
     if (roleFilter) params.set("role", roleFilter);
     const qs = params.toString();
     return `/api/admin/users${qs ? `?${qs}` : ""}`;
-  }, [q, statusFilter, kycFilter, roleFilter]);
+  }, [q, statusFilter, roleFilter]);
 
   const { data, loading, error, reload } = useAdminQuery<{ users: UserRow[] }>(
     url,
@@ -125,7 +106,7 @@ export default function AdminUsersPage() {
     <>
       <AdminPageHeader
         title="Users"
-        subtitle="Balances, KYC, suspend / activate, and wallet controls"
+        subtitle="Balances, suspend / activate, and wallet controls"
         actions={
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
             <div className="relative w-full sm:w-auto">
@@ -147,17 +128,6 @@ export default function AdminUsersPage() {
                 <option value="active">Active</option>
                 <option value="suspended">Suspended</option>
                 <option value="deleted">Deleted</option>
-              </select>
-              <select
-                value={kycFilter}
-                onChange={(e) => setKycFilter(e.target.value)}
-                className="h-11 w-full rounded-[14px] border border-border bg-background px-3 text-sm sm:w-auto"
-              >
-                <option value="">All KYC</option>
-                <option value="unverified">Unverified</option>
-                <option value="pending">Pending</option>
-                <option value="verified">Verified</option>
-                <option value="rejected">Rejected</option>
               </select>
               <select
                 value={roleFilter}
@@ -200,11 +170,6 @@ export default function AdminUsersPage() {
                   cell: (row) => (
                     <span className="text-foreground">{row.country}</span>
                   ),
-                },
-                {
-                  key: "kyc",
-                  header: "KYC",
-                  cell: (row) => <StatusBadge status={row.kycLabel} />,
                 },
                 {
                   key: "status",
@@ -347,7 +312,6 @@ function UserManageSheet({
             <div className="mt-2 flex flex-wrap gap-2">
               <StatusBadge status={detail.user.statusLabel} />
               <StatusBadge status={detail.user.roleLabel} />
-              <StatusBadge status={detail.user.kycLabel} />
               <span className="text-xs text-muted-foreground">
                 {detail.user.country}
               </span>
@@ -481,120 +445,6 @@ function UserManageSheet({
             </div>
           </section>
 
-          <section className="space-y-2">
-            <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-              KYC
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              <ActionBtn
-                disabled={busy}
-                onClick={() =>
-                  void patch(
-                    { kycStatus: "verified", kycLevel: 1 },
-                    "Set Level 1 (ID)",
-                  )
-                }
-                label="Set Level 1"
-                primary
-              />
-              <ActionBtn
-                disabled={busy}
-                onClick={() =>
-                  void patch(
-                    { kycStatus: "verified", kycLevel: 2 },
-                    "Set Level 2 (BVN)",
-                  )
-                }
-                label="Set Level 2"
-                primary
-              />
-              <ActionBtn
-                disabled={busy}
-                onClick={() =>
-                  void patch(
-                    { kycStatus: "verified", kycLevel: 3 },
-                    "Set Level 3 (Address)",
-                  )
-                }
-                label="Set Level 3"
-                primary
-              />
-              <ActionBtn
-                disabled={busy || detail.user.kyc === "rejected"}
-                onClick={() =>
-                  void patch(
-                    { kycStatus: "rejected", kycLevel: 0 },
-                    "KYC rejected",
-                  )
-                }
-                label="Reject KYC"
-                danger
-              />
-              <ActionBtn
-                disabled={busy || detail.user.kyc === "pending"}
-                onClick={() =>
-                  void patch({ kycStatus: "pending" }, "KYC set to pending")
-                }
-                label="Mark pending"
-              />
-              <ActionBtn
-                disabled={busy || detail.user.kyc === "unverified"}
-                onClick={() =>
-                  void patch(
-                    { kycStatus: "unverified", kycLevel: 0 },
-                    "KYC reset to unverified",
-                  )
-                }
-                label="Reset KYC"
-              />
-            </div>
-            {detail.kycSubmission ? (
-              <div className="rounded-xl border border-border p-3 text-xs text-muted-foreground">
-                <p>
-                  Submission: {detail.kycSubmission.statusLabel}
-                  {detail.kycSubmission.idType
-                    ? ` · ${detail.kycSubmission.idType}`
-                    : ""}
-                </p>
-                {detail.kycSubmission.idNumber ? (
-                  <p className="mt-1">ID: {detail.kycSubmission.idNumber}</p>
-                ) : null}
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {detail.kycSubmission.idFrontUrl ? (
-                    <a
-                      href={detail.kycSubmission.idFrontUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="font-semibold text-primary"
-                    >
-                      Front ID
-                    </a>
-                  ) : null}
-                  {detail.kycSubmission.idBackUrl ? (
-                    <a
-                      href={detail.kycSubmission.idBackUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="font-semibold text-primary"
-                    >
-                      Back ID
-                    </a>
-                  ) : null}
-                  {detail.kycSubmission.selfieUrl ? (
-                    <a
-                      href={detail.kycSubmission.selfieUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="font-semibold text-primary"
-                    >
-                      Selfie
-                    </a>
-                  ) : null}
-                </div>
-              </div>
-            ) : null}
-          </section>
-
           <label className="block">
             <span className="text-xs font-semibold text-muted-foreground">
               Note / rejection reason
@@ -603,7 +453,7 @@ function UserManageSheet({
               value={note}
               onChange={(e) => setNote(e.target.value)}
               rows={3}
-              placeholder="Optional note sent with suspend / KYC reject…"
+              placeholder="Optional note sent with suspend…"
               className="mt-1.5 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
             />
           </label>
@@ -648,7 +498,7 @@ function UserManageSheet({
           <DrawerHeader className="shrink-0 px-0 text-left">
             <DrawerTitle>Manage user</DrawerTitle>
             <DrawerDescription>
-              Full account, wallet, and KYC controls
+              Full account and wallet controls
             </DrawerDescription>
           </DrawerHeader>
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
@@ -665,7 +515,7 @@ function UserManageSheet({
         <DialogHeader>
           <DialogTitle>Manage user</DialogTitle>
           <DialogDescription>
-            Full account, wallet, and KYC controls
+            Full account and wallet controls
           </DialogDescription>
         </DialogHeader>
         {body}

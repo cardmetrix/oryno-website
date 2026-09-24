@@ -61,7 +61,7 @@ export async function POST(req: Request) {
       "http://localhost:3000";
     const callbackUrl = origin.includes("usd_ref=")
       ? origin
-      : `${origin.replace(/\/$/, "")}/wallet?usd_fund=1`;
+      : `${origin.replace(/\/$/, "")}/cards?usd_fund=1`;
 
     const email =
       user.email ||
