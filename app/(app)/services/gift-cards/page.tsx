@@ -731,11 +731,7 @@ function GiftCardsPageContent() {
     <AppShell hideNav>
       <PageHeader
         title="Gift Cards"
-        subtitle={
-          mode === "sell"
-            ? `Sell gift cards for ${country.currency} wallet credit`
-            : "Buy digital gift cards with your wallet"
-        }
+        subtitle="Buy digital gift cards with your USD balance"
         backHref="/services/gift-cards/live"
       />
 
@@ -746,31 +742,6 @@ function GiftCardsPageContent() {
       />
 
       <MotionSection className="mb-4">
-        <div className="grid grid-cols-2 gap-2 rounded-2xl border border-border bg-background p-1.5 shadow-[var(--shadow-soft)]">
-          {(["buy"] as const).map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              onClick={() => switchMode(tab)}
-              className={cn(
-                "h-11 rounded-xl text-sm font-semibold capitalize transition",
-                mode === tab
-                  ? "bg-primary text-primary-foreground shadow-[var(--shadow-orange)]"
-                  : "text-muted-foreground hover:bg-muted",
-              )}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
-        {mode === "sell" && (sellDemo || sellUnavailable) ? (
-          <p className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-100">
-            {sellDemo
-              ? "Sell is not live — set SOGO_SECRET_KEY (sogo_sk_live_…) and SOGO_DEMO=false on the server."
-              : sellPartnerError ||
-                "Sogo live rates are temporarily unavailable. You can browse, but selling is paused until the partner responds."}
-          </p>
-        ) : null}
         {mode === "buy" && buyDemo ? (
           <p className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-100">
             Buy is not live — Reloadly credentials are missing or RELOADLY_DEMO is

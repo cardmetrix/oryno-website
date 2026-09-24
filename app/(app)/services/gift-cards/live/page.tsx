@@ -212,29 +212,9 @@ export default function GiftCardsLivePage() {
     <AppShell hideNav>
       <PageHeader
         title="Gift Card Live"
-        subtitle="Live rates · tap a card to trade"
+        subtitle="Browse cards · tap to buy with USD"
         backHref="/services"
       />
-
-      <MotionSection className="mb-4">
-        <div className="grid grid-cols-2 gap-2 rounded-2xl border border-border bg-background p-1.5 shadow-[var(--shadow-soft)]">
-          {(["buy"] as const).map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              onClick={() => setMode(tab)}
-              className={cn(
-                "h-11 rounded-xl text-sm font-semibold capitalize transition",
-                mode === tab
-                  ? "bg-primary text-primary-foreground shadow-[var(--shadow-orange)]"
-                  : "text-muted-foreground hover:bg-muted",
-              )}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
-      </MotionSection>
 
       {mode === "sell" ? (
         <div className="space-y-4">
