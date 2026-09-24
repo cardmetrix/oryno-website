@@ -143,13 +143,11 @@ export function DashboardWalletCarousel({ className }: Props) {
                 <p className="text-[10px] font-bold tracking-[0.2em] text-white/90 uppercase">
                   ORYNO
                 </p>
-                <span className="rounded-full bg-white/15 px-2 py-0.5 text-[9px] font-bold tracking-wide text-white/95 ring-1 ring-white/20">
-                  LOCAL WALLET
-                </span>
+              
               </div>
 
               <p className="text-sm font-semibold tracking-wide sm:text-[15px]">
-                {localCurrency} Wallet {country.flagEmoji}
+                {localCurrency} Wallet
               </p>
 
               <div className="flex items-end justify-between gap-2">
@@ -235,13 +233,11 @@ export function DashboardWalletCarousel({ className }: Props) {
                 <p className="text-[10px] font-bold tracking-[0.2em] uppercase opacity-90">
                   ORYNO
                 </p>
-                <span className="usd-card-chip rounded-full px-2 py-0.5 text-[9px] font-bold tracking-wide">
-                  USD WALLET
-                </span>
+              
               </div>
 
               <p className="text-sm font-semibold tracking-wide sm:text-[15px]">
-                USD Wallet 🌐
+                USD Wallet 
               </p>
 
               <div className="flex items-end justify-between gap-2">
