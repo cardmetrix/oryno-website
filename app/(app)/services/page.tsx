@@ -13,10 +13,9 @@ import { useCountry } from "@/components/providers/country-provider";
 import {
   filterServices,
   getServicesDirectory,
-  SERVICE_QUICK_TAGS,
   serviceCategories,
   type ServiceDirectoryItem,
-  type ServiceQuickTag,
+  type ServiceFilterCategory,
 } from "@/lib/services-directory";
 import { cn } from "@/lib/utils";
 
@@ -28,10 +27,7 @@ export default function ServicesPage() {
     [country.code],
   );
   const [query, setQuery] = useState("");
-  const [category, setCategory] = useState<(typeof serviceCategories)[number]>(
-    "All",
-  );
-  const [tag, setTag] = useState<ServiceQuickTag | null>(null);
+  const [category, setCategory] = useState<ServiceFilterCategory>("All");
 
   useEffect(() => {
     const q = searchParams.get("q");
@@ -39,15 +35,11 @@ export default function ServicesPage() {
   }, [searchParams]);
 
   const visible = useMemo(
-    () => filterServices(services ?? [], { query, category, tag }),
-    [services, query, category, tag],
+    () => filterServices(services ?? [], { query, category }),
+    [services, query, category],
   );
 
   const popularCount = (services ?? []).filter((s) => s.popular).length;
-
-  function toggleTag(next: ServiceQuickTag) {
-    setTag((prev) => (prev === next ? null : next));
-  }
 
   return (
     <AppShell>
@@ -87,24 +79,6 @@ export default function ServicesPage() {
               placeholder="Search electricity, airtime, DStv…"
               className="h-9 w-full rounded-[12px] border border-border bg-muted/40 pr-3 pl-9 text-sm outline-none transition focus:border-primary focus:bg-background focus:ring-2 focus:ring-primary/15"
             />
-          </div>
-
-          <div className="mt-2 flex gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {SERVICE_QUICK_TAGS.map((item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => toggleTag(item)}
-                className={cn(
-                  "shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold transition sm:text-xs",
-                  tag === item
-                    ? "bg-primary text-primary-foreground shadow-[var(--shadow-orange)]"
-                    : "bg-oryno-orange-muted text-primary ring-1 ring-primary/15 hover:bg-primary/15",
-                )}
-              >
-                {item}
-              </button>
-            ))}
           </div>
 
           <div className="mt-2 flex gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -151,7 +125,6 @@ export default function ServicesPage() {
                 onClick={() => {
                   setQuery("");
                   setCategory("All");
-                  setTag(null);
                 }}
                 className="btn-secondary mt-5 h-11 px-5 text-sm"
               >
@@ -160,7 +133,7 @@ export default function ServicesPage() {
             </motion.div>
           ) : (
             <motion.div
-              key={`${category}-${query}-${tag ?? "all"}`}
+              key={`${category}-${query}`}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               className="grid grid-cols-3 gap-3 sm:grid-cols-4 sm:gap-4 lg:grid-cols-5"

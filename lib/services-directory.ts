@@ -399,36 +399,40 @@ export function getServicesDirectory(countryCode?: string | null) {
   });
 }
 
-export const serviceCategories: Array<ServiceCategory | "All"> = [
+export const serviceCategories = [
   "All",
   "Popular",
+  "Most popular",
+  "Hot",
+  "Free",
   "Telecom",
   "Lifestyle",
   "Utilities",
   "Coming soon",
-];
-
-/** Quick-filter chips next to the services search bar. */
-export const SERVICE_QUICK_TAGS = [
-  "Most popular",
-  "Hot",
-  "Free",
 ] as const;
 
-export type ServiceQuickTag = (typeof SERVICE_QUICK_TAGS)[number];
+export type ServiceFilterCategory = (typeof serviceCategories)[number];
 
 export function filterServices(
   items: ServiceDirectoryItem[],
-  opts: { query?: string; category?: string; tag?: string | null },
+  opts: { query?: string; category?: string },
 ) {
   const q = (opts.query ?? "").trim().toLowerCase();
   const category = opts.category ?? "All";
-  const tag = (opts.tag ?? "").trim().toLowerCase();
 
   return items.filter((item) => {
     const matchesCategory =
       category === "All" ||
       (category === "Popular" && item.popular) ||
+      (category === "Most popular" &&
+        ((item.stats ?? "").toLowerCase() === "most popular" ||
+          item.tags.some((t) => t.toLowerCase() === "most popular"))) ||
+      (category === "Hot" &&
+        ((item.stats ?? "").toLowerCase() === "hot" ||
+          item.tags.some((t) => t.toLowerCase() === "hot"))) ||
+      (category === "Free" &&
+        ((item.stats ?? "").toLowerCase() === "free" ||
+          item.tags.some((t) => t.toLowerCase() === "free"))) ||
       (category === "Coming soon" &&
         (item.soon || item.category === "Coming soon")) ||
       item.category === category;
@@ -445,11 +449,6 @@ export function filterServices(
       .toLowerCase();
 
     const matchesQuery = !q || haystack.includes(q);
-    const matchesTag =
-      !tag ||
-      (item.stats ?? "").toLowerCase() === tag ||
-      item.tags.some((t) => t.toLowerCase() === tag);
-
-    return matchesCategory && matchesQuery && matchesTag;
+    return matchesCategory && matchesQuery;
   });
 }
