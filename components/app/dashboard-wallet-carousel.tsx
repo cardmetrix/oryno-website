@@ -17,6 +17,9 @@ const LOCAL_HINT: Record<string, string> = {
   ZA: "Use your ZAR balance for airtime, data, bills and other South African services.",
 };
 
+/** Gap between mobile swipe slides (matches Tailwind gap-3). */
+const MOBILE_GAP_PX = 12;
+
 type Props = { className?: string };
 
 /** Dashboard wallets: swipe one-at-a-time on mobile; both side-by-side from md. */
@@ -38,11 +41,15 @@ export function DashboardWalletCarousel({ className }: Props) {
     LOCAL_HINT[country.code] ??
     `Use your ${localCurrency} balance for local services in ${country.name}.`;
 
+  function slideStride(el: HTMLDivElement) {
+    return el.clientWidth + MOBILE_GAP_PX;
+  }
+
   function onScroll() {
     const el = pagerRef.current;
     if (!el) return;
     if (window.matchMedia("(min-width: 768px)").matches) return;
-    const idx = Math.round(el.scrollLeft / Math.max(el.clientWidth, 1));
+    const idx = Math.round(el.scrollLeft / Math.max(slideStride(el), 1));
     setView(idx >= 1 ? "usd" : "local");
   }
 
@@ -54,14 +61,14 @@ export function DashboardWalletCarousel({ className }: Props) {
       return;
     }
     el.scrollTo({
-      left: target === "usd" ? el.clientWidth : 0,
+      left: target === "usd" ? slideStride(el) : 0,
       behavior: "smooth",
     });
     setView(target);
   }
 
   const footer = (
-    <div className="flex items-center justify-between pt-1 md:hidden">
+    <div className="flex items-center justify-between pt-0.5 md:hidden">
       <div className="flex items-center gap-1.5">
         <button
           type="button"
@@ -98,28 +105,33 @@ export function DashboardWalletCarousel({ className }: Props) {
     </div>
   );
 
+  const fundBtn =
+    "inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-full bg-white/20 text-[13px] font-bold text-white ring-1 ring-white/30 backdrop-blur-sm transition hover:bg-white/28";
+  const convertBtn =
+    "inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-full bg-black/20 text-[13px] font-bold text-white ring-1 ring-white/25 backdrop-blur-md transition hover:bg-black/30";
+
   return (
     <div className={cn(className)}>
       <div
         ref={pagerRef}
         onScroll={onScroll}
         className={cn(
-          "flex w-full snap-x snap-mandatory overflow-x-auto overscroll-x-contain",
+          "flex w-full snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain",
           "[-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-          "md:grid md:grid-cols-2 md:items-stretch md:gap-4 md:overflow-visible md:snap-none",
+          "md:grid md:grid-cols-2 md:items-stretch md:gap-2.5 md:overflow-visible md:snap-none",
         )}
         style={{ WebkitOverflowScrolling: "touch" }}
       >
-        {/* Local — full-bleed slide on mobile */}
+        {/* Local */}
         <div
           className={cn(
             "box-border w-full min-w-full max-w-full shrink-0 basis-full snap-start snap-always",
             "md:min-w-0 md:max-w-none md:basis-auto md:snap-none",
           )}
         >
-          <div className="relative isolate overflow-hidden rounded-[22px] shadow-[0_18px_40px_rgba(255,106,0,0.28)]">
+          <div className="relative isolate overflow-hidden rounded-[18px] shadow-[0_8px_22px_rgba(255,106,0,0.16)]">
             <div className="absolute inset-0 bg-gradient-to-br from-[#ff8124] via-oryno-orange to-[#e85d00]" />
-            <div className="absolute inset-0 bg-[linear-gradient(210deg,rgba(255,255,255,0.18)_0%,transparent_42%,rgba(180,60,0,0.22)_100%)]" />
+            <div className="absolute inset-0 bg-[linear-gradient(210deg,rgba(255,255,255,0.16)_0%,transparent_42%,rgba(180,60,0,0.18)_100%)]" />
             <motion.div
               aria-hidden
               animate={{ x: ["-35%", "135%"] }}
@@ -129,35 +141,35 @@ export function DashboardWalletCarousel({ className }: Props) {
                 ease: "easeInOut",
                 repeatDelay: 2.2,
               }}
-              className="pointer-events-none absolute inset-y-0 w-1/3 skew-x-[-18deg] bg-gradient-to-r from-transparent via-white/22 to-transparent"
+              className="pointer-events-none absolute inset-y-0 w-1/3 skew-x-[-18deg] bg-gradient-to-r from-transparent via-white/18 to-transparent"
             />
 
-            <div className="relative flex flex-col gap-3 p-4 text-white sm:p-5">
-              <div className="flex items-start justify-between gap-3">
-                <p className="text-[11px] font-bold tracking-[0.22em] text-white/90 uppercase">
+            <div className="relative flex flex-col gap-2 p-3.5 text-white sm:gap-2.5 sm:p-4">
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-[10px] font-bold tracking-[0.2em] text-white/90 uppercase">
                   ORYNO
                 </p>
-                <span className="rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-bold tracking-wide text-white/95 ring-1 ring-white/20">
+                <span className="rounded-full bg-white/15 px-2 py-0.5 text-[9px] font-bold tracking-wide text-white/95 ring-1 ring-white/20">
                   LOCAL WALLET
                 </span>
               </div>
 
-              <p className="text-base font-semibold tracking-wide">
+              <p className="text-sm font-semibold tracking-wide sm:text-[15px]">
                 {localCurrency} Wallet {country.flagEmoji}
               </p>
 
-              <div className="flex items-end justify-between gap-3">
+              <div className="flex items-end justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="text-[10px] font-medium tracking-[0.16em] text-white/70 uppercase">
+                  <p className="text-[9px] font-medium tracking-[0.14em] text-white/70 uppercase">
                     Available balance
                   </p>
                   <AnimatePresence mode="wait">
                     <motion.div
                       key={hidden ? "h" : localBalance}
-                      initial={{ opacity: 0, y: 6 }}
+                      initial={{ opacity: 0, y: 4 }}
                       animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -4 }}
-                      className="mt-0.5 truncate text-2xl font-bold tracking-tight sm:text-3xl"
+                      exit={{ opacity: 0, y: -3 }}
+                      className="mt-0.5 truncate text-xl font-bold tracking-tight sm:text-2xl"
                     >
                       <WalletBalanceAmount
                         balance={localBalance}
@@ -172,35 +184,31 @@ export function DashboardWalletCarousel({ className }: Props) {
                   type="button"
                   whileTap={{ scale: 0.92 }}
                   onClick={() => setHidden((v) => !v)}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/25"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/25"
                   aria-label={hidden ? "Show balance" : "Hide balance"}
                 >
                   {hidden ? (
-                    <EyeOff className="h-4 w-4" />
+                    <EyeOff className="h-3.5 w-3.5" />
                   ) : (
-                    <Eye className="h-4 w-4" />
+                    <Eye className="h-3.5 w-3.5" />
                   )}
                 </motion.button>
               </div>
 
-              <p className="text-xs leading-relaxed text-white/80">{hint}</p>
+              <p className="text-[11px] leading-snug text-white/80 sm:text-xs">
+                {hint}
+              </p>
 
-              <div className="grid grid-cols-2 gap-2.5 pt-0.5">
-                <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }}>
-                  <Link
-                    href="/fund"
-                    className="inline-flex h-11 w-full items-center justify-center gap-1.5 rounded-full bg-white text-sm font-bold text-black shadow-[0_8px_20px_rgba(0,0,0,0.12)]"
-                  >
-                    <Plus className="h-4 w-4" strokeWidth={2.5} />
+              <div className="grid grid-cols-2 gap-2 pt-0.5">
+                <motion.div whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }}>
+                  <Link href="/fund" className={fundBtn}>
+                    <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
                     Fund Wallet
                   </Link>
                 </motion.div>
-                <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }}>
-                  <Link
-                    href="/convert"
-                    className="inline-flex h-11 w-full items-center justify-center gap-1.5 rounded-full bg-black/25 text-sm font-bold text-white ring-1 ring-white/25 backdrop-blur-md"
-                  >
-                    <ArrowLeftRight className="h-4 w-4" strokeWidth={2.25} />
+                <motion.div whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }}>
+                  <Link href="/convert" className={convertBtn}>
+                    <ArrowLeftRight className="h-3.5 w-3.5" strokeWidth={2.25} />
                     Convert to USD
                   </Link>
                 </motion.div>
@@ -218,29 +226,29 @@ export function DashboardWalletCarousel({ className }: Props) {
             "md:min-w-0 md:max-w-none md:basis-auto md:snap-none",
           )}
         >
-          <div className="relative isolate overflow-hidden rounded-[22px] bg-[#1C1C1E] shadow-[0_18px_40px_rgba(0,0,0,0.35)] ring-1 ring-white/10">
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_85%_10%,rgba(255,106,0,0.22),transparent_45%)]" />
+          <div className="relative isolate overflow-hidden rounded-[18px] bg-[#1C1C1E] shadow-[0_8px_22px_rgba(0,0,0,0.18)] ring-1 ring-white/10">
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_85%_10%,rgba(255,106,0,0.18),transparent_45%)]" />
 
-            <div className="relative flex flex-col gap-3 p-4 text-white sm:p-5">
-              <div className="flex items-start justify-between gap-3">
-                <p className="text-[11px] font-bold tracking-[0.22em] text-white/90 uppercase">
+            <div className="relative flex flex-col gap-2 p-3.5 text-white sm:gap-2.5 sm:p-4">
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-[10px] font-bold tracking-[0.2em] text-white/90 uppercase">
                   ORYNO
                 </p>
-                <span className="rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-bold tracking-wide text-white/90 ring-1 ring-white/15">
+                <span className="rounded-full bg-white/10 px-2 py-0.5 text-[9px] font-bold tracking-wide text-white/90 ring-1 ring-white/15">
                   USD WALLET
                 </span>
               </div>
 
-              <p className="text-base font-semibold tracking-wide">
+              <p className="text-sm font-semibold tracking-wide sm:text-[15px]">
                 USD Wallet 🌐
               </p>
 
-              <div className="flex items-end justify-between gap-3">
+              <div className="flex items-end justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="text-[10px] font-medium tracking-[0.16em] text-white/65 uppercase">
+                  <p className="text-[9px] font-medium tracking-[0.14em] text-white/65 uppercase">
                     Available balance
                   </p>
-                  <p className="mt-0.5 truncate text-2xl font-bold tracking-tight sm:text-3xl">
+                  <p className="mt-0.5 truncate text-xl font-bold tracking-tight sm:text-2xl">
                     {hidden ? "••••••••" : usdFormatted}
                   </p>
                 </div>
@@ -248,38 +256,32 @@ export function DashboardWalletCarousel({ className }: Props) {
                   type="button"
                   whileTap={{ scale: 0.92 }}
                   onClick={() => setHidden((v) => !v)}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 ring-1 ring-white/20"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 ring-1 ring-white/20"
                   aria-label={hidden ? "Show balance" : "Hide balance"}
                 >
                   {hidden ? (
-                    <EyeOff className="h-4 w-4" />
+                    <EyeOff className="h-3.5 w-3.5" />
                   ) : (
-                    <Eye className="h-4 w-4" />
+                    <Eye className="h-3.5 w-3.5" />
                   )}
                 </motion.button>
               </div>
 
-              <p className="text-xs leading-relaxed text-white/70">
+              <p className="text-[11px] leading-snug text-white/70 sm:text-xs">
                 Use your USD balance for gift cards, international virtual
                 numbers and more.
               </p>
 
-              <div className="grid grid-cols-2 gap-2.5 pt-0.5">
-                <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }}>
-                  <Link
-                    href="/wallet?view=usd&panel=fund"
-                    className="inline-flex h-11 w-full items-center justify-center gap-1.5 rounded-full bg-white text-sm font-bold text-black shadow-[0_8px_20px_rgba(0,0,0,0.2)]"
-                  >
-                    <Plus className="h-4 w-4" strokeWidth={2.5} />
+              <div className="grid grid-cols-2 gap-2 pt-0.5">
+                <motion.div whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }}>
+                  <Link href="/wallet?view=usd&panel=fund" className={fundBtn}>
+                    <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
                     Fund Wallet
                   </Link>
                 </motion.div>
-                <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }}>
-                  <Link
-                    href="/convert?direction=to_local"
-                    className="inline-flex h-11 w-full items-center justify-center gap-1.5 rounded-full bg-white/15 text-sm font-bold text-white ring-1 ring-white/20"
-                  >
-                    <ArrowLeftRight className="h-4 w-4" strokeWidth={2.25} />
+                <motion.div whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }}>
+                  <Link href="/convert?direction=to_local" className={convertBtn}>
+                    <ArrowLeftRight className="h-3.5 w-3.5" strokeWidth={2.25} />
                     Convert
                   </Link>
                 </motion.div>
