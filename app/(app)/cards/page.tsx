@@ -4,13 +4,16 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import {
+  Bell,
+  Check,
   Copy,
   CreditCard,
   Eye,
   EyeOff,
+  Globe2,
   Loader2,
   Lock,
-  Plus,
+  Shield,
   Snowflake,
   Trash2,
   Unlock,
@@ -50,13 +53,21 @@ type PendingOrder = {
   localCurrency: string;
 };
 
+type WaitlistStatus = {
+  joined: boolean;
+  joinedAt: string | null;
+  provider: string;
+};
+
 type CardsPayload = {
   issuer: string;
   issueFeeUsd: number;
   issueFeeFormatted: string;
   maxActiveCards: number;
+  comingSoon?: boolean;
   holderName: string;
   pendingOrder: PendingOrder | null;
+  waitlist?: WaitlistStatus;
   cards: VirtualCard[];
 };
 
@@ -91,7 +102,7 @@ function CardsPageContent() {
   const searchParams = useSearchParams();
   const [data, setData] = useState<CardsPayload | null>(null);
   const [loading, setLoading] = useState(true);
-  const [purchasing, setPurchasing] = useState(false);
+  const [joining, setJoining] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hidden, setHidden] = useState(true);
   const [revealed, setRevealed] = useState<Revealed | null>(null);
@@ -121,7 +132,7 @@ function CardsPageContent() {
     void load();
   }, [load]);
 
-  // Flutterwave return: /cards?card_purchase=1&tx_ref=...
+  // Legacy Flutterwave return (kept for older payment links)
   useEffect(() => {
     const cardPurchase = searchParams.get("card_purchase");
     const reference =
@@ -140,10 +151,7 @@ function CardsPageContent() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ reference, transactionId }),
         });
-        const json = (await res.json()) as {
-          error?: string;
-          order?: PendingOrder;
-        };
+        const json = (await res.json()) as { error?: string };
         if (!res.ok) throw new Error(json.error || "Could not verify payment");
         if (cancelled) return;
         toast.success("Payment received", {
@@ -166,25 +174,44 @@ function CardsPageContent() {
     };
   }, [searchParams, load, router]);
 
-  async function onPurchase() {
-    setPurchasing(true);
+  async function onJoinWaitlist() {
+    setJoining(true);
     try {
-      const callbackUrl = `${window.location.origin}/cards?card_purchase=1`;
-      const res = await fetch("/api/wallet/cards/purchase", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ callbackUrl }),
-      });
+      const res = await fetch("/api/waitlist/usd-card", { method: "POST" });
       const json = (await res.json()) as {
         error?: string;
-        authorizationUrl?: string;
+        created?: boolean;
+        joined?: boolean;
       };
-      if (!res.ok) throw new Error(json.error || "Could not start purchase");
-      if (!json.authorizationUrl) throw new Error("Payment page unavailable");
-      window.location.href = json.authorizationUrl;
+      if (!res.ok) throw new Error(json.error || "Could not join waitlist");
+      toast.success(
+        json.created
+          ? "You're on the waitlist"
+          : "You're already on the waitlist",
+        {
+          description: "We'll notify you by email and push when cards launch.",
+        },
+      );
+      await load();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Purchase failed");
-      setPurchasing(false);
+      toast.error(err instanceof Error ? err.message : "Could not join");
+    } finally {
+      setJoining(false);
+    }
+  }
+
+  async function onLeaveWaitlist() {
+    setJoining(true);
+    try {
+      const res = await fetch("/api/waitlist/usd-card", { method: "DELETE" });
+      const json = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(json.error || "Could not leave waitlist");
+      toast.success("Removed from waitlist");
+      await load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not leave");
+    } finally {
+      setJoining(false);
     }
   }
 
@@ -255,15 +282,34 @@ function CardsPageContent() {
 
   const selected =
     data?.cards.find((c) => c.id === selectedId) ?? data?.cards[0] ?? null;
+  const waitlistJoined = Boolean(data?.waitlist?.joined);
 
   const displayNumber =
     !hidden && revealed
       ? revealed.panFormatted
-      : (selected?.maskedNumber ?? "???? ???? ???? ????");
+      : (selected?.maskedNumber ?? "**** **** **** ****");
   const displayExp =
-    !hidden && revealed ? revealed.expLabel : (selected?.expLabel ?? "??/??");
-  const displayCvv = !hidden && revealed ? revealed.cvv : "???";
+    !hidden && revealed ? revealed.expLabel : (selected?.expLabel ?? "**/**");
+  const displayCvv = !hidden && revealed ? revealed.cvv : "***";
   const holder = revealed?.holderName || data?.holderName || "ORYNO USER";
+
+  const comingSoonDetails = [
+    {
+      icon: Globe2,
+      title: "Spend worldwide",
+      body: "Pay for subscriptions, ads, and online stores that accept Visa.",
+    },
+    {
+      icon: Shield,
+      title: "Secure by design",
+      body: "Freeze anytime. Reveal PAN and CVV only with your transaction PIN.",
+    },
+    {
+      icon: CreditCard,
+      title: `Issued with ${data?.issuer ?? "Maplerad"}`,
+      body: `Launch fee from ${data?.issueFeeFormatted ?? "$1.50"}. Fund from your USD wallet after issue.`,
+    },
+  ];
 
   return (
     <AppShell>
@@ -281,61 +327,140 @@ function CardsPageContent() {
       ) : (
         <>
           {!selected ? (
-            <MotionSection className="mb-4">
-              <div className="usd-card-surface isolate overflow-hidden rounded-[22px] ring-1 ring-[color:var(--usd-card-ring)]">
-                <div className="relative z-[2] flex flex-col gap-4 p-5 sm:p-6">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-[10px] font-bold tracking-[0.2em] uppercase opacity-90">
-                      ORYNO
-                    </p>
-                    <span className="usd-card-chip rounded-full px-2.5 py-0.5 text-[9px] font-bold tracking-wide">
-                      USD VIRTUAL CARD
-                    </span>
-                  </div>
+            <>
+              <MotionSection className="mb-4">
+                <div className="usd-card-surface isolate overflow-hidden rounded-[22px] ring-1 ring-[color:var(--usd-card-ring)]">
+                  <motion.div
+                    aria-hidden
+                    animate={{ x: ["-40%", "140%"] }}
+                    transition={{
+                      duration: 5.5,
+                      repeat: Infinity,
+                      ease: "easeInOut",
+                      repeatDelay: 2,
+                    }}
+                    className="pointer-events-none absolute inset-y-0 z-[1] w-1/3 skew-x-[-18deg] bg-gradient-to-r from-transparent via-[color:var(--usd-card-sheen)] to-transparent"
+                  />
+                  <div className="relative z-[2] flex flex-col gap-4 p-5 sm:p-6">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-[10px] font-bold tracking-[0.2em] uppercase opacity-90">
+                        ORYNO
+                      </p>
+                      <span className="usd-card-chip rounded-full px-2.5 py-0.5 text-[9px] font-bold tracking-wide">
+                        COMING SOON
+                      </span>
+                    </div>
 
-                  <div>
-                    <p className="text-xl font-bold tracking-tight sm:text-2xl">
-                      Purchase a USD virtual card
-                    </p>
-                    <p
-                      className="mt-2 text-sm leading-relaxed"
-                      style={{ color: "var(--usd-card-muted)" }}
-                    >
-                      Pay {data.issueFeeFormatted} via Flutterwave. After
-                      payment, our team reviews your request and issues your
-                      Visa card for online payments worldwide.
-                    </p>
-                  </div>
-
-                  {data.pendingOrder?.status === "paid_pending_review" ? (
-                    <div className="rounded-2xl bg-white/10 px-4 py-3 ring-1 ring-white/15">
-                      <p className="text-sm font-semibold">Under review</p>
+                    <div>
+                      <p className="text-xl font-bold tracking-tight sm:text-2xl">
+                        USD Virtual Card
+                      </p>
                       <p
-                        className="mt-1 text-xs"
+                        className="mt-1.5 text-sm leading-relaxed"
                         style={{ color: "var(--usd-card-muted)" }}
                       >
-                        Payment of {data.pendingOrder.localFormatted} received.
-                        You?ll get a notification when your card is issued.
+                        A Visa card linked to your ORYNO USD wallet ? built for
+                        online payments worldwide. Join the waitlist and we will
+                        notify you the moment it launches.
                       </p>
                     </div>
-                  ) : (
-                    <button
-                      type="button"
-                      disabled={purchasing}
-                      onClick={() => void onPurchase()}
-                      className="usd-card-btn inline-flex h-12 items-center justify-center gap-2 rounded-full text-sm font-bold disabled:opacity-50"
-                    >
-                      {purchasing ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <CreditCard className="h-4 w-4" />
-                      )}
-                      Purchase card - {data.issueFeeFormatted}
-                    </button>
-                  )}
+
+                    <div className="grid grid-cols-3 gap-2 font-mono text-[11px] opacity-80 sm:text-xs">
+                      <div>
+                        <p
+                          className="text-[9px] tracking-wide uppercase"
+                          style={{ color: "var(--usd-card-soft)" }}
+                        >
+                          Number
+                        </p>
+                        <p>**** **** **** ****</p>
+                      </div>
+                      <div>
+                        <p
+                          className="text-[9px] tracking-wide uppercase"
+                          style={{ color: "var(--usd-card-soft)" }}
+                        >
+                          Exp
+                        </p>
+                        <p>**/**</p>
+                      </div>
+                      <div>
+                        <p
+                          className="text-[9px] tracking-wide uppercase"
+                          style={{ color: "var(--usd-card-soft)" }}
+                        >
+                          CVV
+                        </p>
+                        <p>***</p>
+                      </div>
+                    </div>
+
+                    {waitlistJoined ? (
+                      <div className="rounded-2xl bg-white/10 px-4 py-3 ring-1 ring-white/15">
+                        <div className="flex items-center gap-2">
+                          <Check className="h-4 w-4 shrink-0" />
+                          <p className="text-sm font-semibold">
+                            You are on the waitlist
+                          </p>
+                        </div>
+                        <p
+                          className="mt-1 text-xs leading-relaxed"
+                          style={{ color: "var(--usd-card-muted)" }}
+                        >
+                          {data.waitlist?.joinedAt
+                            ? `Joined ${new Date(data.waitlist.joinedAt).toLocaleDateString("en-NG", { dateStyle: "medium" })}. `
+                            : ""}
+                          We will email and push you when {data.issuer} cards go
+                          live.
+                        </p>
+                        <button
+                          type="button"
+                          disabled={joining}
+                          onClick={() => void onLeaveWaitlist()}
+                          className="mt-3 text-[11px] font-semibold underline-offset-2 opacity-80 hover:underline disabled:opacity-50"
+                        >
+                          Leave waitlist
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={joining}
+                        onClick={() => void onJoinWaitlist()}
+                        className="usd-card-btn inline-flex h-12 items-center justify-center gap-2 rounded-full text-sm font-bold disabled:opacity-50"
+                      >
+                        {joining ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Bell className="h-4 w-4" />
+                        )}
+                        Join waitlist
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </MotionSection>
+              </MotionSection>
+
+              <MotionSection
+                delay={0.06}
+                className="mb-4 space-y-3 rounded-[22px] border border-border bg-background p-4 shadow-[var(--shadow-soft)]"
+              >
+                <p className="text-sm font-semibold">What you will get</p>
+                {comingSoonDetails.map((item) => (
+                  <div key={item.title} className="flex gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted">
+                      <item.icon className="h-4 w-4 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold">{item.title}</p>
+                      <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                        {item.body}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </MotionSection>
+            </>
           ) : null}
 
           {selected ? (
@@ -473,7 +598,7 @@ function CardsPageContent() {
                       : "bg-muted text-muted-foreground ring-border",
                   )}
                 >
-                  ???? {card.last4}
+                  **** {card.last4}
                 </button>
               ))}
             </div>
@@ -521,38 +646,6 @@ function CardsPageContent() {
                   onClick={() => void onStatus("terminated")}
                 />
               </div>
-
-              {data.cards.length < data.maxActiveCards ? (
-                <>
-                  <button
-                    type="button"
-                    disabled={
-                      purchasing ||
-                      data.pendingOrder?.status === "paid_pending_review"
-                    }
-                    onClick={() => void onPurchase()}
-                    className="btn-primary mt-4 inline-flex h-12 w-full items-center justify-center gap-2 text-base disabled:opacity-50"
-                  >
-                    {purchasing ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Plus className="h-4 w-4" strokeWidth={2.5} />
-                    )}
-                    Purchase another - {data.issueFeeFormatted}
-                  </button>
-                  <p className="mt-2 text-center text-[11px] text-muted-foreground">
-                    Pay with Flutterwave. Max {data.maxActiveCards} active
-                    cards.
-                  </p>
-                </>
-              ) : null}
-
-              {data.pendingOrder?.status === "paid_pending_review" ? (
-                <p className="mt-3 rounded-xl bg-muted/50 px-3 py-2 text-center text-xs text-muted-foreground">
-                  A purchase is under review ({data.pendingOrder.localFormatted}
-                  ).
-                </p>
-              ) : null}
             </MotionSection>
           ) : null}
         </>

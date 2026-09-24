@@ -652,13 +652,17 @@ export async function getCardsPagePayload(userId: string, fullName: string) {
   const usd = await ensureUsdWallet(userId);
   const cards = await listUserVirtualCards(userId);
   const pendingOrder = await getLatestOpenCardOrder(userId);
+  const { getUsdCardWaitlistStatus } = await import("@/lib/waitlist/usd-card");
+  const waitlist = await getUsdCardWaitlistStatus(userId);
   return {
     issuer: USD_CARD_ISSUER,
     issueFeeUsd: CARD_ISSUE_FEE_USD,
     issueFeeFormatted: formatMoney(CARD_ISSUE_FEE_USD, "USD"),
     maxActiveCards: MAX_ACTIVE_CARDS,
+    comingSoon: true,
     holderName: fullName,
     pendingOrder,
+    waitlist,
     usd: {
       id: usd.id,
       balance: usd.balance,

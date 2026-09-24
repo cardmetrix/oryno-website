@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 
 type Column<T> = {
   key: string;
-  header: string;
+  header: React.ReactNode;
   className?: string;
   /** Hide this column in the mobile card list (e.g. redundant fields). */
   hideOnMobile?: boolean;

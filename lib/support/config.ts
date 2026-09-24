@@ -36,7 +36,7 @@ export const SUPPORT_FAQS = [
   },
   {
     q: "When will USD virtual cards launch?",
-    a: `USD virtual cards (issued with ${USD_CARD_ISSUER}) are available under Cards. Issue a card, fund your USD wallet, then pay online worldwide. Reveal card details with your transaction PIN.`,
+    a: `USD virtual cards (issued with ${USD_CARD_ISSUER}) are coming soon. Open Cards and join the waitlist — we'll email and notify you when they launch.`,
   },
   {
     q: "How do I verify my account (KYC)?",
