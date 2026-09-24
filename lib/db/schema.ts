@@ -1693,15 +1693,35 @@ export const invoices = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     number: varchar("number", { length: 40 }).notNull(),
+    /** Bill from */
+    fromName: varchar("from_name", { length: 160 }),
+    fromEmail: varchar("from_email", { length: 255 }),
+    fromPhone: varchar("from_phone", { length: 40 }),
+    fromAddress: text("from_address"),
+    /** Bill to */
     customerName: varchar("customer_name", { length: 160 }).notNull(),
     customerEmail: varchar("customer_email", { length: 255 }),
     customerPhone: varchar("customer_phone", { length: 40 }),
+    customerAddress: text("customer_address"),
+    /** Optional ship to */
+    shipToName: varchar("ship_to_name", { length: 160 }),
+    shipToAddress: text("ship_to_address"),
     currency: varchar("currency", { length: 3 }).notNull(),
     subtotal: numeric("subtotal", { precision: 18, scale: 2 }).notNull(),
+    taxRate: numeric("tax_rate", { precision: 8, scale: 4 }).notNull().default("0"),
     tax: numeric("tax", { precision: 18, scale: 2 }).notNull().default("0"),
+    discount: numeric("discount", { precision: 18, scale: 2 }).notNull().default("0"),
+    shipping: numeric("shipping", { precision: 18, scale: 2 }).notNull().default("0"),
     total: numeric("total", { precision: 18, scale: 2 }).notNull(),
+    amountPaid: numeric("amount_paid", { precision: 18, scale: 2 })
+      .notNull()
+      .default("0"),
     notes: text("notes"),
+    terms: text("terms"),
+    paymentTerms: varchar("payment_terms", { length: 80 }),
+    poNumber: varchar("po_number", { length: 80 }),
     status: invoiceStatusEnum("status").notNull().default("draft"),
+    issuedAt: timestamp("issued_at", { withTimezone: true }),
     dueAt: timestamp("due_at", { withTimezone: true }),
     paidAt: timestamp("paid_at", { withTimezone: true }),
     metadata: jsonb("metadata").$type<Record<string, unknown>>(),

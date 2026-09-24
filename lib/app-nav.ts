@@ -5,6 +5,7 @@ import {
   History,
   Home,
   LayoutGrid,
+  Link2,
   Phone,
   Settings,
   Smartphone,
@@ -42,6 +43,7 @@ export const serviceNav = [
   { href: "/services/electricity", label: "Electricity", icon: Zap },
   { href: "/services/betting", label: "Betting", icon: Trophy },
   { href: "/invoices", label: "Invoices", icon: FileText },
+  { href: "/payment-links", label: "Payment Links", icon: Link2 },
   { href: "/services", label: "All Services", icon: LayoutGrid },
 ] as const;
 

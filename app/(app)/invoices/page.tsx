@@ -42,8 +42,8 @@ export default function InvoicesPage() {
   return (
     <AppShell>
       <PageHeader
-        title="Invoices"
-        subtitle="Create free professional invoices"
+        title="Invoice Generator"
+        subtitle="Create free professional invoices and download PDFs"
         actions={
           <Link
             href="/invoices/new"
@@ -55,7 +55,7 @@ export default function InvoicesPage() {
       />
       <MotionSection>
         {loading ? (
-          <p className="text-sm text-muted-foreground">Loading invoices…</p>
+          <p className="text-sm text-muted-foreground">Loading invoices...</p>
         ) : error ? (
           <p className="text-sm text-destructive">{error}</p>
         ) : rows.length === 0 ? (

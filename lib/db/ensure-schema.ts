@@ -481,6 +481,26 @@ export async function ensureInvoiceSchema() {
         CREATE UNIQUE INDEX IF NOT EXISTS "invoices_user_number_uidx"
         ON "invoices" ("user_id", "number")
       `);
+      const alters = [
+        sql`ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "from_name" varchar(160)`,
+        sql`ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "from_email" varchar(255)`,
+        sql`ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "from_phone" varchar(40)`,
+        sql`ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "from_address" text`,
+        sql`ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "customer_address" text`,
+        sql`ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "ship_to_name" varchar(160)`,
+        sql`ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "ship_to_address" text`,
+        sql`ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "tax_rate" numeric(8, 4) DEFAULT '0' NOT NULL`,
+        sql`ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "discount" numeric(18, 2) DEFAULT '0' NOT NULL`,
+        sql`ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "shipping" numeric(18, 2) DEFAULT '0' NOT NULL`,
+        sql`ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "amount_paid" numeric(18, 2) DEFAULT '0' NOT NULL`,
+        sql`ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "terms" text`,
+        sql`ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "payment_terms" varchar(80)`,
+        sql`ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "po_number" varchar(80)`,
+        sql`ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "issued_at" timestamptz`,
+      ];
+      for (const stmt of alters) {
+        await db.execute(stmt);
+      }
       await db.execute(sql`
         CREATE TABLE IF NOT EXISTS "invoice_items" (
           "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,

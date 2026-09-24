@@ -1,31 +1,29 @@
 import { NextResponse } from "next/server";
 import { withAdminApi, titleCaseStatus } from "@/lib/admin/api";
-import { listAdminInvoices } from "@/lib/invoices";
-import { formatMoney } from "@/lib/transactions";
-import { db } from "@/lib/db";
-import { platformSettings } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import {
+  getInvoiceSettings,
+  listAdminInvoices,
+  setInvoiceSettings,
+} from "@/lib/invoices";
 
 export const runtime = "nodejs";
 
 export async function GET() {
   return withAdminApi(async () => {
-    const rows = await listAdminInvoices(80);
-    const settings = await db.query.platformSettings.findFirst({
-      where: eq(platformSettings.key, "invoices"),
-    });
+    const [rows, settings] = await Promise.all([
+      listAdminInvoices(80),
+      getInvoiceSettings(),
+    ]);
     return NextResponse.json({
       ok: true,
-      settings: (settings?.value as Record<string, unknown>) || {
-        enabled: true,
-        paymentLinksEnabled: true,
-      },
+      settings,
       invoices: rows.map((row) => ({
         id: row.number,
         customer: row.customerName,
-        amount: formatMoney(Number(row.total), row.currency),
+        amount: row.totalFormatted,
         status: titleCaseStatus(row.status),
         createdAt: row.createdAt,
+        user: row.user,
       })),
     });
   });
@@ -37,17 +35,7 @@ export async function PATCH(req: Request) {
       enabled?: boolean;
       paymentLinksEnabled?: boolean;
     };
-    const value = {
-      enabled: body.enabled !== false,
-      paymentLinksEnabled: body.paymentLinksEnabled !== false,
-    };
-    await db
-      .insert(platformSettings)
-      .values({ key: "invoices", value, updatedAt: new Date() })
-      .onConflictDoUpdate({
-        target: platformSettings.key,
-        set: { value, updatedAt: new Date() },
-      });
-    return NextResponse.json({ ok: true, settings: value });
+    const settings = await setInvoiceSettings(body);
+    return NextResponse.json({ ok: true, settings });
   });
 }

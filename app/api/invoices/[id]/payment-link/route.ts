@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
-import { createPaymentLinkForInvoice } from "@/lib/invoices";
+import {
+  createPaymentLinkForInvoice,
+  getInvoiceSettings,
+} from "@/lib/invoices";
 
 export const runtime = "nodejs";
 
@@ -11,6 +14,15 @@ export async function POST(
   try {
     const user = await ensureAppUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const settings = await getInvoiceSettings();
+    if (!settings.paymentLinksEnabled) {
+      return NextResponse.json(
+        { error: "Payment links are temporarily disabled" },
+        { status: 403 },
+      );
+    }
+
     const { id } = await ctx.params;
     const origin = new URL(req.url).origin;
     const result = await createPaymentLinkForInvoice({

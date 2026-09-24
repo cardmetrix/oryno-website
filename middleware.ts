@@ -48,6 +48,7 @@ const isPublicRoute = createRouteMatcher([
   "/api/sogo(.*)",
   "/api/betting(.*)",
   "/api/invoices(.*)",
+  "/api/payment-links(.*)",
   "/api/pay(.*)",
   "/api/mobile-health(.*)",
   "/pay(.*)",
@@ -76,6 +77,7 @@ const isAppRoute = createRouteMatcher([
   "/support(.*)",
   "/about(.*)",
   "/invoices(.*)",
+  "/payment-links(.*)",
 ]);
 
 const isAdminRoute = createRouteMatcher(["/admin(.*)"]);
