@@ -51,23 +51,23 @@ export function DashboardClient() {
         <AdCarousel />
       </div>
 
-      <MotionSection className="mt-6">
+      <MotionSection className="mt-4 md:mt-5">
         <div className="space-y-4 sm:space-y-5">
-          <MotionSection className="rounded-[28px] border border-border/80 bg-background/90 p-5 shadow-[var(--shadow-soft)] backdrop-blur-sm sm:p-6">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-base font-semibold text-foreground">
+          <MotionSection className="rounded-[20px] border border-border/80 bg-background/90 p-3.5 shadow-[var(--shadow-soft)] backdrop-blur-sm sm:rounded-[22px] sm:p-4">
+            <div className="mb-2.5 flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-foreground sm:text-[15px]">
                 Quick Actions
               </h2>
               <Link
                 href="/services"
-                className="inline-flex items-center gap-1 text-xs font-semibold text-primary"
+                className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary sm:text-xs"
               >
                 View all
-                <ArrowRight className="h-3.5 w-3.5" />
+                <ArrowRight className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
               </Link>
             </div>
 
-            <div className="grid grid-cols-3 gap-3 sm:grid-cols-3 sm:gap-4">
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-3 sm:gap-2.5">
               {quickActions.map((action, index) => (
                 <ServiceActionCard
                   key={action.label}
@@ -75,6 +75,7 @@ export function DashboardClient() {
                   label={action.label}
                   icon={action.icon}
                   index={index}
+                  size="sm"
                 />
               ))}
             </div>

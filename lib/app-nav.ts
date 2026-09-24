@@ -1,5 +1,7 @@
 import {
   Activity,
+  ArrowLeftRight,
+  FileText,
   History,
   Home,
   LayoutGrid,
@@ -19,6 +21,7 @@ import { GiftCardIcon } from "@/components/icons/gift-card-icon";
 export const primaryNav = [
   { href: "/dashboard", label: "Home", icon: Home },
   { href: "/wallet", label: "Wallet", icon: Wallet },
+  { href: "/convert", label: "Convert", icon: ArrowLeftRight },
   { href: "/history", label: "History", icon: History },
   { href: "/profile", label: "Profile", icon: User },
   { href: "/settings", label: "Settings", icon: Settings },
@@ -38,6 +41,7 @@ export const serviceNav = [
   { href: "/services/bills", label: "TV Bills", icon: Tv },
   { href: "/services/electricity", label: "Electricity", icon: Zap },
   { href: "/services/betting", label: "Betting", icon: Trophy },
+  { href: "/invoices", label: "Invoices", icon: FileText },
   { href: "/services", label: "All Services", icon: LayoutGrid },
 ] as const;
 

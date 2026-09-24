@@ -177,10 +177,9 @@ export const COUNTRY_LANGUAGES: Record<SupportedCountryCode, AppLanguage[]> = {
   ],
 };
 
-/** English + country-specific languages for the detected market. */
-export function languagesForCountry(code?: string | null): AppLanguage[] {
-  const country = resolveCountryCode(code);
-  return [ENGLISH_LANGUAGE, ...COUNTRY_LANGUAGES[country]];
+/** App language options — English only for Phase 1. */
+export function languagesForCountry(_code?: string | null): AppLanguage[] {
+  return [ENGLISH_LANGUAGE];
 }
 
 export function isLanguageAllowedForCountry(

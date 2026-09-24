@@ -9,7 +9,6 @@ import {
   ChevronRight,
   FileText,
   HelpCircle,
-  History,
   Languages,
   LockKeyhole,
   LogOut,
@@ -17,7 +16,6 @@ import {
   Moon,
   ShieldCheck,
   UserRound,
-  Wallet,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/app-shell";
@@ -26,13 +24,8 @@ import { PageHeader } from "@/components/app/page-header";
 import { SettingsSkeleton } from "@/components/app/settings-skeleton";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Switch } from "@/components/ui/switch";
-import { useCountry } from "@/components/providers/country-provider";
 import { announceLogout } from "@/lib/auth/client-logout";
 import { AUTH_LINKS } from "@/lib/auth-links";
-import {
-  languageLabel as resolveLanguageLabel,
-  languagesForCountry,
-} from "@/lib/country";
 import type { ProfileDto } from "@/lib/profile";
 import { cn } from "@/lib/utils";
 
@@ -53,13 +46,9 @@ type SettingsPayload = {
 export default function SettingsPage() {
   const { isLoaded } = useUser();
   const { signOut } = useClerk();
-  const { country } = useCountry();
   const [data, setData] = useState<SettingsPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const languages = languagesForCountry(
-    data?.profile.countryCode ?? country.code,
-  );
 
   const load = useCallback(async () => {
     try {
@@ -113,15 +102,6 @@ export default function SettingsPage() {
     }
   }
 
-  async function onLanguage(language: string) {
-    try {
-      await patch({ language });
-      toast.success("Language updated");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Update failed");
-    }
-  }
-
   async function onThemePersist(nextDark: boolean) {
     // ThemeToggle already painted the theme instantly.
     setSaving(true);
@@ -146,12 +126,6 @@ export default function SettingsPage() {
       </AppShell>
     );
   }
-
-  const countryCode = data.profile.countryCode ?? country.code;
-  const languageLabel = resolveLanguageLabel(
-    data.preferences.language,
-    countryCode,
-  );
 
   return (
     <AppShell>
@@ -190,15 +164,20 @@ export default function SettingsPage() {
 
       <MotionSection delay={0.04}>
         <Section title="Account">
-          <Row href="/profile" icon={UserRound} label="Profile Details" hint={data.profile.username ? `@${data.profile.username}` : undefined} />
+          <Row
+            href="/profile"
+            icon={UserRound}
+            label="Profile Details"
+            hint={
+              data.profile.username ? `@${data.profile.username}` : undefined
+            }
+          />
           <Row
             href="/settings/security"
             icon={LockKeyhole}
             label="Security & PIN"
             hint={data.security.hasPin ? "PIN set" : "Set PIN"}
           />
-          <Row href="/wallet" icon={Wallet} label="Wallet & Banks" />
-          <Row href="/history" icon={History} label="Transaction History" />
           <Row href="/invoices" icon={FileText} label="Invoices" hint="Free" />
         </Section>
       </MotionSection>
@@ -223,33 +202,17 @@ export default function SettingsPage() {
             />
           </div>
 
-          <div className="border-t border-border px-4 py-3.5">
-            <div className="mb-2.5 flex items-center gap-3">
+          <div className="flex items-center justify-between border-t border-border px-4 py-3.5">
+            <div className="flex items-center gap-3">
               <IconBubble icon={Languages} />
               <div>
                 <p className="text-sm font-semibold text-foreground">Language</p>
-                <p className="text-xs text-muted-foreground">
-                  {languageLabel} · {country.name}
-                </p>
+                <p className="text-xs text-muted-foreground">English</p>
               </div>
             </div>
-            <div className="flex flex-wrap gap-2 pl-12">
-              {languages.map((lang) => (
-                <button
-                  key={lang.code}
-                  type="button"
-                  onClick={() => void onLanguage(lang.code)}
-                  className={cn(
-                    "rounded-full px-3 py-1.5 text-xs font-semibold transition",
-                    data.preferences.language === lang.code
-                      ? "bg-oryno-charcoal text-white"
-                      : "bg-muted text-muted-foreground hover:bg-oryno-orange-muted hover:text-primary",
-                  )}
-                >
-                  {lang.label}
-                </button>
-              ))}
-            </div>
+            <span className="rounded-full bg-oryno-charcoal px-3 py-1.5 text-xs font-semibold text-white">
+              English
+            </span>
           </div>
 
           <div className="flex items-center justify-between border-t border-border px-4 py-3.5">
