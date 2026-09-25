@@ -189,7 +189,7 @@ export function DashboardWalletCarousel({ className }: Props) {
                 </AnimatePresence>
               </div>
 
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-2 gap-3.5">
                 <motion.div whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }}>
                   <Link href="/fund" className={localFundBtn}>
                     <Plus className="h-3 w-3" strokeWidth={2.5} />
@@ -274,7 +274,7 @@ export function DashboardWalletCarousel({ className }: Props) {
                 </AnimatePresence>
               </div>
 
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-2 gap-3.5">
                 <motion.div whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }}>
                   <Link href="/cards" className={usdFundBtn}>
                     <Plus className="h-3 w-3" strokeWidth={2.5} />
