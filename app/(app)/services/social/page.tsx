@@ -194,7 +194,7 @@ export default function SocialBoostPage() {
         setServices(list);
         if (data.demo) {
           setError(
-            "Social boosting is not live yet. Set JAP_API_KEY and JAP_DEMO=false on the server.",
+            "Social boosting is not available right now. Please try again later.",
           );
         } else if (data.fallback) {
           setError(

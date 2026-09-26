@@ -152,7 +152,7 @@ export async function purchaseJapBoost(input: {
 
   if (isJapDemoMode()) {
     throw new Error(
-      "JustAnotherPanel is not configured for live purchases. Set JAP_API_KEY and JAP_DEMO=false.",
+      "Social boosting is not configured for live purchases.",
     );
   }
 

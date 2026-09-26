@@ -74,7 +74,8 @@ export function herosmsErrorToEnglish(raw: unknown): string {
       .replace(/HeroSMS/gi, "ORYNO")
       .replace(/hero-sms/gi, "oryno")
       .replace(/VTpass/gi, "ORYNO")
-      .replace(/JustAnotherPanel/gi, "ORYNO"),
+      .replace(/JustAnotherPanel/gi, "ORYNO")
+      .replace(/famsup/gi, "ORYNO"),
   );
 }
 

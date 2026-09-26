@@ -1,12 +1,15 @@
 /**
- * JustAnotherPanel (JAP) API client — live social boosting
- * Docs: https://justanotherpanel.com/api
- * Endpoint: POST https://justanotherpanel.com/api/v2
+ * Famsup panel API client — live social boosting
+ * Docs: https://famsup.com (account → API)
+ * Endpoint: POST https://famsup.com/api/v2
+ *
+ * Actions used: services, add, status, balance.
+ * Env: FAMSUP_API_KEY (preferred) or JAP_API_KEY. JAP_DEMO=true forces demo.
  */
 
 import { japErrorToEnglish } from "./errors";
 
-const DEFAULT_BASE = "https://justanotherpanel.com/api/v2";
+const DEFAULT_BASE = "https://famsup.com/api/v2";
 const LOG_PREFIX = "[jap]";
 
 function truncate(value: string, max = 400) {
@@ -21,7 +24,7 @@ function maskKey(key: string) {
 }
 
 export function japApiKey() {
-  return (process.env.JAP_API_KEY || "").trim();
+  return (process.env.FAMSUP_API_KEY || process.env.JAP_API_KEY || "").trim();
 }
 
 export function japBaseUrl() {
@@ -132,7 +135,7 @@ function mapJapServicesPayload(json: unknown): JapService[] {
 async function japPost(params: Record<string, string | number>) {
   logJapModeOnce();
   const key = japApiKey();
-  if (!key) throw new Error("JAP_API_KEY is not configured");
+  if (!key) throw new Error("FAMSUP_API_KEY is not configured");
 
   const body = new URLSearchParams();
   body.set("key", key);
@@ -225,7 +228,7 @@ export async function getJapBalance() {
  */
 export async function assertJapReady(minUsd = 0.01) {
   if (!isJapLive()) {
-    throw new Error("JAP_API_KEY is not configured");
+    throw new Error("FAMSUP_API_KEY is not configured");
   }
   try {
     const { balance, currency } = await getJapBalance();

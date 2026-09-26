@@ -224,15 +224,20 @@ export const SERVICE_PROVIDERS: CountryServiceProvider[] = [
   },
   {
     id: "jap",
-    name: "JustAnotherPanel",
+    name: "Famsup",
     role: "Social boost catalog (all countries)",
     services: ["social"],
     countries: ["NG", "GH", "KE", "ZA"],
-    signupUrl: "https://justanotherpanel.com/signup",
-    dashboardUrl: "https://justanotherpanel.com",
-    apiKeysUrl: "https://justanotherpanel.com/settings",
-    docsUrl: "https://justanotherpanel.com/api",
-    credentials: [{ env: "JAP_API_KEY", label: "API key" }],
+    signupUrl: "https://famsup.com",
+    dashboardUrl: "https://famsup.com",
+    apiKeysUrl: "https://famsup.com",
+    docsUrl: "https://famsup.com/api/v2",
+    credentials: [
+      { env: "FAMSUP_API_KEY", label: "API key (preferred)" },
+      { env: "JAP_API_KEY", label: "API key (fallback name)" },
+    ],
+    notes:
+      "Social boosts are placed on Famsup (POST https://famsup.com/api/v2). Copy the API key from the Famsup account API page. Fund the Famsup wallet before live orders will succeed. Leave JAP_DEMO unset or false.",
   },
   {
     id: "fivesim",

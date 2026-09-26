@@ -1,7 +1,7 @@
 import { publicServiceError, SERVICE_UNAVAILABLE } from "@/lib/service-errors";
 
 /**
- * Map JustAnotherPanel / SMM panel errors to clear English for the UI.
+ * Map Famsup / SMM panel errors to clear English for the UI.
  * Never expose the provider brand name.
  */
 const JAP_ERROR_EN: Record<string, string> = {
@@ -46,6 +46,7 @@ export function japErrorToEnglish(raw: unknown): string {
     text
       .replace(/JustAnotherPanel/gi, "ORYNO")
       .replace(/justanotherpanel/gi, "oryno")
+      .replace(/famsup/gi, "ORYNO")
       .replace(/\bJAP\b/g, "ORYNO"),
   );
 }

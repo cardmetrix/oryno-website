@@ -23,7 +23,7 @@ export type JapCatalogService = JapService & {
   priceUsdFor: (quantity: number) => number;
 };
 
-/** Demo catalog when JAP_API_KEY is missing. Rates = USD per 1000. */
+/** Demo catalog when the Famsup API key is missing. Rates = USD per 1000. */
 export const FALLBACK_JAP_SERVICES: JapService[] = [
   {
     service: 1001,

@@ -104,7 +104,7 @@ export async function GET() {
       },
       {
         id: "jap",
-        name: "JustAnotherPanel",
+        name: "Famsup",
         type: "Social boosting",
         country: "Global",
         status: modeLabel({
