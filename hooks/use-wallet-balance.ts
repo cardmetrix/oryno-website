@@ -39,9 +39,11 @@ export function useWalletBalance() {
 
   const canAffordUsd = useCallback(
     (amount: number) => {
-      if (loading || usdBalance == null || !walletReady) return false;
       if (!Number.isFinite(amount) || amount <= 0) return true;
-      return amount <= usdBalance + 0.0001;
+      // Unknown balance is not "short" — the server checks the real USD wallet.
+      if (loading || usdBalance == null) return true;
+      if (!walletReady) return false;
+      return amount <= usdBalance + 0.009;
     },
     [loading, walletReady, usdBalance],
   );

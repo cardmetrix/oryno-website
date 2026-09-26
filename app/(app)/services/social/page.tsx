@@ -146,7 +146,8 @@ const selectClassName = cn(authInputClassName, "appearance-none pr-10");
 
 export default function SocialBoostPage() {
   const isMobile = useIsMobile();
-  const { canAffordUsd, frozen } = useWalletBalance();
+  const { canAffordUsd, usdBalance, loading: walletLoading, frozen } =
+    useWalletBalance();
   const [platforms, setPlatforms] = useState<string[]>([]);
   const [platform, setPlatform] = useState("");
   const [metric, setMetric] = useState("");
@@ -413,11 +414,10 @@ export default function SocialBoostPage() {
     }
     setCommentsDraft(EMPTY_COMMENTS_DRAFT);
     setQuantityText((prev) => {
+      const floor = Math.max(QUANTITY_FLOOR, selected.min);
       const n = parseQuantityInput(prev);
-      if (n == null) return prev;
-      if (n < Math.max(QUANTITY_FLOOR, selected.min) || n > selected.max) {
-        return "";
-      }
+      if (n == null) return String(Math.min(selected.max, floor));
+      if (n < floor || n > selected.max) return String(Math.min(selected.max, floor));
       return prev;
     });
   }, [selected]);
@@ -635,7 +635,10 @@ export default function SocialBoostPage() {
       ? "Boosting unavailable"
       : frozen
       ? "Wallet unavailable"
-      : amount > 0 && !canAffordUsd(amount)
+      : !walletLoading &&
+        usdBalance != null &&
+        amount > 0 &&
+        !canAffordUsd(amount)
         ? "Insufficient USD balance"
         : selected && quantityValid && quantity != null
           ? `Boost now · ${money(amount)}`
