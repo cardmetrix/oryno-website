@@ -3,19 +3,20 @@
 import { use, useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import {
-  CheckCircle2,
-  Clock3,
   Copy,
   Download,
   Loader2,
   MessageSquareText,
   Phone,
   RefreshCw,
-  RotateCcw,
   Share2,
   TrendingUp,
-  XCircle,
 } from "lucide-react";
+import {
+  StatusMarkIcon,
+  normalizeStatusMark,
+  statusMarkIcon,
+} from "@/components/app/status-mark-icon";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/app-shell";
 import { MotionSection } from "@/components/app/motion-section";
@@ -47,6 +48,22 @@ function isSocialBoostTx(tx: TransactionReceipt) {
   );
 }
 
+/** Receipts that render a live status panel (boost or number SMS). */
+function hasLiveStatusSection(tx: TransactionReceipt) {
+  if (isSocialBoostTx(tx)) {
+    return Boolean(metaString(tx.metadata, "japOrderId") || tx.externalRef);
+  }
+  if (isVirtualNumberTx(tx)) {
+    return Boolean(
+      metaString(tx.metadata, "activationId") ||
+        tx.externalRef ||
+        metaString(tx.metadata, "phoneNumber") ||
+        metaString(tx.metadata, "smsCode"),
+    );
+  }
+  return false;
+}
+
 export default function TransactionReceiptPage({
   params,
 }: {
@@ -59,6 +76,7 @@ export default function TransactionReceiptPage({
   const [error, setError] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [receiptOpen, setReceiptOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -88,6 +106,13 @@ export default function TransactionReceiptPage({
       cancelled = true;
     };
   }, [id]);
+
+  useEffect(() => {
+    setReceiptOpen(false);
+  }, [id]);
+
+  const hasStatusSection = tx ? hasLiveStatusSection(tx) : false;
+  const showReceipt = !hasStatusSection || receiptOpen;
 
   async function buildReceiptImage() {
     if (!tx) throw new Error("No transaction");
@@ -212,7 +237,33 @@ export default function TransactionReceiptPage({
         </MotionSection>
       ) : (
         <>
-          <MotionSection>
+          {isVirtualNumberTx(tx) ? (
+            <MotionSection>
+              <VirtualNumberCodePanel tx={tx} />
+            </MotionSection>
+          ) : null}
+
+          {isSocialBoostTx(tx) ? (
+            <MotionSection>
+              <SocialBoostStatusPanel tx={tx} />
+            </MotionSection>
+          ) : null}
+
+          {hasStatusSection && !receiptOpen ? (
+            <MotionSection delay={0.04} className="mt-5">
+              <button
+                type="button"
+                onClick={() => setReceiptOpen(true)}
+                className="btn-primary inline-flex h-12 w-full items-center justify-center text-sm"
+              >
+                View receipt
+              </button>
+            </MotionSection>
+          ) : null}
+
+          {showReceipt ? (
+          <>
+          <MotionSection className={hasStatusSection ? "mt-5" : undefined}>
             <div
               ref={receiptRef}
               className="overflow-hidden rounded-[28px] bg-background shadow-[var(--shadow-soft)]"
@@ -284,18 +335,6 @@ export default function TransactionReceiptPage({
             </div>
           </MotionSection>
 
-          {isVirtualNumberTx(tx) ? (
-            <MotionSection delay={0.04} className="mt-5">
-              <VirtualNumberCodePanel tx={tx} />
-            </MotionSection>
-          ) : null}
-
-          {isSocialBoostTx(tx) ? (
-            <MotionSection delay={0.04} className="mt-5">
-              <SocialBoostStatusPanel tx={tx} />
-            </MotionSection>
-          ) : null}
-
           <MotionSection delay={0.06} className="mt-5 grid grid-cols-2 gap-3">
             <button
               type="button"
@@ -324,6 +363,8 @@ export default function TransactionReceiptPage({
               Download
             </button>
           </MotionSection>
+          </>
+          ) : null}
         </>
       )}
     </AppShell>
@@ -641,31 +682,12 @@ function VirtualNumberCodePanel({ tx }: { tx: TransactionReceipt }) {
   );
 }
 
-function normalizeStatus(status: string): "Successful" | "Pending" | "Failed" | "Reversed" {
-  const s = status.toLowerCase();
-  if (s === "reversed") return "Reversed";
-  if (s === "failed") return "Failed";
-  if (s === "pending" || s === "processing") return "Pending";
-  if (s === "completed" || s === "successful" || s === "success") return "Successful";
-  return "Successful";
+function normalizeStatus(status: string) {
+  return normalizeStatusMark(status);
 }
 
 function StatusHeroIcon({ status }: { status: string }) {
-  const label = normalizeStatus(status);
-  const Icon =
-    label === "Failed"
-      ? XCircle
-      : label === "Reversed"
-        ? RotateCcw
-        : label === "Pending"
-          ? Clock3
-          : CheckCircle2;
-
-  return (
-    <span className="mx-auto flex h-14 w-14 items-center justify-center">
-      <Icon className="h-full w-full text-white" strokeWidth={1.75} />
-    </span>
-  );
+  return <StatusMarkIcon status={status} className="mx-auto text-white" />;
 }
 
 function ReceiptWatermark() {
@@ -703,14 +725,7 @@ function ReceiptWatermark() {
 
 function StatusPill({ status }: { status: string }) {
   const label = normalizeStatus(status);
-  const Icon =
-    label === "Failed"
-      ? XCircle
-      : label === "Reversed"
-        ? RotateCcw
-        : label === "Pending"
-          ? Clock3
-          : CheckCircle2;
+  const Icon = statusMarkIcon(status);
   return (
     <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white">
       <Icon className="h-3.5 w-3.5" />

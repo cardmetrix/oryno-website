@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertTriangle, Headphones, Loader2, Mail, X } from "lucide-react";
+import { Headphones, Loader2, Mail, X } from "lucide-react";
+import { StatusMarkIcon } from "@/components/app/status-mark-icon";
 import {
   Dialog,
   DialogContent,
@@ -116,9 +117,7 @@ export function ErrorAlertModal({
           </button>
 
           <DialogHeader className="pr-10 text-left">
-            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50 text-red-600">
-              <AlertTriangle className="h-6 w-6" strokeWidth={1.75} />
-            </div>
+            <StatusMarkIcon status="Failed" className="mb-3 text-primary" />
             <DialogTitle className="text-xl font-bold tracking-tight text-foreground">
               Something went wrong
             </DialogTitle>

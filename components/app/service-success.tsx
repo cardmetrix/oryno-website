@@ -3,9 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 import {
-  Check,
   ChevronRight,
-  Clock3,
   Copy,
   FileText,
   Headphones,
@@ -15,6 +13,7 @@ import {
   ShieldCheck,
   Wallet,
 } from "lucide-react";
+import { StatusMarkIcon } from "@/components/app/status-mark-icon";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -159,29 +158,10 @@ export function ServiceSuccess({
           className,
         )}
       >
-        <div className="relative -mt-1 mx-auto flex h-20 w-20 items-center justify-center">
-          <span
-            aria-hidden
-            className={cn(
-              "absolute inset-0 rounded-full",
-              isSuccess ? "bg-[var(--oryno-success)]/20" : "bg-amber-500/15",
-            )}
-          />
-          <span
-            className={cn(
-              "relative flex h-16 w-16 items-center justify-center rounded-full text-white shadow-lg",
-              isSuccess
-                ? "bg-[var(--oryno-success)] shadow-[0_12px_32px_rgba(52,199,89,0.35)]"
-                : "bg-amber-500 shadow-[0_12px_32px_rgba(245,158,11,0.3)]",
-            )}
-          >
-            {isSuccess ? (
-              <Check className="h-8 w-8" strokeWidth={2.5} />
-            ) : (
-              <Clock3 className="h-7 w-7" strokeWidth={2} />
-            )}
-          </span>
-        </div>
+        <StatusMarkIcon
+          status={isSuccess ? "Successful" : "Pending"}
+          className="mx-auto -mt-1 text-primary"
+        />
 
         <DialogTitle className="mt-3 text-2xl font-bold tracking-tight text-foreground">
           {title}
