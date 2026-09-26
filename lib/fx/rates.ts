@@ -32,6 +32,7 @@ async function fetchUsdRates(): Promise<{
     const res = await fetch("https://open.er-api.com/v6/latest/USD", {
       cache: "no-store",
       next: { revalidate: 0 },
+      signal: AbortSignal.timeout(8_000),
     });
     if (res.ok) {
       const json = (await res.json()) as {
@@ -56,6 +57,7 @@ async function fetchUsdRates(): Promise<{
   try {
     const res = await fetch("https://api.frankfurter.app/latest?from=USD", {
       cache: "no-store",
+      signal: AbortSignal.timeout(8_000),
     });
     if (res.ok) {
       const json = (await res.json()) as {

@@ -241,6 +241,16 @@ async function japPost(params: Record<string, string | number>) {
   return json;
 }
 
+/** First Famsup call for an order: balance must return before we charge anyone. */
+export async function pingFamsup() {
+  const started = Date.now();
+  console.log("[boost] famsup api request", { action: "balance" });
+  const result = await getJapBalance();
+  const ms = Date.now() - started;
+  console.log("[boost] famsup api ok", { ...result, ms });
+  return { ...result, ms };
+}
+
 export async function getJapBalance() {
   const json = (await japPost({ action: "balance" })) as {
     balance?: string;
@@ -302,12 +312,20 @@ export async function getJapServices(): Promise<JapService[]> {
     const json = await japPost({ action: "services" });
     const raw = mapJapServicesPayload(json);
     const panelCurrency = famsupPanelCurrency();
-    const data = await Promise.all(
-      raw.map(async (service) => ({
-        ...service,
-        rate: await famsupAmountToUsd(service.rate, panelCurrency),
-      })),
-    );
+    let perUsd = 1;
+    if (panelCurrency !== "USD" && panelCurrency !== "USDT") {
+      try {
+        perUsd = (await getUsdMidRate(panelCurrency)).midRate;
+      } catch (error) {
+        console.warn("[boost] fx unavailable, using fallback rate", error);
+        perUsd = panelCurrency === "NGN" ? 1600 : 0;
+        if (!(perUsd > 0)) throw error;
+      }
+    }
+    const data = raw.map((service) => ({
+      ...service,
+      rate: roundPanelUsd(service.rate / perUsd),
+    }));
     console.log(LOG_PREFIX, "services", {
       count: data.length,
       panelCurrency,
