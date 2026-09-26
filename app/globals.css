@@ -466,22 +466,6 @@ img {
   }
 }
 
-@keyframes oryno-refresh-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes oryno-refresh-pulse {
-  0%,
-  100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(0.94);
-  }
-}
-
 @keyframes shimmer {
   100% {
     transform: translateX(100%);

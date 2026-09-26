@@ -144,7 +144,7 @@ export default function HistoryPage() {
   }
 
   return (
-    <AppShell onRefresh={() => load()}>
+    <AppShell>
       <PageHeader
         title="Transactions"
         backHref="/dashboard"
