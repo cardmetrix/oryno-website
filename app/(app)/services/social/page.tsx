@@ -26,6 +26,7 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useInvalidateWallet } from "@/hooks/use-wallet";
 import { useWalletBalance } from "@/hooks/use-wallet-balance";
 import { formatUsd } from "@/lib/country";
 import { isCustomCommentsService } from "@/lib/jap/catalog";
@@ -146,6 +147,7 @@ const selectClassName = cn(authInputClassName, "appearance-none pr-10");
 
 export default function SocialBoostPage() {
   const isMobile = useIsMobile();
+  const refreshWallet = useInvalidateWallet();
   const { canAffordUsd, usdBalance, loading: walletLoading, frozen } =
     useWalletBalance();
   const [platforms, setPlatforms] = useState<string[]>([]);
@@ -453,10 +455,10 @@ export default function SocialBoostPage() {
         const data = await res.json();
         if (data.data?.status) {
           setStatusLabel(String(data.data.status));
-          const done = /completed|partial|canceled|cancelled|refunded/i.test(
-            String(data.data.status),
-          );
-          if (done) {
+          const label = String(data.data.status);
+          const done = /^(completed|success|done|finished)$/i.test(label.trim());
+          const failed = /cancel|refund|fail|reject/i.test(label);
+          if (done || failed) {
             setPolling(false);
             return;
           }
@@ -641,6 +643,7 @@ export default function SocialBoostPage() {
       setReceipt(data.amountFormatted);
       setStatusLabel(data.simulated ? "Demo · In progress" : "Pending");
       setSuccess(true);
+      refreshWallet();
     } catch (err) {
       const timedOut =
         err instanceof Error &&
@@ -696,12 +699,11 @@ export default function SocialBoostPage() {
           <MotionSection key="success">
             <ServiceSuccess
               variant={
-                statusLabel &&
-                /completed|partial/i.test(statusLabel)
+                statusLabel && /^(completed|success|done|finished)$/i.test(
+                  statusLabel.trim(),
+                )
                   ? "success"
-                  : polling
-                    ? "pending"
-                    : "success"
+                  : "pending"
               }
               title="Boost ordered!"
               subtitle={`${(quantity ?? 0).toLocaleString()} ${selected.metric.toLowerCase()} for ${selected.platform}`}

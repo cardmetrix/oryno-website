@@ -258,12 +258,22 @@ export default function TransactionReceiptPage({
                   <DetailRow label="Type" value={credit ? "Credit" : "Debit"} />
                   <DetailRow label="Date" value={tx.createdAtFormatted} />
                   <DetailRow label="Reference" value={tx.reference} mono />
-                  <DetailRow label="Currency" value={tx.currency ?? "NGN"} />
+                  <DetailRow
+                    label="Currency"
+                    value={
+                      isSocialBoostTx(tx)
+                        ? tx.currency ?? "USD"
+                        : tx.currency ?? "NGN"
+                    }
+                  />
                   {isVirtualNumberTx(tx) ? (
                     <VirtualNumberDetails meta={tx.metadata} />
                   ) : null}
                   {isSocialBoostTx(tx) ? (
-                    <SocialBoostDetails meta={tx.metadata} />
+                    <>
+                      <DetailRow label="Paid from" value="USD wallet" />
+                      <SocialBoostDetails meta={tx.metadata} />
+                    </>
                   ) : null}
                 </div>
               </div>

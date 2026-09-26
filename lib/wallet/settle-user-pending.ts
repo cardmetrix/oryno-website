@@ -187,6 +187,25 @@ async function settleOnePending(row: PendingRow) {
   if (row.category === "virtual_number") {
     return "still_pending" as const;
   }
+  if (row.category === "social") {
+    const japOrderId = String(meta.japOrderId || row.externalRef || "").trim();
+    if (japOrderId) {
+      try {
+        const { pollJapOrderStatus } = await import("@/lib/jap/purchase");
+        const polled = await pollJapOrderStatus(japOrderId, row.userId);
+        if (polled.orderStatus === "completed") return "completed" as const;
+        if (
+          polled.orderStatus === "failed" ||
+          polled.orderStatus === "cancelled"
+        ) {
+          return "failed" as const;
+        }
+      } catch (error) {
+        console.error("[settle-pending-social]", row.id, error);
+      }
+    }
+    return "still_pending" as const;
+  }
   if (row.type === "credit") {
     await db
       .update(transactions)

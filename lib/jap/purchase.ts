@@ -303,7 +303,7 @@ export async function purchaseJapBoost(input: {
     await db
       .update(transactions)
       .set({
-        status: "completed",
+        status: "processing",
         externalRef: orderId,
         relatedOrderId: order?.id,
         relatedOrderType: "social_order",
@@ -311,8 +311,11 @@ export async function purchaseJapBoost(input: {
         metadata: {
           provider: "jap",
           kind: "social_boost",
+          chargedFrom: "usd_wallet",
           japOrderId: orderId,
           japServiceId: input.serviceId,
+          japStatus: "Pending",
+          orderStatus: "processing",
           quantity,
           link,
           simulated: false,
@@ -377,11 +380,60 @@ export async function purchaseJapBoost(input: {
 function mapJapStatusToOrder(
   raw: string,
 ): "processing" | "completed" | "failed" | "cancelled" {
-  const s = raw.toLowerCase();
+  const s = raw.toLowerCase().trim();
   if (/cancel|refund/.test(s)) return "cancelled";
   if (/fail|error|reject/.test(s)) return "failed";
-  if (/complet|partial|done|success|finish/.test(s)) return "completed";
+  if (/partial|in progress|processing|pending|queue|started/.test(s)) {
+    return "processing";
+  }
+  if (/complet|done|success|finish/.test(s)) return "completed";
   return "processing";
+}
+
+async function syncBoostTransactionStatus(input: {
+  transactionId: string;
+  rawStatus: string;
+  orderStatus: "processing" | "completed" | "failed" | "cancelled";
+  userId: string;
+}) {
+  const tx = await db.query.transactions.findFirst({
+    where: eq(transactions.id, input.transactionId),
+  });
+  if (!tx) return;
+
+  const meta = (tx.metadata || {}) as Record<string, unknown>;
+  const txStatus =
+    input.orderStatus === "completed"
+      ? "completed"
+      : input.orderStatus === "failed" || input.orderStatus === "cancelled"
+        ? "failed"
+        : "processing";
+
+  await db
+    .update(transactions)
+    .set({
+      status: txStatus,
+      metadata: {
+        ...meta,
+        japStatus: input.rawStatus,
+        orderStatus: input.orderStatus,
+        chargedFrom: meta.chargedFrom ?? "usd_wallet",
+      },
+      updatedAt: new Date(),
+    })
+    .where(eq(transactions.id, tx.id));
+
+  if (
+    (input.orderStatus === "failed" || input.orderStatus === "cancelled") &&
+    (tx.status === "processing" || tx.status === "pending")
+  ) {
+    await refundDebit({
+      walletId: tx.walletId,
+      transactionId: tx.id,
+      amount: Number(tx.amount),
+      reason: `Boost ${input.rawStatus}`,
+    });
+  }
 }
 
 export async function pollJapOrderStatus(orderId: string, userId?: string) {
@@ -430,6 +482,15 @@ export async function pollJapOrderStatus(orderId: string, userId?: string) {
         updatedAt: new Date(),
       })
       .where(eq(socialOrders.id, owned.id));
+  }
+
+  if (owned?.transactionId) {
+    await syncBoostTransactionStatus({
+      transactionId: owned.transactionId,
+      rawStatus,
+      orderStatus,
+      userId: userId || owned.userId,
+    });
   }
 
   if (
