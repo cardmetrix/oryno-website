@@ -8,6 +8,7 @@ import {
   groupTransactionsByDate,
   toAppTransaction,
 } from "@/lib/transactions";
+import { scheduleUserBackgroundSettle } from "@/lib/wallet/background-settle";
 
 export const runtime = "nodejs";
 
@@ -18,13 +19,7 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    void import("@/lib/wallet/settle-user-pending")
-      .then((m) =>
-        m.settleUserPendingTransactions({ userId: user.id, limit: 10 }),
-      )
-      .catch((error) => {
-        console.error("[transactions-get-settle]", error);
-      });
+    scheduleUserBackgroundSettle(user.id, "quick");
 
     const rows = await db.query.transactions.findMany({
       where: eq(transactions.userId, user.id),

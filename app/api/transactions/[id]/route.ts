@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { transactions } from "@/lib/db/schema";
 import { getDisplayFx } from "@/lib/display-currency";
 import { toTransactionReceipt } from "@/lib/transactions";
+import { scheduleUserBackgroundSettle } from "@/lib/wallet/background-settle";
 
 export const runtime = "nodejs";
 
@@ -22,13 +23,7 @@ export async function GET(_req: Request, { params }: Params) {
       return NextResponse.json({ error: "Missing id" }, { status: 400 });
     }
 
-    await import("@/lib/wallet/settle-user-pending")
-      .then((m) =>
-        m.settleUserPendingTransactions({ userId: user.id, limit: 15 }),
-      )
-      .catch((error) => {
-        console.error("[transactions-id-settle]", error);
-      });
+    scheduleUserBackgroundSettle(user.id, "quick");
 
     const row = await db.query.transactions.findFirst({
       where: and(eq(transactions.id, id), eq(transactions.userId, user.id)),

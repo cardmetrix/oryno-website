@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
+import { scheduleUserBackgroundSettle } from "@/lib/wallet/background-settle";
 import { loadWalletPayload } from "@/lib/wallet/load-payload";
 
 export const runtime = "nodejs";
@@ -17,13 +18,7 @@ export async function GET(req: Request) {
       );
     }
 
-    void import("@/lib/wallet/settle-user-pending")
-      .then((m) =>
-        m.settleUserPendingTransactions({ userId: user.id, limit: 15 }),
-      )
-      .catch((error) => {
-        console.error("[wallet-settle-pending]", error);
-      });
+    scheduleUserBackgroundSettle(user.id, "quick");
 
     const payload = await loadWalletPayload(user);
 

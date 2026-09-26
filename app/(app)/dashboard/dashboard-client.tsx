@@ -21,6 +21,7 @@ import { ServiceActionCard } from "@/components/app/service-action-card";
 import { GiftCardIcon } from "@/components/icons/gift-card-icon";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useWallet } from "@/hooks/use-wallet";
+import { useProcessingTransactionRefresh } from "@/hooks/use-processing-transaction-refresh";
 import { useSettlePendingTransactions } from "@/hooks/use-settle-pending-transactions";
 import type { AppTransaction } from "@/lib/transactions";
 
@@ -36,6 +37,7 @@ const quickActions = [
 export function DashboardClient() {
   const { data, isLoading } = useWallet();
   useSettlePendingTransactions(true);
+  useProcessingTransactionRefresh(true);
   const recent = (data?.recent.slice(0, 4) ?? []) as AppTransaction[];
   const loadingTx = isLoading && !data;
 

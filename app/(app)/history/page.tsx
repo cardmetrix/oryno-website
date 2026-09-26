@@ -53,31 +53,51 @@ export default function HistoryPage() {
     return (fromItems || country.currency || "NGN").toUpperCase();
   }, [items, country.currency]);
 
+  const fetchItems = useCallback(async () => {
+    const txRes = await fetch("/api/transactions", { cache: "no-store" });
+    if (!txRes.ok) throw new Error("Failed");
+    const json = (await txRes.json()) as { items: AppTransaction[] };
+    return json.items ?? [];
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(false);
     try {
-      const settled = await settlePending();
-      if (
-        settled &&
-        (settled.completed ?? 0) + (settled.reversed ?? 0) + (settled.failed ?? 0) > 0
-      ) {
-        toast.message("Pending transactions updated", {
-          description:
-            "Older pending withdrawals were completed or returned to your wallet.",
-        });
-      }
-      const txRes = await fetch("/api/transactions", { cache: "no-store" });
-      if (!txRes.ok) throw new Error("Failed");
-      const json = (await txRes.json()) as { items: AppTransaction[] };
-      setItems(json.items ?? []);
+      setItems(await fetchItems());
+      void settlePending().then(async (settled) => {
+        if (
+          settled &&
+          !settled.queued &&
+          (settled.completed ?? 0) +
+            (settled.reversed ?? 0) +
+            (settled.failed ?? 0) >
+            0
+        ) {
+          toast.message("Pending transactions updated", {
+            description:
+              "Older pending withdrawals were completed or returned to your wallet.",
+          });
+          try {
+            setItems(await fetchItems());
+          } catch {
+            /* ignore background refresh errors */
+          }
+        } else if (settled?.queued) {
+          window.setTimeout(() => {
+            void fetchItems()
+              .then(setItems)
+              .catch(() => undefined);
+          }, 15_000);
+        }
+      });
     } catch {
       setError(true);
       setItems([]);
     } finally {
       setLoading(false);
     }
-  }, [settlePending]);
+  }, [fetchItems, settlePending]);
 
   useEffect(() => {
     void load();

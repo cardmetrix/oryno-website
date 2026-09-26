@@ -179,7 +179,44 @@ async function settlePendingService(row: PendingRow) {
   return "reversed" as const;
 }
 
-async function settleOnePending(row: PendingRow) {
+const SOCIAL_POLL_TIMEOUT_MS = 8_000;
+
+async function pollSocialBoostRow(row: PendingRow) {
+  const meta = (row.metadata || {}) as Record<string, unknown>;
+  const japOrderId = String(meta.japOrderId || row.externalRef || "").trim();
+  if (!japOrderId) {
+    return "still_pending" as const;
+  }
+  try {
+    const { pollJapOrderStatus } = await import("@/lib/jap/purchase");
+    const polled = await Promise.race([
+      pollJapOrderStatus(japOrderId, row.userId),
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error("Boost status check timed out")),
+          SOCIAL_POLL_TIMEOUT_MS,
+        ),
+      ),
+    ]);
+    if (polled.orderStatus === "completed") return "completed" as const;
+    if (
+      polled.orderStatus === "failed" ||
+      polled.orderStatus === "cancelled"
+    ) {
+      return "failed" as const;
+    }
+  } catch (error) {
+    console.error("[settle-pending-social]", row.id, error);
+  }
+  return "still_pending" as const;
+}
+
+type SettleOneOptions = { pollSocialBoosts?: boolean };
+
+async function settleOnePending(
+  row: PendingRow,
+  options?: SettleOneOptions,
+) {
   if (row.category === "withdraw") {
     return settlePendingWithdrawal(row);
   }
@@ -188,32 +225,10 @@ async function settleOnePending(row: PendingRow) {
     return "still_pending" as const;
   }
   if (row.category === "social") {
-    const meta = (row.metadata || {}) as Record<string, unknown>;
-    const japOrderId = String(meta.japOrderId || row.externalRef || "").trim();
-    if (japOrderId) {
-      try {
-        const { pollJapOrderStatus } = await import("@/lib/jap/purchase");
-        const polled = await Promise.race([
-          pollJapOrderStatus(japOrderId, row.userId),
-          new Promise<never>((_, reject) =>
-            setTimeout(
-              () => reject(new Error("Boost status check timed out")),
-              12_000,
-            ),
-          ),
-        ]);
-        if (polled.orderStatus === "completed") return "completed" as const;
-        if (
-          polled.orderStatus === "failed" ||
-          polled.orderStatus === "cancelled"
-        ) {
-          return "failed" as const;
-        }
-      } catch (error) {
-        console.error("[settle-pending-social]", row.id, error);
-      }
+    if (!options?.pollSocialBoosts) {
+      return "still_pending" as const;
     }
-    return "still_pending" as const;
+    return pollSocialBoostRow(row);
   }
   if (row.type === "credit") {
     await db
@@ -233,11 +248,39 @@ async function settleOnePending(row: PendingRow) {
   return settlePendingService(row);
 }
 
+/** Poll Famsup for in-flight boosts (any age); safe to run in background only. */
+export async function syncPendingSocialBoosts(input: {
+  userId: string;
+  limit?: number;
+}) {
+  const open = await db.query.transactions.findMany({
+    where: and(
+      eq(transactions.userId, input.userId),
+      eq(transactions.category, "social"),
+      inArray(transactions.status, [...OPEN_STATUSES]),
+    ),
+    limit: input.limit ?? 5,
+    orderBy: (t, { desc }) => [desc(t.createdAt)],
+  });
+
+  let completed = 0;
+  let failed = 0;
+  for (const row of open) {
+    const action = await pollSocialBoostRow(row);
+    if (action === "completed") completed += 1;
+    else if (action === "failed") failed += 1;
+  }
+  return { scanned: open.length, completed, failed };
+}
+
 /** Complete, fail, or reverse a user's pending transactions older than 5 minutes. */
 export async function settleUserPendingTransactions(input: {
   userId: string;
   limit?: number;
+  /** When false, skips slow Famsup polls (use syncPendingSocialBoosts in background). */
+  pollSocialBoosts?: boolean;
 }) {
+  const pollSocialBoosts = input.pollSocialBoosts ?? true;
   const withdrawalSettle = await settleStuckWithdrawals({
     userId: input.userId,
     limit: input.limit ?? 25,
@@ -288,7 +331,7 @@ export async function settleUserPendingTransactions(input: {
         continue;
       }
 
-      const action = await settleOnePending(row);
+      const action = await settleOnePending(row, { pollSocialBoosts });
       results.push({ id: row.id, action });
       if (action === "completed") completed += 1;
       else if (action === "reversed") reversed += 1;

@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
-import { settleUserPendingTransactions } from "@/lib/wallet/settle-user-pending";
+import { scheduleUserBackgroundSettle } from "@/lib/wallet/background-settle";
 
 export const runtime = "nodejs";
 
-/** Resolve the current user's pending transactions older than 5 minutes. */
+/** Queue pending-tx / boost sync (runs after response via `after()`). */
 export async function POST() {
   try {
     const user = await ensureAppUser();
@@ -12,14 +12,11 @@ export async function POST() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const result = await settleUserPendingTransactions({
-      userId: user.id,
-      limit: 15,
-    });
+    scheduleUserBackgroundSettle(user.id, "full");
 
     return NextResponse.json({
       ok: true,
-      ...result,
+      queued: true,
     });
   } catch (error) {
     console.error("[transactions-settle]", error);

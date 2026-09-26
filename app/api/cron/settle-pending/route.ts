@@ -50,8 +50,16 @@ export async function POST(req: Request) {
     const userSettles = [];
     for (const userId of userIds) {
       userSettles.push(
-        await settleUserPendingTransactions({ userId, limit: 8 }),
+        await settleUserPendingTransactions({
+          userId,
+          limit: 8,
+          pollSocialBoosts: false,
+        }),
       );
+      const { syncPendingSocialBoosts } = await import(
+        "@/lib/wallet/settle-user-pending"
+      );
+      await syncPendingSocialBoosts({ userId, limit: 6 });
     }
     return NextResponse.json({
       ok: true,

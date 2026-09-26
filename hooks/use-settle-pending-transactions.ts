@@ -6,17 +6,19 @@ import { WALLET_QUERY_KEY } from "@/lib/query-keys";
 
 type SettleResult = {
   ok?: boolean;
+  queued?: boolean;
   scanned?: number;
   completed?: number;
   reversed?: number;
   failed?: number;
 };
 
-const POLL_MS = 60_000;
+const POLL_MS = 5 * 60_000;
+const INITIAL_DELAY_MS = 4_000;
 
 /**
- * Checks pending/processing transactions older than 5 minutes from createdAt,
- * then completes, fails, or reverses them based on the provider state.
+ * Queues server-side pending-tx / boost sync (non-blocking).
+ * Wallet and history refresh via useProcessingTransactionRefresh when txs are open.
  */
 export function useSettlePendingTransactions(enabled = true) {
   const queryClient = useQueryClient();
@@ -29,11 +31,20 @@ export function useSettlePendingTransactions(enabled = true) {
       const res = await fetch("/api/transactions/settle", {
         method: "POST",
         cache: "no-store",
-        signal: AbortSignal.timeout(15_000),
+        signal: AbortSignal.timeout(8_000),
       });
       if (!res.ok) return null;
       const json = (await res.json()) as SettleResult;
-      if ((json.completed ?? 0) + (json.reversed ?? 0) + (json.failed ?? 0) > 0) {
+      if (json.queued) {
+        window.setTimeout(() => {
+          void queryClient.invalidateQueries({ queryKey: WALLET_QUERY_KEY });
+        }, 12_000);
+        return json;
+      }
+      if (
+        (json.completed ?? 0) + (json.reversed ?? 0) + (json.failed ?? 0) >
+        0
+      ) {
         void queryClient.invalidateQueries({ queryKey: WALLET_QUERY_KEY });
       }
       return json;
@@ -47,7 +58,9 @@ export function useSettlePendingTransactions(enabled = true) {
 
   useEffect(() => {
     if (!enabled) return;
-    void settle();
+    const startId = window.setTimeout(() => {
+      void settle();
+    }, INITIAL_DELAY_MS);
     const id = window.setInterval(() => {
       void settle();
     }, POLL_MS);
@@ -56,6 +69,7 @@ export function useSettlePendingTransactions(enabled = true) {
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => {
+      window.clearTimeout(startId);
       window.clearInterval(id);
       document.removeEventListener("visibilitychange", onVisible);
     };
