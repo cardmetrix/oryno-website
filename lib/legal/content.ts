@@ -33,6 +33,7 @@ export const TERMS_OF_SERVICE: {
         "You must be at least 18 years old (or the age of majority where you live) and able to form a binding contract. You may only open one personal account unless we expressly allow otherwise. Some Services are available only in selected countries.",
       ],
     },
+    
     {
       heading: "3. Your account",
       paragraphs: [
