@@ -16,7 +16,6 @@ import {
 import { refundFailedDebit } from "@/lib/wallet/ledger";
 import {
   addJapOrder,
-  assertJapReady,
   getJapOrderStatus,
   getJapServices,
   isJapDemoMode,
@@ -247,10 +246,6 @@ export async function purchaseJapBoost(input: {
     buyRate: quote.buyRate,
     companyCharge,
   });
-
-  step("checking provider balance");
-  await assertJapReady(Math.max(0.01, wholesaleUsd * 0.5));
-  step("provider balance ok");
 
   step("debiting usd wallet", { chargeAmount });
   const debit = await debitUsdWallet({

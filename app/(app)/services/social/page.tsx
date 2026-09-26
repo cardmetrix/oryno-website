@@ -626,7 +626,7 @@ export default function SocialBoostPage() {
           priceLocal: amount,
           ...(isCustomComments ? { comments: filledComments } : {}),
         }),
-        signal: AbortSignal.timeout(45_000),
+        signal: AbortSignal.timeout(25_000),
       });
       const data = await res.json().catch(() => ({}));
       console.log("[boost] response", {

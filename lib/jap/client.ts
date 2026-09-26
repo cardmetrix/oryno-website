@@ -78,12 +78,12 @@ const JAP_SERVICES_TTL_MS = 10 * 60 * 1000;
 /** Keep serving a previous catalog longer when the live panel is slow/down. */
 const JAP_SERVICES_STALE_MAX_MS = 6 * 60 * 60 * 1000;
 const JAP_TIMEOUT_MS: Record<string, number> = {
-  services: 25_000,
-  balance: 12_000,
-  add: 20_000,
-  status: 12_000,
+  services: 10_000,
+  balance: 8_000,
+  add: 15_000,
+  status: 8_000,
 };
-const JAP_TIMEOUT_DEFAULT_MS = 15_000;
+const JAP_TIMEOUT_DEFAULT_MS = 10_000;
 
 let japServicesCache: { at: number; data: JapService[] } | null = null;
 
@@ -183,9 +183,12 @@ async function japPost(params: Record<string, string | number>) {
   });
 
   const started = Date.now();
+  const timeoutMs = japTimeoutMs(action);
   let res: Response;
   try {
-    res = await fetch(japBaseUrl(), {
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const request = fetch(japBaseUrl(), {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
@@ -193,8 +196,24 @@ async function japPost(params: Record<string, string | number>) {
       },
       body: body.toString(),
       cache: "no-store",
-      signal: AbortSignal.timeout(japTimeoutMs(action)),
+      signal: controller.signal,
+    }).finally(() => {
+      if (timer) clearTimeout(timer);
     });
+    request.catch(() => undefined);
+    res = await Promise.race([
+      request,
+      new Promise<Response>((_, reject) => {
+        timer = setTimeout(() => {
+          controller.abort();
+          reject(
+            Object.assign(new Error("Boost provider timed out"), {
+              name: "TimeoutError",
+            }),
+          );
+        }, timeoutMs);
+      }),
+    ]);
   } catch (error) {
     const timedOut =
       error instanceof Error &&

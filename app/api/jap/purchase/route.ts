@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
 import { createNotification } from "@/lib/notifications-service";
 import { formatMoney } from "@/lib/transactions";
-import { japErrorToEnglish, pingFamsup, purchaseJapBoost } from "@/lib/jap";
+import { japErrorToEnglish, purchaseJapBoost } from "@/lib/jap";
 import { actionLockHttpStatus } from "@/lib/wallet/action-lock";
 
 export const runtime = "nodejs";
@@ -14,14 +14,6 @@ export async function POST(req: Request) {
   };
   step("request received");
   try {
-    step("calling famsup api");
-    const api = await pingFamsup();
-    step("famsup api ok", {
-      balance: api.balance,
-      currency: api.currency,
-      apiMs: api.ms,
-    });
-
     const user = await ensureAppUser();
     step("user loaded", { userId: user?.id ?? null });
     if (!user) {
