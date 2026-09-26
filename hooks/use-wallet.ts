@@ -11,7 +11,10 @@ import type { WalletPayload } from "@/lib/wallet-types";
 export { WALLET_QUERY_KEY };
 
 export async function fetchWallet(): Promise<WalletPayload> {
-  const res = await fetch("/api/wallet", { cache: "no-store" });
+  const res = await fetch("/api/wallet", {
+    cache: "no-store",
+    signal: AbortSignal.timeout(25_000),
+  });
   if (!res.ok) throw new Error("Failed to load wallet");
   return (await res.json()) as WalletPayload;
 }

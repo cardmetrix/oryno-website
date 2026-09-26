@@ -15,16 +15,11 @@ const globalForDb = globalThis as unknown as {
 };
 
 /**
- * Supabase session mode (pooler port 5432) caps at ~15 clients and returns
- * EMAXCONNSESSION. App queries use the transaction pooler on 6543 instead.
- * `prepare: false` below is required for that mode.
+ * Supabase pooler URLs: keep session mode (5432) so DDL in ensureWalletSchema works.
+ * postgres.js `max: 1` limits connections per serverless instance.
  */
 export function appDatabaseUrl(raw: string): string {
-  if (!/pooler\.supabase\.com/i.test(raw)) return raw;
-  return raw.replace(
-    /(pooler\.supabase\.com):5432(?=\/|\?|$)/i,
-    "$1:6543",
-  );
+  return raw.trim();
 }
 
 function createClient() {

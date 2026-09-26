@@ -5,7 +5,6 @@ import {
   lookupFlutterwaveTransfer,
   settlePayoutTransfer,
 } from "@/lib/flutterwave/transfers";
-import { pollJapOrderStatus } from "@/lib/jap";
 import { refundFailedDebit } from "@/lib/wallet/ledger";
 import { settleStuckWithdrawals } from "@/lib/wallet/settle-withdrawals";
 
@@ -193,7 +192,16 @@ async function settleOnePending(row: PendingRow) {
     const japOrderId = String(meta.japOrderId || row.externalRef || "").trim();
     if (japOrderId) {
       try {
-        const polled = await pollJapOrderStatus(japOrderId, row.userId);
+        const { pollJapOrderStatus } = await import("@/lib/jap/purchase");
+        const polled = await Promise.race([
+          pollJapOrderStatus(japOrderId, row.userId),
+          new Promise<never>((_, reject) =>
+            setTimeout(
+              () => reject(new Error("Boost status check timed out")),
+              12_000,
+            ),
+          ),
+        ]);
         if (polled.orderStatus === "completed") return "completed" as const;
         if (
           polled.orderStatus === "failed" ||

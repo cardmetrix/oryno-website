@@ -29,6 +29,7 @@ export function useSettlePendingTransactions(enabled = true) {
       const res = await fetch("/api/transactions/settle", {
         method: "POST",
         cache: "no-store",
+        signal: AbortSignal.timeout(15_000),
       });
       if (!res.ok) return null;
       const json = (await res.json()) as SettleResult;
