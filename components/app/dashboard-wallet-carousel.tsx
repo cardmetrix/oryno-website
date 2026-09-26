@@ -25,7 +25,7 @@ export function DashboardWalletCarousel({ className }: Props) {
   if (isLoading && !data) {
     return (
       <div className={cn(className)}>
-        <div className="h-[148px] w-full animate-pulse rounded-[20px] bg-muted sm:h-[156px] md:rounded-[22px]" />
+        <div className="h-[148px] w-full animate-pulse bg-muted sm:h-[156px]" />
       </div>
     );
   }
@@ -111,7 +111,7 @@ export function DashboardWalletCarousel({ className }: Props) {
     "box-border w-full min-w-full max-w-full shrink-0 basis-full snap-start snap-always",
     "md:min-w-0 md:max-w-none md:basis-auto md:snap-none",
   );
-  const cardRadius = "overflow-hidden rounded-[20px] md:rounded-[22px]";
+  const cardRadius = "overflow-hidden";
 
   return (
     <div className={cn("w-full", className)}>
