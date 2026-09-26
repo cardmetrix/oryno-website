@@ -7,7 +7,11 @@ import {
 } from "@/lib/db/schema";
 import { quoteLocalUsd } from "@/lib/fx/customer-quote";
 import { resolveCountryCode } from "@/lib/country";
-import { usdFromLocalRetail } from "@/lib/pricing/service-pricing";
+import { roundMoney } from "@/lib/fx/rates";
+import {
+  getProviderMarkup,
+  usdFromLocalRetail,
+} from "@/lib/pricing/service-pricing";
 import { debitUsdWallet } from "@/lib/wallet-usd";
 import {
   currencyForCountry,
@@ -17,9 +21,8 @@ import { refundFailedDebit } from "@/lib/wallet/ledger";
 import {
   addJapOrder,
   getJapOrderStatus,
-  getJapServices,
+  getJapServiceById,
   isJapDemoMode,
-  isJapLive,
 } from "./client";
 import {
   isCustomCommentsService,
@@ -165,21 +168,18 @@ export async function purchaseJapBoost(input: {
     );
   }
 
-  let liveServices: Awaited<ReturnType<typeof getJapServices>>;
+  let providerService: Awaited<ReturnType<typeof getJapServiceById>>;
   try {
-    step("loading catalog");
-    liveServices = await getJapServices();
-    step("catalog ready", { count: liveServices.length });
+    step("loading service");
+    providerService = await getJapServiceById(input.serviceId);
+    step("service ready", { found: Boolean(providerService) });
   } catch (error) {
-    console.error("[boost] catalog failed", error);
+    console.error("[boost] service lookup failed", error);
     throw new Error(
       "Could not load boost catalog from the provider. Try again in a moment.",
     );
   }
 
-  const providerService = liveServices.find(
-    (s) => s.service === input.serviceId,
-  );
   if (!providerService || !(providerService.rate > 0)) {
     throw new Error("That boost package is no longer available. Pick another.");
   }
@@ -223,28 +223,23 @@ export async function purchaseJapBoost(input: {
   // Always price from provider catalog rate — never trust client rateUsd.
   const wholesaleUsd = japUsdCost(providerService.rate, quantity);
   step("pricing", { wholesaleUsd, providerRateUsd: providerService.rate });
-  const { usd, local, quote, companyCharge } = await usdRetailJapPrice(
-    wholesaleUsd,
-    input.countryCode,
-    String(input.serviceId),
-  );
-  const chargeAmount = usd;
-  const currency = "USD";
 
-  const pkg = await ensureSocialPackage({
-    countryCode: resolveCountryCode(input.countryCode),
-    platform: input.platform,
-    name: serviceName,
-    metric: input.metric,
-    quantity,
-    price: chargeAmount,
-  });
+  const currencyCode = currencyForCountry(input.countryCode);
+  const [quote, markup] = await Promise.all([
+    quoteLocalUsd(currencyCode),
+    getProviderMarkup("jap"),
+  ]);
+  const localRetail = roundMoney(
+    wholesaleUsd * quote.buyRate * markup,
+  );
+  const chargeAmount = usdFromLocalRetail(localRetail, quote.buyRate);
+  const currency = "USD";
 
   step("price ready", {
     chargeAmount,
     currency,
     buyRate: quote.buyRate,
-    companyCharge,
+    markup,
   });
 
   step("debiting usd wallet", { chargeAmount });
@@ -262,7 +257,7 @@ export async function purchaseJapBoost(input: {
       link,
       costUsd: wholesaleUsd,
       priceUsd: chargeAmount,
-      priceLocal: local,
+      priceLocal: localRetail,
       buyRate: quote.buyRate,
       ...(needsComments
         ? { customComments: true, commentsCount: comments.length }
@@ -280,7 +275,16 @@ export async function purchaseJapBoost(input: {
       ...(needsComments ? { comments: commentsPayload } : { quantity }),
     });
     const orderId = placed.orderId;
-    console.log(LOG_PREFIX, "purchase LIVE", { orderId });
+    step("provider order ok", { orderId });
+
+    const pkg = await ensureSocialPackage({
+      countryCode: resolveCountryCode(input.countryCode),
+      platform: input.platform,
+      name: serviceName,
+      metric: input.metric,
+      quantity,
+      price: chargeAmount,
+    });
 
     const [order] = await db
       .insert(socialOrders)
@@ -322,29 +326,25 @@ export async function purchaseJapBoost(input: {
     const { scheduleReferralCheck } = await import("@/lib/referrals/service");
     scheduleReferralCheck(input.userId);
 
-    try {
-      const { recognizeUsdServiceProfit } = await import(
-        "@/lib/company/recognize"
-      );
-      await recognizeUsdServiceProfit({
-        source: "social",
-        transactionId: debit.transaction.id,
-        userId: input.userId,
-        customerUsd: chargeAmount,
-        providerUsd: wholesaleUsd,
-        chargeUsd: Math.max(
-          0,
-          quote.buyRate > 0 ? companyCharge / quote.buyRate : 0,
-        ),
-        description: `Social boost ${input.platform}`,
-        metadata: {
-          japServiceId: input.serviceId,
-          quantity,
-        },
+    void import("@/lib/company/recognize")
+      .then(({ recognizeUsdServiceProfit }) =>
+        recognizeUsdServiceProfit({
+          source: "social",
+          transactionId: debit.transaction.id,
+          userId: input.userId,
+          customerUsd: chargeAmount,
+          providerUsd: wholesaleUsd,
+          chargeUsd: 0,
+          description: `Social boost ${input.platform}`,
+          metadata: {
+            japServiceId: input.serviceId,
+            quantity,
+          },
+        }),
+      )
+      .catch((revenueError) => {
+        console.error("[jap-revenue]", revenueError);
       });
-    } catch (revenueError) {
-      console.error("[jap-revenue]", revenueError);
-    }
 
     return {
       simulated: false,

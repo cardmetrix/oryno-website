@@ -6,6 +6,7 @@ import { japErrorToEnglish, purchaseJapBoost } from "@/lib/jap";
 import { actionLockHttpStatus } from "@/lib/wallet/action-lock";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 export async function POST(req: Request) {
   const started = Date.now();
@@ -63,25 +64,21 @@ export async function POST(req: Request) {
     });
 
     step("waiting for wallet lock");
-    const { withSpendLock } = await import("@/lib/wallet/action-lock");
-    const result = await withSpendLock(
-      user.id,
-      Number(body.priceLocal) || 0,
-      user.countryCode,
-      () =>
-        purchaseJapBoost({
-          userId: user.id,
-          countryCode: user.countryCode,
-          serviceId: Number(body.serviceId),
-          serviceName: body.serviceName!.trim(),
-          platform: body.platform || "Other",
-          metric: body.metric || "Boost",
-          link: body.link!.trim(),
-          quantity: Number(body.quantity) || 0,
-          rateUsd: Number(body.rateUsd) || undefined,
-          priceLocal: Number(body.priceLocal) || undefined,
-          comments: body.comments,
-        }),
+    const { withUserActionLock } = await import("@/lib/wallet/action-lock");
+    const result = await withUserActionLock(user.id, () =>
+      purchaseJapBoost({
+        userId: user.id,
+        countryCode: user.countryCode,
+        serviceId: Number(body.serviceId),
+        serviceName: body.serviceName!.trim(),
+        platform: body.platform || "Other",
+        metric: body.metric || "Boost",
+        link: body.link!.trim(),
+        quantity: Number(body.quantity) || 0,
+        rateUsd: Number(body.rateUsd) || undefined,
+        priceLocal: Number(body.priceLocal) || undefined,
+        comments: body.comments,
+      }),
     );
 
     step("order placed", {

@@ -67,9 +67,38 @@ async function assertNoRecentInFlight(userId: string) {
       gte(transactions.updatedAt, since),
     ),
   });
-  if (inflight) {
-    throw new ActionInProgressError();
+  if (!inflight) return;
+
+  // A timed-out boost can leave a social debit in "processing" with no provider order.
+  const meta =
+    inflight.metadata && typeof inflight.metadata === "object"
+      ? (inflight.metadata as Record<string, unknown>)
+      : null;
+  const isStaleSocial =
+    inflight.category === "social" &&
+    !meta?.japOrderId &&
+    inflight.updatedAt.getTime() < Date.now() - 20_000;
+
+  if (isStaleSocial) {
+    const { refundFailedDebit } = await import("@/lib/wallet/ledger");
+    try {
+      await refundFailedDebit({
+        walletId: inflight.walletId,
+        transactionId: inflight.id,
+        amount: Number(inflight.amount),
+        reason: "Boost order timed out — wallet refunded",
+      });
+      console.warn("[boost] recovered stale social debit", {
+        userId,
+        transactionId: inflight.id,
+      });
+      return;
+    } catch (error) {
+      console.error("[boost] stale debit recovery failed", error);
+    }
   }
+
+  throw new ActionInProgressError();
 }
 
 export async function withSpendLock<T>(

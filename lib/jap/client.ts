@@ -183,12 +183,9 @@ async function japPost(params: Record<string, string | number>) {
   });
 
   const started = Date.now();
-  const timeoutMs = japTimeoutMs(action);
   let res: Response;
   try {
-    const controller = new AbortController();
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const request = fetch(japBaseUrl(), {
+    res = await fetch(japBaseUrl(), {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
@@ -196,24 +193,8 @@ async function japPost(params: Record<string, string | number>) {
       },
       body: body.toString(),
       cache: "no-store",
-      signal: controller.signal,
-    }).finally(() => {
-      if (timer) clearTimeout(timer);
+      signal: AbortSignal.timeout(japTimeoutMs(action)),
     });
-    request.catch(() => undefined);
-    res = await Promise.race([
-      request,
-      new Promise<Response>((_, reject) => {
-        timer = setTimeout(() => {
-          controller.abort();
-          reject(
-            Object.assign(new Error("Boost provider timed out"), {
-              name: "TimeoutError",
-            }),
-          );
-        }, timeoutMs);
-      }),
-    ]);
   } catch (error) {
     const timedOut =
       error instanceof Error &&
@@ -315,6 +296,13 @@ export async function assertJapReady(minUsd = 0.01) {
       ),
     );
   }
+}
+
+export async function getJapServiceById(
+  serviceId: number,
+): Promise<JapService | null> {
+  const list = await getJapServices();
+  return list.find((s) => s.service === serviceId) ?? null;
 }
 
 export async function getJapServices(): Promise<JapService[]> {
