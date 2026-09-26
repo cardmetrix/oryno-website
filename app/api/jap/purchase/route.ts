@@ -8,8 +8,14 @@ import { actionLockHttpStatus } from "@/lib/wallet/action-lock";
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
+  const started = Date.now();
+  const step = (name: string, extra?: Record<string, unknown>) => {
+    console.log("[boost]", name, { ms: Date.now() - started, ...extra });
+  };
+  step("request received");
   try {
     const user = await ensureAppUser();
+    step("user loaded", { userId: user?.id ?? null });
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -48,7 +54,7 @@ export async function POST(req: Request) {
       );
     }
 
-    console.log("[jap-purchase] request", {
+    step("body ok", {
       serviceId: body.serviceId,
       platform: body.platform,
       metric: body.metric,
@@ -56,6 +62,7 @@ export async function POST(req: Request) {
       hasComments,
     });
 
+    step("waiting for wallet lock");
     const { withSpendLock } = await import("@/lib/wallet/action-lock");
     const result = await withSpendLock(
       user.id,
@@ -77,7 +84,7 @@ export async function POST(req: Request) {
         }),
     );
 
-    console.log("[jap-purchase] ok", {
+    step("order placed", {
       orderId: result.orderId,
       transactionId: result.transactionId,
     });
@@ -112,7 +119,10 @@ export async function POST(req: Request) {
       message: "Boost ordered successfully",
     });
   } catch (error) {
-    console.error("[jap-purchase]", error);
+    console.error("[boost] purchase failed", {
+      ms: Date.now() - started,
+      error,
+    });
     const raw =
       error instanceof Error ? error.message : "Failed to place boost";
     return NextResponse.json(

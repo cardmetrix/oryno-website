@@ -147,7 +147,17 @@ export async function purchaseJapBoost(input: {
   priceLocal?: number;
   comments?: string | string[];
 }) {
+  const started = Date.now();
+  const step = (name: string, extra?: Record<string, unknown>) => {
+    console.log("[boost]", name, { ms: Date.now() - started, ...extra });
+  };
+
   const link = input.link.trim();
+  step("purchase start", {
+    serviceId: input.serviceId,
+    quantity: input.quantity,
+    platform: input.platform,
+  });
   if (link.length < 4) throw new Error("Enter a valid profile or post link");
 
   if (isJapDemoMode()) {
@@ -158,8 +168,11 @@ export async function purchaseJapBoost(input: {
 
   let liveServices: Awaited<ReturnType<typeof getJapServices>>;
   try {
+    step("loading catalog");
     liveServices = await getJapServices();
-  } catch {
+    step("catalog ready", { count: liveServices.length });
+  } catch (error) {
+    console.error("[boost] catalog failed", error);
     throw new Error(
       "Could not load boost catalog from the provider. Try again in a moment.",
     );
@@ -210,6 +223,7 @@ export async function purchaseJapBoost(input: {
 
   // Always price from provider catalog rate — never trust client rateUsd.
   const wholesaleUsd = japUsdCost(providerService.rate, quantity);
+  step("pricing", { wholesaleUsd, providerRateUsd: providerService.rate });
   const { usd, local, quote, companyCharge } = await usdRetailJapPrice(
     wholesaleUsd,
     input.countryCode,
@@ -227,23 +241,18 @@ export async function purchaseJapBoost(input: {
     price: chargeAmount,
   });
 
-  console.log(LOG_PREFIX, "purchase start", {
-    live: isJapLive(),
-    serviceId: input.serviceId,
-    platform: input.platform,
-    metric: input.metric,
-    quantity,
-    needsComments,
-    commentsCount: comments.length,
-    providerRate: providerService.rate,
-    wholesaleUsd,
+  step("price ready", {
     chargeAmount,
     currency,
     buyRate: quote.buyRate,
+    companyCharge,
   });
 
+  step("checking provider balance");
   await assertJapReady(Math.max(0.01, wholesaleUsd * 0.5));
+  step("provider balance ok");
 
+  step("debiting usd wallet", { chargeAmount });
   const debit = await debitUsdWallet({
     userId: input.userId,
     amount: chargeAmount,
@@ -266,7 +275,10 @@ export async function purchaseJapBoost(input: {
     },
   });
 
+  step("wallet debited", { transactionId: debit.transaction.id });
+
   try {
+    step("placing provider order");
     const placed = await addJapOrder({
       service: input.serviceId,
       link,

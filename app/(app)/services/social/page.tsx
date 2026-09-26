@@ -597,6 +597,18 @@ export default function SocialBoostPage() {
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (!canSubmit || !selected || quantity == null || !quantityValid) return;
+    const started = Date.now();
+    const payload = {
+      serviceId: selected.service,
+      serviceName: selected.name,
+      platform: selected.platform,
+      metric: selected.metric,
+      link: profileUrl.trim(),
+      quantity,
+      amountUsd: amount,
+      usdBalance,
+    };
+    console.log("[boost] click", payload);
     setSubmitting(true);
     setError(null);
     try {
@@ -614,8 +626,15 @@ export default function SocialBoostPage() {
           priceLocal: amount,
           ...(isCustomComments ? { comments: filledComments } : {}),
         }),
+        signal: AbortSignal.timeout(45_000),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      console.log("[boost] response", {
+        status: res.status,
+        ok: res.ok,
+        ms: Date.now() - started,
+        data,
+      });
       if (!res.ok) throw new Error(data.error || "Purchase failed");
       setOrderId(data.orderId);
       setTransactionId(data.transactionId || "");
@@ -623,8 +642,22 @@ export default function SocialBoostPage() {
       setStatusLabel(data.simulated ? "Demo · In progress" : "Pending");
       setSuccess(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Purchase failed");
+      const timedOut =
+        err instanceof Error &&
+        (err.name === "TimeoutError" || err.name === "AbortError");
+      const message = timedOut
+        ? "Boost order timed out. Check the server log for the last [boost] step."
+        : err instanceof Error
+          ? err.message
+          : "Purchase failed";
+      console.error("[boost] failed", {
+        ms: Date.now() - started,
+        message,
+        error: err,
+      });
+      setError(message);
     } finally {
+      console.log("[boost] button reset", { ms: Date.now() - started });
       setSubmitting(false);
     }
   }
