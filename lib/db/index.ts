@@ -14,14 +14,27 @@ const globalForDb = globalThis as unknown as {
   __orynoDb?: Db;
 };
 
+/**
+ * Supabase session mode (pooler port 5432) caps at ~15 clients and returns
+ * EMAXCONNSESSION. App queries use the transaction pooler on 6543 instead.
+ * `prepare: false` below is required for that mode.
+ */
+export function appDatabaseUrl(raw: string): string {
+  if (!/pooler\.supabase\.com/i.test(raw)) return raw;
+  return raw.replace(
+    /(pooler\.supabase\.com):5432(?=\/|\?|$)/i,
+    "$1:6543",
+  );
+}
+
 function createClient() {
-  const url = process.env.DATABASE_URL;
-  if (!url) {
+  const configured = process.env.DATABASE_URL;
+  if (!configured) {
     throw new Error("DATABASE_URL is not set");
   }
+  const url = appDatabaseUrl(configured);
 
   // Vercel/serverless: keep pool tiny so we don't exhaust Neon/Supabase poolers.
-  // Supabase session pooler (~15 clients) — stay at 1 locally too when using pooler host.
   const usingPooler = /pooler\.supabase\.com/i.test(url);
   const max =
     Number(process.env.DB_POOL_MAX) ||
@@ -69,7 +82,7 @@ export function isDbConnectivityError(error: unknown): boolean {
     error instanceof Error
       ? `${error.message} ${String((error as { cause?: unknown }).cause ?? "")}`
       : String(error);
-  return /CONNECT_TIMEOUT|ETIMEDOUT|ECONNRESET|ECONNREFUSED|connection.*closed|ENOTFOUND/i.test(
+  return /CONNECT_TIMEOUT|ETIMEDOUT|ECONNRESET|ECONNREFUSED|connection.*closed|ENOTFOUND|EMAXCONNSESSION|max clients reached/i.test(
     text,
   );
 }
