@@ -7,6 +7,7 @@
  * Env: FAMSUP_API_KEY (preferred) or JAP_API_KEY. JAP_DEMO=true forces demo.
  */
 
+import { getUsdMidRate } from "@/lib/fx/rates";
 import { japErrorToEnglish } from "./errors";
 
 const DEFAULT_BASE = "https://famsup.com/api/v2";
@@ -109,6 +110,36 @@ export type JapOrderStatus = {
 
 function japTimeoutMs(action: string) {
   return JAP_TIMEOUT_MS[action] ?? JAP_TIMEOUT_DEFAULT_MS;
+}
+
+/**
+ * Famsup bills this account in naira. USD is used when FAMSUP_CURRENCY=USD.
+ */
+export function famsupPanelCurrency() {
+  const raw = (
+    process.env.FAMSUP_CURRENCY ||
+    process.env.JAP_CURRENCY ||
+    "NGN"
+  )
+    .trim()
+    .toUpperCase();
+  return raw || "NGN";
+}
+
+function roundPanelUsd(amount: number) {
+  return Math.round(amount * 1_000_000) / 1_000_000;
+}
+
+/** Convert a Famsup amount (per 1,000, or a wallet balance) into USD. */
+export async function famsupAmountToUsd(amount: number, currency = famsupPanelCurrency()) {
+  if (!Number.isFinite(amount)) return 0;
+  const code = currency.toUpperCase();
+  if (code === "USD" || code === "USDT") return amount;
+  const { midRate } = await getUsdMidRate(code);
+  if (!Number.isFinite(midRate) || midRate <= 0) {
+    throw new Error(`No USD rate for ${code}`);
+  }
+  return roundPanelUsd(amount / midRate);
 }
 
 function mapJapServicesPayload(json: unknown): JapService[] {
@@ -217,7 +248,7 @@ export async function getJapBalance() {
   };
   const result = {
     balance: Number(json.balance) || 0,
-    currency: json.currency || "USD",
+    currency: (json.currency || famsupPanelCurrency()).toUpperCase(),
   };
   console.log(LOG_PREFIX, "balance", result);
   return result;
@@ -232,14 +263,22 @@ export async function assertJapReady(minUsd = 0.01) {
   }
   try {
     const { balance, currency } = await getJapBalance();
-    console.log(LOG_PREFIX, "preflight balance", { balance, currency, minUsd });
+    const panelCurrency = famsupPanelCurrency();
+    const balanceUsd = await famsupAmountToUsd(balance, panelCurrency);
+    console.log(LOG_PREFIX, "preflight balance", {
+      balance,
+      reportedCurrency: currency,
+      panelCurrency,
+      balanceUsd,
+      minUsd,
+    });
     if (!Number.isFinite(balance)) {
       throw new Error("incorrect api key");
     }
-    if (balance < minUsd) {
+    if (balanceUsd < minUsd) {
       throw new Error("not enough funds");
     }
-    return { balance, currency };
+    return { balance, currency: panelCurrency, balanceUsd };
   } catch (error) {
     throw new Error(
       japErrorToEnglish(
@@ -261,8 +300,19 @@ export async function getJapServices(): Promise<JapService[]> {
 
   try {
     const json = await japPost({ action: "services" });
-    const data = mapJapServicesPayload(json);
-    console.log(LOG_PREFIX, "services", { count: data.length });
+    const raw = mapJapServicesPayload(json);
+    const panelCurrency = famsupPanelCurrency();
+    const data = await Promise.all(
+      raw.map(async (service) => ({
+        ...service,
+        rate: await famsupAmountToUsd(service.rate, panelCurrency),
+      })),
+    );
+    console.log(LOG_PREFIX, "services", {
+      count: data.length,
+      panelCurrency,
+      sampleRateUsd: data[0]?.rate ?? null,
+    });
     japServicesCache = { at: now, data };
     return data;
   } catch (error) {

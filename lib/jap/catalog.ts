@@ -213,7 +213,7 @@ export function detectQuality(name: string, type?: string): string {
   return "Standard";
 }
 
-/** JAP rate is USD cost per 1000 units for Default services. */
+/** USD cost per 1,000 units. Live Famsup rates are converted from naira before this. */
 export function japUsdCost(ratePerThousand: number, quantity: number) {
   if (!Number.isFinite(ratePerThousand) || !Number.isFinite(quantity)) return 0;
   return (ratePerThousand * quantity) / 1000;
