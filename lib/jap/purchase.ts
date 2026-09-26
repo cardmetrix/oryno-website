@@ -427,12 +427,16 @@ async function syncBoostTransactionStatus(input: {
     (input.orderStatus === "failed" || input.orderStatus === "cancelled") &&
     (tx.status === "processing" || tx.status === "pending")
   ) {
-    await refundDebit({
-      walletId: tx.walletId,
-      transactionId: tx.id,
-      amount: Number(tx.amount),
-      reason: `Boost ${input.rawStatus}`,
-    });
+    try {
+      await refundDebit({
+        walletId: tx.walletId,
+        transactionId: tx.id,
+        amount: Number(tx.amount),
+        reason: `Boost ${input.rawStatus}`,
+      });
+    } catch (error) {
+      console.error("[boost] refund after provider failure", error);
+    }
   }
 }
 

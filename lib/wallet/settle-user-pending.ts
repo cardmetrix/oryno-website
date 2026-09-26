@@ -5,6 +5,7 @@ import {
   lookupFlutterwaveTransfer,
   settlePayoutTransfer,
 } from "@/lib/flutterwave/transfers";
+import { pollJapOrderStatus } from "@/lib/jap";
 import { refundFailedDebit } from "@/lib/wallet/ledger";
 import { settleStuckWithdrawals } from "@/lib/wallet/settle-withdrawals";
 
@@ -188,10 +189,10 @@ async function settleOnePending(row: PendingRow) {
     return "still_pending" as const;
   }
   if (row.category === "social") {
+    const meta = (row.metadata || {}) as Record<string, unknown>;
     const japOrderId = String(meta.japOrderId || row.externalRef || "").trim();
     if (japOrderId) {
       try {
-        const { pollJapOrderStatus } = await import("@/lib/jap/purchase");
         const polled = await pollJapOrderStatus(japOrderId, row.userId);
         if (polled.orderStatus === "completed") return "completed" as const;
         if (

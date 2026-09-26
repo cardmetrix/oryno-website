@@ -47,7 +47,7 @@ function createClient() {
     idle_timeout: 20,
     max_lifetime: 60 * 10,
     // Hotspot / flaky networks were hitting CONNECT_TIMEOUT at 10s.
-    connect_timeout: 30,
+    connect_timeout: 12,
     ...(disableSsl ? {} : { ssl: "require" as const }),
   });
 }
