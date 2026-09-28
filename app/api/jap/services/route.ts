@@ -12,7 +12,7 @@ import {
   getJapServicesSafe,
   japUsdCost,
 } from "@/lib/jap";
-import { createUsdPricer, usdFromLocalRetail } from "@/lib/pricing/service-pricing";
+import { createUsdPricer } from "@/lib/pricing/service-pricing";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -107,9 +107,11 @@ export async function GET(req: Request) {
         refill: s.refill,
         cancel: s.cancel,
         currency: "USD",
-        priceUsdPerThousand: usdFromLocalRetail(perThousand.local, quote.buyRate),
+        priceUsdPerThousand:
+          quote.buyRate > 0 ? perThousand.local / quote.buyRate : perThousand.local,
         sampleQuantity: sampleQty,
-        samplePriceUsd: usdFromLocalRetail(sample.local, quote.buyRate),
+        samplePriceUsd:
+          quote.buyRate > 0 ? sample.local / quote.buyRate : sample.local,
         priceLocalPerThousand: perThousand.local,
         samplePriceLocal: sample.local,
         listPriceLocal: sample.listLocal,

@@ -66,6 +66,7 @@ function presentAmount(
   amount: string | number,
   storedCurrency: string,
   fx?: NgnLocalQuote | null,
+  metadata?: Record<string, unknown> | null,
 ) {
   const raw = typeof amount === "number" ? amount : Number(amount);
   const stored = (storedCurrency || "NGN").toUpperCase();
@@ -94,8 +95,22 @@ function presentAmount(
     };
   }
 
-  // USD wallet → local display.
+  // USD wallet → local display. Boosting stores the exact local charge so
+  // the history line matches the Famsup naira charge (plus revenue, if any).
   if (stored === "USD" && display !== "USD") {
+    const pricedLocal = Number(metadata?.priceLocal);
+    const pricedCurrency = String(metadata?.localCurrency || "").toUpperCase();
+    if (
+      pricedCurrency === display &&
+      Number.isFinite(pricedLocal) &&
+      pricedLocal > 0
+    ) {
+      return {
+        value: Math.abs(pricedLocal),
+        currency: display,
+        formatted: formatMoney(pricedLocal, display),
+      };
+    }
     const rate = fx.usdToLocal && fx.usdToLocal > 0 ? fx.usdToLocal : null;
     if (rate) {
       const local = Math.round(Math.abs(raw) * rate * 100) / 100;
@@ -139,7 +154,7 @@ export function toAppTransaction(
   fx?: NgnLocalQuote | null,
 ): AppTransaction {
   const credit = row.type === "credit";
-  const presented = presentAmount(row.amount, row.currency, fx);
+  const presented = presentAmount(row.amount, row.currency, fx, row.metadata);
   return {
     id: row.id,
     title: row.title,

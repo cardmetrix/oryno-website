@@ -245,7 +245,7 @@ export async function createUsdPricer(
   provider: PricingProvider,
   source?: CompanyChargeSource | null,
 ) {
-  const markup = await getProviderMarkup(provider);
+  const groupMarkup = await getProviderMarkup(provider);
   const maps = await loadOverrideMaps();
   const providerMap = maps.get(provider);
   const charges = await getCompanyCharges();
@@ -257,6 +257,10 @@ export async function createUsdPricer(
     chargeKey && chargeKey !== "fx_conversion" && chargeKey !== "withdraw"
       ? charges.services[chargeKey]
       : null;
+  // Famsup is billed in naira and converted at the admin rate. The social
+  // revenue row is the only extra. Group markup stays off so a zero revenue
+  // charge debits the same naira amount Famsup charged.
+  const markup = provider === "jap" ? 1 : groupMarkup;
 
   const bake = (
     base: number,

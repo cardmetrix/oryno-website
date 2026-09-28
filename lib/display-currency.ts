@@ -7,19 +7,40 @@ export async function getDisplayFx(
   countryCode?: string | null,
 ): Promise<DisplayFx> {
   const currency = currencyForCountry(countryCode);
+  let quote: DisplayFx;
   try {
-    return await quoteNgnToLocal(currency);
+    quote = await quoteNgnToLocal(currency);
   } catch {
-    return {
+    quote = {
       from: "NGN",
       to: currency,
       ngnToLocal: 1,
       localToNgn: 1,
-      usdToLocal: currency === "USD" ? 1 : currency === "NGN" ? 1600 : 1,
+      usdToLocal: currency === "USD" ? 1 : currency === "NGN" ? 1350 : 1,
       provider: "fallback",
       asOf: new Date().toISOString(),
     };
   }
+
+  try {
+    const { adminUsdConversionRate } = await import("@/lib/fx/customer-quote");
+    const perUsd = await adminUsdConversionRate(currency);
+    const ngnPerUsd =
+      currency === "NGN" ? perUsd : await adminUsdConversionRate("NGN");
+    if (perUsd > 0 && ngnPerUsd > 0) {
+      quote = {
+        ...quote,
+        usdToLocal: perUsd,
+        ngnToLocal: currency === "NGN" ? 1 : perUsd / ngnPerUsd,
+        localToNgn: currency === "NGN" ? 1 : ngnPerUsd / perUsd,
+        provider: "admin",
+      };
+    }
+  } catch {
+    return quote;
+  }
+
+  return quote;
 }
 
 /** @deprecated Prefer localServiceLedgerCurrency(countryCode) — Phase 1 uses true local wallets. */

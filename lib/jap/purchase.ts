@@ -323,6 +323,12 @@ export async function purchaseJapBoost(input: {
           quantity,
           link,
           simulated: false,
+          costUsd: wholesaleUsd,
+          priceUsd: chargeAmount,
+          priceLocal: priced.local,
+          localCurrency: priced.localCurrency,
+          buyRate: priced.quote.buyRate,
+          companyChargeUsd,
           ...(needsComments
             ? { customComments: true, commentsCount: comments.length }
             : {}),
