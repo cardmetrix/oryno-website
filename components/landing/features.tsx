@@ -1,76 +1,90 @@
 "use client";
 
+import type { LucideIcon } from "lucide-react";
 import {
-  Smartphone,
-  Wifi,
-  Zap,
-  Tv,
+  FileText,
+  Gift,
+  Link2,
   Phone,
-  Megaphone,
-  ShieldCheck,
+  TrendingUp,
   Trophy,
+  Tv,
+  Zap,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { GiftCardIcon } from "@/components/icons/gift-card-icon";
 import { fadeUp, stagger } from "./motion";
 
-const features: {
-  icon: typeof Smartphone | typeof GiftCardIcon;
+type FeatureItem = {
+  icon: LucideIcon | typeof GiftCardIcon;
   title: string;
   description: string;
-}[] = [
+  badge?: string;
+};
+
+const features: FeatureItem[] = [
   {
     icon: GiftCardIcon,
-    title: "Gift Cards",
+    title: "Buy Gift Cards",
     description:
-      "Sell and buy gift cards with live rates — credit lands in your wallet.",
-  },
-  {
-    icon: Smartphone,
-    title: "Airtime",
-    description:
-      "Top up instantly across local networks in every supported country.",
-  },
-  {
-    icon: Wifi,
-    title: "Data Bundles",
-    description:
-      "Buy data packs from the providers you already use — fast and reliable.",
-  },
-  {
-    icon: Zap,
-    title: "Utility Bills",
-    description:
-      "Pay electricity and essential utilities without leaving the app.",
-  },
-  {
-    icon: Tv,
-    title: "TV Subscriptions",
-    description: "Renew DStv, GOtv, Startimes and more in a few taps.",
-  },
-  {
-    icon: Trophy,
-    title: "Betting Funding",
-    description:
-      "Fund Bet9ja, SportyBet, 1xBet, BetKing and more from your wallet.",
+      "Purchase digital gift cards worldwide across top brands with live rates directly from your wallet.",
+    badge: "50+ Brands",
   },
   {
     icon: Phone,
     title: "Virtual Numbers",
     description:
-      "Purchase numbers by country for SMS verification and rentals.",
+      "Get temporary or rental numbers across multiple countries for instant SMS verification.",
+    badge: "Hot",
   },
   {
-    icon: Megaphone,
+    icon: TrendingUp,
     title: "Social Boosting",
     description:
-      "Grow your presence with simple, built-in social media boosting tools.",
+      "Grow your online presence with followers, likes, and engagement across Instagram, TikTok, YouTube, and X.",
+    badge: "Most Popular",
   },
   {
-    icon: ShieldCheck,
-    title: "Secure by Design",
+    icon: FileText,
+    title: "Free Invoices",
     description:
-      "OTP, device recognition, encrypted APIs, and clear transaction logs.",
+      "Create and download polished, professional PDF invoices with custom line items, tax, and discount options.",
+    badge: "Free",
+  },
+  {
+    icon: Link2,
+    title: "Payment Links",
+    description:
+      "Generate standalone checkout payment links to collect deposits, fees, and retainers from clients effortlessly.",
+    badge: "Instant",
+  },
+  {
+    icon: Zap,
+    title: "Electricity Bills",
+    description:
+      "Pay prepaid and postpaid meters across major power discos and receive recharge tokens instantly.",
+    badge: "All Discos",
+  },
+  {
+    icon: Tv,
+    title: "TV Subscriptions",
+    description:
+      "Renew DStv, GOtv, StarTimes, and cable TV packages in just a few taps without leaving your home.",
+    badge: "Cable TV",
+  },
+  {
+    icon: Trophy,
+    title: "Betting Funding",
+    description:
+      "Fund Bet9ja, SportyBet, 1xBet, BetKing, and other top bookmakers directly from your balance.",
+    badge: "Instant",
+  },
+  {
+    icon: Gift,
+    title: "International Gifting",
+    description:
+      "Send thoughtful gifts, packages, and cards to friends and loved ones abroad with personalized notes.",
+    badge: "Worldwide",
   },
 ];
 
@@ -93,11 +107,12 @@ export function Features() {
           </motion.h2>
           <motion.p variants={fadeUp} className="section-copy">
             ORYNO brings everyday digital needs into a single, premium
-            experience — spacious, fast, and built to expand across Africa.
+            experience — fast, reliable, and built to streamline your digital
+            lifestyle.
           </motion.p>
         </motion.div>
 
-        <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {features.map((feature, index) => {
             const Icon = feature.icon;
             return (
@@ -114,8 +129,15 @@ export function Features() {
                 whileHover={{ y: -6 }}
                 className="feature-tile group"
               >
-                <div className="icon-tile mb-4 transition-transform duration-300 group-hover:scale-110 group-hover:bg-oryno-orange-muted">
-                  <Icon className="h-5 w-5" strokeWidth={1.75} />
+                <div className="mb-4 flex items-center justify-between">
+                  <div className="icon-tile transition-transform duration-300 group-hover:scale-110 group-hover:bg-oryno-orange-muted">
+                    <Icon className="h-5 w-5" strokeWidth={1.75} />
+                  </div>
+                  {feature.badge ? (
+                    <span className="rounded-full bg-oryno-orange-muted px-2.5 py-0.5 text-[11px] font-semibold text-primary">
+                      {feature.badge}
+                    </span>
+                  ) : null}
                 </div>
                 <h3 className="text-base font-semibold text-foreground">
                   {feature.title}
