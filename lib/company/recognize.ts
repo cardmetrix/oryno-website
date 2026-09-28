@@ -1,5 +1,6 @@
 import { recognizeRevenueSafe } from "@/lib/company/revenue";
-import { getUsdMidRate, roundMoney } from "@/lib/fx/rates";
+import { adminUsdConversionRate } from "@/lib/fx/customer-quote";
+import { roundMoney } from "@/lib/fx/rates";
 import type { FxQuote } from "@/lib/fx/rates";
 
 export async function recognizeFxProfit(input: {
@@ -108,6 +109,6 @@ export async function recognizeNgnServiceProfit(input: {
 }
 
 export async function ngnValueOfUsd(usd: number) {
-  const { midRate } = await getUsdMidRate("NGN");
-  return roundMoney(usd * midRate);
+  const perUsd = await adminUsdConversionRate("NGN");
+  return roundMoney(usd * perUsd);
 }

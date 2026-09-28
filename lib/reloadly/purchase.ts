@@ -93,21 +93,17 @@ export async function quoteGiftCardBuy(input: {
     input.product.senderPriceMap,
     input.unitPrice,
   );
+  const { adminUsdConversionRate } = await import("@/lib/fx/customer-quote");
+  const faceCurrency = (input.product.recipientCurrency || "USD").toUpperCase();
   let usdFace: number;
   if (mappedUsd != null) {
     usdFace = mappedUsd;
-  } else if (
-    (input.product.recipientCurrency || "").toUpperCase() === "USD"
-  ) {
+  } else if (faceCurrency === "USD" || faceCurrency === "USDT") {
     usdFace = input.unitPrice;
   } else {
-    const { getUsdMidRate } = await import("@/lib/fx/rates");
     try {
-      const mid = await getUsdMidRate(
-        input.product.recipientCurrency.toUpperCase(),
-      );
-      usdFace =
-        mid.midRate > 0 ? input.unitPrice / mid.midRate : input.unitPrice;
+      const perUsd = await adminUsdConversionRate(faceCurrency);
+      usdFace = perUsd > 0 ? input.unitPrice / perUsd : input.unitPrice;
     } catch {
       usdFace = input.unitPrice;
     }
@@ -119,6 +115,7 @@ export async function quoteGiftCardBuy(input: {
   );
   const markup = await getProviderMarkup("reloadly");
   const charges = await getCompanyCharges();
+  const ngnPerUsd = await adminUsdConversionRate("NGN");
   const listed = roundMoney(usdFace * markup);
   const withCharge = applySilentCharge({
     base: listed,
@@ -127,6 +124,8 @@ export async function quoteGiftCardBuy(input: {
       value: 0,
       enabled: false,
     },
+    localBuyRate: 1,
+    ngnBuyRate: ngnPerUsd,
   });
   const usdCharge = Math.max(0.01, roundMoney(withCharge.total));
 

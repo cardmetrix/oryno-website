@@ -7,7 +7,8 @@
  * Env: FAMSUP_API_KEY (preferred) or JAP_API_KEY. JAP_DEMO=true forces demo.
  */
 
-import { getUsdMidRate } from "@/lib/fx/rates";
+import { DEFAULT_USD_CONVERSION_RATES } from "@/lib/company/charge-types";
+import { adminUsdConversionRate } from "@/lib/fx/customer-quote";
 import { japErrorToEnglish } from "./errors";
 
 const DEFAULT_BASE = "https://famsup.com/api/v2";
@@ -130,16 +131,43 @@ function roundPanelUsd(amount: number) {
   return Math.round(amount * 1_000_000) / 1_000_000;
 }
 
+/** Local units of the Famsup panel currency per 1 USD. Nigeria uses the admin rate (1,350). */
+async function famsupUsdRate(currency = famsupPanelCurrency()) {
+  const code = currency.toUpperCase();
+  if (code === "USD" || code === "USDT") return 1;
+  try {
+    const perUsd = await adminUsdConversionRate(code);
+    if (Number.isFinite(perUsd) && perUsd > 0) return perUsd;
+  } catch (error) {
+    console.warn("[boost] conversion rate unavailable, using starting rate", error);
+  }
+  const preset = DEFAULT_USD_CONVERSION_RATES[code];
+  if (preset && preset > 0) return preset;
+  throw new Error(`No USD rate for ${code}`);
+}
+
 /** Convert a Famsup amount (per 1,000, or a wallet balance) into USD. */
 export async function famsupAmountToUsd(amount: number, currency = famsupPanelCurrency()) {
   if (!Number.isFinite(amount)) return 0;
-  const code = currency.toUpperCase();
-  if (code === "USD" || code === "USDT") return amount;
-  const { midRate } = await getUsdMidRate(code);
-  if (!Number.isFinite(midRate) || midRate <= 0) {
-    throw new Error(`No USD rate for ${code}`);
+  const perUsd = await famsupUsdRate(currency);
+  return roundPanelUsd(amount / perUsd);
+}
+
+/** Turn panel-currency catalog rates into USD with the admin conversion rate. */
+async function convertFamsupCatalogToUsd(raw: JapService[]) {
+  const panelCurrency = famsupPanelCurrency();
+  const perUsd = await famsupUsdRate(panelCurrency);
+  if (perUsd === 1) {
+    return { data: raw, panelCurrency, perUsd };
   }
-  return roundPanelUsd(amount / midRate);
+  return {
+    panelCurrency,
+    perUsd,
+    data: raw.map((service) => ({
+      ...service,
+      rate: roundPanelUsd(service.rate / perUsd),
+    })),
+  };
 }
 
 function mapJapServicesPayload(json: unknown): JapService[] {
@@ -305,7 +333,8 @@ export async function getJapServiceById(
   return list.find((s) => s.service === serviceId) ?? null;
 }
 
-export async function getJapServices(): Promise<JapService[]> {
+/** Panel-currency rates. Converted to USD on every read so admin rate changes apply immediately. */
+async function getRawJapServices(): Promise<JapService[]> {
   const now = Date.now();
   if (japServicesCache && now - japServicesCache.at < JAP_SERVICES_TTL_MS) {
     console.log(LOG_PREFIX, "services cache hit", {
@@ -317,27 +346,7 @@ export async function getJapServices(): Promise<JapService[]> {
 
   try {
     const json = await japPost({ action: "services" });
-    const raw = mapJapServicesPayload(json);
-    const panelCurrency = famsupPanelCurrency();
-    let perUsd = 1;
-    if (panelCurrency !== "USD" && panelCurrency !== "USDT") {
-      try {
-        perUsd = (await getUsdMidRate(panelCurrency)).midRate;
-      } catch (error) {
-        console.warn("[boost] fx unavailable, using fallback rate", error);
-        perUsd = panelCurrency === "NGN" ? 1600 : 0;
-        if (!(perUsd > 0)) throw error;
-      }
-    }
-    const data = raw.map((service) => ({
-      ...service,
-      rate: roundPanelUsd(service.rate / perUsd),
-    }));
-    console.log(LOG_PREFIX, "services", {
-      count: data.length,
-      panelCurrency,
-      sampleRateUsd: data[0]?.rate ?? null,
-    });
+    const data = mapJapServicesPayload(json);
     japServicesCache = { at: now, data };
     return data;
   } catch (error) {
@@ -356,6 +365,18 @@ export async function getJapServices(): Promise<JapService[]> {
     }
     throw error;
   }
+}
+
+export async function getJapServices(): Promise<JapService[]> {
+  const raw = await getRawJapServices();
+  const converted = await convertFamsupCatalogToUsd(raw);
+  console.log(LOG_PREFIX, "services usd", {
+    count: converted.data.length,
+    panelCurrency: converted.panelCurrency,
+    perUsd: converted.perUsd,
+    sampleRateUsd: converted.data[0]?.rate ?? null,
+  });
+  return converted.data;
 }
 
 export async function addJapOrder(input: {

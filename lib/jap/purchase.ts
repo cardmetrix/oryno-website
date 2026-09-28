@@ -8,10 +8,7 @@ import {
 import { quoteLocalUsd } from "@/lib/fx/customer-quote";
 import { resolveCountryCode } from "@/lib/country";
 import { roundMoney } from "@/lib/fx/rates";
-import {
-  getProviderMarkup,
-  usdFromLocalRetail,
-} from "@/lib/pricing/service-pricing";
+import { usdFromLocalRetail } from "@/lib/pricing/service-pricing";
 import { debitUsdWallet } from "@/lib/wallet-usd";
 import {
   currencyForCountry,
@@ -220,26 +217,31 @@ export async function purchaseJapBoost(input: {
 
   const commentsPayload = needsComments ? comments.join("\n") : undefined;
 
-  // Always price from provider catalog rate — never trust client rateUsd.
+  // Provider rate is already USD (Famsup naira ÷ Nigeria conversion rate).
+  // Markup and company revenue are added in the user's currency, then converted
+  // back to USD with that country's admin rate.
   const wholesaleUsd = japUsdCost(providerService.rate, quantity);
-  step("pricing", { wholesaleUsd, providerRateUsd: providerService.rate });
-
-  const currencyCode = currencyForCountry(input.countryCode);
-  const [quote, markup] = await Promise.all([
-    quoteLocalUsd(currencyCode),
-    getProviderMarkup("jap"),
-  ]);
-  const localRetail = roundMoney(
-    wholesaleUsd * quote.buyRate * markup,
+  const priced = await usdRetailJapPrice(
+    wholesaleUsd,
+    input.countryCode,
+    String(input.serviceId),
   );
-  const chargeAmount = usdFromLocalRetail(localRetail, quote.buyRate);
+  const chargeAmount = priced.usd;
   const currency = "USD";
+  const companyChargeUsd =
+    priced.quote.buyRate > 0
+      ? roundMoney(priced.companyCharge / priced.quote.buyRate)
+      : 0;
 
-  step("price ready", {
+  step("pricing", {
+    wholesaleUsd,
+    providerRateUsd: providerService.rate,
     chargeAmount,
     currency,
-    buyRate: quote.buyRate,
-    markup,
+    buyRate: priced.quote.buyRate,
+    markup: priced.markup,
+    companyChargeUsd,
+    localRetail: priced.local,
   });
 
   step("debiting usd wallet", { chargeAmount });
@@ -257,8 +259,10 @@ export async function purchaseJapBoost(input: {
       link,
       costUsd: wholesaleUsd,
       priceUsd: chargeAmount,
-      priceLocal: localRetail,
-      buyRate: quote.buyRate,
+      priceLocal: priced.local,
+      buyRate: priced.quote.buyRate,
+      companyChargeUsd,
+      localCurrency: priced.localCurrency,
       ...(needsComments
         ? { customComments: true, commentsCount: comments.length }
         : {}),
@@ -337,7 +341,7 @@ export async function purchaseJapBoost(input: {
           userId: input.userId,
           customerUsd: chargeAmount,
           providerUsd: wholesaleUsd,
-          chargeUsd: 0,
+          chargeUsd: companyChargeUsd,
           description: `Social boost ${input.platform}`,
           metadata: {
             japServiceId: input.serviceId,

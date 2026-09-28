@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
-import { quoteLocalUsd } from "@/lib/fx/customer-quote";
+import {
+  adminUsdConversionRate,
+  quoteLocalUsd,
+} from "@/lib/fx/customer-quote";
 import { currencyForCountry } from "@/lib/wallet";
 import {
   enrichJapService,
+  famsupPanelCurrency,
   filterJapServices,
   getJapServicesSafe,
   japUsdCost,
@@ -68,6 +72,11 @@ export async function GET(req: Request) {
             .slice(0, 400);
 
     const quote = await quoteLocalUsd(localCurrency);
+    const panelCurrency = famsupPanelCurrency();
+    const panelPerUsd =
+      panelCurrency === "USD" || panelCurrency === "USDT"
+        ? 1
+        : await adminUsdConversionRate(panelCurrency);
     const priceUsd = await createUsdPricer("jap");
 
     const services = sliced.map((s) => {
@@ -125,6 +134,12 @@ export async function GET(req: Request) {
       fallback,
       currency: "USD",
       fx: quote,
+      conversion: {
+        currency: localCurrency,
+        perUsd: quote.buyRate,
+        panelCurrency,
+        panelPerUsd,
+      },
       platforms: [
         "All",
         ...platforms.filter((p) => p !== "Other"),

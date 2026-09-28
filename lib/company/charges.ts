@@ -4,6 +4,7 @@ import { platformSettings } from "@/lib/db/schema";
 import {
   COMPANY_CHARGE_SOURCES,
   DEFAULT_COMPANY_CHARGES,
+  DEFAULT_USD_CONVERSION_RATES,
   type CompanyChargeSource,
   type CompanyChargesConfig,
   type FxCurrencyOverride,
@@ -14,6 +15,7 @@ import {
 export {
   COMPANY_CHARGE_SOURCES,
   DEFAULT_COMPANY_CHARGES,
+  DEFAULT_USD_CONVERSION_RATES,
   VIRTUAL_NUMBER_SERVICE_OPTIONS,
   type CompanyChargeSource,
   type ChargeMode,
@@ -178,7 +180,14 @@ export function normalizeCompanyCharges(raw: unknown): CompanyChargesConfig {
     for (const [code, value] of Object.entries(incoming)) {
       const key = code.trim().toUpperCase().slice(0, 3);
       if (!key) continue;
-      currencies[key] = normalizeFxCurrency(value);
+      const normalized = normalizeFxCurrency(value);
+      const fallback = base.fx.currencies[key];
+      const preset = DEFAULT_USD_CONVERSION_RATES[key];
+      currencies[key] = {
+        buyRate: normalized.buyRate ?? fallback?.buyRate ?? preset ?? null,
+        sellRate: normalized.sellRate ?? fallback?.sellRate ?? preset ?? null,
+        spreadPercent: normalized.spreadPercent,
+      };
     }
   }
 

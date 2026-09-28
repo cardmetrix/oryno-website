@@ -37,6 +37,17 @@ export type FxCurrencyOverride = {
   spreadPercent: number | null;
 };
 
+/**
+ * Local units per 1 USD. Nigeria is fixed at 1,350 for now.
+ * The other markets have a starting rate the admin can change.
+ */
+export const DEFAULT_USD_CONVERSION_RATES: Record<string, number> = {
+  NGN: 1350,
+  GHS: 15.5,
+  KES: 129,
+  ZAR: 18.2,
+};
+
 export type CompanyChargesConfig = {
   /** Flat NGN fee shown on withdrawals. */
   withdrawFeeNgn: number;
@@ -69,10 +80,10 @@ export const DEFAULT_COMPANY_CHARGES: CompanyChargesConfig = {
   fx: {
     defaultSpreadPercent: 1,
     currencies: {
-      NGN: { buyRate: null, sellRate: null, spreadPercent: null },
-      GHS: { buyRate: null, sellRate: null, spreadPercent: null },
-      KES: { buyRate: null, sellRate: null, spreadPercent: null },
-      ZAR: { buyRate: null, sellRate: null, spreadPercent: null },
+      NGN: { buyRate: 1350, sellRate: 1350, spreadPercent: null },
+      GHS: { buyRate: 15.5, sellRate: 15.5, spreadPercent: null },
+      KES: { buyRate: 129, sellRate: 129, spreadPercent: null },
+      ZAR: { buyRate: 18.2, sellRate: 18.2, spreadPercent: null },
     },
   },
 };

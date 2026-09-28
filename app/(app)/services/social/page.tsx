@@ -53,6 +53,36 @@ type JapServiceRow = {
   samplePriceLocal: number;
 };
 
+type BoostConversion = {
+  currency: string;
+  perUsd: number;
+  panelCurrency: string;
+  panelPerUsd: number;
+};
+
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  NGN: "₦",
+  GHS: "GH₵",
+  KES: "KSh",
+  ZAR: "R",
+  USD: "$",
+};
+
+function formatConversionRate(currency: string, perUsd: number) {
+  const symbol = CURRENCY_SYMBOLS[currency] ?? `${currency} `;
+  const amount = perUsd.toLocaleString("en", { maximumFractionDigits: 4 });
+  return `1 USD = ${symbol}${amount}`;
+}
+
+function formatLocalMoney(amount: number, currency: string) {
+  const symbol = CURRENCY_SYMBOLS[currency] ?? `${currency} `;
+  const formatted = amount.toLocaleString("en", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  return `${symbol}${formatted}`;
+}
+
 type BoostOption = {
   value: string;
   label: string;
@@ -170,6 +200,7 @@ export default function SocialBoostPage() {
   const [statusLabel, setStatusLabel] = useState<string | null>(null);
   const [polling, setPolling] = useState(false);
   const [liveMode, setLiveMode] = useState(false);
+  const [conversion, setConversion] = useState<BoostConversion | null>(null);
 
   // Load the full catalog once — platform/type/package filter client-side.
   useEffect(() => {
@@ -184,6 +215,10 @@ export default function SocialBoostPage() {
         if (cancelled) return;
 
         setLiveMode(data.demo === false && data.fallback !== true);
+        const nextConversion = data.conversion as BoostConversion | undefined;
+        setConversion(
+          nextConversion && nextConversion.perUsd > 0 ? nextConversion : null,
+        );
         const nextPlatforms: string[] = (data.platforms ?? []).filter(
           (p: string) => p && p !== "All",
         );
@@ -1018,6 +1053,41 @@ export default function SocialBoostPage() {
                   }
                   accent
                 />
+                <SummaryRow
+                  label="Conversion rate"
+                  value={
+                    conversion
+                      ? formatConversionRate(
+                          conversion.panelCurrency,
+                          conversion.panelPerUsd,
+                        )
+                      : "—"
+                  }
+                />
+                {conversion &&
+                conversion.currency !== conversion.panelCurrency &&
+                conversion.currency !== "USD" ? (
+                  <SummaryRow
+                    label={`${conversion.currency} rate`}
+                    value={formatConversionRate(
+                      conversion.currency,
+                      conversion.perUsd,
+                    )}
+                  />
+                ) : null}
+                {conversion &&
+                selected &&
+                quantityValid &&
+                quantity != null &&
+                conversion.currency !== "USD" ? (
+                  <SummaryRow
+                    label={`In ${conversion.currency}`}
+                    value={formatLocalMoney(
+                      amount * conversion.perUsd,
+                      conversion.currency,
+                    )}
+                  />
+                ) : null}
                 <div className="flex items-center justify-between border-t border-border pt-3">
                   <span className="inline-flex items-center gap-2 font-semibold text-foreground">
                     <Wallet className="h-4 w-4 text-primary" />

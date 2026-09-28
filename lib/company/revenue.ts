@@ -5,7 +5,8 @@ import {
   companyPayouts,
   companyRevenueEntries,
 } from "@/lib/db/schema";
-import { getUsdMidRate, roundMoney } from "@/lib/fx/rates";
+import { adminUsdConversionRate } from "@/lib/fx/customer-quote";
+import { roundMoney } from "@/lib/fx/rates";
 import type { CompanyChargeSource } from "@/lib/company/charges";
 
 export type RevenueSource = CompanyChargeSource;
@@ -28,10 +29,11 @@ async function profitToNgn(amount: number, currency: string) {
   const code = currency.toUpperCase();
   if (code === "NGN") return roundMoney(amount);
   if (amount === 0) return 0;
-  const { midRate } = await getUsdMidRate(code === "USD" ? "NGN" : code);
-  if (code === "USD") return roundMoney(amount * midRate);
-  const ngn = await getUsdMidRate("NGN");
-  return roundMoney((amount / midRate) * ngn.midRate);
+  const ngnPerUsd = await adminUsdConversionRate("NGN");
+  if (code === "USD") return roundMoney(amount * ngnPerUsd);
+  const perUsd = await adminUsdConversionRate(code);
+  if (!(perUsd > 0)) return 0;
+  return roundMoney((amount / perUsd) * ngnPerUsd);
 }
 
 type LedgerClient = {

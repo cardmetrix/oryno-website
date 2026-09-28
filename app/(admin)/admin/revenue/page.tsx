@@ -791,9 +791,12 @@ export default function AdminRevenuePage() {
 
           <AdminCard title="Conversion rates by country" delay={0.08} className="mb-5">
             <p className="mb-4 text-sm text-muted-foreground">
-              Live mid-market is what $1 is actually worth. Customer buy is what
-              users pay per $1. The difference is ORYNO conversion profit.
-              Leave buy/sell empty to use the default spread.
+              These are the rates USD services use: boosting, virtual numbers,
+              gift cards, and the USD wallet. Nigeria starts at ₦1,350 per $1.
+              Famsup prices in naira are converted with the Nigeria rate, then
+              any boosting revenue is added and converted with the customer’s
+              country rate. Ghana, Kenya, and South Africa start with a rate
+              you can change. Customer buy is what users pay per $1.
             </p>
             <div className="mb-4 flex flex-wrap items-end gap-3">
               <label className="text-sm">
