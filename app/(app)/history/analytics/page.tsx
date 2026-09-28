@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -22,9 +22,9 @@ import {
   formatMoneyAmount,
   summarizeCashflow,
 } from "@/lib/history";
-import type { AppTransaction } from "@/lib/transactions";
 import { cn } from "@/lib/utils";
 import { useCountry } from "@/components/providers/country-provider";
+import { useTransactions } from "@/hooks/use-transactions";
 
 export default function HistoryAnalyticsPage() {
   return (
@@ -47,8 +47,9 @@ export default function HistoryAnalyticsPage() {
 
 function HistoryAnalyticsContent() {
   const searchParams = useSearchParams();
-  const [items, setItems] = useState<AppTransaction[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, isPending } = useTransactions();
+  const items = data ?? [];
+  const loading = isPending && items.length === 0;
   const [monthKey, setMonthKey] = useState(searchParams.get("month") ?? "");
   const [monthOpen, setMonthOpen] = useState(false);
   const { country } = useCountry();
@@ -57,24 +58,6 @@ function HistoryAnalyticsContent() {
     const fromItems = items.find((item) => item.currency)?.currency;
     return (fromItems || country.currency || "NGN").toUpperCase();
   }, [items, country.currency]);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const txRes = await fetch("/api/transactions", { cache: "no-store" });
-      if (!txRes.ok) throw new Error("Failed");
-      const json = (await txRes.json()) as { items: AppTransaction[] };
-      setItems(json.items ?? []);
-    } catch {
-      setItems([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
 
   const months = useMemo(() => buildHistoryMonths(items), [items]);
   const paramMonth = searchParams.get("month") ?? "";

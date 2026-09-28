@@ -17,28 +17,40 @@ export type FxQuote = {
 
 type CacheEntry = { at: number; rates: Record<string, number>; provider: string };
 let cache: CacheEntry | null = null;
+let inflight: Promise<{ rates: Record<string, number>; provider: string }> | null =
+  null;
+let lastRefreshAt = 0;
 const CACHE_TTL_MS = 1000 * 60 * 15;
+const FX_WAIT_MS = 1_200;
+const FX_RETRY_MS = 30_000;
 
-async function fetchUsdRates(): Promise<{
+const FALLBACK_RATES: Record<string, number> = {
+  USD: 1,
+  NGN: 1600,
+  GHS: 15.5,
+  KES: 129,
+  ZAR: 18.2,
+};
+
+function rememberedRates() {
+  if (!cache) return null;
+  return { rates: cache.rates, provider: cache.provider };
+}
+
+async function loadUsdRatesFromNetwork(): Promise<{
   rates: Record<string, number>;
   provider: string;
 }> {
-  if (cache && Date.now() - cache.at < CACHE_TTL_MS) {
-    return { rates: cache.rates, provider: cache.provider };
-  }
-
   // Primary: open.er-api.com (free, no key, broad African coverage)
   try {
     const res = await fetch("https://open.er-api.com/v6/latest/USD", {
       cache: "no-store",
-      next: { revalidate: 0 },
-      signal: AbortSignal.timeout(8_000),
+      signal: AbortSignal.timeout(4_000),
     });
     if (res.ok) {
       const json = (await res.json()) as {
         result?: string;
         rates?: Record<string, number>;
-        time_last_update_utc?: string;
       };
       if (json.result === "success" && json.rates) {
         cache = {
@@ -57,13 +69,10 @@ async function fetchUsdRates(): Promise<{
   try {
     const res = await fetch("https://api.frankfurter.app/latest?from=USD", {
       cache: "no-store",
-      signal: AbortSignal.timeout(8_000),
+      signal: AbortSignal.timeout(3_000),
     });
     if (res.ok) {
-      const json = (await res.json()) as {
-        rates?: Record<string, number>;
-        date?: string;
-      };
+      const json = (await res.json()) as { rates?: Record<string, number> };
       if (json.rates) {
         cache = {
           at: Date.now(),
@@ -77,16 +86,71 @@ async function fetchUsdRates(): Promise<{
     console.error("[fx-frankfurter]", error);
   }
 
-  // Last-resort static mid rates so demo still works offline
-  const fallback = {
-    USD: 1,
-    NGN: 1600,
-    GHS: 15.5,
-    KES: 129,
-    ZAR: 18.2,
-  };
-  cache = { at: Date.now(), rates: fallback, provider: "fallback" };
-  return { rates: fallback, provider: "fallback" };
+  throw new Error("No live FX rates");
+}
+
+function refreshUsdRates() {
+  if (inflight) return inflight;
+  lastRefreshAt = Date.now();
+  inflight = loadUsdRatesFromNetwork()
+    .catch(() => {
+      if (!cache) {
+        cache = {
+          at: Date.now() - CACHE_TTL_MS,
+          rates: FALLBACK_RATES,
+          provider: "fallback",
+        };
+      }
+      return { rates: cache.rates, provider: cache.provider };
+    })
+    .finally(() => {
+      inflight = null;
+    });
+  return inflight;
+}
+
+async function fetchUsdRates(): Promise<{
+  rates: Record<string, number>;
+  provider: string;
+}> {
+  const fresh =
+    cache &&
+    cache.provider !== "fallback" &&
+    Date.now() - cache.at < CACHE_TTL_MS;
+  if (fresh && cache) {
+    return { rates: cache.rates, provider: cache.provider };
+  }
+
+  if (cache && cache.provider !== "fallback") {
+    void refreshUsdRates();
+    return { rates: cache.rates, provider: cache.provider };
+  }
+
+  if (cache?.provider === "fallback" && Date.now() - lastRefreshAt < FX_RETRY_MS) {
+    return { rates: cache.rates, provider: cache.provider };
+  }
+
+  const pending = refreshUsdRates();
+  const cached = rememberedRates();
+  if (cached) return cached;
+
+  try {
+    return await Promise.race([
+      pending,
+      new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error("fx-timeout")), FX_WAIT_MS);
+      }),
+    ]);
+  } catch {
+    const latest = rememberedRates();
+    if (latest) return latest;
+    cache = {
+      at: Date.now() - CACHE_TTL_MS,
+      rates: FALLBACK_RATES,
+      provider: "fallback",
+    };
+    return { rates: FALLBACK_RATES, provider: "fallback" };
+  }
 }
 
 /** How many units of `currency` equal 1 USD (mid-market). */

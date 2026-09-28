@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  keepPreviousData,
   useQuery,
   useQueryClient,
   type UseQueryOptions,
@@ -28,7 +29,9 @@ export function useWallet(options?: WalletQueryOptions) {
   return useQuery({
     queryKey: WALLET_QUERY_KEY,
     queryFn: fetchWallet,
-    staleTime: 20_000,
+    staleTime: 60_000,
+    placeholderData: keepPreviousData,
+    refetchOnWindowFocus: false,
     ...options,
   });
 }

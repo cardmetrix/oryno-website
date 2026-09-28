@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, ChevronDown, Loader2 } from "lucide-react";
@@ -28,18 +28,19 @@ import {
   formatMoneyAmount,
   summarizeCashflow,
 } from "@/lib/history";
-import { type AppTransaction } from "@/lib/transactions";
 import { cn } from "@/lib/utils";
 import { useCountry } from "@/components/providers/country-provider";
 import { useSettlePendingTransactions } from "@/hooks/use-settle-pending-transactions";
+import { useTransactions } from "@/hooks/use-transactions";
 
 type StatementFormat = "pdf" | "xlsx";
 type SheetKind = "month" | "statement" | null;
 
 export default function HistoryPage() {
-  const [items, setItems] = useState<AppTransaction[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const { data, isPending, isError, refetch } = useTransactions();
+  const items = data ?? [];
+  const loading = isPending && items.length === 0;
+  const error = isError && items.length === 0;
   const [monthKey, setMonthKey] = useState("");
   const [category, setCategory] = useState("all");
   const [status, setStatus] = useState("all");
@@ -53,55 +54,23 @@ export default function HistoryPage() {
     return (fromItems || country.currency || "NGN").toUpperCase();
   }, [items, country.currency]);
 
-  const fetchItems = useCallback(async () => {
-    const txRes = await fetch("/api/transactions", { cache: "no-store" });
-    if (!txRes.ok) throw new Error("Failed");
-    const json = (await txRes.json()) as { items: AppTransaction[] };
-    return json.items ?? [];
-  }, []);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(false);
-    try {
-      setItems(await fetchItems());
-      void settlePending().then(async (settled) => {
-        if (
-          settled &&
-          !settled.queued &&
-          (settled.completed ?? 0) +
-            (settled.reversed ?? 0) +
-            (settled.failed ?? 0) >
-            0
-        ) {
-          toast.message("Pending transactions updated", {
-            description:
-              "Older pending withdrawals were completed or returned to your wallet.",
-          });
-          try {
-            setItems(await fetchItems());
-          } catch {
-            /* ignore background refresh errors */
-          }
-        } else if (settled?.queued) {
-          window.setTimeout(() => {
-            void fetchItems()
-              .then(setItems)
-              .catch(() => undefined);
-          }, 15_000);
-        }
-      });
-    } catch {
-      setError(true);
-      setItems([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [fetchItems, settlePending]);
-
   useEffect(() => {
-    void load();
-  }, [load]);
+    void settlePending().then((settled) => {
+      if (
+        settled &&
+        !settled.queued &&
+        (settled.completed ?? 0) +
+          (settled.reversed ?? 0) +
+          (settled.failed ?? 0) >
+          0
+      ) {
+        toast.message("Pending transactions updated", {
+          description:
+            "Older pending withdrawals were completed or returned to your wallet.",
+        });
+      }
+    });
+  }, [settlePending]);
 
   const months = useMemo(() => buildHistoryMonths(items), [items]);
 
@@ -187,7 +156,7 @@ export default function HistoryPage() {
       {loading ? (
         <HistorySkeleton />
       ) : error ? (
-        <HistoryError onRetry={() => void load()} />
+        <HistoryError onRetry={() => void refetch()} />
       ) : (
         <>
           <MotionSection className="grid grid-cols-2 gap-2.5">

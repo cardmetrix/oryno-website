@@ -1,14 +1,12 @@
 import { NextResponse } from "next/server";
-import { desc, eq } from "drizzle-orm";
 import { ensureAppUser } from "@/lib/auth/current-user";
-import { db } from "@/lib/db";
-import { transactions } from "@/lib/db/schema";
 import { getDisplayFx } from "@/lib/display-currency";
 import {
   groupTransactionsByDate,
   toAppTransaction,
 } from "@/lib/transactions";
 import { scheduleUserBackgroundSettle } from "@/lib/wallet/background-settle";
+import { listTransactionRows } from "@/lib/wallet";
 
 export const runtime = "nodejs";
 
@@ -21,14 +19,13 @@ export async function GET() {
 
     scheduleUserBackgroundSettle(user.id, "quick");
 
-    const rows = await db.query.transactions.findMany({
-      where: eq(transactions.userId, user.id),
-      orderBy: [desc(transactions.createdAt)],
-      limit: 100,
-    });
-
-    const displayFx = await getDisplayFx(user.countryCode);
-    const items = rows.map((row) => toAppTransaction(row, displayFx));
+    const [rows, displayFx] = await Promise.all([
+      listTransactionRows(user.id, 100),
+      getDisplayFx(user.countryCode),
+    ]);
+    const items = rows.map((row) =>
+      toAppTransaction({ ...row, metadata: null }, displayFx),
+    );
 
     return NextResponse.json({
       items,

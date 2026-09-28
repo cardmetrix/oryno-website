@@ -240,18 +240,35 @@ export async function listBankAccounts(userId: string) {
     );
 }
 
+/** List columns only — skips transaction metadata JSON, which can be large. */
+export async function listTransactionRows(userId: string, limit = 100) {
+  return db
+    .select({
+      id: transactions.id,
+      type: transactions.type,
+      category: transactions.category,
+      title: transactions.title,
+      subtitle: transactions.subtitle,
+      amount: transactions.amount,
+      currency: transactions.currency,
+      status: transactions.status,
+      balanceAfter: transactions.balanceAfter,
+      externalRef: transactions.externalRef,
+      createdAt: transactions.createdAt,
+    })
+    .from(transactions)
+    .where(eq(transactions.userId, userId))
+    .orderBy(desc(transactions.createdAt))
+    .limit(limit);
+}
+
 export async function recentWalletTransactions(
   userId: string,
   limit = 8,
   fx?: NgnLocalQuote | null,
 ): Promise<AppTransaction[]> {
-  const rows = await db.query.transactions.findMany({
-    where: eq(transactions.userId, userId),
-    orderBy: [desc(transactions.createdAt)],
-    limit,
-  });
-
-  return rows.map((row) => toAppTransaction(row, fx));
+  const rows = await listTransactionRows(userId, limit);
+  return rows.map((row) => toAppTransaction({ ...row, metadata: null }, fx));
 }
 
 function assertHealthy(wallet: WalletRow) {

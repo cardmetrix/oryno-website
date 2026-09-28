@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import {
   ArrowRight,
@@ -21,6 +23,8 @@ import { ServiceActionCard } from "@/components/app/service-action-card";
 import { GiftCardIcon } from "@/components/icons/gift-card-icon";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useWallet } from "@/hooks/use-wallet";
+import { fetchTransactions } from "@/hooks/use-transactions";
+import { TRANSACTIONS_QUERY_KEY } from "@/lib/query-keys";
 import { useProcessingTransactionRefresh } from "@/hooks/use-processing-transaction-refresh";
 import { useSettlePendingTransactions } from "@/hooks/use-settle-pending-transactions";
 import type { AppTransaction } from "@/lib/transactions";
@@ -35,11 +39,21 @@ const quickActions = [
 ];
 
 export function DashboardClient() {
+  const queryClient = useQueryClient();
   const { data, isLoading } = useWallet();
   useSettlePendingTransactions(true);
   useProcessingTransactionRefresh(true);
   const recent = (data?.recent.slice(0, 4) ?? []) as AppTransaction[];
   const loadingTx = isLoading && !data;
+
+  useEffect(() => {
+    if (!data) return;
+    void queryClient.prefetchQuery({
+      queryKey: TRANSACTIONS_QUERY_KEY,
+      queryFn: fetchTransactions,
+      staleTime: 60_000,
+    });
+  }, [data, queryClient]);
 
   return (
     <AppShell>

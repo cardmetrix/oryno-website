@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { WALLET_QUERY_KEY } from "@/lib/query-keys";
+import { WALLET_QUERY_KEY, TRANSACTIONS_QUERY_KEY } from "@/lib/query-keys";
 
 type SettleResult = {
   ok?: boolean;
@@ -38,6 +38,7 @@ export function useSettlePendingTransactions(enabled = true) {
       if (json.queued) {
         window.setTimeout(() => {
           void queryClient.invalidateQueries({ queryKey: WALLET_QUERY_KEY });
+          void queryClient.invalidateQueries({ queryKey: TRANSACTIONS_QUERY_KEY });
         }, 12_000);
         return json;
       }
@@ -46,6 +47,7 @@ export function useSettlePendingTransactions(enabled = true) {
         0
       ) {
         void queryClient.invalidateQueries({ queryKey: WALLET_QUERY_KEY });
+        void queryClient.invalidateQueries({ queryKey: TRANSACTIONS_QUERY_KEY });
       }
       return json;
     } catch (error) {
