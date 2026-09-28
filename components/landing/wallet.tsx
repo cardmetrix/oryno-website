@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ArrowRight, Banknote, Globe2, Wallet } from "lucide-react";
+import { ArrowLeftRight, ArrowRight, Wallet, Zap } from "lucide-react";
 import { fadeUp, stagger } from "./motion";
 import { PhoneFrame } from "./phone-frame";
 
@@ -10,19 +10,19 @@ const steps = [
     icon: Wallet,
     title: "Credit your wallet",
     description:
-      "Funds from completed transactions land in your ORYNO Wallet in local currency.",
+      "Funds from deposits and transactions land in your ORYNO Wallet instantly in local currency.",
   },
   {
-    icon: Globe2,
-    title: "Country-aware routing",
+    icon: ArrowLeftRight,
+    title: "Convert to USD",
     description:
-      "ORYNO detects your country and routes payouts through the right provider automatically.",
+      "Swap seamlessly between your local currency and USD with live, transparent exchange rates.",
   },
   {
-    icon: Banknote,
-    title: "Withdraw locally",
+    icon: Zap,
+    title: "Pay for digital services",
     description:
-      "Send money to local banks or mobile money — or keep it to use other services.",
+      "Use your balance to purchase gift cards, virtual numbers, pay utility bills, and fund services with zero friction.",
   },
 ];
 
@@ -54,8 +54,8 @@ export function WalletSection({ walletSrc }: WalletSectionProps) {
             A wallet built to move with you.
           </motion.h2>
           <motion.p variants={fadeUp} className="section-copy max-w-lg">
-            Keep balances, track history, and withdraw with confidence.
-            Multi-country architecture means expansion never means redesign.
+            Keep local and USD balances, convert with live rates, and pay for all
+            your everyday digital services with complete confidence.
           </motion.p>
 
           <div className="mt-10 space-y-5">
