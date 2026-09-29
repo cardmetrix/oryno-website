@@ -12,8 +12,8 @@ export async function notifyWalletFunded(input: {
 
   await createNotification({
     userId: input.userId,
-    title: "Wallet funded",
-    body: `${input.amountFormatted} received. Ref ${reference}`,
+    title: "Wallet funded successfully",
+    body: `${input.amountFormatted} is now in your wallet.`,
     type: "fund",
     metadata: {
       href: input.href || "/cards",

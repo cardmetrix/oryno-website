@@ -14,8 +14,7 @@ import {
   saveDepositIdentity,
   type DepositIdentityRequired,
 } from "@/lib/flutterwave/deposit-identity";
-import { getServerEgressIp } from "@/lib/flutterwave/egress-ip";
-import { humanizeFlutterwaveSetupError, isFlutterwaveIpWhitelistError } from "@/lib/flutterwave/errors";
+import { publicPaymentError } from "@/lib/flutterwave/errors";
 import { notifyWalletFunded } from "@/lib/notify/fund-events";
 import { createNotification } from "@/lib/notifications-service";
 import {
@@ -531,7 +530,6 @@ export async function getWalletFundOptions(user: typeof users.$inferSelect) {
   let account: DepositAccountDto | null = null;
   let loadError: string | null = null;
   let setupHint: string | null = null;
-  let serverEgressIp: string | null = null;
 
   if (hasLiveAccount) {
     account = toDto(existing);
@@ -552,16 +550,11 @@ export async function getWalletFundOptions(user: typeof users.$inferSelect) {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Could not load deposit account";
-      if (/bvn|nin/i.test(message)) {
+      if (/bvn|nin/i.test(message) && !/flutterwave/i.test(message)) {
         identityRequired = await buildDepositIdentityRequired(user);
       } else {
-        if (isFlutterwaveIpWhitelistError(message)) {
-          serverEgressIp = await getServerEgressIp();
-          loadError = "Payment provider blocked this server (IP whitelist).";
-          setupHint = humanizeFlutterwaveSetupError(message, serverEgressIp);
-        } else {
-          loadError = message;
-        }
+        loadError = publicPaymentError(message);
+        setupHint = null;
       }
     }
   }
@@ -582,7 +575,6 @@ export async function getWalletFundOptions(user: typeof users.$inferSelect) {
     identityRequired,
     error: loadError,
     setupHint,
-    serverEgressIp,
     demoMode,
     paymentOptions: flutterwavePaymentOptions(countryCode),
   };

@@ -577,6 +577,20 @@ export async function creditUsdWalletFromFunding(input: {
     console.error("[usd-fund-revenue]", revenueError);
   }
 
+  try {
+    const { notifyWalletFunded } = await import("@/lib/notify/fund-events");
+    await notifyWalletFunded({
+      userId: input.userId,
+      amountFormatted: formatMoney(usdAmount, "USD"),
+      reference: input.reference,
+      transactionId: result.transactionId,
+      fundingId: funding.id,
+      href: "/cards",
+    });
+  } catch (notifyError) {
+    console.error("[usd-fund-notify]", notifyError);
+  }
+
   return {
     duplicated: false as const,
     transactionId: result.transactionId,

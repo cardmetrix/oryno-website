@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
 import { ensureWalletSchema } from "@/lib/db/ensure-schema";
+import { publicPaymentError } from "@/lib/flutterwave/errors";
 import { reconcileUserDeposits } from "@/lib/flutterwave/reconcile-deposits";
 import { ensurePrimaryWallet, toWalletSummary } from "@/lib/wallet";
 
@@ -18,7 +19,7 @@ export async function POST() {
     const result = await reconcileUserDeposits(user.id);
     if (!result.ok) {
       return NextResponse.json(
-        { error: result.error, credited: 0, checked: 0 },
+        { error: publicPaymentError(result.error), credited: 0, checked: 0 },
         { status: 400 },
       );
     }
@@ -45,10 +46,11 @@ export async function POST() {
     console.error("[deposit-reconcile]", error);
     return NextResponse.json(
       {
-        error:
+        error: publicPaymentError(
           error instanceof Error
             ? error.message
             : "Could not check for new deposits",
+        ),
       },
       { status: 500 },
     );

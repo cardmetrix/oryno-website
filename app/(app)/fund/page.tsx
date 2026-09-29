@@ -20,6 +20,7 @@ import { AuthField, authInputClassName } from "@/components/auth/auth-field";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useWallet } from "@/hooks/use-wallet";
 import type { WalletSummary } from "@/lib/wallet-types";
+import { publicPaymentError } from "@/lib/flutterwave/errors";
 import { cn } from "@/lib/utils";
 
 type DepositAccount = {
@@ -189,7 +190,10 @@ function FundPageContent() {
   const applyOptions = useCallback((json: FundOptions) => {
     setDeposit(json.account ?? null);
     setIdentityRequired(json.identityRequired ?? null);
-    setSetupHint(json.setupHint ?? null);
+    const hint = json.setupHint?.trim() || null;
+    setSetupHint(
+      hint && publicPaymentError(hint) === "Service unavailable" ? null : hint,
+    );
     setCheckoutAvailable(Boolean(json.checkoutAvailable));
     if (json.currency) setCurrency(json.currency);
     if (json.countryCode) setCountryCode(json.countryCode);
@@ -219,9 +223,11 @@ function FundPageContent() {
         Boolean(json.checkoutAvailable);
 
       if (!depositRes.ok && !hasPath) {
-        setError(json.error || "Could not load funding options");
+        setError(
+          publicPaymentError(json.error || "Could not load funding options"),
+        );
       } else if (!hasPath && json.error) {
-        setError(json.error);
+        setError(publicPaymentError(json.error));
       }
     } catch {
       setError("Could not load funding options");
@@ -265,7 +271,7 @@ function FundPageContent() {
         };
         if (!res.ok) throw new Error(json.error || "Could not verify payment");
         if (cancelled) return;
-        toast.success("Wallet funded", {
+        toast.success("Wallet funded successfully", {
           description: json.amountFormatted,
         });
         await refetchWallet();
@@ -277,12 +283,11 @@ function FundPageContent() {
         );
       } catch (err) {
         if (cancelled) return;
-        setError(
+        const message = publicPaymentError(
           err instanceof Error ? err.message : "Payment verification failed",
         );
-        toast.error(
-          err instanceof Error ? err.message : "Payment verification failed",
-        );
+        setError(message);
+        toast.error(message);
         router.replace("/fund");
       } finally {
         if (!cancelled) setVerifying(false);
@@ -312,7 +317,7 @@ function FundPageContent() {
     setError(null);
     toast.message("Checking for your transfer", {
       description:
-        "We’re matching your bank payment with Flutterwave. This can take a few minutes.",
+        "We’re matching your bank payment. This can take a few minutes.",
     });
     try {
       const res = await fetch("/api/wallet/deposit-account/reconcile", {
@@ -335,8 +340,9 @@ function FundPageContent() {
           });
         }
       } else if (json.error) {
-        setError(json.error);
-        toast.error(json.error);
+        const message = publicPaymentError(json.error);
+        setError(message);
+        toast.error(message);
       }
     } catch {
       toast.error("Could not check for your deposit");
@@ -371,7 +377,11 @@ function FundPageContent() {
         return;
       }
 
-      setError(json.error || "Could not create your fund account. Try again.");
+      setError(
+        publicPaymentError(
+          json.error || "Could not create your fund account. Try again.",
+        ),
+      );
     } catch {
       setError("Could not save your details. Try again.");
     } finally {
@@ -433,7 +443,11 @@ function FundPageContent() {
       }
       window.location.href = json.authorizationUrl;
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not start payment");
+      setError(
+        publicPaymentError(
+          err instanceof Error ? err.message : "Could not start payment",
+        ),
+      );
       setConfirming(false);
       setPaying(false);
     }
@@ -581,7 +595,7 @@ function FundPageContent() {
                     />
                   ) : null}
                   <p className="pt-1 text-xs leading-relaxed text-muted-foreground">
-                    You’ll complete payment securely on Flutterwave. Funds land
+                    You’ll complete payment securely. Funds land
                     in your local ({currency}) wallet 1:1 after confirmation.
                   </p>
                 </div>

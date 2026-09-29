@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeftRight, Loader2, Plus, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
+import { publicPaymentError } from "@/lib/flutterwave/errors";
 import type { WalletSummary } from "@/lib/wallet-types";
 import { cn } from "@/lib/utils";
 
@@ -313,14 +314,16 @@ export function UsdWalletActionsPanel({
         return;
       }
 
-      toast.success("USD wallet funded", {
+      toast.success("Wallet funded successfully", {
         description: json.usdFormatted ?? `$${amount} credited`,
       });
       onPanelChange("fund");
       onUpdated?.();
       if (json.transactionId) router.push(`/history/${json.transactionId}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Funding failed");
+      setError(
+        publicPaymentError(err instanceof Error ? err.message : "Funding failed"),
+      );
     } finally {
       setBusy(false);
     }

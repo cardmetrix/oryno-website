@@ -30,6 +30,35 @@ export function humanizeFlutterwaveSetupError(
   return flutterwaveIpWhitelistSetupHint(egressIp);
 }
 
+export const SERVICE_UNAVAILABLE_MESSAGE = "Service unavailable";
+
+/** Customer-facing copy. Raw Flutterwave / proxy text stays in server logs only. */
+export function isHiddenProviderError(message?: string | null) {
+  if (!message) return false;
+  const value = message.toLowerCase();
+  return (
+    value.includes("flutterwave") ||
+    value.includes("flw_") ||
+    isFlutterwaveIpWhitelistError(message) ||
+    isFixieQuotaError(message) ||
+    value.includes("proxy request failed") ||
+    value.includes("secret key") ||
+    value.includes("secret_key") ||
+    value.includes("flutterwave_https_proxy") ||
+    value.includes("payment provider blocked")
+  );
+}
+
+export function publicPaymentError(
+  message?: string | null,
+  fallback = SERVICE_UNAVAILABLE_MESSAGE,
+) {
+  const text = (message || "").trim();
+  if (!text) return fallback;
+  if (isHiddenProviderError(text)) return SERVICE_UNAVAILABLE_MESSAGE;
+  return text;
+}
+
 export const WITHDRAWAL_UNAVAILABLE_MESSAGE =
   "Withdrawal unavailable right now. Please try again shortly. Your money was returned to your ORYNO wallet.";
 

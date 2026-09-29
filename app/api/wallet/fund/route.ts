@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
+import { publicPaymentError } from "@/lib/flutterwave/errors";
 import { notifyWalletFunded } from "@/lib/notify/fund-events";
 import { formatMoney } from "@/lib/transactions";
 import {
@@ -75,8 +76,9 @@ export async function POST(req: Request) {
       reference: result.funding.externalRef,
     });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to fund wallet";
+    const message = publicPaymentError(
+      error instanceof Error ? error.message : "Failed to fund wallet",
+    );
     console.error("[wallet-fund]", error);
     return NextResponse.json({ error: message }, { status: 400 });
   }

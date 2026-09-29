@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { ensureAppUser } from "@/lib/auth/current-user";
+import { publicPaymentError } from "@/lib/flutterwave/errors";
 import { verifyLocalWalletFund } from "@/lib/flutterwave/local-fund";
 
 export const runtime = "nodejs";
@@ -37,8 +38,9 @@ export async function POST(req: Request) {
     console.error("[wallet-fund-verify]", error);
     return NextResponse.json(
       {
-        error:
+        error: publicPaymentError(
           error instanceof Error ? error.message : "Failed to verify payment",
+        ),
       },
       { status: 400 },
     );

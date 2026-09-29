@@ -6,6 +6,7 @@ import {
   saveDepositIdentity,
 } from "@/lib/flutterwave/deposit-accounts";
 import { IdentityConflictError } from "@/lib/flutterwave/deposit-identity";
+import { publicPaymentError } from "@/lib/flutterwave/errors";
 
 export const runtime = "nodejs";
 
@@ -36,10 +37,11 @@ export async function GET() {
     console.error("[deposit-account-get]", error);
     return NextResponse.json(
       {
-        error:
+        error: publicPaymentError(
           error instanceof Error
             ? error.message
             : "Failed to load deposit account",
+        ),
       },
       { status: 500 },
     );
@@ -95,10 +97,11 @@ export async function POST(req: Request) {
     }
     return NextResponse.json(
       {
-        error:
+        error: publicPaymentError(
           error instanceof Error
             ? error.message
             : "Failed to create deposit account",
+        ),
       },
       { status: 500 },
     );

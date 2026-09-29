@@ -5,6 +5,7 @@ import {
   convertWalletCurrency,
   initiateUsdWalletFund,
 } from "@/lib/wallet-usd";
+import { publicPaymentError } from "@/lib/flutterwave/errors";
 import { formatMoney } from "@/lib/transactions";
 
 export const runtime = "nodejs";
@@ -91,8 +92,9 @@ export async function POST(req: Request) {
     console.error("[wallet-usd-fund]", error);
     return NextResponse.json(
       {
-        error:
+        error: publicPaymentError(
           error instanceof Error ? error.message : "Failed to fund USD wallet",
+        ),
       },
       { status: 400 },
     );
