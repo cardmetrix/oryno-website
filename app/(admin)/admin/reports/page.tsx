@@ -23,7 +23,20 @@ export default function AdminReportsPage() {
     useAdminQuery<Response>("/api/admin/reports");
 
   const series = data?.series?.slice(-14) || [];
-  const max = Math.max(1, ...series.map((s) => s.total));
+  const max = Math.max(
+    1,
+    ...series.map((s) => {
+      const total = Number(s.total);
+      return Number.isFinite(total) ? total : 0;
+    }),
+  );
+  const barMaxPx = 168;
+
+  function barHeight(total: number) {
+    const value = Number(total);
+    if (!Number.isFinite(value) || value <= 0) return 6;
+    return Math.max(8, Math.round((value / max) * barMaxPx));
+  }
 
   function exportCsv() {
     if (!data) return;
@@ -106,34 +119,29 @@ export default function AdminReportsPage() {
               <AdminEmptyBlock message="No transactions in the last 30 days." />
             ) : (
               <div className="-mx-1 overflow-x-auto px-1 pb-1">
-                <div className="flex h-52 min-w-[420px] items-end gap-2 sm:min-w-0 sm:gap-3">
-                  {series.map((item, index) => (
-                    <div
-                      key={item.day}
-                      className="flex min-w-0 flex-1 flex-col items-center gap-2"
-                      title={`${item.day}: ${item.total}`}
-                    >
-                      <motion.div
-                        initial={{ height: 0 }}
-                        animate={{
-                          height: `${Math.max(6, (item.total / max) * 100)}%`,
-                        }}
-                        transition={{
-                          delay: 0.1 + index * 0.03,
-                          duration: 0.45,
-                        }}
-                        className="w-full max-w-10 rounded-t-[10px] bg-gradient-to-t from-oryno-orange to-oryno-orange-soft"
-                      />
-                      <span className="text-[10px] font-medium text-muted-foreground">
-                        <span className="sm:hidden">
-                          {item.day.slice(8)}
+                <div className="flex h-56 min-w-[420px] items-end gap-2 sm:min-w-0 sm:gap-3">
+                  {series.map((item) => {
+                    const day = String(item.day || "");
+                    const height = barHeight(item.total);
+                    return (
+                      <div
+                        key={day || item.total}
+                        className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-2"
+                        title={`${day}: ${Number(item.total).toLocaleString()} · ${item.count} transactions`}
+                      >
+                        <div className="flex w-full flex-1 items-end justify-center">
+                          <div
+                            className="w-full max-w-10 rounded-t-[10px] bg-gradient-to-t from-oryno-orange to-oryno-orange-soft"
+                            style={{ height }}
+                          />
+                        </div>
+                        <span className="shrink-0 text-[10px] font-medium text-muted-foreground">
+                          <span className="sm:hidden">{day.slice(8)}</span>
+                          <span className="hidden sm:inline">{day.slice(5)}</span>
                         </span>
-                        <span className="hidden sm:inline">
-                          {item.day.slice(5)}
-                        </span>
-                      </span>
-                    </div>
-                  ))}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}

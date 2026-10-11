@@ -63,8 +63,6 @@ export function DashboardClient() {
         <MotionSection className="min-w-0">
           <DashboardWalletCarousel />
         </MotionSection>
-
-        <AdCarousel />
       </div>
 
       <MotionSection className="mt-2">
@@ -98,7 +96,7 @@ export function DashboardClient() {
           </MotionSection>
         </div>
       </MotionSection>
-
+      <AdCarousel />
       <MotionSection className="mt-2 rounded-[28px] border border-border/80 bg-background/90 p-5 shadow-[var(--shadow-soft)] backdrop-blur-sm sm:p-6">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-base font-semibold text-foreground">
