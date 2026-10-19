@@ -65,7 +65,7 @@ export function DashboardClient() {
         </MotionSection>
       </div>
 
-      <MotionSection className="mt-2">
+      <MotionSection className="mt-2 mb-2">
         <div className="space-y-4 sm:space-y-5">
           <MotionSection className="rounded-[20px] border border-border/80 bg-background/90 p-3.5 shadow-[var(--shadow-soft)] backdrop-blur-sm sm:rounded-[22px] sm:p-4">
             <div className="mb-2.5 flex items-center justify-between">
